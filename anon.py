@@ -166,13 +166,13 @@ def get_presidio_engines(trf_model_config, ner_model_config):
 
 def batch_process_text(texts, analyzer_engine, anonymizer_engine, batch_size=32):
     results = []
+    # Remove MedicalLicense detection
+    analyzer_engine.registry.remove_recognizer("MedicalLicenseRecognizer")
+
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
         # Convert to strings and handle NaN values
         batch = [str(text) if pd.notna(text) else "" for text in batch]
-
-        # Remove MedicalLicense detection
-        analyzer_engine.registry.remove_recognizer("MedicalLicenseRecognizer")
 
         # Run analysis in parallel on the batch without DATE_TIME detection
         analyzer_results = [
