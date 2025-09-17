@@ -354,12 +354,14 @@ def main() -> None:
             data_parts.append(para.text)
             for run in para.runs:
                 for inline in run._r.xpath(".//w:drawing"):
-                    for rel in doc.part.rels.values():
-                        if "image" in rel.target_ref and rel.rId in inline.xpath(".//a:blip/@r:embed")[0]:
-                            image_bytes = rel.target_part.blob
-                            images_to_process.append(image_bytes)
-                            # Add a placeholder for the image text
-                            data_parts.append("__IMAGE_PLACEHOLDER__")
+                    blip_embeds = inline.xpath(".//a:blip/@r:embed")
+                    if blip_embeds:
+                        for rel in doc.part.rels.values():
+                            if "image" in rel.target_ref and rel.rId in blip_embeds[0]:
+                                image_bytes = rel.target_part.blob
+                                images_to_process.append(image_bytes)
+                                # Add a placeholder for the image text
+                                data_parts.append("__IMAGE_PLACEHOLDER__")
         
         with concurrent.futures.ThreadPoolExecutor() as executor:
             image_texts = list(executor.map(extract_text_from_image, images_to_process))
