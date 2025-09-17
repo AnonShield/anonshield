@@ -427,7 +427,7 @@ def main() -> None:
         )
         anonymizer_results = anonymizer_engine.anonymize(
             text=data,
-            analyzer_results=analyzer_results, #type: ignore
+            analyzer_results=analyzer_results,
             operators={
                 "DEFAULT": OperatorConfig("custom_slug"),
             },
