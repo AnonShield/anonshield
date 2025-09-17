@@ -305,7 +305,6 @@ def models_check():
         print("[!] Baixando Spacy...")
         subprocess.run([sys.executable, "-m", "spacy", "download", "pt_core_news_lg"], check=True)
         print("[+] Spacy baixado com sucesso.")
-        print("[+] Spacy baixado com sucesso.")
     # Check Transformer
     if not os.path.exists(TRF_MODEL_PATH):
         print("[!] Baixando Transformer...")
