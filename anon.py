@@ -270,7 +270,7 @@ def write_file(anonymizer_results: EngineResult | pd.DataFrame, file_path: str) 
 
     if isinstance(anonymizer_results, pd.DataFrame):
         output_file = os.path.join("output", f"anon_{base_name}_{ext[1:]}.csv")
-        anonymizer_results.to_csv(output_file, index=False, encoding="utf-8", header=False)
+        anonymizer_results.to_csv(output_file, index=False, encoding="utf-8")
     else:
         output_file = os.path.join("output", f"anon_{base_name}_{ext[1:]}.txt")
         with open(output_file, "w", encoding="utf-8") as f:
