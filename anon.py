@@ -17,12 +17,13 @@ import pandas as pd
 import pytesseract
 import spacy
 import spacy.cli
-from PIL import Image, ImageDraw
 from docx import Document
 from huggingface_hub import snapshot_download
+from PIL import Image, ImageDraw
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
 from presidio_analyzer.nlp_engine import NerModelConfiguration, TransformersNlpEngine
 from presidio_anonymizer import AnonymizerEngine, EngineResult, OperatorConfig
+from presidio_anonymizer.entities import RecognizerResult as AnonymizerRecognizerResult
 from presidio_anonymizer.operators import Operator, OperatorType
 from transformers import AutoModelForTokenClassification, AutoTokenizer
 
@@ -303,7 +304,9 @@ def models_check():
     # Check Spacy
     if not spacy.util.is_package("pt_core_news_lg"):
         print("[!] Baixando Spacy...")
-        subprocess.run([sys.executable, "-m", "spacy", "download", "pt_core_news_lg"], check=True)
+        subprocess.run(
+            [sys.executable, "-m", "spacy", "download", "pt_core_news_lg"], check=True
+        )
         print("[+] Spacy baixado com sucesso.")
     # Check Transformer
     if not os.path.exists(TRF_MODEL_PATH):
@@ -362,13 +365,18 @@ def main() -> None:
                                 images_to_process.append(image_bytes)
                                 # Add a placeholder for the image text
                                 data_parts.append("__IMAGE_PLACEHOLDER__")
-        
+
         with concurrent.futures.ThreadPoolExecutor() as executor:
             image_texts = list(executor.map(extract_text_from_image, images_to_process))
 
         # Replace placeholders with image text
         image_text_iter = iter(image_texts)
-        data = "\n".join([part if part != "__IMAGE_PLACEHOLDER__" else next(image_text_iter) for part in data_parts])
+        data = "\n".join(
+            [
+                part if part != "__IMAGE_PLACEHOLDER__" else next(image_text_iter)
+                for part in data_parts
+            ]
+        )
 
     elif ext == ".xlsx":
         wb = openpyxl.load_workbook(file_path)
@@ -376,16 +384,27 @@ def main() -> None:
 
         for sheetname in wb.sheetnames:
             sheet = wb[sheetname]
-            for image in sheet._images: # type: ignore
+            for image in sheet._images:  # type: ignore
                 row = image.anchor._from.row
                 col = image.anchor._from.col
-                images_to_process.append((sheetname, row, col, image._data(), analyzer_engine, anonymizer_engine))
+                images_to_process.append(
+                    (
+                        sheetname,
+                        row,
+                        col,
+                        image._data(),
+                        analyzer_engine,
+                        anonymizer_engine,
+                    )
+                )
 
         def process_image(args):
             sheetname, row, col, image_bytes, analyzer, anonymizer = args
             text = extract_text_from_image(image_bytes).strip()
             analyzer_results = analyzer.analyze(text=text, language="pt")
-            anonymized_text = anonymizer.anonymize(text=text, analyzer_results=analyzer_results).text
+            anonymized_text = anonymizer.anonymize(
+                text=text, analyzer_results=analyzer_results
+            ).text
             return sheetname, row, col, anonymized_text
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -401,7 +420,7 @@ def main() -> None:
                 while col >= len(df.columns):
                     df[len(df.columns)] = ""
                 df.at[row, col] = text
-        
+
         data = list(df_dict.values())[0]
 
     else:
@@ -425,9 +444,19 @@ def main() -> None:
             allow_list=ALLOW_LIST,
             entities=entities_without_date,
         )
+        # Convert to anonymizer's RecognizerResult
+        converted_analyzer_results = [
+            AnonymizerRecognizerResult(
+                entity_type=result.entity_type,
+                start=result.start,
+                end=result.end,
+                score=result.score,
+            )
+            for result in analyzer_results
+        ]
         anonymizer_results = anonymizer_engine.anonymize(
             text=data,
-            analyzer_results=analyzer_results,
+            analyzer_results=converted_analyzer_results,
             operators={
                 "DEFAULT": OperatorConfig("custom_slug"),
             },
