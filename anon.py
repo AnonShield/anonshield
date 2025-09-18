@@ -1,22 +1,29 @@
 #! /usr/bin/env python
 
+import concurrent.futures
 import datetime
 import hashlib
+import io
 import os
 import sqlite3
+import subprocess
 import sys
 import time
 import warnings
 
 import numpy as np
+import openpyxl
 import pandas as pd
+import pytesseract
 import spacy
 import spacy.cli
 from docx import Document
 from huggingface_hub import snapshot_download
+from PIL import Image, ImageDraw
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
 from presidio_analyzer.nlp_engine import NerModelConfiguration, TransformersNlpEngine
 from presidio_anonymizer import AnonymizerEngine, EngineResult, OperatorConfig
+from presidio_anonymizer.entities import RecognizerResult as AnonymizerRecognizerResult
 from presidio_anonymizer.operators import Operator, OperatorType
 from transformers import AutoModelForTokenClassification, AutoTokenizer
 
@@ -95,15 +102,15 @@ def save_entity(
 
 class CustomSlugAnonymizer(Operator):
     # Strip before hashing to guarantee uniqueness
-    def operate(self, text: str, params: dict = None) -> str:
+    def operate(self, text: str, params: dict | None = None) -> str:
         clean_text = " ".join(text.split()).strip()
         full_hash = hashlib.sha256(clean_text.encode()).hexdigest()
         slug = full_hash[:10]
-        entity_type = params.get("entity_type", "UNKNOWN")
+        entity_type = params.get("entity_type", "UNKNOWN") if params else "UNKNOWN"
         save_entity(DB_PATH, entity_type, clean_text, slug, full_hash)
         return f"[{entity_type}_{slug}]"
 
-    def validate(self, params: dict = None) -> None:
+    def validate(self, params: dict | None = None) -> None:
         pass
 
     def operator_name(self) -> str:
@@ -111,6 +118,23 @@ class CustomSlugAnonymizer(Operator):
 
     def operator_type(self) -> OperatorType:
         return OperatorType.Anonymize
+
+
+def tesseract_check():
+    try:
+        pytesseract.get_tesseract_version()
+    except pytesseract.TesseractNotFoundError:
+        print("[!] Tesseract is not installed or not in your PATH. Please install it.")
+        sys.exit(1)
+
+
+def extract_text_from_image(
+    image_bytes: bytes,
+) -> str:
+    img = Image.open(io.BytesIO(image_bytes))
+    # Get OCR data
+    text = pytesseract.image_to_string(img)
+    return text
 
 
 def transformer_model_config():
@@ -226,22 +250,14 @@ def anonymize_dataframe(
 
 
 def read_file(file_path) -> str | pd.DataFrame:
-    if len(sys.argv) != 2:
-        print("[!] Uso: uv run anon.py <arquivo>")
-        sys.exit(1)
-
     ext = os.path.splitext(file_path)[1].lower()
     if ext == ".txt":
         with open(file_path, "r", encoding="utf-8") as f:
             return f.read()
-    elif ext == ".docx":
-        doc = Document(file_path)
-        paragraphs = [para.text for para in doc.paragraphs]
-        return "\n".join(paragraphs)
+    elif ext in (".docx", ".xlsx"):
+        return file_path  # Return the path for now
     elif ext == ".csv":
         return pd.read_csv(file_path, dtype=str)
-    elif ext == ".xlsx":
-        return pd.read_excel(file_path, dtype=str)
     elif ext == ".xml":
         return pd.read_xml(file_path, dtype=str)
     else:
@@ -285,11 +301,12 @@ def write_report(file_path: str, start_time: float, data: str | pd.DataFrame) ->
 
 def models_check():
     # Check if folder exists, create if not
-    os.makedirs("models", exist_ok=True)
     # Check Spacy
     if not spacy.util.is_package("pt_core_news_lg"):
         print("[!] Baixando Spacy...")
-        spacy.cli.download("pt_core_news_lg")
+        subprocess.run(
+            [sys.executable, "-m", "spacy", "download", "pt_core_news_lg"], check=True
+        )
         print("[+] Spacy baixado com sucesso.")
     # Check Transformer
     if not os.path.exists(TRF_MODEL_PATH):
@@ -308,6 +325,9 @@ def main() -> None:
         print("[!] Uso: uv run anon.py <arquivo>")
         sys.exit(1)
 
+    # Check for tesseract
+    tesseract_check()
+
     # Check if the models are present
     models_check()
 
@@ -316,7 +336,6 @@ def main() -> None:
 
     # Read the file
     file_path = sys.argv[1]
-    data = read_file(file_path=file_path)
 
     # Let the user know what's going on
     print(f"[+] Processando arquivo {file_path}...")
@@ -326,6 +345,86 @@ def main() -> None:
     analyzer_engine, anonymizer_engine = get_presidio_engines(
         trf_model_config, ner_model_config
     )
+
+    # Process text and images
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext == ".docx":
+        doc = Document(file_path)
+        data_parts = []
+        images_to_process = []
+
+        for para in doc.paragraphs:
+            data_parts.append(para.text)
+            for run in para.runs:
+                for inline in run._r.xpath(".//w:drawing"):
+                    blip_embeds = inline.xpath(".//a:blip/@r:embed")
+                    if blip_embeds:
+                        for rel in doc.part.rels.values():
+                            if "image" in rel.target_ref and rel.rId in blip_embeds[0]:
+                                image_bytes = rel.target_part.blob
+                                images_to_process.append(image_bytes)
+                                # Add a placeholder for the image text
+                                data_parts.append("__IMAGE_PLACEHOLDER__")
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            image_texts = list(executor.map(extract_text_from_image, images_to_process))
+
+        # Replace placeholders with image text
+        image_text_iter = iter(image_texts)
+        data = "\n".join(
+            [
+                part if part != "__IMAGE_PLACEHOLDER__" else next(image_text_iter)
+                for part in data_parts
+            ]
+        )
+
+    elif ext == ".xlsx":
+        wb = openpyxl.load_workbook(file_path)
+        images_to_process = []
+
+        for sheetname in wb.sheetnames:
+            sheet = wb[sheetname]
+            for image in sheet._images:  # type: ignore
+                row = image.anchor._from.row
+                col = image.anchor._from.col
+                images_to_process.append(
+                    (
+                        sheetname,
+                        row,
+                        col,
+                        image._data(),
+                        analyzer_engine,
+                        anonymizer_engine,
+                    )
+                )
+
+        def process_image(args):
+            sheetname, row, col, image_bytes, analyzer, anonymizer = args
+            text = extract_text_from_image(image_bytes).strip()
+            analyzer_results = analyzer.analyze(text=text, language="pt")
+            anonymized_text = anonymizer.anonymize(
+                text=text, analyzer_results=analyzer_results
+            ).text
+            return sheetname, row, col, anonymized_text
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            results = list(executor.map(process_image, images_to_process))
+
+        # Read all sheets into a dictionary of dataframes
+        df_dict = pd.read_excel(file_path, sheet_name=None, dtype=str, header=None)
+
+        for sheetname, row, col, text in results:
+            if sheetname in df_dict:
+                df = df_dict[sheetname]
+                # Ensure column exists
+                while col >= len(df.columns):
+                    df[len(df.columns)] = ""
+                df.at[row, col] = text
+
+        data = list(df_dict.values())[0]
+
+    else:
+        data = read_file(file_path=file_path)
 
     # Analysis and Anonymization
     if isinstance(data, pd.DataFrame):
@@ -345,9 +444,19 @@ def main() -> None:
             allow_list=ALLOW_LIST,
             entities=entities_without_date,
         )
+        # Convert to anonymizer's RecognizerResult
+        converted_analyzer_results = [
+            AnonymizerRecognizerResult(
+                entity_type=result.entity_type,
+                start=result.start,
+                end=result.end,
+                score=result.score,
+            )
+            for result in analyzer_results
+        ]
         anonymizer_results = anonymizer_engine.anonymize(
             text=data,
-            analyzer_results=analyzer_results,
+            analyzer_results=converted_analyzer_results,
             operators={
                 "DEFAULT": OperatorConfig("custom_slug"),
             },
