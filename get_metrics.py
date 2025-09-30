@@ -21,19 +21,19 @@ def parse_report(file_path):
         content = f.read()
 
     num_lines = 0
-    time_spent = 0.0
+    time_elapsed = 0.0
 
     for line in content.splitlines():
-        if line.startswith("Número de linhas processadas:"):
+        if line.startswith("Number of processed rows:"):
             match = re.search(r"\d+", line)
             if match:
                 num_lines = int(match.group())
-        elif line.startswith("Tempo total gasto:"):
+        elif line.startswith("Total elapsed time:"):
             match = re.search(r"[\d.]+", line)
             if match:
-                time_spent = float(match.group())
+                time_elapsed = float(match.group())
 
-    return num_lines, time_spent
+    return num_lines, time_elapsed
 
 
 def aggregate_reports(log_folder):
@@ -45,8 +45,8 @@ def aggregate_reports(log_folder):
     data = []
 
     for file in report_files:
-        num_lines, time_spent = parse_report(file)
-        data.append((num_lines, time_spent))
+        num_lines, time_elapsed = parse_report(file)
+        data.append((num_lines, time_elapsed))
 
     # Caso não haja relatórios
     if not data:
@@ -55,14 +55,14 @@ def aggregate_reports(log_folder):
     linhas, tempos = zip(*data)
 
     stats = {
-        "total_arquivos": len(data),
-        "total_linhas": sum(linhas),
-        "média_linhas": np.mean(linhas),
-        "desvio_linhas": np.std(linhas),
-        "média_tempo": np.mean(tempos),
-        "desvio_tempo": np.std(tempos),
-        "tempo_total": sum(tempos),
-        "correlação": np.corrcoef(linhas, tempos)[0, 1] if len(data) > 1 else None,
+        "total_files": len(data),
+        "total_rows": sum(linhas),
+        "avg_rows": np.mean(linhas),
+        "std_rows": np.std(linhas),
+        "avg_time": np.mean(tempos),
+        "std_time": np.std(tempos),
+        "total_time": sum(tempos),
+        "correlation": np.corrcoef(linhas, tempos)[0, 1] if len(data) > 1 else None,
     }
 
     return stats
@@ -73,17 +73,17 @@ if __name__ == "__main__":
     stats = aggregate_reports(log_folder)
 
     if stats:
-        print("=== Estatísticas Gerais ===")
-        print(f"Arquivos processados: {stats['total_arquivos']}")
-        print(f"Total de linhas processadas: {stats['total_linhas']}")
+        print("=== General Statistics ===")
+        print(f"Processed files: {stats['total_files']}")
+        print(f"Total processed rows: {stats['total_rows']}")
         print(
-            f"Média de linhas por arquivo: {stats['média_linhas']:.2f} ± {stats['desvio_linhas']:.2f}"
+            f"Average rows per file: {stats['avg_rows']:.2f} ± {stats['std_rows']:.2f}"
         )
-        print(f"Tempo total gasto: {stats['tempo_total']:.2f} segundos")
+        print(f"Total elapsed time: {stats['total_time']:.2f} seconds")
         print(
-            f"Média de tempo por arquivo: {stats['média_tempo']:.2f} ± {stats['desvio_tempo']:.2f} segundos"
+            f"Average time per file: {stats['avg_time']:.2f} ± {stats['std_time']:.2f} seconds"
         )
-        if stats["correlação"] is not None:
+        if stats["correlation"] is not None:
             print(
-                f"Correlação de Pearson entre linhas processadas e tempo gasto: {stats['correlação']:.3f}"
+                f"Pearson correlation between processed rows and elapsed time: {stats['correlation']:.3f}"
             )

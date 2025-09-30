@@ -261,7 +261,7 @@ def read_file(file_path) -> str | pd.DataFrame:
     elif ext == ".xml":
         return pd.read_xml(file_path, dtype=str)
     else:
-        raise ValueError(f"Formato {ext} não suportado")
+        raise ValueError(f"{ext} file format not supported")
 
 
 def write_file(anonymizer_results: EngineResult | pd.DataFrame, file_path: str) -> None:
@@ -277,7 +277,7 @@ def write_file(anonymizer_results: EngineResult | pd.DataFrame, file_path: str) 
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(anonymizer_results.text)
 
-    print(f"Arquivo anonimizado salvo em: {output_file}")
+    print(f"Anonymized file saved at: {output_file}")
 
 
 def write_report(file_path: str, start_time: float, data: str | pd.DataFrame) -> None:
@@ -289,40 +289,40 @@ def write_report(file_path: str, start_time: float, data: str | pd.DataFrame) ->
     base_name, ext = os.path.splitext(os.path.basename(file_path))
     report_file = os.path.join("logs", f"report_{base_name}_{ext[1:]}.txt")
     with open(report_file, "w", encoding="utf-8") as report:
-        report.write(f"Arquivo processado: {file_path}\n")
+        report.write(f"Processed file: {file_path}\n")
         if isinstance(data, pd.DataFrame):
-            report.write(f"Número de linhas processadas: {len(data)}\n")
+            report.write(f"Number of processed rows: {len(data)}\n")
         else:
             # Textual files count as 1 ticket
-            report.write("Número de linhas processadas: 1\n")
-        report.write(f"Tempo total gasto: {elapsed_time:.2f} segundos\n")
-    print(f"Relatório salvo em: {report_file}")
+            report.write(f"Number of processed rows: 1\n")
+        report.write(f"Total elapsed time: {elapsed_time:.2f} seconds\n")
+    print(f"Report saved at: {report_file}")
 
 
 def models_check():
     # Check if folder exists, create if not
     # Check Spacy
     if not spacy.util.is_package("pt_core_news_lg"):
-        print("[!] Baixando Spacy...")
+        print("[!] Downloading Spacy...")
         subprocess.run(
             [sys.executable, "-m", "spacy", "download", "pt_core_news_lg"], check=True
         )
-        print("[+] Spacy baixado com sucesso.")
+        print("[+] Spacy downloaded successfully")
     # Check Transformer
     if not os.path.exists(TRF_MODEL_PATH):
-        print("[!] Baixando Transformer...")
+        print("[!] Downloading Transformer...")
         snapshot_download(
             repo_id=TRANSFORMER_MODEL,
             cache_dir=TRF_MODEL_PATH,
             max_workers=10,
         )
-        print("[+] Transformer baixado com sucesso.")
+        print("[+] Transformer downloaded successfully")
 
 
 def main() -> None:
     # Check if called with a file argument
     if len(sys.argv) != 2:
-        print("[!] Uso: uv run anon.py <arquivo>")
+        print("[!] Usage: uv run anon.py <file_path>") 
         sys.exit(1)
 
     # Check for tesseract
@@ -338,7 +338,7 @@ def main() -> None:
     file_path = sys.argv[1]
 
     # Let the user know what's going on
-    print(f"[+] Processando arquivo {file_path}...")
+    print(f"[+] Processing file {file_path}...")
 
     trf_model_config, ner_model_config = transformer_model_config()
 

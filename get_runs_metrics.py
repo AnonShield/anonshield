@@ -27,13 +27,13 @@ CSV_OUT = "metrics_runs.csv"
 
 # Um caminho foi passado?
 if len(argv) < 2:
-    print("Uso: python get_runs_metrics.py <caminho_para_testes>")
+    print("Use: python get_runs_metrics.py <tests_path>")
     exit(1)
 
 # O caminho passado é um diretório válido?
 test_dir = argv[1].rstrip(os.sep)
 if not os.path.isdir(test_dir):
-    print(f"Erro: O diretório '{test_dir}' não existe ou é inválido.")
+    print(f"Error: '{test_dir}' is not a valid directory.")
     exit(1)
 
 # Arquivos de teste (sem a barra no final)
@@ -53,18 +53,18 @@ def collect_run_metrics(run_id):
       - tempo médio por arquivo (s)
       - tempo médio por ticket (s)
     """
-    print(f"\n=== Iniciando run {run_id}/{NUM_RUNS} ===")
+    print(f"\n=== Starting run {run_id}/{NUM_RUNS} ===")
 
     per_file_times = []
     total_tickets = 0
 
     for idx, file in enumerate(TEST_FILES, start=1):
-        print(f"[Run {run_id}] Processando arquivo {idx}/{len(TEST_FILES)}: {file}")
+        print(f"[Run {run_id}] Processing file {idx}/{len(TEST_FILES)}: {file}")
         # dispara o anon.py e deixa stdout/stderr no console
         try:
             subprocess.run(CMD_BASE + [file], check=True)
         except subprocess.CalledProcessError as e:
-            print(f"[Run {run_id}] ⚠️ Erro em {file}: {e}")
+            print(f"[Run {run_id}] ⚠️ Error in {file}: {e}")
 
         # nome do relatório gerado
         base, ext = os.path.splitext(os.path.basename(file))
@@ -75,7 +75,7 @@ def collect_run_metrics(run_id):
         while not os.path.exists(report_file) and time.time() < deadline:
             time.sleep(0.5)
         if not os.path.exists(report_file):
-            print(f"[Run {run_id}] ⚠️ Relatório faltando: {report_file}")
+            print(f"[Run {run_id}] ⚠️ Report missing: {report_file}")
             # fallback: .docx = 1 ticket, 0s; outros = 0 ticket, 0s
             tickets = 1 if ext.lower() == ".docx" else 0
             per_file_times.append(0.0)
@@ -84,8 +84,8 @@ def collect_run_metrics(run_id):
 
         # lê e extrai métricas
         content = open(report_file, encoding="utf-8").read()
-        m_lines = re.search(r"Número de linhas processadas:\s*(\d+)", content)
-        m_time = re.search(r"Tempo total gasto:\s*([\d.]+)", content)
+        m_lines = re.search(r"Number of processed rows:\s*(\d+)", content)
+        m_time = re.search(r"Total elapsed time:\s*([\d.]+)", content)
 
         tickets = (
             int(m_lines.group(1)) if m_lines else (1 if ext.lower() == ".docx" else 0)
@@ -95,7 +95,7 @@ def collect_run_metrics(run_id):
         per_file_times.append(time_spent)
         total_tickets += tickets
 
-        print(f"[Run {run_id}] → tickets: {tickets}, tempo: {time_spent:.2f}s")
+        print(f"[Run {run_id}] → tickets: {tickets}, time: {time_spent:.2f}s")
 
     # agrega métricas da run
     total_time = sum(per_file_times)
@@ -103,7 +103,7 @@ def collect_run_metrics(run_id):
     avg_ticket = total_time / total_tickets if total_tickets else 0.0
 
     print(
-        f"[Run {run_id}] ✔️ Concluída: total_time={total_time:.2f}s, "
+        f"[Run {run_id}] ✔️ Completed: total_time={total_time:.2f}s, "
         f"total_tickets={total_tickets}, avg_file={avg_file:.2f}s, "
         f"avg_ticket={avg_ticket:.2f}s"
     )
@@ -126,11 +126,11 @@ def main():
         writer = csv.DictWriter(
             csvf,
             fieldnames=[
-                "Rodada",
-                "Total de Tickets",
-                "Tempo Total (s)",
-                "Tempo Médio por Arquivo (s)",
-                "Tempo Médio por Ticket (s)",
+                "Run",
+                "Total Tickets",
+                "Total Time (s)",
+                "Average Time per File (s)",
+                "Average Time per Ticket (s)",
             ],
         )
         # Se for a primeira vez, escreve o cabeçalho
@@ -142,17 +142,17 @@ def main():
             metrics = collect_run_metrics(run_id)
             writer.writerow(
                 {
-                    "Rodada": metrics["run"],
-                    "Total de Tickets": metrics["total_tickets"],
-                    "Tempo Total (s)": metrics["total_time_s"],
-                    "Tempo Médio por Arquivo (s)": metrics["avg_time_per_file"],
-                    "Tempo Médio por Ticket (s)": metrics["avg_time_per_ticket"],
+                    "Run": metrics["run"],
+                    "Total Tickets": metrics["total_tickets"],
+                    "Total Time (s)": metrics["total_time_s"],
+                    "Average Time per File (s)": metrics["avg_time_per_file"],
+                    "Average Time per Ticket (s)": metrics["avg_time_per_ticket"],
                 }
             )
             csvf.flush()
-            print(f"[Main] Linha da run {run_id} adicionada ao CSV.")
+            print(f"[Main] Run {run_id} row added to CSV.")
 
-    print(f"\n✅ Todas as {NUM_RUNS} runs concluídas. Métricas em: {CSV_OUT}")
+    print(f"\n✅ All {NUM_RUNS} runs completed. Metrics in: {CSV_OUT}")
 
 
 if __name__ == "__main__":
