@@ -3,6 +3,7 @@
 import concurrent.futures
 import datetime
 import hashlib
+import hmac
 import io
 import os
 import sqlite3
@@ -11,6 +12,7 @@ import sys
 import time
 import warnings
 
+import fitz  # PyMuPDF
 import numpy as np
 import openpyxl
 import pandas as pd
@@ -31,6 +33,7 @@ from transformers import AutoModelForTokenClassification, AutoTokenizer
 ALLOW_LIST = ["TCP", "UDP", "HTTP", "HTTPS", "admin", "localhost"]
 TRANSFORMER_MODEL = "Davlan/xlm-roberta-base-ner-hrl"
 TRF_MODEL_PATH = os.path.join("models", TRANSFORMER_MODEL)
+SECRET_KEY = os.environ.get("ANON_SECRET_KEY")
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -103,9 +106,13 @@ def save_entity(
 class CustomSlugAnonymizer(Operator):
     # Strip before hashing to guarantee uniqueness
     def operate(self, text: str, params: dict | None = None) -> str:
+        if SECRET_KEY is None:
+            raise ValueError("ANON_SECRET_KEY environment variable not set")
         clean_text = " ".join(text.split()).strip()
-        full_hash = hashlib.sha256(clean_text.encode()).hexdigest()
-        slug = full_hash[:10]
+        full_hash = hmac.new(
+            SECRET_KEY.encode(), clean_text.encode(), hashlib.sha256
+        ).hexdigest()
+        slug = full_hash
         entity_type = params.get("entity_type", "UNKNOWN") if params else "UNKNOWN"
         save_entity(DB_PATH, entity_type, clean_text, slug, full_hash)
         return f"[{entity_type}_{slug}]"
@@ -260,6 +267,27 @@ def read_file(file_path) -> str | pd.DataFrame:
         return pd.read_csv(file_path, dtype=str)
     elif ext == ".xml":
         return pd.read_xml(file_path, dtype=str)
+    elif ext == ".pdf":
+        try:
+            content_parts = []
+            with fitz.open(file_path) as doc:
+                for page in doc:
+                    # Extract regular text from the page
+                    content_parts.append(page.get_text())
+                    # Extract images from the page
+                    image_list = page.get_images(full=True)
+                    for img in image_list:
+                        xref = img[0]
+                        base_image = doc.extract_image(xref)
+                        image_bytes = base_image["image"]
+                        # Perform OCR on the image bytes
+                        ocr_text = extract_text_from_image(image_bytes)
+                        if ocr_text.strip():
+                            content_parts.append(ocr_text)
+            return "\n".join(content_parts)
+        except Exception as e:
+            print(f"[!] Error processing PDF file {file_path}: {e}")
+            sys.exit(1)
     else:
         raise ValueError(f"{ext} file format not supported")
 
@@ -273,7 +301,7 @@ def write_file(anonymizer_results: EngineResult | pd.DataFrame, file_path: str) 
         output_file = os.path.join("output", f"anon_{base_name}_{ext[1:]}.csv")
         anonymizer_results.to_csv(output_file, index=False, encoding="utf-8")
     else:
-        output_file = os.path.join("output", f"anon_{base_name}_{ext[1:]}.txt")
+        output_file = os.path.join("output", f"anon_{base_name.replace('.', '_')}.txt")
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(anonymizer_results.text)
 
@@ -322,7 +350,12 @@ def models_check():
 def main() -> None:
     # Check if called with a file argument
     if len(sys.argv) != 2:
-        print("[!] Usage: uv run anon.py <file_path>") 
+        print("[!] Usage: uv run anon.py <file_path>")
+        sys.exit(1)
+
+    # Check for HMAC secret key
+    if not SECRET_KEY:
+        print("[!] Error: ANON_SECRET_KEY environment variable not set.")
         sys.exit(1)
 
     # Check for tesseract
