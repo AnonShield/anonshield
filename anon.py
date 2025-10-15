@@ -1,19 +1,16 @@
 #! /usr/bin/env python
-
-import concurrent.futures
-import datetime
-import hashlib
-import hmac
+# /anon.py
+import argparse
 import io
+import json
 import os
-import sqlite3
 import subprocess
 import sys
 import time
 import warnings
 
 import fitz  # PyMuPDF
-import numpy as np
+import numpy as np 
 import openpyxl
 import pandas as pd
 import pytesseract
@@ -21,483 +18,268 @@ import spacy
 import spacy.cli
 from docx import Document
 from huggingface_hub import snapshot_download
-from PIL import Image, ImageDraw
-from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
-from presidio_analyzer.nlp_engine import NerModelConfiguration, TransformersNlpEngine
-from presidio_anonymizer import AnonymizerEngine, EngineResult, OperatorConfig
-from presidio_anonymizer.entities import RecognizerResult as AnonymizerRecognizerResult
-from presidio_anonymizer.operators import Operator, OperatorType
-from transformers import AutoModelForTokenClassification, AutoTokenizer
+from lxml import etree
+from PIL import Image
 
-# Globals
-ALLOW_LIST = ["TCP", "UDP", "HTTP", "HTTPS", "admin", "localhost"]
-TRANSFORMER_MODEL = "Davlan/xlm-roberta-base-ner-hrl"
-TRF_MODEL_PATH = os.path.join("models", TRANSFORMER_MODEL)
-SECRET_KEY = os.environ.get("ANON_SECRET_KEY")
+from config import DEFAULT_ALLOW_LIST, SECRET_KEY, TRANSFORMER_MODEL, TRF_MODEL_PATH
+from engine import anonymize_text, get_presidio_engines, batch_process_text 
 
-# Suppress warnings
 warnings.filterwarnings("ignore")
 
-# Entity mappings between the model's and Presidio's
-ENTITY_MAPPING = dict(
-    LOC="LOCATION",
-    ORG="ORGANIZATION",
-    PER="PERSON",
-    EMAIL="EMAIL",
-    PHONE="PHONE_NUMBER",
-    PERSON="PERSON",
-    LOCATION="LOCATION",
-    GPE="LOCATION",
-    ORGANIZATION="ORGANIZATION",
-)
+_ENGINES_CACHE = {}
 
-
-def initialize_db():
-    db_dir = os.path.join(os.getcwd(), "db")
-    os.makedirs(db_dir, exist_ok=True)
-    db_path = os.path.join(db_dir, "entities.db")
-    with sqlite3.connect(db_path, check_same_thread=False) as conn:
-        # Little optimizations
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-        conn.execute("PRAGMA cache_size=10000;")
-        conn.execute("PRAGMA temp_store=MEMORY;")
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS entities (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                entity_type TEXT,
-                original_name TEXT,
-                slug_name TEXT,
-                full_hash TEXT UNIQUE,
-                first_seen TEXT,
-                last_seen TEXT
-            )
-            """
-        )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_full_hash ON entities(full_hash);")
-        conn.commit()
-    return db_path
-
-
-# Should be global too
-DB_PATH = initialize_db()
-
-
-def save_entity(
-    db_path: str, entity_type: str, original_name: str, slug_name: str, full_hash: str
-) -> None:
-    now = datetime.datetime.now().isoformat()
-    with sqlite3.connect(db_path, check_same_thread=False) as conn:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-        cur = conn.execute("SELECT id FROM entities WHERE full_hash=?", (full_hash,))
-        row = cur.fetchone()
-        if row:
-            conn.execute("UPDATE entities SET last_seen=? WHERE id=?", (now, row[0]))
-        else:
-            conn.execute(
-                "INSERT OR IGNORE INTO entities (entity_type, original_name, slug_name, full_hash, first_seen, last_seen) VALUES (?, ?, ?, ?, ?, ?)",
-                (entity_type, original_name.strip(), slug_name, full_hash, now, now),
-            )
-        conn.commit()
-
-
-class CustomSlugAnonymizer(Operator):
-    # Strip before hashing to guarantee uniqueness
-    def operate(self, text: str, params: dict | None = None) -> str:
-        if SECRET_KEY is None:
-            raise ValueError("ANON_SECRET_KEY environment variable not set")
-        clean_text = " ".join(text.split()).strip()
-        full_hash = hmac.new(
-            SECRET_KEY.encode(), clean_text.encode(), hashlib.sha256
-        ).hexdigest()
-        slug = full_hash
-        entity_type = params.get("entity_type", "UNKNOWN") if params else "UNKNOWN"
-        save_entity(DB_PATH, entity_type, clean_text, slug, full_hash)
-        return f"[{entity_type}_{slug}]"
-
-    def validate(self, params: dict | None = None) -> None:
-        pass
-
-    def operator_name(self) -> str:
-        return "custom_slug"
-
-    def operator_type(self) -> OperatorType:
-        return OperatorType.Anonymize
-
-
+# --- Dependency Checks ---
 def tesseract_check():
+    """Checks if Tesseract OCR is installed and accessible."""
     try:
         pytesseract.get_tesseract_version()
     except pytesseract.TesseractNotFoundError:
-        print("[!] Tesseract is not installed or not in your PATH. Please install it.")
+        print("[!] Tesseract is not installed or not in your PATH.", file=sys.stderr)
         sys.exit(1)
 
-
-def extract_text_from_image(
-    image_bytes: bytes,
-) -> str:
-    img = Image.open(io.BytesIO(image_bytes))
-    # Get OCR data
-    text = pytesseract.image_to_string(img)
-    return text
-
-
-def transformer_model_config():
-    # Intantiate tokenizer and (transformer) model
-    tokenizer = AutoTokenizer.from_pretrained(
-        TRANSFORMER_MODEL, cache_dir=TRF_MODEL_PATH
-    )
-    model = AutoModelForTokenClassification.from_pretrained(
-        TRANSFORMER_MODEL, cache_dir=TRF_MODEL_PATH
-    )
-
-    # Transformer model config
-    trf_model_config = [
-        {
-            "lang_code": "pt",
-            "model_name": {
-                "spacy": "pt_core_news_lg",
-                "transformers": TRANSFORMER_MODEL,  # Used only for NER
-            },
-        }
-    ]
-
-    # Transformer NER config
-    ner_model_configuration = NerModelConfiguration(
-        model_to_presidio_entity_mapping=ENTITY_MAPPING,
-        alignment_mode="expand",  # "strict", "contract", "expand"
-        aggregation_strategy="max",  # "simple", "first", "average", "max"
-        labels_to_ignore=["O"],
-    )
-
-    return trf_model_config, ner_model_configuration
-
-
-def get_presidio_engines(trf_model_config, ner_model_config):
-    # Wrapper on spacy functionality
-    transformers_nlp_engine = TransformersNlpEngine(
-        models=trf_model_config, ner_model_configuration=ner_model_config
-    )
-
-    # Analyzer Engine config
-    analyzer_engine = AnalyzerEngine(
-        nlp_engine=transformers_nlp_engine,
-        supported_languages=["pt", "en"],
-        log_decision_process=False,
-    )
-
-    # Anonymizer Engine config
-    anonymizer_engine = AnonymizerEngine()
-    anonymizer_engine.add_anonymizer(CustomSlugAnonymizer)
-
-    return analyzer_engine, anonymizer_engine
-
-
-def batch_process_text(texts, analyzer_engine, anonymizer_engine, batch_size=32):
-    results = []
-    # Remove MedicalLicense detection
-    analyzer_engine.registry.remove_recognizer("MedicalLicenseRecognizer")
-
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i : i + batch_size]
-        # Convert to strings and handle NaN values
-        batch = [str(text) if pd.notna(text) else "" for text in batch]
-
-        # Run analysis in parallel on the batch without DATE_TIME detection
-        analyzer_results = [
-            analyzer_engine.analyze(
-                text=text,
-                language="pt",
-                score_threshold=0.6,
-                allow_list=ALLOW_LIST,
-                entities=[
-                    ent
-                    for ent in analyzer_engine.get_supported_entities()
-                    if ent != "DATE_TIME"
-                ],
-            )
-            for text in batch
-        ]
-
-        # Run anonymization on the batch
-        anonymized_texts = [
-            anonymizer_engine.anonymize(
-                text=batch[j],
-                analyzer_results=analyzer_results[j],
-                operators={
-                    "DEFAULT": OperatorConfig("custom_slug"),
-                    "AS_NUMBER": OperatorConfig("custom_slug"),
-                },
-            ).text
-            for j in range(len(batch))
-        ]
-
-        results.extend(anonymized_texts)
-    return results
-
-
-def anonymize_dataframe(
-    df: pd.DataFrame,
-    analyzer_engine: AnalyzerEngine,
-    anonymizer_engine: AnonymizerEngine,
-) -> pd.DataFrame:
-    # Flatten dataframe to a list of values
-    all_values = df.values.flatten().tolist()
-
-    # Process all values in batches
-    anonymized_values = batch_process_text(
-        all_values, analyzer_engine, anonymizer_engine
-    )
-
-    # Reshape back to dataframe structure
-    anonymized_array = np.array(anonymized_values).reshape(df.shape)
-    return pd.DataFrame(anonymized_array, columns=df.columns, index=df.index)
-
-
-def read_file(file_path) -> str | pd.DataFrame:
-    ext = os.path.splitext(file_path)[1].lower()
-    if ext == ".txt":
-        with open(file_path, "r", encoding="utf-8") as f:
-            return f.read()
-    elif ext in (".docx", ".xlsx"):
-        return file_path  # Return the path for now
-    elif ext == ".csv":
-        return pd.read_csv(file_path, dtype=str)
-    elif ext == ".xml":
-        return pd.read_xml(file_path, dtype=str)
-    elif ext == ".pdf":
+def models_check(lang: str):
+    """Downloads and verifies necessary spaCy and Transformer models."""
+    spacy_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
+    spacy_model = spacy_model_map.get(lang)
+    
+    if spacy_model and not spacy.util.is_package(spacy_model):
+        print(f"[+] Spacy model '{spacy_model}' not found. Downloading...")
         try:
-            content_parts = []
-            with fitz.open(file_path) as doc:
-                for page in doc:
-                    # Extract regular text from the page
-                    content_parts.append(page.get_text())
-                    # Extract images from the page
-                    image_list = page.get_images(full=True)
-                    for img in image_list:
-                        xref = img[0]
-                        base_image = doc.extract_image(xref)
-                        image_bytes = base_image["image"]
-                        # Perform OCR on the image bytes
-                        ocr_text = extract_text_from_image(image_bytes)
-                        if ocr_text.strip():
-                            content_parts.append(ocr_text)
-            return "\n".join(content_parts)
-        except Exception as e:
-            print(f"[!] Error processing PDF file {file_path}: {e}")
+            subprocess.run(
+                [sys.executable, "-m", "spacy", "download", spacy_model], 
+                check=True, capture_output=True, text=True
+            )
+            print(f"[*] Successfully downloaded '{spacy_model}'.")
+            if not spacy.util.is_package(spacy_model):
+                raise Exception(f"Model '{spacy_model}' downloaded but still not available.")
+        except subprocess.CalledProcessError as e:
+            print(f"[!] Failed to download spaCy model '{spacy_model}'.", file=sys.stderr)
             sys.exit(1)
-    else:
-        raise ValueError(f"{ext} file format not supported")
+            
+    if not os.path.exists(TRF_MODEL_PATH):
+        print(f"[!] Downloading Transformer model '{TRANSFORMER_MODEL}'...")
+        snapshot_download(repo_id=TRANSFORMER_MODEL, cache_dir=TRF_MODEL_PATH, max_workers=10)
 
+# --- Text Extraction ---
+def extract_text_from_image(image_bytes: bytes) -> str:
+    """Extracts text from image bytes using OCR."""
+    try:
+        return pytesseract.image_to_string(Image.open(io.BytesIO(image_bytes)))
+    except Exception:
+        return ""
 
-def write_file(anonymizer_results: EngineResult | pd.DataFrame, file_path: str) -> None:
-    # Ensure output directory exists
+# --- Lazy Loading Engine Manager ---
+def get_or_create_engines_lazily(lang: str):
+    """Lazily initializes and retrieves NLP engines from a cache."""
+    if lang not in _ENGINES_CACHE:
+        print(f"[+] Lazily initializing NLP engines for language '{lang}' (this may take a moment)...")
+        _ENGINES_CACHE[lang] = get_presidio_engines(lang)
+    return _ENGINES_CACHE[lang]
+
+# --- File Processors ---
+
+# <--- ALTERADO: Antiga 'process_text_based' renomeada e focada em TXT e PDF --->
+def process_plain_text_and_pdf(file_path, anonymizer_func):
+    """Processes plain text and PDF files, including OCR for PDFs."""
+    ext = os.path.splitext(file_path)[1].lower()
+    content = ""
+    if ext == ".txt":
+        with open(file_path, "r", encoding="utf-8") as f: content = f.read()
+    elif ext == ".pdf":
+        parts = []
+        with fitz.open(file_path) as doc:
+            for page in doc:
+                parts.append(page.get_text())
+                for img in page.get_images(full=True):
+                    base_image = doc.extract_image(img[0])
+                    parts.append(extract_text_from_image(base_image["image"]))
+        content = "\n".join(parts)
+    
+    anonymized_content = anonymizer_func(content)
+    output_path = get_output_path(file_path, ".txt")
+    with open(output_path, "w", encoding="utf-8") as f: f.write(anonymized_content)
+    return output_path
+
+# <--- ADICIONADO: Novo processador para DOCX com OCR --->
+def process_docx_with_ocr(file_path, anonymizer_func):
+    """Processes DOCX files, extracting text from paragraphs and images (OCR)."""
+    doc = Document(file_path)
+    data_parts = []
+    images_to_process = []
+
+    # Extrai texto e referências de imagem
+    for para in doc.paragraphs:
+        data_parts.append(para.text)
+        for run in para.runs:
+            for inline in run._r.xpath(".//w:drawing"):
+                blip_embeds = inline.xpath(".//a:blip/@r:embed")
+                if blip_embeds:
+                    for rel in doc.part.rels.values():
+                        if "image" in rel.target_ref and rel.rId in blip_embeds[0]:
+                            images_to_process.append(rel.target_part.blob)
+                            data_parts.append("__IMAGE_PLACEHOLDER__")
+
+    # Processa imagens com OCR
+    image_texts = [extract_text_from_image(img_bytes) for img_bytes in images_to_process]
+    
+    # Combina texto de parágrafos e de imagens
+    image_text_iter = iter(image_texts)
+    full_content = "\n".join(
+        [part if part != "__IMAGE_PLACEHOLDER__" else next(image_text_iter, "") for part in data_parts]
+    )
+
+    anonymized_content = anonymizer_func(full_content)
+    output_path = get_output_path(file_path, ".txt")
+    with open(output_path, "w", encoding="utf-8") as f: f.write(anonymized_content)
+    return output_path
+
+# <--- ADICIONADO: Novo processador para CSV com BATCH --->
+def process_csv_batched(file_path, lang, allow_list, entities_to_preserve):
+    """Processes CSV files in batches for performance."""
+    df = pd.read_csv(file_path, dtype=str)
+    analyzer_engine, anonymizer_engine = get_or_create_engines_lazily(lang)
+    
+    all_values = df.values.flatten().tolist()
+    
+    anonymized_values = batch_process_text(
+        all_values, analyzer_engine, anonymizer_engine, lang, allow_list, entities_to_preserve
+    )
+    
+    anonymized_array = np.array(anonymized_values).reshape(df.shape)
+    anonymized_df = pd.DataFrame(anonymized_array, columns=df.columns, index=df.index)
+    
+    output_path = get_output_path(file_path, ".csv")
+    anonymized_df.to_csv(output_path, index=False, encoding="utf-8")
+    return output_path
+
+def process_xlsx(file_path, anonymizer_func):
+    """Processes XLSX files, preserving structure, and now including OCR for images."""
+    wb = openpyxl.load_workbook(file_path)
+    image_texts_anonymized = []
+
+    for sheet in wb.worksheets:
+        for image in sheet._images:
+            img_bytes = image._data()
+            ocr_text = extract_text_from_image(img_bytes)
+            if ocr_text.strip():
+                anonymized_ocr = anonymizer_func(ocr_text)
+                image_texts_anonymized.append(anonymized_ocr)
+
+    for sheet in wb.worksheets:
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.value and isinstance(cell.value, str):
+                    cell.value = anonymizer_func(cell.value)
+
+    if image_texts_anonymized:
+        ws = wb.worksheets[0]
+        ws.append([]) 
+        ws.append(["--- ANONYMIZED IMAGE TEXT (OCR) ---"])
+        for text in image_texts_anonymized:
+            for line in text.split('\n'):
+                ws.append([line])
+    
+    output_path = get_output_path(file_path, ".xlsx")
+    wb.save(output_path)
+    return output_path
+
+def process_xml(file_path, anonymizer_func):
+    """Processes XML files, preserving their hierarchical structure."""
+    parser = etree.XMLParser(recover=True, strip_cdata=False)
+    tree = etree.parse(file_path, parser)
+    for element in tree.iter():
+        if element.text and element.text.strip(): element.text = anonymizer_func(element.text)
+        if element.tail and element.tail.strip(): element.tail = anonymizer_func(element.tail)
+    output_path = get_output_path(file_path, ".xml")
+    tree.write(output_path, encoding="utf-8", xml_declaration=True)
+    return output_path
+
+def process_json(file_path, anonymizer_func):
+    """Processes JSON files, preserving their nested structure."""
+    with open(file_path, "r", encoding="utf-8") as f: data = json.load(f)
+    
+    def recursive_anonymize(obj):
+        if isinstance(obj, dict): return {k: recursive_anonymize(v) for k, v in obj.items()}
+        elif isinstance(obj, list): return [recursive_anonymize(item) for item in obj]
+        elif isinstance(obj, str): return anonymizer_func(obj)
+        return obj
+
+    anonymized_data = recursive_anonymize(data)
+    output_path = get_output_path(file_path, ".json")
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(anonymized_data, f, indent=4, ensure_ascii=False)
+    return output_path
+
+# --- Utility Functions ---
+def get_output_path(original_path, new_ext):
+    """Constructs the output file path in the 'output' directory."""
     os.makedirs("output", exist_ok=True)
-    base_name, ext = os.path.splitext(os.path.basename(file_path))
+    base_name = os.path.splitext(os.path.basename(original_path))[0]
+    return os.path.join("output", f"anon_{base_name}{new_ext}")
 
-    if isinstance(anonymizer_results, pd.DataFrame):
-        output_file = os.path.join("output", f"anon_{base_name}_{ext[1:]}.csv")
-        anonymizer_results.to_csv(output_file, index=False, encoding="utf-8")
-    else:
-        output_file = os.path.join("output", f"anon_{base_name.replace('.', '_')}.txt")
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(anonymizer_results.text)
-
-    print(f"Anonymized file saved at: {output_file}")
-
-
-def write_report(file_path: str, start_time: float, data: str | pd.DataFrame) -> None:
-    # Ensure output directory exists
+def write_report(file_path, start_time):
+    """Writes a simple performance report to the 'logs' directory."""
     os.makedirs("logs", exist_ok=True)
-    # Calculate elapsed time
-    elapsed_time = time.time() - start_time
-    # Create the output file retaining original name and extension
-    base_name, ext = os.path.splitext(os.path.basename(file_path))
-    report_file = os.path.join("logs", f"report_{base_name}_{ext[1:]}.txt")
+    base_name = os.path.basename(file_path)
+    report_file = os.path.join("logs", f"report_{base_name}.txt")
     with open(report_file, "w", encoding="utf-8") as report:
         report.write(f"Processed file: {file_path}\n")
-        if isinstance(data, pd.DataFrame):
-            report.write(f"Number of processed rows: {len(data)}\n")
-        else:
-            # Textual files count as 1 ticket
-            report.write(f"Number of processed rows: 1\n")
-        report.write(f"Total elapsed time: {elapsed_time:.2f} seconds\n")
+        report.write(f"Total elapsed time: {time.time() - start_time:.2f} seconds\n")
     print(f"Report saved at: {report_file}")
 
+def main():
+    """Main function to parse arguments and orchestrate the anonymization process."""
+    parser = argparse.ArgumentParser(description="Anonymize sensitive information in various file formats.")
+    parser.add_argument("file_path", help="Path to the file to be anonymized.")
+    parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve (e.g., 'LOCATION,ORGANIZATION').")
+    parser.add_argument("--lang", type=str, default="pt", choices=["pt", "en"], help="Language of the document for model selection.")
+    parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to add to the allow list.")
+    args = parser.parse_args()
 
-def models_check():
-    # Check if folder exists, create if not
-    # Check Spacy
-    if not spacy.util.is_package("pt_core_news_lg"):
-        print("[!] Downloading Spacy...")
-        subprocess.run(
-            [sys.executable, "-m", "spacy", "download", "pt_core_news_lg"], check=True
-        )
-        print("[+] Spacy downloaded successfully")
-    # Check Transformer
-    if not os.path.exists(TRF_MODEL_PATH):
-        print("[!] Downloading Transformer...")
-        snapshot_download(
-            repo_id=TRANSFORMER_MODEL,
-            cache_dir=TRF_MODEL_PATH,
-            max_workers=10,
-        )
-        print("[+] Transformer downloaded successfully")
-
-
-def main() -> None:
-    # Check if called with a file argument
-    if len(sys.argv) != 2:
-        print("[!] Usage: uv run anon.py <file_path>")
-        sys.exit(1)
-
-    # Check for HMAC secret key
     if not SECRET_KEY:
-        print("[!] Error: ANON_SECRET_KEY environment variable not set.")
+        print("[!] Error: ANON_SECRET_KEY environment variable not set.", file=sys.stderr)
         sys.exit(1)
-
-    # Check for tesseract
-    tesseract_check()
-
-    # Check if the models are present
-    models_check()
-
-    # For report-generating purposes
+    
     start_time = time.time()
+    tesseract_check()
+    models_check(args.lang)
 
-    # Read the file
-    file_path = sys.argv[1]
+    allow_list = DEFAULT_ALLOW_LIST + [term.strip() for term in args.allow_list.split(',') if term]
+    entities_to_preserve = [e.strip().upper() for e in args.preserve_entities.split(',') if e]
+    
+    def anonymizer_func(text_to_anonymize):
+        analyzer_engine, anonymizer_engine = get_or_create_engines_lazily(args.lang)
+        return anonymize_text(text_to_anonymize, analyzer_engine, anonymizer_engine, allow_list, entities_to_preserve, lang=args.lang)
 
-    # Let the user know what's going on
-    print(f"[+] Processing file {file_path}...")
+    print(f"[+] Processing file: {args.file_path}...")
+    ext = os.path.splitext(args.file_path)[1].lower()
+    
+    file_processors = {
+        ".txt": process_plain_text_and_pdf,
+        ".pdf": process_plain_text_and_pdf,
+        ".docx": process_docx_with_ocr,
+        ".csv": process_csv_batched,
+        ".xlsx": process_xlsx,
+        ".xml": process_xml,
+        ".json": process_json,
+    }
 
-    trf_model_config, ner_model_config = transformer_model_config()
+    processor = file_processors.get(ext)
+    if not processor:
+        print(f"[!] Unsupported file format: {ext}", file=sys.stderr)
+        sys.exit(1)
+        
+    try:
+        if ext == ".csv":
+            output_file = processor(args.file_path, args.lang, allow_list, entities_to_preserve)
+        else:
+            output_file = processor(args.file_path, anonymizer_func)
 
-    analyzer_engine, anonymizer_engine = get_presidio_engines(
-        trf_model_config, ner_model_config
-    )
-
-    # Process text and images
-    ext = os.path.splitext(file_path)[1].lower()
-    if ext == ".docx":
-        doc = Document(file_path)
-        data_parts = []
-        images_to_process = []
-
-        for para in doc.paragraphs:
-            data_parts.append(para.text)
-            for run in para.runs:
-                for inline in run._r.xpath(".//w:drawing"):
-                    blip_embeds = inline.xpath(".//a:blip/@r:embed")
-                    if blip_embeds:
-                        for rel in doc.part.rels.values():
-                            if "image" in rel.target_ref and rel.rId in blip_embeds[0]:
-                                image_bytes = rel.target_part.blob
-                                images_to_process.append(image_bytes)
-                                # Add a placeholder for the image text
-                                data_parts.append("__IMAGE_PLACEHOLDER__")
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            image_texts = list(executor.map(extract_text_from_image, images_to_process))
-
-        # Replace placeholders with image text
-        image_text_iter = iter(image_texts)
-        data = "\n".join(
-            [
-                part if part != "__IMAGE_PLACEHOLDER__" else next(image_text_iter)
-                for part in data_parts
-            ]
-        )
-
-    elif ext == ".xlsx":
-        wb = openpyxl.load_workbook(file_path)
-        images_to_process = []
-
-        for sheetname in wb.sheetnames:
-            sheet = wb[sheetname]
-            for image in sheet._images:  # type: ignore
-                row = image.anchor._from.row
-                col = image.anchor._from.col
-                images_to_process.append(
-                    (
-                        sheetname,
-                        row,
-                        col,
-                        image._data(),
-                        analyzer_engine,
-                        anonymizer_engine,
-                    )
-                )
-
-        def process_image(args):
-            sheetname, row, col, image_bytes, analyzer, anonymizer = args
-            text = extract_text_from_image(image_bytes).strip()
-            analyzer_results = analyzer.analyze(text=text, language="pt")
-            anonymized_text = anonymizer.anonymize(
-                text=text, analyzer_results=analyzer_results
-            ).text
-            return sheetname, row, col, anonymized_text
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            results = list(executor.map(process_image, images_to_process))
-
-        # Read all sheets into a dictionary of dataframes
-        df_dict = pd.read_excel(file_path, sheet_name=None, dtype=str, header=None)
-
-        for sheetname, row, col, text in results:
-            if sheetname in df_dict:
-                df = df_dict[sheetname]
-                # Ensure column exists
-                while col >= len(df.columns):
-                    df[len(df.columns)] = ""
-                df.at[row, col] = text
-
-        data = list(df_dict.values())[0]
-
-    else:
-        data = read_file(file_path=file_path)
-
-    # Analysis and Anonymization
-    if isinstance(data, pd.DataFrame):
-        anonymizer_results = anonymize_dataframe(
-            data, analyzer_engine, anonymizer_engine
-        )
-    else:
-        # Remove MedicalLicense detection
-        analyzer_engine.registry.remove_recognizer("MedicalLicenseRecognizer")
-        # Remove DATE_TIME detection
-        entities = analyzer_engine.get_supported_entities()
-        entities_without_date = [ent for ent in entities if ent != "DATE_TIME"]
-        analyzer_results = analyzer_engine.analyze(
-            text=data,
-            language="pt",
-            score_threshold=0.6,
-            allow_list=ALLOW_LIST,
-            entities=entities_without_date,
-        )
-        # Convert to anonymizer's RecognizerResult
-        converted_analyzer_results = [
-            AnonymizerRecognizerResult(
-                entity_type=result.entity_type,
-                start=result.start,
-                end=result.end,
-                score=result.score,
-            )
-            for result in analyzer_results
-        ]
-        anonymizer_results = anonymizer_engine.anonymize(
-            text=data,
-            analyzer_results=converted_analyzer_results,
-            operators={
-                "DEFAULT": OperatorConfig("custom_slug"),
-            },
-        )
-
-    write_file(anonymizer_results, file_path)
-    write_report(file_path, start_time, data)
-
+        print(f"[*] Anonymized file saved at: {output_file}")
+        write_report(args.file_path, start_time)
+    except Exception as e:
+        print(f"[!] An error occurred during processing: {e}", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
