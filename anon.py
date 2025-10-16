@@ -18,7 +18,7 @@ import spacy
 import spacy.cli
 from docx import Document
 from huggingface_hub import snapshot_download
-from lxml import etree
+from lxml import etree # type: ignore
 from PIL import Image
 
 from config import DEFAULT_ALLOW_LIST, SECRET_KEY, TRANSFORMER_MODEL, TRF_MODEL_PATH
@@ -142,7 +142,7 @@ def process_csv_batched(file_path, lang, allow_list, entities_to_preserve):
     df = pd.read_csv(file_path, dtype=str)
     analyzer_engine, anonymizer_engine = get_or_create_engines_lazily(lang)
 
-    all_values = df.values.flatten().tolist()
+    all_values = [str(val) if val is not None else "" for val in df.values.flatten().tolist()]
 
     anonymized_values = batch_process_text(
         all_values, analyzer_engine, anonymizer_engine, lang, allow_list, entities_to_preserve
@@ -156,35 +156,53 @@ def process_csv_batched(file_path, lang, allow_list, entities_to_preserve):
     return output_path
 
 def process_xlsx(file_path, anonymizer_func):
-    """Processes XLSX files, preserving structure, and now including OCR for images."""
+    """
+    Processes XLSX files by anonymizing text in cells and replacing images
+    with their anonymized OCR text.
+    """
     wb = openpyxl.load_workbook(file_path)
-    image_texts_anonymized = []
-    has_images = any(sheet._images for sheet in wb.worksheets)
 
-    if has_images:
-        tesseract_check()
-        for sheet in wb.worksheets:
-            for image in sheet._images:
+    for sheet in wb.worksheets:
+        image_replacements = []
+        if hasattr(sheet, '_images') and sheet._images: # type: ignore
+            images_to_process = list(sheet._images) # type: ignore
+
+            for image in images_to_process:
                 img_bytes = image._data()
                 image._data = (lambda b: lambda: b)(img_bytes)
+
                 ocr_text = extract_text_from_image(img_bytes)
                 if ocr_text.strip():
                     anonymized_ocr = anonymizer_func(ocr_text)
-                    image_texts_anonymized.append(anonymized_ocr)
+                    image_replacements.append((image.anchor, anonymized_ocr))
 
-    for sheet in wb.worksheets:
+            sheet._images.clear() # type: ignore
+
+        # Anonymize cell text
         for row in sheet.iter_rows():
             for cell in row:
                 if cell.value and isinstance(cell.value, str):
                     cell.value = anonymizer_func(cell.value)
 
-    if image_texts_anonymized:
-        ws = wb.worksheets[0]
-        ws.append([])
-        ws.append(["--- ANONYMIZED IMAGE TEXT (OCR) ---"])
-        for text in image_texts_anonymized:
-            for line in text.split('\n'):
-                ws.append([line])
+        # Add the anonymized image text to cells
+        for anchor, text in image_replacements:
+            try:
+                if hasattr(anchor, '_from') and hasattr(anchor._from, 'row') and hasattr(anchor._from, 'col'):
+                    row = anchor._from.row + 1
+                    col = anchor._from.col + 1
+                    cell = sheet.cell(row=row, column=col)
+                    
+                    existing_value = cell.value
+                    if existing_value:
+                        cell.value = f"{text}\n{existing_value}" # type: ignore
+                    else:
+                        cell.value = text
+                else:
+                    # Fallback: append to end of sheet
+                    sheet.append([f"Anonymized image text:", text])
+            except Exception:
+                # If any error occurs, append to end of sheet
+                sheet.append([f"Anonymized image text:", text])
 
     output_path = get_output_path(file_path, ".xlsx")
     wb.save(output_path)
