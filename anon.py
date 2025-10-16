@@ -34,7 +34,7 @@ def tesseract_check():
     try:
         pytesseract.get_tesseract_version()
     except pytesseract.TesseractNotFoundError:
-        print("[!] Tesseract is not installed or not in your PATH.", file=sys.stderr)
+        print("[!] Tesseract is not installed or not in your PATH. It is required for processing images.", file=sys.stderr)
         sys.exit(1)
 
 def models_check(lang: str):
@@ -59,7 +59,7 @@ def models_check(lang: str):
         except subprocess.CalledProcessError as e:
             print(f"[!] Failed to download spaCy model '{spacy_model}'.", file=sys.stderr)
             sys.exit(1)
-            
+
     if not os.path.exists(TRF_MODEL_PATH):
         print(f"[!] Downloading Transformer model '{TRANSFORMER_MODEL}'...")
         snapshot_download(repo_id=TRANSFORMER_MODEL, cache_dir=TRF_MODEL_PATH, max_workers=10)
@@ -82,7 +82,6 @@ def get_or_create_engines_lazily(lang: str):
 
 # --- File Processors ---
 
-# <--- ALTERADO: Antiga 'process_text_based' renomeada e focada em TXT e PDF --->
 def process_plain_text_and_pdf(file_path, anonymizer_func):
     """Processes plain text and PDF files, including OCR for PDFs."""
     ext = os.path.splitext(file_path)[1].lower()
@@ -90,6 +89,7 @@ def process_plain_text_and_pdf(file_path, anonymizer_func):
     if ext == ".txt":
         with open(file_path, "r", encoding="utf-8") as f: content = f.read()
     elif ext == ".pdf":
+        tesseract_check()
         parts = []
         with fitz.open(file_path) as doc:
             for page in doc:
@@ -98,15 +98,15 @@ def process_plain_text_and_pdf(file_path, anonymizer_func):
                     base_image = doc.extract_image(img[0])
                     parts.append(extract_text_from_image(base_image["image"]))
         content = "\n".join(parts)
-    
+
     anonymized_content = anonymizer_func(content)
     output_path = get_output_path(file_path, ".txt")
     with open(output_path, "w", encoding="utf-8") as f: f.write(anonymized_content)
     return output_path
 
-# <--- ADICIONADO: Novo processador para DOCX com OCR --->
 def process_docx_with_ocr(file_path, anonymizer_func):
     """Processes DOCX files, extracting text from paragraphs and images (OCR)."""
+    tesseract_check()
     doc = Document(file_path)
     data_parts = []
     images_to_process = []
@@ -125,7 +125,7 @@ def process_docx_with_ocr(file_path, anonymizer_func):
 
     # Processa imagens com OCR
     image_texts = [extract_text_from_image(img_bytes) for img_bytes in images_to_process]
-    
+
     # Combina texto de parágrafos e de imagens
     image_text_iter = iter(image_texts)
     full_content = "\n".join(
@@ -137,21 +137,20 @@ def process_docx_with_ocr(file_path, anonymizer_func):
     with open(output_path, "w", encoding="utf-8") as f: f.write(anonymized_content)
     return output_path
 
-# <--- ADICIONADO: Novo processador para CSV com BATCH --->
 def process_csv_batched(file_path, lang, allow_list, entities_to_preserve):
     """Processes CSV files in batches for performance."""
     df = pd.read_csv(file_path, dtype=str)
     analyzer_engine, anonymizer_engine = get_or_create_engines_lazily(lang)
-    
+
     all_values = df.values.flatten().tolist()
-    
+
     anonymized_values = batch_process_text(
         all_values, analyzer_engine, anonymizer_engine, lang, allow_list, entities_to_preserve
     )
-    
+
     anonymized_array = np.array(anonymized_values).reshape(df.shape)
     anonymized_df = pd.DataFrame(anonymized_array, columns=df.columns, index=df.index)
-    
+
     output_path = get_output_path(file_path, ".csv")
     anonymized_df.to_csv(output_path, index=False, encoding="utf-8")
     return output_path
@@ -160,14 +159,17 @@ def process_xlsx(file_path, anonymizer_func):
     """Processes XLSX files, preserving structure, and now including OCR for images."""
     wb = openpyxl.load_workbook(file_path)
     image_texts_anonymized = []
+    has_images = any(sheet._images for sheet in wb.worksheets)
 
-    for sheet in wb.worksheets:
-        for image in sheet._images:
-            img_bytes = image._data()
-            ocr_text = extract_text_from_image(img_bytes)
-            if ocr_text.strip():
-                anonymized_ocr = anonymizer_func(ocr_text)
-                image_texts_anonymized.append(anonymized_ocr)
+    if has_images:
+        tesseract_check()
+        for sheet in wb.worksheets:
+            for image in sheet._images:
+                img_bytes = image._data()
+                ocr_text = extract_text_from_image(img_bytes)
+                if ocr_text.strip():
+                    anonymized_ocr = anonymizer_func(ocr_text)
+                    image_texts_anonymized.append(anonymized_ocr)
 
     for sheet in wb.worksheets:
         for row in sheet.iter_rows():
@@ -177,12 +179,12 @@ def process_xlsx(file_path, anonymizer_func):
 
     if image_texts_anonymized:
         ws = wb.worksheets[0]
-        ws.append([]) 
+        ws.append([])
         ws.append(["--- ANONYMIZED IMAGE TEXT (OCR) ---"])
         for text in image_texts_anonymized:
             for line in text.split('\n'):
                 ws.append([line])
-    
+
     output_path = get_output_path(file_path, ".xlsx")
     wb.save(output_path)
     return output_path
@@ -201,7 +203,7 @@ def process_xml(file_path, anonymizer_func):
 def process_json(file_path, anonymizer_func):
     """Processes JSON files, preserving their nested structure."""
     with open(file_path, "r", encoding="utf-8") as f: data = json.load(f)
-    
+
     def recursive_anonymize(obj):
         if isinstance(obj, dict): return {k: recursive_anonymize(v) for k, v in obj.items()}
         elif isinstance(obj, list): return [recursive_anonymize(item) for item in obj]
@@ -212,6 +214,20 @@ def process_json(file_path, anonymizer_func):
     output_path = get_output_path(file_path, ".json")
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(anonymized_data, f, indent=4, ensure_ascii=False)
+    return output_path
+
+def process_image_file(file_path, anonymizer_func):
+    """Processes a single image file using OCR."""
+    tesseract_check()
+    with open(file_path, "rb") as f:
+        image_bytes = f.read()
+    
+    extracted_text = extract_text_from_image(image_bytes)
+    anonymized_content = anonymizer_func(extracted_text)
+    
+    output_path = get_output_path(file_path, ".txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(anonymized_content)
     return output_path
 
 # --- Utility Functions ---
@@ -243,21 +259,20 @@ def main():
     if not SECRET_KEY:
         print("[!] Error: ANON_SECRET_KEY environment variable not set.", file=sys.stderr)
         sys.exit(1)
-    
+
     start_time = time.time()
-    tesseract_check()
     models_check(args.lang)
 
     allow_list = DEFAULT_ALLOW_LIST + [term.strip() for term in args.allow_list.split(',') if term]
     entities_to_preserve = [e.strip().upper() for e in args.preserve_entities.split(',') if e]
-    
+
     def anonymizer_func(text_to_anonymize):
         analyzer_engine, anonymizer_engine = get_or_create_engines_lazily(args.lang)
         return anonymize_text(text_to_anonymize, analyzer_engine, anonymizer_engine, allow_list, entities_to_preserve, lang=args.lang)
 
     print(f"[+] Processing file: {args.file_path}...")
     ext = os.path.splitext(args.file_path)[1].lower()
-    
+
     file_processors = {
         ".txt": process_plain_text_and_pdf,
         ".pdf": process_plain_text_and_pdf,
@@ -266,13 +281,22 @@ def main():
         ".xlsx": process_xlsx,
         ".xml": process_xml,
         ".json": process_json,
+        ".jpeg": process_image_file,
+        ".png": process_image_file,
+        ".gif": process_image_file,
+        ".bmp": process_image_file,
+        ".tiff": process_image_file,
+        ".tif": process_image_file,
+        ".webp": process_image_file,
+        ".jp2": process_image_file,
+        ".pnm": process_image_file,
     }
 
     processor = file_processors.get(ext)
     if not processor:
         print(f"[!] Unsupported file format: {ext}", file=sys.stderr)
         sys.exit(1)
-        
+
     try:
         if ext == ".csv":
             output_file = processor(args.file_path, args.lang, allow_list, entities_to_preserve)
