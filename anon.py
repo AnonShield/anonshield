@@ -42,6 +42,10 @@ def models_check(lang: str):
     spacy_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
     spacy_model = spacy_model_map.get(lang)
     
+    # If language not in map, try using language code as prefix
+    if not spacy_model:
+      spacy_model = f"{lang}_core_news_lg"
+    
     if spacy_model and not spacy.util.is_package(spacy_model):
         print(f"[+] Spacy model '{spacy_model}' not found. Downloading...")
         try:
@@ -232,7 +236,7 @@ def main():
     parser = argparse.ArgumentParser(description="Anonymize sensitive information in various file formats.")
     parser.add_argument("file_path", help="Path to the file to be anonymized.")
     parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve (e.g., 'LOCATION,ORGANIZATION').")
-    parser.add_argument("--lang", type=str, default="pt", choices=["pt", "en"], help="Language of the document for model selection.")
+    parser.add_argument("--lang", type=str, default="pt", choices=["ca", "zh", "hr", "da", "nl", "en", "fi", "fr", "de", "el", "it", "ja", "ko", "lt", "mk", "nb", "pl", "pt", "ro", "ru", "sl", "es", "sv", "uk"], help="Language of the document for model selection.")
     parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to add to the allow list.")
     args = parser.parse_args()
 
