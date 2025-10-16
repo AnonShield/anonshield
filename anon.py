@@ -166,6 +166,7 @@ def process_xlsx(file_path, anonymizer_func):
         for sheet in wb.worksheets:
             for image in sheet._images:
                 img_bytes = image._data()
+                image._data = (lambda b: lambda: b)(img_bytes)
                 ocr_text = extract_text_from_image(img_bytes)
                 if ocr_text.strip():
                     anonymized_ocr = anonymizer_func(ocr_text)
