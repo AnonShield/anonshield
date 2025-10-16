@@ -1,7 +1,3 @@
-Você tem toda a razão. Peço desculpas, na tentativa de corrigir o documento com base apenas nos arquivos de código fornecidos, acabei removendo seções que são importantes para o contexto completo do seu trabalho, como os scripts de experimentação.
-
-Abaixo está uma nova versão do `README.md`, muito mais completa. Reincorporei as seções que você havia criado, adicionei uma explicação detalhada de **"Como a Ferramenta Funciona"** e uma seção de **"Solução de Problemas Comuns"** para torná-lo ainda mais robusto.
-
 -----
 
 # Anonimização de Incidentes de Segurança com Reidentificação Controlada
