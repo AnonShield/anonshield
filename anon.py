@@ -9,7 +9,7 @@ import sys
 import time
 import warnings
 
-import fitz  # PyMuPDF
+import pymupdf as fitz
 import numpy as np 
 import openpyxl
 import pandas as pd
@@ -36,6 +36,73 @@ def tesseract_check():
     except pytesseract.TesseractNotFoundError:
         print("[!] Tesseract is not installed or not in your PATH. It is required for processing images.", file=sys.stderr)
         sys.exit(1)
+
+def ocr_check(file_path: str) -> bool:
+    # Text documents: detect whether OCR would be necessary
+    ext = os.path.splitext(file_path)[1].lower()
+    need_ocr = False
+
+    try: 
+        if ext == ".pdf": 
+            with fitz.open(file_path) as doc:
+                for page in doc:
+                    text = page.get_text()
+                    images = page.get_images(full=True)
+                    if images and not text.strip():
+                        need_ocr = True
+                        break
+
+        elif ext == ".docx":
+            doc = Document(file_path)
+            for para in doc.paragraphs:
+                for run in para.runs:
+                    for inline in run._r.xpath(".//w:drawing"):
+                        blip_embeds = inline.xpath(".//a:blip/@r:embed")
+                        if blip_embeds:
+                            need_ocr = True
+                            break
+                    if need_ocr:
+                        break
+                if need_ocr:
+                    break
+                
+        elif ext in (".xlsx"):
+            wb = openpyxl.load_workbook(file_path)
+            for sheet in wb.worksheets:
+                if hasattr(sheet, '_images') and sheet._images:  # type: ignore
+                    need_ocr = True
+                    break
+        else:
+            # other text types (txt, csv) -> no OCR
+            need_ocr = False
+    except Exception: 
+        # on error, assume no OCR needed
+        need_ocr = False
+        
+    return need_ocr
+
+
+# Decide whether OCR should be performed for a given file.
+def ensure_ocr_policy(file_path: str, is_image_file: bool) -> bool:
+    # If image file (PNG, JPG, etc), require Tesseract and abort
+    if is_image_file:
+        tesseract_check()
+        return True
+    
+    # If OCR is needed (text files), check for Tesseract without aborting
+    need_ocr = ocr_check(file_path)
+
+    if not need_ocr:
+        return False
+
+    # if OCR is needed but Tesseract is missing, warn and skip OCR
+    if need_ocr:
+        try:
+            pytesseract.get_tesseract_version()
+            return True
+        except pytesseract.TesseractNotFoundError:
+            print(f"[!] Warning: '{file_path}' contains images or scanned pages but Tesseract is not available. Image OCR will be skipped.", file=sys.stderr)
+            return False
 
 def models_check(lang: str):
     """Downloads and verifies necessary spaCy and Transformer models."""
@@ -89,14 +156,32 @@ def process_plain_text_and_pdf(file_path, anonymizer_func):
     if ext == ".txt":
         with open(file_path, "r", encoding="utf-8") as f: content = f.read()
     elif ext == ".pdf":
-        tesseract_check()
-        parts = []
+        parts: list[str] = []
+        images_for_ocr: list[bytes] = []
+        need_ocr = False
+
         with fitz.open(file_path) as doc:
             for page in doc:
-                parts.append(page.get_text())
-                for img in page.get_images(full=True):
-                    base_image = doc.extract_image(img[0])
-                    parts.append(extract_text_from_image(base_image["image"]))
+                page_text = page.get_text()
+                parts.append(page_text)
+
+                images = page.get_images(full=True)
+                if images:
+                    # collect image bytes to OCR only if needed
+                    for img in images:
+                        base_image = doc.extract_image(img[0])
+                        images_for_ocr.append(base_image["image"])
+                    # if page has no extractable text, OCR would be needed
+                    if not page_text.strip():
+                        need_ocr = True
+
+        if need_ocr and images_for_ocr:
+            # decide via central policy whether to OCR for this document
+            do_ocr = ensure_ocr_policy(file_path, is_image_file=False)
+            if do_ocr:
+                for img_bytes in images_for_ocr:
+                    parts.append(extract_text_from_image(img_bytes))
+
         content = "\n".join(parts)
 
     anonymized_content = anonymizer_func(content)
@@ -106,12 +191,11 @@ def process_plain_text_and_pdf(file_path, anonymizer_func):
 
 def process_docx_with_ocr(file_path, anonymizer_func):
     """Processes DOCX files, extracting text from paragraphs and images (OCR)."""
-    tesseract_check()
     doc = Document(file_path)
     data_parts = []
     images_to_process = []
 
-    # Extrai texto e referências de imagem
+    # Extract text and collect image blobs (don't OCR yet)
     for para in doc.paragraphs:
         data_parts.append(para.text)
         for run in para.runs:
@@ -123,10 +207,13 @@ def process_docx_with_ocr(file_path, anonymizer_func):
                             images_to_process.append(rel.target_part.blob)
                             data_parts.append("__IMAGE_PLACEHOLDER__")
 
-    # Processa imagens com OCR
-    image_texts = [extract_text_from_image(img_bytes) for img_bytes in images_to_process]
+    image_texts: list[str] = []
+    if images_to_process:
+        do_ocr = ensure_ocr_policy(file_path, is_image_file=False)
+        if do_ocr:
+            image_texts = [extract_text_from_image(img_bytes) for img_bytes in images_to_process]
 
-    # Combina texto de parágrafos e de imagens
+    # Combine text and image OCR results
     image_text_iter = iter(image_texts)
     full_content = "\n".join(
         [part if part != "__IMAGE_PLACEHOLDER__" else next(image_text_iter, "") for part in data_parts]
@@ -167,14 +254,16 @@ def process_xlsx(file_path, anonymizer_func):
         if hasattr(sheet, '_images') and sheet._images: # type: ignore
             images_to_process = list(sheet._images) # type: ignore
 
-            for image in images_to_process:
-                img_bytes = image._data()
-                image._data = (lambda b: lambda: b)(img_bytes)
+            do_ocr = ensure_ocr_policy(file_path, is_image_file=False)
+            if do_ocr:
+                for image in images_to_process:
+                    img_bytes = image._data()
+                    image._data = (lambda b: lambda: b)(img_bytes)
 
-                ocr_text = extract_text_from_image(img_bytes)
-                if ocr_text.strip():
-                    anonymized_ocr = anonymizer_func(ocr_text)
-                    image_replacements.append((image.anchor, anonymized_ocr))
+                    ocr_text = extract_text_from_image(img_bytes)
+                    if ocr_text.strip():
+                        anonymized_ocr = anonymizer_func(ocr_text)
+                        image_replacements.append((image.anchor, anonymized_ocr))
 
             sheet._images.clear() # type: ignore
 
@@ -237,13 +326,15 @@ def process_json(file_path, anonymizer_func):
 
 def process_image_file(file_path, anonymizer_func):
     """Processes a single image file using OCR."""
-    tesseract_check()
+    # For standalone image files require Tesseract; ensure_ocr_policy will abort via tesseract_check()
+    ensure_ocr_policy(file_path, is_image_file=True)
+
     with open(file_path, "rb") as f:
         image_bytes = f.read()
-    
+
     extracted_text = extract_text_from_image(image_bytes)
     anonymized_content = anonymizer_func(extracted_text)
-    
+
     output_path = get_output_path(file_path, ".txt")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(anonymized_content)
