@@ -40,25 +40,25 @@ def tesseract_check():
 def models_check(lang: str):
     """Downloads and verifies necessary spaCy and Transformer models."""
     spacy_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
-    spacy_model = spacy_model_map.get(lang)
-    
-    # If language not in map, try using language code as prefix
-    if not spacy_model:
-      spacy_model = f"{lang}_core_news_lg"
-    
-    if spacy_model and not spacy.util.is_package(spacy_model):
-        print(f"[+] Spacy model '{spacy_model}' not found. Downloading...")
-        try:
-            subprocess.run(
-                [sys.executable, "-m", "spacy", "download", spacy_model], 
-                check=True, capture_output=True, text=True
-            )
-            print(f"[*] Successfully downloaded '{spacy_model}'.")
-            if not spacy.util.is_package(spacy_model):
-                raise Exception(f"Model '{spacy_model}' downloaded but still not available.")
-        except subprocess.CalledProcessError as e:
-            print(f"[!] Failed to download spaCy model '{spacy_model}'.", file=sys.stderr)
-            sys.exit(1)
+    en_model = spacy_model_map["en"]
+
+    # Try to download the requested spaCy model if not present
+    requested = spacy_model_map.get(lang) or f"{lang}_core_news_lg"
+
+    for model in (en_model, requested):
+        if model and not spacy.util.is_package(model):
+            print(f"[+] Spacy model '{model}' not found. Downloading...")
+            try:
+                subprocess.run(
+                    [sys.executable, "-m", "spacy", "download", model],
+                    check=True, capture_output=True, text=True,
+                )
+                print(f"[*] Successfully downloaded '{model}'.")
+                if not spacy.util.is_package(model):
+                    raise Exception(f"Model '{model}' downloaded but still not available.")
+            except subprocess.CalledProcessError:
+                print(f"[!] Failed to download spaCy model '{model}'.", file=sys.stderr)
+                sys.exit(1)
 
     if not os.path.exists(TRF_MODEL_PATH):
         print(f"[!] Downloading Transformer model '{TRANSFORMER_MODEL}'...")
@@ -271,7 +271,7 @@ def main():
     parser = argparse.ArgumentParser(description="Anonymize sensitive information in various file formats.")
     parser.add_argument("file_path", help="Path to the file to be anonymized.")
     parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve (e.g., 'LOCATION,ORGANIZATION').")
-    parser.add_argument("--lang", type=str, default="pt", choices=["ca", "zh", "hr", "da", "nl", "en", "fi", "fr", "de", "el", "it", "ja", "ko", "lt", "mk", "nb", "pl", "pt", "ro", "ru", "sl", "es", "sv", "uk"], help="Language of the document for model selection.")
+    parser.add_argument("--lang", type=str, default="en", choices=["ca", "zh", "hr", "da", "nl", "en", "fi", "fr", "de", "el", "it", "ja", "ko", "lt", "mk", "nb", "pl", "pt", "ro", "ru", "sl", "es", "sv", "uk"], help="Language of the document for model selection.")
     parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to add to the allow list.")
     args = parser.parse_args()
 
