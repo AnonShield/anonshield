@@ -56,20 +56,34 @@ def load_custom_recognizers():
     return [cve_recognizer, ip_recognizer]
 
 
-def get_presidio_engines(lang: str = "pt") -> tuple[AnalyzerEngine, AnonymizerEngine]:
+def get_presidio_engines(lang: str = "en") -> tuple[AnalyzerEngine, AnonymizerEngine]:
     """Initializes and returns the Presidio Analyzer and Anonymizer engines for a specific language."""
     
     lang_model_map = { "pt": "pt_core_news_lg", "en": "en_core_web_lg" }
-    spacy_model_name = lang_model_map.get(lang, "xx_ent_wiki_sm")
+    spacy_model_name = lang_model_map.get(lang, f"{lang}_core_news_lg")
 
+    # Always load English model
     try:
-        spacy.load(spacy_model_name)
-        print(f"[*] Successfully loaded spaCy model '{spacy_model_name}'.")
+        spacy.load("en_core_web_lg")
+        print(f"[*] Successfully loaded spaCy model 'en_core_web_lg'.")
     except OSError:
-        print(f"[!] Critical Error: spaCy model '{spacy_model_name}' could not be loaded even after download.", file=sys.stderr)
+        print(f"[!] Critical Error: spaCy model 'en_core_web_lg' could not be loaded.", file=sys.stderr)
         sys.exit(1)
 
-    trf_model_config = [{"lang_code": lang, "model_name": {"spacy": spacy_model_name, "transformers": TRANSFORMER_MODEL}}]
+    # Load the selected language model if it's not English
+    if lang != "en":
+        try:
+            spacy.load(spacy_model_name)
+            print(f"[*] Successfully loaded spaCy model '{spacy_model_name}'.")
+        except OSError:
+            print(f"[!] Critical Error: spaCy model '{spacy_model_name}' could not be loaded.", file=sys.stderr)
+            sys.exit(1)
+
+    trf_model_config = [
+        {"lang_code": "en", "model_name": {"spacy": "en_core_web_lg", "transformers": TRANSFORMER_MODEL}},
+        {"lang_code": lang, "model_name": {"spacy": spacy_model_name, "transformers": TRANSFORMER_MODEL}}
+    ]
+    
     ner_model_configuration = NerModelConfiguration(
         model_to_presidio_entity_mapping=ENTITY_MAPPING, alignment_mode="expand",
         aggregation_strategy="max", labels_to_ignore=["O"],

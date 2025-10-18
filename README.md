@@ -249,6 +249,11 @@ uv run deanonymize.py "[PERSON_a1b2c3d4e5f6...]"
       - **Causa**: O Tesseract OCR não foi encontrado no seu sistema.
       - **Solução**: Siga as instruções de instalação na seção **Pré-requisitos**. Se você já instalou (especialmente no Windows), verifique se o local da instalação foi adicionado à variável de ambiente `PATH`.
 
+   - **Aviso: `[!] Tesseract is not installed or not in your PATH...`**
+
+      - **Causa**: O Tesseract OCR não foi encontrado no seu sistema.
+      - **Solução**: Siga as instruções de instalação na seção **Pré-requisitos**. Se você já instalou (especialmente no Windows), verifique se o local da instalação foi adicionado à variável de ambiente `PATH`.
+
   - **Erro: `[!] Error: ANON_SECRET_KEY environment variable not set.`**
 
       - **Causa**: A chave secreta não foi configurada.

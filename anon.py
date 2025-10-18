@@ -9,7 +9,7 @@ import sys
 import time
 import warnings
 
-import fitz  # PyMuPDF
+import pymupdf as fitz
 import numpy as np 
 import openpyxl
 import pandas as pd
@@ -18,7 +18,7 @@ import spacy
 import spacy.cli
 from docx import Document
 from huggingface_hub import snapshot_download
-from lxml import etree
+from lxml import etree # type: ignore
 from PIL import Image
 
 from config import DEFAULT_ALLOW_LIST, SECRET_KEY, TRANSFORMER_MODEL, TRF_MODEL_PATH
@@ -34,28 +34,66 @@ def tesseract_check():
     try:
         pytesseract.get_tesseract_version()
     except pytesseract.TesseractNotFoundError:
-        print("[!] Tesseract is not installed or not in your PATH.", file=sys.stderr)
+        print("[!] Tesseract is not installed or not in your PATH. It is required for processing images.", file=sys.stderr)
         sys.exit(1)
+
+def ocr_check(file_path: str) -> bool:
+    """Checks if a file requires OCR processing."""
+    ext = os.path.splitext(file_path)[1].lower()
+    return ext in (".pdf", ".docx", ".xlsx")
+
+
+def ensure_ocr_policy(file_path: str, is_image_file: bool, need_ocr_hint: bool | None = None) -> bool:
+    """Decide whether OCR should be performed for a given file
+
+    - need_ocr_hint: if the caller already determined that OCR is
+        needed (True/False), pass it to avoid re-opening the file
+    """
+    # If image file (PNG, JPG, etc), require Tesseract and abort early
+    if is_image_file:
+        tesseract_check()
+        return True
+
+    # Use caller's precomputed decision if available to avoid duplicate IO
+    if need_ocr_hint is None:
+        need_ocr = ocr_check(file_path)
+    else:
+        need_ocr = bool(need_ocr_hint)
+
+    if not need_ocr:
+        return False
+
+    # if OCR is needed but Tesseract is missing, warn and skip OCR
+    try:
+        pytesseract.get_tesseract_version()
+        return True
+    except pytesseract.TesseractNotFoundError:
+        print(f"[!] Warning: '{file_path}' contains images or scanned pages but Tesseract is not available. Image OCR will be skipped.", file=sys.stderr)
+        return False
 
 def models_check(lang: str):
     """Downloads and verifies necessary spaCy and Transformer models."""
     spacy_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
-    spacy_model = spacy_model_map.get(lang)
-    
-    if spacy_model and not spacy.util.is_package(spacy_model):
-        print(f"[+] Spacy model '{spacy_model}' not found. Downloading...")
-        try:
-            subprocess.run(
-                [sys.executable, "-m", "spacy", "download", spacy_model], 
-                check=True, capture_output=True, text=True
-            )
-            print(f"[*] Successfully downloaded '{spacy_model}'.")
-            if not spacy.util.is_package(spacy_model):
-                raise Exception(f"Model '{spacy_model}' downloaded but still not available.")
-        except subprocess.CalledProcessError as e:
-            print(f"[!] Failed to download spaCy model '{spacy_model}'.", file=sys.stderr)
-            sys.exit(1)
-            
+    en_model = spacy_model_map["en"]
+
+    # Try to download the requested spaCy model if not present
+    requested = spacy_model_map.get(lang) or f"{lang}_core_news_lg"
+
+    for model in (en_model, requested):
+        if model and not spacy.util.is_package(model):
+            print(f"[+] Spacy model '{model}' not found. Downloading...")
+            try:
+                subprocess.run(
+                    [sys.executable, "-m", "spacy", "download", model],
+                    check=True, capture_output=True, text=True,
+                )
+                print(f"[*] Successfully downloaded '{model}'.")
+                if not spacy.util.is_package(model):
+                    raise Exception(f"Model '{model}' downloaded but still not available.")
+            except subprocess.CalledProcessError:
+                print(f"[!] Failed to download spaCy model '{model}'.", file=sys.stderr)
+                sys.exit(1)
+
     if not os.path.exists(TRF_MODEL_PATH):
         print(f"[!] Downloading Transformer model '{TRANSFORMER_MODEL}'...")
         snapshot_download(repo_id=TRANSFORMER_MODEL, cache_dir=TRF_MODEL_PATH, max_workers=10)
@@ -78,7 +116,6 @@ def get_or_create_engines_lazily(lang: str):
 
 # --- File Processors ---
 
-# <--- ALTERADO: Antiga 'process_text_based' renomeada e focada em TXT e PDF --->
 def process_plain_text_and_pdf(file_path, anonymizer_func):
     """Processes plain text and PDF files, including OCR for PDFs."""
     ext = os.path.splitext(file_path)[1].lower()
@@ -86,28 +123,46 @@ def process_plain_text_and_pdf(file_path, anonymizer_func):
     if ext == ".txt":
         with open(file_path, "r", encoding="utf-8") as f: content = f.read()
     elif ext == ".pdf":
-        parts = []
+        parts: list[str] = []
+        images_for_ocr: list[bytes] = []
+        need_ocr = False
+
         with fitz.open(file_path) as doc:
             for page in doc:
-                parts.append(page.get_text())
-                for img in page.get_images(full=True):
-                    base_image = doc.extract_image(img[0])
-                    parts.append(extract_text_from_image(base_image["image"]))
+                page_text = page.get_text()
+                parts.append(page_text)
+
+                images = page.get_images(full=True)
+                if images:
+                    # collect image bytes to OCR only if needed
+                    for img in images:
+                        base_image = doc.extract_image(img[0])
+                        images_for_ocr.append(base_image["image"])
+                    # if page has no extractable text, OCR would be needed
+                    if not page_text.strip():
+                        need_ocr = True
+
+        if need_ocr and images_for_ocr:
+            # decide via central policy whether to OCR for this document
+            do_ocr = ensure_ocr_policy(file_path, is_image_file=False, need_ocr_hint=need_ocr)
+            if do_ocr:
+                for img_bytes in images_for_ocr:
+                    parts.append(extract_text_from_image(img_bytes))
+
         content = "\n".join(parts)
-    
+
     anonymized_content = anonymizer_func(content)
     output_path = get_output_path(file_path, ".txt")
     with open(output_path, "w", encoding="utf-8") as f: f.write(anonymized_content)
     return output_path
 
-# <--- ADICIONADO: Novo processador para DOCX com OCR --->
 def process_docx_with_ocr(file_path, anonymizer_func):
     """Processes DOCX files, extracting text from paragraphs and images (OCR)."""
     doc = Document(file_path)
     data_parts = []
     images_to_process = []
 
-    # Extrai texto e referências de imagem
+    # Extract text and collect image blobs (don't OCR yet)
     for para in doc.paragraphs:
         data_parts.append(para.text)
         for run in para.runs:
@@ -119,10 +174,15 @@ def process_docx_with_ocr(file_path, anonymizer_func):
                             images_to_process.append(rel.target_part.blob)
                             data_parts.append("__IMAGE_PLACEHOLDER__")
 
-    # Processa imagens com OCR
-    image_texts = [extract_text_from_image(img_bytes) for img_bytes in images_to_process]
-    
-    # Combina texto de parágrafos e de imagens
+    image_texts: list[str] = []
+    if images_to_process:
+        # We already detected embedded images; pass the precomputed flag to
+        # avoid re-opening/parsing the DOCX inside ensure_ocr_policy.
+        do_ocr = ensure_ocr_policy(file_path, is_image_file=False, need_ocr_hint=True)
+        if do_ocr:
+            image_texts = [extract_text_from_image(img_bytes) for img_bytes in images_to_process]
+
+    # Combine text and image OCR results
     image_text_iter = iter(image_texts)
     full_content = "\n".join(
         [part if part != "__IMAGE_PLACEHOLDER__" else next(image_text_iter, "") for part in data_parts]
@@ -133,52 +193,79 @@ def process_docx_with_ocr(file_path, anonymizer_func):
     with open(output_path, "w", encoding="utf-8") as f: f.write(anonymized_content)
     return output_path
 
-# <--- ADICIONADO: Novo processador para CSV com BATCH --->
 def process_csv_batched(file_path, lang, allow_list, entities_to_preserve):
     """Processes CSV files in batches for performance."""
     df = pd.read_csv(file_path, dtype=str)
     analyzer_engine, anonymizer_engine = get_or_create_engines_lazily(lang)
-    
-    all_values = df.values.flatten().tolist()
-    
+
+    all_values = [str(val) if val is not None else "" for val in df.values.flatten().tolist()]
+
     anonymized_values = batch_process_text(
         all_values, analyzer_engine, anonymizer_engine, lang, allow_list, entities_to_preserve
     )
-    
+
     anonymized_array = np.array(anonymized_values).reshape(df.shape)
     anonymized_df = pd.DataFrame(anonymized_array, columns=df.columns, index=df.index)
-    
+
     output_path = get_output_path(file_path, ".csv")
     anonymized_df.to_csv(output_path, index=False, encoding="utf-8")
     return output_path
 
 def process_xlsx(file_path, anonymizer_func):
-    """Processes XLSX files, preserving structure, and now including OCR for images."""
+    """
+    Processes XLSX files by anonymizing text in cells and replacing images
+    with their anonymized OCR text.
+    """
     wb = openpyxl.load_workbook(file_path)
-    image_texts_anonymized = []
 
     for sheet in wb.worksheets:
-        for image in sheet._images:
-            img_bytes = image._data()
-            ocr_text = extract_text_from_image(img_bytes)
-            if ocr_text.strip():
-                anonymized_ocr = anonymizer_func(ocr_text)
-                image_texts_anonymized.append(anonymized_ocr)
+        image_replacements = []
+        if hasattr(sheet, '_images') and sheet._images: # type: ignore
+            images_to_process = list(sheet._images) # type: ignore
 
-    for sheet in wb.worksheets:
+            # We already know the sheet has embedded images; pass that as a
+            # precomputed hint so ensure_ocr_policy doesn't reopen the file.
+            do_ocr = ensure_ocr_policy(file_path, is_image_file=False, need_ocr_hint=True)
+            if do_ocr:
+                for image in images_to_process:
+                    # extract image bytes, ensure the openpyxl image keeps its data
+                    img_bytes = image._data()
+                    image._data = (lambda b: lambda: b)(img_bytes)
+
+                    # Perform OCR per-image
+                    ocr_text = extract_text_from_image(img_bytes)
+                    if ocr_text.strip():
+                        anonymized_ocr = anonymizer_func(ocr_text)
+                        image_replacements.append((image.anchor, anonymized_ocr))
+
+            sheet._images.clear() # type: ignore
+
+        # Anonymize cell text
         for row in sheet.iter_rows():
             for cell in row:
                 if cell.value and isinstance(cell.value, str):
                     cell.value = anonymizer_func(cell.value)
 
-    if image_texts_anonymized:
-        ws = wb.worksheets[0]
-        ws.append([]) 
-        ws.append(["--- ANONYMIZED IMAGE TEXT (OCR) ---"])
-        for text in image_texts_anonymized:
-            for line in text.split('\n'):
-                ws.append([line])
-    
+        # Add the anonymized image text to cells
+        for anchor, text in image_replacements:
+            try:
+                if hasattr(anchor, '_from') and hasattr(anchor._from, 'row') and hasattr(anchor._from, 'col'):
+                    row = anchor._from.row + 1
+                    col = anchor._from.col + 1
+                    cell = sheet.cell(row=row, column=col)
+                    
+                    existing_value = cell.value
+                    if existing_value:
+                        cell.value = f"{text}\n{existing_value}" # type: ignore
+                    else:
+                        cell.value = text
+                else:
+                    # Fallback: append to end of sheet
+                    sheet.append([f"Anonymized image text:", text])
+            except Exception:
+                # If any error occurs, append to end of sheet
+                sheet.append([f"Anonymized image text:", text])
+
     output_path = get_output_path(file_path, ".xlsx")
     wb.save(output_path)
     return output_path
@@ -197,7 +284,7 @@ def process_xml(file_path, anonymizer_func):
 def process_json(file_path, anonymizer_func):
     """Processes JSON files, preserving their nested structure."""
     with open(file_path, "r", encoding="utf-8") as f: data = json.load(f)
-    
+
     def recursive_anonymize(obj):
         if isinstance(obj, dict): return {k: recursive_anonymize(v) for k, v in obj.items()}
         elif isinstance(obj, list): return [recursive_anonymize(item) for item in obj]
@@ -208,6 +295,22 @@ def process_json(file_path, anonymizer_func):
     output_path = get_output_path(file_path, ".json")
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(anonymized_data, f, indent=4, ensure_ascii=False)
+    return output_path
+
+def process_image_file(file_path, anonymizer_func):
+    """Processes a single image file using OCR."""
+    # For standalone image files require Tesseract; ensure_ocr_policy will abort via tesseract_check()
+    ensure_ocr_policy(file_path, is_image_file=True)
+
+    with open(file_path, "rb") as f:
+        image_bytes = f.read()
+
+    extracted_text = extract_text_from_image(image_bytes)
+    anonymized_content = anonymizer_func(extracted_text)
+
+    output_path = get_output_path(file_path, ".txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(anonymized_content)
     return output_path
 
 # --- Utility Functions ---
@@ -232,28 +335,27 @@ def main():
     parser = argparse.ArgumentParser(description="Anonymize sensitive information in various file formats.")
     parser.add_argument("file_path", help="Path to the file to be anonymized.")
     parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve (e.g., 'LOCATION,ORGANIZATION').")
-    parser.add_argument("--lang", type=str, default="pt", choices=["pt", "en"], help="Language of the document for model selection.")
+    parser.add_argument("--lang", type=str, default="en", choices=["ca", "zh", "hr", "da", "nl", "en", "fi", "fr", "de", "el", "it", "ja", "ko", "lt", "mk", "nb", "pl", "pt", "ro", "ru", "sl", "es", "sv", "uk"], help="Language of the document for model selection.")
     parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to add to the allow list.")
     args = parser.parse_args()
 
     if not SECRET_KEY:
         print("[!] Error: ANON_SECRET_KEY environment variable not set.", file=sys.stderr)
         sys.exit(1)
-    
+
     start_time = time.time()
-    tesseract_check()
     models_check(args.lang)
 
     allow_list = DEFAULT_ALLOW_LIST + [term.strip() for term in args.allow_list.split(',') if term]
     entities_to_preserve = [e.strip().upper() for e in args.preserve_entities.split(',') if e]
-    
+
     def anonymizer_func(text_to_anonymize):
         analyzer_engine, anonymizer_engine = get_or_create_engines_lazily(args.lang)
         return anonymize_text(text_to_anonymize, analyzer_engine, anonymizer_engine, allow_list, entities_to_preserve, lang=args.lang)
 
     print(f"[+] Processing file: {args.file_path}...")
     ext = os.path.splitext(args.file_path)[1].lower()
-    
+
     file_processors = {
         ".txt": process_plain_text_and_pdf,
         ".pdf": process_plain_text_and_pdf,
@@ -262,13 +364,22 @@ def main():
         ".xlsx": process_xlsx,
         ".xml": process_xml,
         ".json": process_json,
+        ".jpeg": process_image_file,
+        ".png": process_image_file,
+        ".gif": process_image_file,
+        ".bmp": process_image_file,
+        ".tiff": process_image_file,
+        ".tif": process_image_file,
+        ".webp": process_image_file,
+        ".jp2": process_image_file,
+        ".pnm": process_image_file,
     }
 
     processor = file_processors.get(ext)
     if not processor:
         print(f"[!] Unsupported file format: {ext}", file=sys.stderr)
         sys.exit(1)
-        
+
     try:
         if ext == ".csv":
             output_file = processor(args.file_path, args.lang, allow_list, entities_to_preserve)
