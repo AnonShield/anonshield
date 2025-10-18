@@ -21,8 +21,8 @@ from huggingface_hub import snapshot_download
 from lxml import etree # type: ignore
 from PIL import Image
 
-from config import DEFAULT_ALLOW_LIST, SECRET_KEY, TRANSFORMER_MODEL, TRF_MODEL_PATH
-from engine import anonymize_text, get_presidio_engines, batch_process_text 
+from config import DEFAULT_ALLOW_LIST, SECRET_KEY, TRANSFORMER_MODEL, TRF_MODEL_PATH, ENTITY_MAPPING
+from engine import anonymize_text, get_presidio_engines, batch_process_text, load_custom_recognizers
 
 warnings.filterwarnings("ignore")
 
@@ -333,11 +333,41 @@ def write_report(file_path, start_time):
 def main():
     """Main function to parse arguments and orchestrate the anonymization process."""
     parser = argparse.ArgumentParser(description="Anonymize sensitive information in various file formats.")
-    parser.add_argument("file_path", help="Path to the file to be anonymized.")
+    parser.add_argument("file_path", nargs='?', help="Path to the file to be anonymized.")
+    parser.add_argument("--list-entities", action="store_true", help="List all supported entity types and exit.")
     parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve (e.g., 'LOCATION,ORGANIZATION').")
     parser.add_argument("--lang", type=str, default="en", choices=["ca", "zh", "hr", "da", "nl", "en", "fi", "fr", "de", "el", "it", "ja", "ko", "lt", "mk", "nb", "pl", "pt", "ro", "ru", "sl", "es", "sv", "uk"], help="Language of the document for model selection.")
     parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to add to the allow list.")
     args = parser.parse_args()
+
+    def get_supported_entities() -> list[str]:
+        """Return a sorted list of supported entity names gathered from config and custom recognizers."""
+        supported = set()
+        if isinstance(ENTITY_MAPPING, dict):
+            supported.update(v for v in ENTITY_MAPPING.values() if v)
+
+        try:
+            for r in load_custom_recognizers():
+                ent = getattr(r, "supported_entity", None) or getattr(r, "supported_entities", None)
+                if isinstance(ent, (list, tuple, set)):
+                    supported.update(e for e in ent if e)
+                elif ent:
+                    supported.add(ent)
+        except Exception as exc:
+            print(f"[!] Warning: failed to read custom recognizers: {exc}", file=sys.stderr)
+
+        return sorted(supported)
+
+    if args.list_entities:
+        supported_list = get_supported_entities()
+        print("[*] Supported entity types:")
+        for entity in supported_list:
+            print(f" - {entity}")
+        sys.exit(0)
+
+    # If not listing entities, file_path is required
+    if not args.list_entities and not args.file_path:
+        parser.error("the following arguments are required: file_path")
 
     if not SECRET_KEY:
         print("[!] Error: ANON_SECRET_KEY environment variable not set.", file=sys.stderr)
@@ -347,7 +377,14 @@ def main():
     models_check(args.lang)
 
     allow_list = DEFAULT_ALLOW_LIST + [term.strip() for term in args.allow_list.split(',') if term]
-    entities_to_preserve = [e.strip().upper() for e in args.preserve_entities.split(',') if e]
+    # Normalize and validate entities_to_preserve
+    requested_preserve = [e.strip().upper() for e in args.preserve_entities.split(',') if e and e.strip()]
+    supported_entities_upper = {s.upper() for s in get_supported_entities()}
+    unknown = [e for e in requested_preserve if e not in supported_entities_upper]
+    if unknown:
+        print(f"[!] Warning: the following --preserve-entities values are not supported and will be ignored: {', '.join(unknown)}", file=sys.stderr)
+
+    entities_to_preserve = [e for e in requested_preserve if e in supported_entities_upper]
 
     def anonymizer_func(text_to_anonymize):
         analyzer_engine, anonymizer_engine = get_or_create_engines_lazily(args.lang)

@@ -70,6 +70,25 @@ O processo de anonimização segue um fluxo bem definido para garantir seguranç
 1.  **Leitura e Extração**: O script `anon.py` lê o arquivo de entrada e detecta seu formato (e.g., `.txt`, `.pdf`, `.json`). Ele extrai todo o conteúdo textual. Para arquivos PDF, ele também utiliza **Tesseract OCR** para extrair texto de imagens incorporadas.
 2.  **Carregamento dos Motores de IA**: Os motores de NLP da biblioteca **Presidio** são inicializados. A ferramenta utiliza um modelo spaCy (`pt_core_news_lg` ou `en_core_web_lg`) para tarefas gerais e um modelo Transformer (`Davlan/xlm-roberta-base-ner-hrl`) para um reconhecimento de entidades mais apurado. Os modelos são carregados de forma "lazy", ou seja, apenas na primeira vez que são necessários.
 3.  **Análise e Detecção**: O texto extraído é processado pelo motor de análise, que identifica informações sensíveis (PII) como nomes de pessoas (`PERSON`), locais (`LOCATION`), organizações (`ORGANIZATION`), e-mails, etc. A ferramenta também utiliza reconhecedores personalizados para entidades como `CVE` e `IP_ADDRESS`.
+
+### Entidades suportadas
+
+A ferramenta detecta (por padrão) as seguintes entidades:
+
+- PERSON
+- LOCATION
+- ORGANIZATION
+- EMAIL_ADDRESS
+- PHONE_NUMBER
+- CVE
+- IP_ADDRESS
+
+Essas entidades são derivadas do mapeamento de labels do modelo (em `config.py`) e de reconhecedores customizados carregados em `engine.py`. Você pode ver a lista completa em tempo de execução usando a opção de linha de comando `--list-entities`:
+
+```bash
+uv run anon.py --list-entities
+```
+
 4.  **Geração de Slug e Armazenamento**: Para cada entidade detectada, a ferramenta gera um "slug" anonimizado. Esse slug é um hash **HMAC-SHA256** do texto original, usando a `ANON_SECRET_KEY` como chave. A relação entre o texto original e seu hash é armazenada de forma segura em um banco de dados SQLite no diretório `db/`. Isso garante que a mesma entidade (e.g., o nome "João da Silva") sempre gere o mesmo slug, mantendo a consistência.
 5.  **Substituição**: O texto original é substituído pelo slug anonimizado, no formato `[TIPO_DA_ENTIDADE_hash...]` (ex: `[PERSON_a1b2c3d4...]`).
 6.  **Geração de Arquivos**: Um novo arquivo com o conteúdo anonimizado é salvo no diretório `output/`, e um relatório de execução é gerado em `logs/`.
