@@ -38,71 +38,38 @@ def tesseract_check():
         sys.exit(1)
 
 def ocr_check(file_path: str) -> bool:
-    # Text documents: detect whether OCR would be necessary
+    """Checks if a file requires OCR processing."""
     ext = os.path.splitext(file_path)[1].lower()
-    need_ocr = False
-
-    try: 
-        if ext == ".pdf": 
-            with fitz.open(file_path) as doc:
-                for page in doc:
-                    text = page.get_text()
-                    images = page.get_images(full=True)
-                    if images and not text.strip():
-                        need_ocr = True
-                        break
-
-        elif ext == ".docx":
-            doc = Document(file_path)
-            for para in doc.paragraphs:
-                for run in para.runs:
-                    for inline in run._r.xpath(".//w:drawing"):
-                        blip_embeds = inline.xpath(".//a:blip/@r:embed")
-                        if blip_embeds:
-                            need_ocr = True
-                            break
-                    if need_ocr:
-                        break
-                if need_ocr:
-                    break
-                
-        elif ext in (".xlsx"):
-            wb = openpyxl.load_workbook(file_path)
-            for sheet in wb.worksheets:
-                if hasattr(sheet, '_images') and sheet._images:  # type: ignore
-                    need_ocr = True
-                    break
-        else:
-            # other text types (txt, csv) -> no OCR
-            need_ocr = False
-    except Exception: 
-        # on error, assume no OCR needed
-        need_ocr = False
-        
-    return need_ocr
+    return ext in (".pdf", ".docx", ".xlsx")
 
 
-# Decide whether OCR should be performed for a given file.
-def ensure_ocr_policy(file_path: str, is_image_file: bool) -> bool:
-    # If image file (PNG, JPG, etc), require Tesseract and abort
+def ensure_ocr_policy(file_path: str, is_image_file: bool, need_ocr_hint: bool | None = None) -> bool:
+    """Decide whether OCR should be performed for a given file
+
+    - need_ocr_hint: if the caller already determined that OCR is
+        needed (True/False), pass it to avoid re-opening the file
+    """
+    # If image file (PNG, JPG, etc), require Tesseract and abort early
     if is_image_file:
         tesseract_check()
         return True
-    
-    # If OCR is needed (text files), check for Tesseract without aborting
-    need_ocr = ocr_check(file_path)
+
+    # Use caller's precomputed decision if available to avoid duplicate IO
+    if need_ocr_hint is None:
+        need_ocr = ocr_check(file_path)
+    else:
+        need_ocr = bool(need_ocr_hint)
 
     if not need_ocr:
         return False
 
     # if OCR is needed but Tesseract is missing, warn and skip OCR
-    if need_ocr:
-        try:
-            pytesseract.get_tesseract_version()
-            return True
-        except pytesseract.TesseractNotFoundError:
-            print(f"[!] Warning: '{file_path}' contains images or scanned pages but Tesseract is not available. Image OCR will be skipped.", file=sys.stderr)
-            return False
+    try:
+        pytesseract.get_tesseract_version()
+        return True
+    except pytesseract.TesseractNotFoundError:
+        print(f"[!] Warning: '{file_path}' contains images or scanned pages but Tesseract is not available. Image OCR will be skipped.", file=sys.stderr)
+        return False
 
 def models_check(lang: str):
     """Downloads and verifies necessary spaCy and Transformer models."""
@@ -177,7 +144,7 @@ def process_plain_text_and_pdf(file_path, anonymizer_func):
 
         if need_ocr and images_for_ocr:
             # decide via central policy whether to OCR for this document
-            do_ocr = ensure_ocr_policy(file_path, is_image_file=False)
+            do_ocr = ensure_ocr_policy(file_path, is_image_file=False, need_ocr_hint=need_ocr)
             if do_ocr:
                 for img_bytes in images_for_ocr:
                     parts.append(extract_text_from_image(img_bytes))
@@ -209,7 +176,9 @@ def process_docx_with_ocr(file_path, anonymizer_func):
 
     image_texts: list[str] = []
     if images_to_process:
-        do_ocr = ensure_ocr_policy(file_path, is_image_file=False)
+        # We already detected embedded images; pass the precomputed flag to
+        # avoid re-opening/parsing the DOCX inside ensure_ocr_policy.
+        do_ocr = ensure_ocr_policy(file_path, is_image_file=False, need_ocr_hint=True)
         if do_ocr:
             image_texts = [extract_text_from_image(img_bytes) for img_bytes in images_to_process]
 
@@ -254,12 +223,16 @@ def process_xlsx(file_path, anonymizer_func):
         if hasattr(sheet, '_images') and sheet._images: # type: ignore
             images_to_process = list(sheet._images) # type: ignore
 
-            do_ocr = ensure_ocr_policy(file_path, is_image_file=False)
+            # We already know the sheet has embedded images; pass that as a
+            # precomputed hint so ensure_ocr_policy doesn't reopen the file.
+            do_ocr = ensure_ocr_policy(file_path, is_image_file=False, need_ocr_hint=True)
             if do_ocr:
                 for image in images_to_process:
+                    # extract image bytes, ensure the openpyxl image keeps its data
                     img_bytes = image._data()
                     image._data = (lambda b: lambda: b)(img_bytes)
 
+                    # Perform OCR per-image
                     ocr_text = extract_text_from_image(img_bytes)
                     if ocr_text.strip():
                         anonymized_ocr = anonymizer_func(ocr_text)
