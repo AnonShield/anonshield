@@ -7,42 +7,48 @@ A practical and intelligent tool for anonymizing security incident tickets, desi
 The tool is designed with a modular, layered architecture to separate responsibilities and allow for extensibility. The following diagram illustrates the main components and workflows.
 
 ```mermaid
+%% Fluxo da Arquitetura de Anonimização (AnonLFI 2.0)
 graph TD
-    subgraph "Anonymization Workflow"
-        direction LR
-        
-        subgraph "A. Input & Processing"
-            UserInput[File/Directory Path] --> Factory[Processor Factory];
-            Factory --> Processor[File Processor<br/><<Strategy>>];
-            Processor -- Extracts --> ContentStream{Raw Content Stream};
-        end
+    A[Usuário] -- "uv run anon.py <arquivo> [args]" --> B(anon.py CLI);
 
-        subgraph "B. Core Anonymization Service"
-            ContentStream --> Orchestrator(Orchestrator);
-            Orchestrator --> Analyzer(Analyzer Engine);
-            Analyzer --> Anonymizer(Anonymizer Engine);
-            Anonymizer --> CustomOp(CustomSlugAnonymizer);
-        end
-
-        subgraph "C. Output"
-             Anonymizer --> OutputFile[Anonymized File];
-        end
+    subgraph "1. Orquestração e Seleção"
+        B -- "Lê argumentos (--lang, --preserve...)" --> B;
+        B -- "Instancia" --> Eng(AnonymizationOrchestrator);
+        B -- "get_processor(arquivo, motor)" --> F["Fábrica de Processadores (processors.py)"];
     end
 
-    subgraph "Data Persistence"
-        style Persistence fill:#lightgrey,stroke:#333
-        CustomOp <--> DB[(SQLite DB<br>Entity-Slug Map)];
+    subgraph "2. Processamento por Tipo (processors.py)"
+        F -- ".pdf" --> P_PDF(PdfFileProcessor);
+        F -- ".json" --> P_JSON(JsonFileProcessor);
+        F -- ".txt" --> P_TXT(TextFileProcessor);
+        F -- ".docx" --> P_DOCX(DocxFileProcessor);
+        F -- ".png" --> P_IMG(ImageFileProcessor);
+        F -- "..." --> P_ETC(...);
     end
 
-    subgraph "De-anonymization Workflow (Optional Utility)"
-        direction LR
-        InputSlug[Anonymized Slug] --> DeanonScript["deanonymize.py<br/><<Script>>"];
-        DeanonScript -- Queries --> DB;
+    subgraph "3. Extração e OCR (Ex: PDF / DOCX)"
+        P_PDF -- "Lê arquivo (PyMuPDF)" --> T1[Texto Puro];
+        P_PDF -- "Extrai Imagens Embutidas" --> IMG[Imagens];
+        IMG -- "Processa c/" --> OCR(Tesseract OCR);
+        OCR -- "Texto do OCR" --> T2[Texto da Imagem];
+        T1 & T2 -- "Concatena Conteúdo" --> TXT_BRUTO(Texto Bruto);
     end
 
-    %% Styling
-    style DB fill:#f9f,stroke:#333,stroke-width:2px
-    style Orchestrator fill:#bbf,stroke:#333,stroke-width:2px
+    subgraph "4. Motor de Anonimização (engine.py)"
+        TXT_BRUTO -- "orchestrator.anonymize_text()" --> ENG_A(Presidio Analyzer);
+        ENG_A -- "Carrega Modelos (spaCy, Transformer)" --> MOD(models/);
+        ENG_A -- "Identifica Entidades (PII, CVE...)" --> ENG_B(CustomSlugAnonymizer);
+        ENG_B -- "HMAC-SHA256(texto, SECRET_KEY)" --> HASH[Hash Seguro];
+        HASH -- "Salva Mapeamento (original, hash)" --> DB[(db/entities.db)];
+        HASH -- "Gera Slug [TIPO_hash...]" --> SLUG[Slug Anonimizado];
+        SLUG -- "Substitui PII no Texto" --> TXT_ANON(Texto Anonimizado);
+    end
+
+    subgraph "5. Geração de Saída"
+        TXT_ANON -- "Retorna para" --> P_PDF;
+        P_PDF -- "Grava arquivo .txt (ou preserva .json, .csv)" --> OUT(output/anon_arquivo...);
+        B -- "Grava Relatório" --> LOG(logs/report.txt);
+    end
 ```
 
 ## Key Features
