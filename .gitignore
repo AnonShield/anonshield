@@ -6,7 +6,6 @@ logs/*
 models/*
 output/*
 ignore/ 
-tests/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
