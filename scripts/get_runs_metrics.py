@@ -40,7 +40,7 @@ if not os.path.isdir(test_dir):
 TEST_FILES = glob.glob(f"{test_dir}/*")
 
 # Comando base para rodar o anon
-CMD_BASE = ["uv", "run", "anon.py"]
+CMD_BASE = ["uv", "run", "../anon.py"]
 
 
 def collect_run_metrics(run_id):

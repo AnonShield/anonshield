@@ -25,7 +25,7 @@ if not base_path.exists() or not base_path.is_dir():
     sys.exit(1)
 
 # Tipos de arquivos a serem considerados
-extensoes = [".csv", ".xlsx", ".docx", ".txt"]
+extensoes = [".csv", ".xlsx", ".docx", ".txt", ".pdf", ".xml", ".json", ".jpeg", ".jpg", ".png", ".gif", ".bmp", ".tiff", ".tif", ".webp", ".jp2", ".pnm"]
 
 contagem = {}
 soma_total = 0
@@ -35,16 +35,15 @@ for arquivo in base_path.iterdir():
         continue
 
     try:
-        if arquivo.suffix == ".csv":
+        if arquivo.suffix.lower() == ".csv":
             df = pd.read_csv(arquivo)
             linhas = len(df)
-        elif arquivo.suffix == ".xlsx":
+        elif arquivo.suffix.lower() == ".xlsx":
             df = pd.read_excel(arquivo)
             linhas = len(df)
-        elif arquivo.suffix == ".docx":
-            linhas = 1  # cada docx é 1 ticket
-        elif arquivo.suffix == ".txt":
-            linhas = 1  # output anonimizado de docx é txt
+        else:
+            # Para todos os outros tipos de arquivo (docx, txt, pdf, xml, json, imagens), conta como 1 ticket
+            linhas = 1
 
         linhas = max(0, linhas)
         contagem[arquivo.name] = linhas

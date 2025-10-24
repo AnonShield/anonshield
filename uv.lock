@@ -20,6 +20,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "email-validator" },
+    { name = "lxml" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "pillow" },
@@ -37,6 +38,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "email-validator", specifier = ">=2.2.0" },
+    { name = "lxml", specifier = ">=5.2.2" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pillow", specifier = ">=10.4.0" },

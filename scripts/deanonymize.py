@@ -4,26 +4,33 @@ import os
 import sqlite3
 import sys
 
-from config import DB_PATH, SECRET_KEY
+from src.anon.config import DB_PATH, SECRET_KEY
 
 def find_original_text(slug: str) -> str | None:
     """Queries the database to find the original text for a given anonymized slug."""
     if not os.path.exists(DB_PATH):
         return "Database file not found. Please run the anonymizer first."
 
-    # The slug is in the format [ENTITY_TYPE_hash]
+    # The slug is in the format [ENTITY_TYPE_display_hash]
     try:
-        # Extract the 64-character hash part from the slug
-        full_hash = slug.strip().split('_')[-1].rstrip(']')
-        if not full_hash or len(full_hash) != 64:
-             return "Invalid slug format. Expected format: [ENTITY_TYPE_hash]."
+        # Extract the display_hash part from the slug
+        parts = slug.strip().split('_')
+        if len(parts) < 2:
+            return "Invalid slug format. Expected format: [ENTITY_TYPE_display_hash]."
+        
+        entity_type_part = parts[0].lstrip('[')
+        display_hash = parts[-1].rstrip(']')
+
+        if not display_hash:
+             return "Invalid slug format. Display hash not found."
     except (IndexError, AttributeError):
-        return "Invalid slug format. Expected format: [ENTITY_TYPE_hash]."
+        return "Invalid slug format. Expected format: [ENTITY_TYPE_display_hash]."
 
     try:
         with sqlite3.connect(DB_PATH) as conn:
             cur = conn.cursor()
-            cur.execute("SELECT original_name, entity_type, first_seen, last_seen FROM entities WHERE full_hash = ?", (full_hash,))
+            # Query using slug_name (which stores the display_hash)
+            cur.execute("SELECT original_name, entity_type, first_seen, last_seen FROM entities WHERE slug_name = ?", (display_hash,))
             result = cur.fetchone()
             
             if result:
