@@ -7,10 +7,8 @@ import openpyxl
 import fitz
 from docx import Document
 import sqlite3
-import time
 import datetime
 from PIL import Image, ImageDraw, ImageFont
-import io
 import re
 
 class TestAnonIntegration(unittest.TestCase):
