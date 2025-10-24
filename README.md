@@ -7,17 +7,17 @@ A practical and intelligent tool for anonymizing security incident tickets, desi
 The tool is designed with a modular, layered architecture to separate responsibilities and allow for extensibility. The following diagram illustrates the main components and workflows.
 
 ```mermaid
-%% Fluxo da Arquitetura de Anonimização (AnonLFI 2.0)
+%% Anonymization Architecture Flow (AnonLFI 2.0)
 graph TD
-    A[Usuário] -- "uv run anon.py <arquivo> [args]" --> B(anon.py CLI);
+    A[User] -- "uv run anon.py <file> [args]" --> B(anon.py CLI);
 
-    subgraph "1. Orquestração e Seleção"
-        B -- "Lê argumentos (--lang, --preserve...)" --> B;
-        B -- "Instancia" --> Eng(AnonymizationOrchestrator);
-        B -- "get_processor(arquivo, motor)" --> F["Fábrica de Processadores (processors.py)"];
+    subgraph "1. Orchestration and Selection"
+        B -- "Reads arguments (--lang, --preserve...)" --> B;
+        B -- "Instantiates" --> Eng(AnonymizationOrchestrator);
+        B -- "get_processor(file, engine)" --> F["Processor Factory (processors.py)"];
     end
 
-    subgraph "2. Processamento por Tipo (processors.py)"
+    subgraph "2. Processing by Type (processors.py)"
         F -- ".pdf" --> P_PDF(PdfFileProcessor);
         F -- ".json" --> P_JSON(JsonFileProcessor);
         F -- ".txt" --> P_TXT(TextFileProcessor);
@@ -26,28 +26,28 @@ graph TD
         F -- "..." --> P_ETC(...);
     end
 
-    subgraph "3. Extração e OCR (Ex: PDF / DOCX)"
-        P_PDF -- "Lê arquivo (PyMuPDF)" --> T1[Texto Puro];
-        P_PDF -- "Extrai Imagens Embutidas" --> IMG[Imagens];
-        IMG -- "Processa c/" --> OCR(Tesseract OCR);
-        OCR -- "Texto do OCR" --> T2[Texto da Imagem];
-        T1 & T2 -- "Concatena Conteúdo" --> TXT_BRUTO(Texto Bruto);
+    subgraph "3. Extraction and OCR (Ex: PDF / DOCX)"
+        P_PDF -- "Reads file (PyMuPDF)" --> T1[Plain Text];
+        P_PDF -- "Extracts Embedded Images" --> IMG[Images];
+        IMG -- "Processes w/" --> OCR(Tesseract OCR);
+        OCR -- "OCR Text" --> T2[Image Text];
+        T1 & T2 -- "Concatenates Content" --> TXT_BRUTO(Raw Text);
     end
 
-    subgraph "4. Motor de Anonimização (engine.py)"
+    subgraph "4. Anonymization Engine (engine.py)"
         TXT_BRUTO -- "orchestrator.anonymize_text()" --> ENG_A(Presidio Analyzer);
-        ENG_A -- "Carrega Modelos (spaCy, Transformer)" --> MOD(models/);
-        ENG_A -- "Identifica Entidades (PII, CVE...)" --> ENG_B(CustomSlugAnonymizer);
-        ENG_B -- "HMAC-SHA256(texto, SECRET_KEY)" --> HASH[Hash Seguro];
-        HASH -- "Salva Mapeamento (original, hash)" --> DB[(db/entities.db)];
-        HASH -- "Gera Slug [TIPO_hash...]" --> SLUG[Slug Anonimizado];
-        SLUG -- "Substitui PII no Texto" --> TXT_ANON(Texto Anonimizado);
+        ENG_A -- "Loads Models (spaCy, Transformer)" --> MOD(models/);
+        ENG_A -- "Identifies Entities (PII, CVE...)" --> ENG_B(CustomSlugAnonymizer);
+        ENG_B -- "HMAC-SHA256(text, SECRET_KEY)" --> HASH[Secure Hash];
+        HASH -- "Saves Mapping (original, hash)" --> DB[(db/entities.db)];
+        HASH -- "Generates Slug [TYPE_hash...]" --> SLUG[Anonymized Slug];
+        SLUG -- "Replaces PII in Text" --> TXT_ANON(Anonymized Text);
     end
 
-    subgraph "5. Geração de Saída"
-        TXT_ANON -- "Retorna para" --> P_PDF;
-        P_PDF -- "Grava arquivo .txt (ou preserva .json, .csv)" --> OUT(output/anon_arquivo...);
-        B -- "Grava Relatório" --> LOG(logs/report.txt);
+    subgraph "5. Output Generation"
+        TXT_ANON -- "Returns to" --> P_PDF;
+        P_PDF -- "Writes .txt file (or preserves .json, .csv)" --> OUT(output/anon_file...);
+        B -- "Writes Report" --> LOG(logs/report.txt);
     end
 ```
 
