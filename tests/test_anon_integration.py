@@ -255,6 +255,47 @@ class TestAnonIntegration(unittest.TestCase):
         self.assertTrue(person_index != -1 and email_index != -1 and location_index != -1)
         self.assertTrue(person_index < email_index < location_index)
 
+    def test_image_format_anonymization(self):
+        image_formats = {
+            "png": "PNG",
+            "jpeg": "JPEG",
+            "gif": "GIF",
+            "bmp": "BMP",
+            "tiff": "TIFF",
+            "webp": "WEBP",
+            "jp2": "JPEG2000",
+        }
+        image_text = "This image contains an email: image.test@example.com."
+
+        img = Image.new('RGB', (1200, 200), color = (255, 255, 255))
+        d = ImageDraw.Draw(img)
+        try:
+            font = ImageFont.truetype("DejaVuSans.ttf", 40)
+        except IOError:
+            font = ImageFont.load_default()
+        d.text((10,10), image_text, fill=(0,0,0), font=font)
+
+        for ext, pillow_format in image_formats.items():
+            with self.subTest(ext=ext):
+                file_name = f"test_image_format.{ext}"
+                image_path = os.path.join(self.test_data_dir, file_name)
+                
+                try:
+                    img.save(image_path, pillow_format)
+                except (KeyError, ValueError) as e:
+                    self.skipTest(f"Saving with Pillow format {pillow_format} for .{ext} failed: {e}")
+                    continue
+
+                self._run_anon_py(image_path)
+                output_file = self._get_output_file_path(image_path)
+
+                self.assertTrue(os.path.exists(output_file), f"Output file for {ext} not created.")
+                with open(output_file, "r") as f:
+                    content = f.read()
+
+                self.assertIn("[EMAIL_ADDRESS_", content)
+                self.assertNotIn("image.test@example.com", content)
+
     def test_preserve_entities(self):
         test_file = os.path.join(self.test_data_dir, "test.txt")
         self._run_anon_py(test_file, preserve_entities="PERSON")
