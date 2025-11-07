@@ -63,7 +63,7 @@ def get_supported_entities() -> list[str]:
     """Return a sorted list of supported entity names."""
     supported = set(ENTITY_MAPPING.values())
     try:
-        for r in load_custom_recognizers():
+        for r in load_custom_recognizers(langs=['en']):
             supported.update(r.supported_entities)
     except Exception as exc:
         print(f"[!] Warning: failed to read custom recognizers: {exc}", file=sys.stderr)
@@ -169,9 +169,18 @@ def main():
             print(f"[+] Processing file: {args.file_path}...")
             processor = get_processor(args.file_path, orchestrator)
             output_file = processor.process()
-            print(f"[*] Anonymized file saved at: {output_file}")
-        
-        write_report(args.file_path, start_time)
+                    
+                    print(f"[*] Anonymized file saved at: {output_file}")
+                    
+                    print("\n--- Anonymization Stats ---")
+                    print(f"Total entities processed: {orchestrator.total_entities_processed}")
+                    if hasattr(orchestrator, 'entity_counts') and orchestrator.entity_counts:
+                        print("Entities by type:")
+                        for entity_type, count in sorted(orchestrator.entity_counts.items()):
+                            print(f"  - {entity_type}: {count}")
+                    print("---------------------------\n")
+            
+                    write_report(args.file_path, start_time)
 
     except Exception as e:
         print(f"[!] An error occurred during processing: {e}", file=sys.stderr)

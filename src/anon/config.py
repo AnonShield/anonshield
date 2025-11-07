@@ -122,5 +122,4 @@ def bulk_save_entities(db_path: str, entity_list: list) -> None:
 
             conn.commit()
 
-# Initialize the database when the config is loaded
-initialize_db()
+# The database initialization is now handled in anon.py to ensure proper order of operations.

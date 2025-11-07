@@ -45,12 +45,20 @@ class CustomSlugAnonymizer(Operator):
         entity_type = params.get("entity_type", "UNKNOWN") if params else "UNKNOWN"
         slug_length = params.get("slug_length", None) if params else None
         entity_collector = params.get("entity_collector", None) if params else None
+        total_entities_counter = params.get("total_entities_counter", None) if params else None
+        entity_counts = params.get("entity_counts", None) if params else None
 
         display_hash = full_hash[:slug_length] if slug_length is not None else full_hash
 
         if entity_collector is not None:
             entity_collector.append((entity_type, clean_text, display_hash, full_hash))
+
+        if total_entities_counter is not None:
+            total_entities_counter.total_entities_processed += 1
         
+        if entity_counts is not None:
+            entity_counts[entity_type] = entity_counts.get(entity_type, 0) + 1
+
         return f"[{entity_type}_{display_hash}]"
 
     def validate(self, params: dict | None = None) -> None: pass
@@ -58,15 +66,100 @@ class CustomSlugAnonymizer(Operator):
     def operator_type(self) -> OperatorType: return OperatorType.Anonymize
 
 
-def load_custom_recognizers() -> List[PatternRecognizer]:
-    """Loads custom regex-based recognizers for cybersecurity entities."""
-    cve_pattern = Pattern(name="CVE Pattern", regex=r"CVE-\d{4}-\d+", score=0.8)
-    cve_recognizer = PatternRecognizer(supported_entity="CVE", context=["CVE"],  patterns=[cve_pattern])
-    ip_pattern = Pattern(name="IP Address Pattern", regex=r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", score=0.6)
-    ipv6_pattern = Pattern(name="IPv6 Address Pattern", regex=r"(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,6})|:)|:((:[0-9a-fA-F]{1,7})|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))", score=0.6)
-    ip_recognizer = PatternRecognizer(supported_entity="IP_ADDRESS", context=["IP, IPV6"], patterns=[ip_pattern, ipv6_pattern])
-    return [cve_recognizer, ip_recognizer]
+def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
+    """Loads custom regex-based recognizers for cybersecurity entities for specific languages."""
+    
+    # URL recognizer
+    url_pattern = Pattern(
+      name="URL Pattern", 
+      regex=r"(?:https?://|ftp://|www\.)[^\s]+\.(?:com|net|org|edu|gov|mil|int|br|app|dev|io|co|uk|de|fr|es|it|ru|cn|jp|kr|au|ca|mx|ar|cl|pe|co\.uk|com\.br|org\.br|gov\.br|edu\.br|net\.br|vercel\.app|herokuapp\.com|github\.io|gitlab\.io|netlify\.app|firebase\.app|appspot\.com|cloudfront\.net|amazonaws\.com|azure\.com|digitalocean\.com)[^\s]*",
+      score=0.7
+    )
 
+    # IP address recognizers (IPv4 and IPv6)
+    ip_pattern = Pattern(name="IP Address Pattern", regex=r"(?<!\d\.)\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b(?!\.\d)", score=0.6)
+    ipv6_pattern = Pattern(name="IPv6 Address Pattern", regex=r"^((?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?:(?::[0-9A-Fa-f]{1,4}){1,6})|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:[0-9A-Fa-f]{1,4}|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|(?:[0-9A-Fa-f]{1,4}:){1,4}:(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$", score=0.6)
+
+    hostname_patterns = [
+        Pattern(
+            name="FQDN Pattern",
+            regex=r"\b([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b",
+            score=0.6
+        ),
+        Pattern(
+            name="Common Hostname Pattern",
+            regex=r"\b(localhost)\b", # Simplificado para focar no seu problema
+            score=0.65
+        ),
+        Pattern(
+            name="Certificate CN Pattern",
+            regex=r"CN=([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]|[a-f0-9]{8,16})\b",
+            score=0.7
+        ),
+        Pattern(
+            name="Standalone Hex Hostname Pattern",
+            regex=r"(?<![:/])(?<![vV])\b(?!20\d{10})[a-f0-9]{12,16}\b(?!\.)",
+            score=0.6
+        ),
+    ]
+
+
+    # 2. Hashes (SHA256 e MD5 com dois-pontos)
+    hash_patterns = [
+        # Para: 0631792DF994C0A697B4FD08A4BDBDF47FE99620C3AF773B5CAB7052CC0E119E
+        Pattern(name="SHA256 Hash", regex=r"\b[0-9a-fA-F]{64}\b", score=0.8),
+        # Para: 8d:3d:d5:0a:9c:d9:5f:5f:7b:96:cd:b4:9f:9c:c0:18
+        Pattern(
+            name="MD5 Colon-Separated Hash",
+            regex=r"\b([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}\b",
+            score=0.85 # Score alto para vencer o IPv6
+        )
+    ]
+
+    # 3. UUIDs (Para todos os Report IDs, Task IDs, etc.)
+    uuid_pattern = Pattern(
+        name="UUID Pattern",
+        regex=r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b",
+        score=0.8
+    )
+
+    # 4. Seriais de Certificado (Os de 40 caracteres)
+    serial_pattern = Pattern(
+        name="Certificate Serial (40-char Hex)",
+        regex=r"\b[0-9a-fA-F]{40}\b",
+        score=0.75
+    )
+
+    # 5. Strings CPE (cpe:/a:...)
+    cpe_pattern = Pattern(
+        name="CPE String",
+        regex=r"\bcpe:/[a-z]:[^:]+:[^:]+(:[^:]+){0,4}\b",
+        score=0.7
+    )
+    
+    # 6. Corpos de Certificado (Blocos Base64)
+    cert_body_pattern = Pattern(
+        name="Certificate Body (Base64)",
+        regex=r"\bMII[a-zA-Z0-9+/=\n]{100,}\b", # Pega blocos Base64 que começam com MII e são longos
+        score=0.8
+    )
+
+    # === CARREGANDO OS RECOGNIZERS ===
+    
+    recognizers = []
+    for lang in langs:
+        recognizers.append(PatternRecognizer(supported_entity="URL", patterns=[url_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="IP_ADDRESS", patterns=[ip_pattern, ipv6_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="HOSTNAME", patterns=hostname_patterns, supported_language=lang))
+        
+        # Adicionando os novos
+        recognizers.append(PatternRecognizer(supported_entity="HASH", patterns=hash_patterns, supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="UUID", patterns=[uuid_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="CERT_SERIAL", patterns=[serial_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="CPE_STRING", patterns=[cpe_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="CERT_BODY", patterns=[cert_body_pattern], supported_language=lang))
+
+    return recognizers
 
 class AnonymizationOrchestrator:
     """Orchestrates the text anonymization process using Presidio."""
@@ -76,6 +169,8 @@ class AnonymizationOrchestrator:
         self.allow_list = allow_list
         self.entities_to_preserve = entities_to_preserve
         self.slug_length = slug_length
+        self.total_entities_processed = 0
+        self.entity_counts = {}
         self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
 
     def _setup_engines(self) -> tuple[AnalyzerEngine, AnonymizerEngine]:
@@ -101,11 +196,12 @@ class AnonymizationOrchestrator:
         try:
             analyzer.registry.remove_recognizer("DateRecognizer")
             analyzer.registry.remove_recognizer("MedicalLicenseRecognizer")
+            analyzer.registry.remove_recognizer("IpRecognizer")
         except Exception:
             # Recognizer might not exist for the selected language, fail silently
             pass
 
-        for recognizer in load_custom_recognizers():
+        for recognizer in load_custom_recognizers(langs=analyzer.supported_languages):
             analyzer.registry.add_recognizer(recognizer)
             
         anonymizer = AnonymizerEngine()
@@ -121,17 +217,26 @@ class AnonymizationOrchestrator:
         entity_collector = []
         entities = self._get_entities_to_anonymize()
         analyzer_results = self.analyzer_engine.analyze(
-            text=text, language=self.lang, score_threshold=0.6,
-            allow_list=self.allow_list, entities=entities
+            text=text, language=self.lang, score_threshold=0.6, entities=entities
         )
+
+        # Filter out results that are in the allow_list
+        filtered_analyzer_results = []
+        for result in analyzer_results:
+            result_text = text[result.start:result.end]
+            if result_text not in self.allow_list:
+                filtered_analyzer_results.append(result)
+
         anonymizer_results = self.anonymizer_engine.anonymize(
-            text=text, analyzer_results=analyzer_results, # type: ignore
+            text=text, analyzer_results=filtered_analyzer_results,  # Use filtered results
             operators={
                 "DEFAULT": OperatorConfig(
-                    "custom_slug", 
+                    "custom_slug",
                     {
-                        "slug_length": self.slug_length, 
-                        "entity_collector": entity_collector
+                        "slug_length": self.slug_length,
+                        "entity_collector": entity_collector,
+                        "total_entities_counter": self,
+                        "entity_counts": self.entity_counts
                     }
                 )
             }
@@ -152,23 +257,42 @@ class AnonymizationOrchestrator:
             batch = texts[i : i + batch_size]
             batch = [str(text) if pd.notna(text) else "" for text in batch]
 
-            analyzer_results = [
+            analyzer_results_batch = [
                 self.analyzer_engine.analyze(
-                    text=text, language=self.lang, score_threshold=0.6,
-                    allow_list=self.allow_list, entities=entities_to_anonymize
+                    text=text, language=self.lang, score_threshold=0.6, entities=entities_to_anonymize
                 )
                 for text in batch
             ]
 
+            analyzer_results_batch = [
+                self.analyzer_engine.analyze(
+                    text=text, language=self.lang, score_threshold=0.6, entities=entities_to_anonymize
+                )
+                for text in batch
+            ]
+
+            # Filter out results that are in the allow_list
+            filtered_analyzer_results_batch = []
+            for i, analyzer_results in enumerate(analyzer_results_batch):
+                filtered_results = []
+                for result in analyzer_results:
+                    result_text = batch[i][result.start:result.end]
+                    if result_text not in self.allow_list:
+                        filtered_results.append(result)
+                filtered_analyzer_results_batch.append(filtered_results)
+
+
             anonymized_texts = [
                 self.anonymizer_engine.anonymize(
-                    text=batch[j], analyzer_results=analyzer_results[j], # type: ignore
+                    text=batch[j], analyzer_results=filtered_analyzer_results_batch[j], # type: ignore
                     operators={
                         "DEFAULT": OperatorConfig(
                             "custom_slug", 
                             {
                                 "slug_length": self.slug_length, 
-                                "entity_collector": entity_collector
+                                "entity_collector": entity_collector,
+                                "total_entities_counter": self,
+                                "entity_counts": self.entity_counts
                             }
                         )
                     }
