@@ -13,7 +13,13 @@ import sys
 import time
 import warnings
 
-from src.anon.config import SECRET_KEY, TRANSFORMER_MODEL, TRF_MODEL_PATH, ENTITY_MAPPING
+from src.anon.config import (
+    ENTITY_MAPPING,
+    SECRET_KEY,
+    TRANSFORMER_MODEL,
+    TRF_MODEL_PATH,
+    initialize_db,
+)
 from src.anon.engine import AnonymizationOrchestrator, load_custom_recognizers, SUPPORTED_LANGUAGES
 from src.anon.processors import get_processor
 
@@ -124,6 +130,7 @@ def main():
         sys.exit(1)
 
     start_time = time.time()
+    initialize_db()
     models_check(args.lang)
 
     allow_list = [term.strip() for term in args.allow_list.split(',') if term]
@@ -169,18 +176,17 @@ def main():
             print(f"[+] Processing file: {args.file_path}...")
             processor = get_processor(args.file_path, orchestrator)
             output_file = processor.process()
-                    
-                    print(f"[*] Anonymized file saved at: {output_file}")
-                    
-                    print("\n--- Anonymization Stats ---")
-                    print(f"Total entities processed: {orchestrator.total_entities_processed}")
-                    if hasattr(orchestrator, 'entity_counts') and orchestrator.entity_counts:
-                        print("Entities by type:")
-                        for entity_type, count in sorted(orchestrator.entity_counts.items()):
-                            print(f"  - {entity_type}: {count}")
-                    print("---------------------------\n")
-            
-                    write_report(args.file_path, start_time)
+            print(f"[*] Anonymized file saved at: {output_file}")
+
+            print("\n--- Anonymization Stats ---")
+            print(f"Total entities processed: {orchestrator.total_entities_processed}")
+            if hasattr(orchestrator, 'entity_counts') and orchestrator.entity_counts:
+                print("Entities by type:")
+                for entity_type, count in sorted(orchestrator.entity_counts.items()):
+                    print(f"  - {entity_type}: {count}")
+            print("---------------------------\n")
+
+            write_report(args.file_path, start_time)
 
     except Exception as e:
         print(f"[!] An error occurred during processing: {e}", file=sys.stderr)
