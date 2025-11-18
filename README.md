@@ -1,6 +1,6 @@
-# Data Anonymization Tool with Controlled Re-identification
+# AnonLFI 2.0: Extensible Architecture for PII Pseudonymization in CSIRTs with OCR and Technical Recognizers
 
-A practical and intelligent tool for anonymizing security incident tickets, designed for local use by CSIRTs, ensuring that sensitive data can be safely used to train AI (LLM) models.
+AnonLFI 2.0 is a modular pseudonymization framework for CSIRTs that resolves the conflict between data confidentiality (GDPR/LGPD) and analytical utility. It uses HMAC-SHA256 to generate strong, reversible pseudonyms, natively preserves XML and JSON structures, and integrates an OCR pipeline and specialized technical recognizers to handle PII in complex security artifacts. This allows sensitive incident data to be used safely for threat analysis, detection engineering, and training AI (LLM) models.
 
 ## System Architecture
 
@@ -37,7 +37,7 @@ graph TD
     subgraph "4. Anonymization Engine (engine.py)"
         TXT_BRUTO -- "orchestrator.anonymize_text()" --> ENG_A(Presidio Analyzer);
         ENG_A -- "Loads Models (spaCy, Transformer)" --> MOD(models/);
-        ENG_A -- "Identifies Entities (PII, CVE...)" --> ENG_B(CustomSlugAnonymizer);
+        ENG_A -- "Identifies Entities (PII, technical...)" --> ENG_B(CustomSlugAnonymizer);
         ENG_B -- "HMAC-SHA256(text, SECRET_KEY)" --> HASH[Secure Hash];
         HASH -- "Saves Mapping (original, hash)" --> DB[(db/entities.db)];
         HASH -- "Generates Slug [TYPE_hash...]" --> SLUG[Anonymized Slug];
@@ -53,10 +53,10 @@ graph TD
 
 ## Key Features
 
-- **Multiple File Format Support:** Anonymizes `.txt`, `.csv`, `.json`, `.xml`, `.pdf`, `.docx`, and `.xlsx`. 
-- **OCR for Images:** Automatically extracts and anonymizes text embedded in images within PDF and DOCX files. Also supports direct anonymization of image files like `.png`, `.jpeg`, `.gif`, `.bmp`, and `.tiff`.
+- **Structure-Preserving Processing:** Natively processes `.json` and `.xml` files to preserve their original hierarchy, while also supporting `.txt`, `.csv`, `.pdf`, `.docx`, and `.xlsx`.
+- **OCR for Images:** Automatically extracts and anonymizes text embedded in images within PDF and DOCX files. Also supports direct anonymization of image files like `.png`, `.jpeg`, `.gif`, `.bmp`, `.tiff`, `.webp`, and more.
 - **Advanced Entity Recognition:** Uses Presidio and a Transformer model (`Davlan/xlm-roberta-base-ner-hrl`) for high-accuracy entity detection.
-- **Custom Recognizers:** Includes custom logic to detect specific patterns like CVEs and IP addresses.
+- **Cybersecurity-Focused Recognizers:** Includes custom logic to detect specific patterns like IP addresses, URLs, hostnames, hashes, UUIDs, and more.
 - **Consistent & Secure Anonymization:** Generates stable HMAC-SHA256-based slugs for each unique entity.
 - **Controlled De-anonymization:** A separate script allows for retrieving original data from a slug, protected by the same secret key.
 - **Configurable:** Allows preserving specific entity types, adding terms to an allow-list, and customizing the anonymized slug length.
@@ -97,30 +97,66 @@ The tool uses a SQLite database (`db/entities.db`) to persist the mapping betwee
 | `first_seen` | TEXT | Timestamp of when the entity was first seen. |
 | `last_seen` | TEXT | Timestamp of when the entity was last seen. |
 
+## Performance Validation
+
+The tool's effectiveness was validated in two representative case studies from the research paper, demonstrating high precision in complex scenarios:
+
+| Scenario | Description | Precision | Recall | F1-Score |
+| :--- | :--- | :--- | :--- | :--- |
+| **PDF with OCR** | An incident report with PII in text and embedded terminal screenshots. | 100% | 61.9% | 76.5% |
+| **OpenVAS XML** | A vulnerability report with nested technical entities (hashes, certs, etc.). | 100% | 85.42% | 92.13% |
+
+The results confirm the engine's accuracy and the value of the specialized OCR and technical recognizers.
+
 ## Supported Entities & Languages
 
 #### Entities
-By default, the tool is configured to detect and anonymize the following entity types:
+By default, the tool is configured to detect and anonymize a wide range of PII and cybersecurity-related entities:
 - `PERSON`
 - `LOCATION`
 - `ORGANIZATION`
 - `EMAIL_ADDRESS`
 - `PHONE_NUMBER`
-- `IP_ADDRESS` (custom recognizer)
-- `CVE` (custom recognizer)
+- `IP_ADDRESS`
+- `URL`
+- `HOSTNAME`
+- `HASH` (e.g., SHA256, MD5)
+- `UUID`
+- `CERT_SERIAL` (Certificate Serials)
+- `CPE_STRING` (Common Platform Enumeration)
+- `CERT_BODY` (Base64 Certificate Bodies)
 
 *This list can be retrieved by running `uv run anon.py --list-entities`.*
 
 #### Languages
-The tool is pre-configured for several languages, including:
+The tool is pre-configured for **24 languages**:
 
 | Code | Language |
 | :--- | :--- |
+| `ca` | Catalan |
+| `zh` | Chinese |
+| `hr` | Croatian |
+| `da` | Danish |
+| `nl` | Dutch |
 | `en` | English |
-| `pt` | Portuguese |
-| `es` | Spanish |
+| `fi` | Finnish |
 | `fr` | French |
 | `de` | German |
+| `el` | Greek |
+| `it` | Italian |
+| `ja` | Japanese |
+| `ko` | Korean |
+| `lt` | Lithuanian |
+| `mk` | Macedonian |
+| `nb` | Norwegian Bokmål |
+| `pl` | Polish |
+| `pt` | Portuguese |
+| `ro` | Romanian |
+| `ru` | Russian |
+| `sl` | Slovenian |
+| `es` | Spanish |
+| `sv` | Swedish |
+| `uk` | Ukrainian |
 
 *For a full list of supported languages, run `uv run anon.py --list-languages`.*
 
@@ -161,7 +197,7 @@ The tool is pre-configured for several languages, including:
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/gt-rnp-lfi/anon.git
+    git clone https://github.com/AnonShield/AnonLFI2.0.git
     ```
 
 2.  **Set the Secret Key (Mandatory):**
@@ -209,15 +245,15 @@ uv run scripts/deanonymize.py "[PERSON_...hash...]"
 **Command-Line Options:**
 - `file_path`: The path to the target file or directory to be anonymized.
 - `--lang <code>`: Sets the document's language (e.g., `en`, `pt`). Default: `en`.
-- `--preserve-entities <TYPES>`: A comma-separated list of entity types to *not* anonymize (e.g., `"LOCATION,CVE"`).
+- `--preserve-entities <TYPES>`: A comma-separated list of entity types to *not* anonymize (e.g., `"LOCATION,HOSTNAME"`).
 - `--allow-list <TERMS>`: A comma-separated list of terms to ignore.
-- `--slug-length <NUM>`: Sets the character length of the hash displayed in the slug (1-64).
+- `--slug-length <NUM>`: Sets the character length of the hash displayed in the slug (1-64). If not specified, it defaults to 64 (the full hash), which guarantees no collisions.
 - `--list-entities`: Lists all supported entity types and exits.
 - `--list-languages`: Lists all supported languages and exits.
 
 **Example with Options:**
 ```bash
-uv run anon.py cve_report.docx --lang en --preserve-entities "CVE" --slug-length 12
+uv run anon.py incident_report.pdf --lang en --preserve-entities "HOSTNAME" --slug-length 12
 ```
 
 ### Running Tests
@@ -231,7 +267,7 @@ uv run python -m unittest tests/test_anon_integration.py
 The `scripts/` directory contains several helper scripts for analysis and management.
 
 #### `deanonymize.py`
-**Function:** Reverses the anonymization of a single slug, revealing the original text. Requires the `ANON_SECRET_KEY` to be set.
+**Function:** Reverses the anonymization of a single slug, revealing the original text. Requires the `ANON_SECRET_KEY` to be set and supports audit logging.
 **Usage:**
 ```bash
 uv run scripts/deanonymize.py "[PERSON_a1b2c3d4...]"
