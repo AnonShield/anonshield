@@ -18,4 +18,5 @@ dependencies = [
     "pytesseract>=0.3.10",
     "Pillow>=10.4.0",
     "PyMuPDF>=1.24.9",
+    "lxml>=5.2.2",
 ]
