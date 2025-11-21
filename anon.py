@@ -14,6 +14,7 @@ import time
 import warnings
 import spacy
 import torch
+import spacy_transformers
 
 from src.anon.config import (
     ENTITY_MAPPING,
@@ -126,6 +127,37 @@ def _handle_list_languages():
 def main():
     """Main function to orchestrate the anonymization process."""
     args = _parse_arguments()
+
+    # Dynamically set LD_LIBRARY_PATH for CUDA libraries within the venv
+    import os
+    import sys 
+    
+    # Determine the Python version in the venv dynamically
+    # This assumes the venv structure is consistent and 'sys.executable' points to the venv python
+    # Example: /tool/venv/bin/python -> .../venv/lib/python3.11
+    venv_python_path = os.path.dirname(sys.executable) # /tool/venv/bin
+    venv_lib_path = os.path.join(os.path.dirname(venv_python_path), "lib") # /tool/venv/lib
+    
+    # Find the pythonX.Y directory in venv_lib_path
+    venv_python_version_path = "python3.11" # Default fallback
+    for item in os.listdir(venv_lib_path):
+        if item.startswith("python") and os.path.isdir(os.path.join(venv_lib_path, item)):
+            venv_python_version_path = item
+            break
+
+    cuda_lib_path = os.path.join(venv_lib_path, venv_python_version_path, "site-packages", "nvidia", "cuda_runtime", "lib")
+    
+    # Check if the path exists before adding it to LD_LIBRARY_PATH
+    if os.path.exists(cuda_lib_path):
+        current_ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
+        if cuda_lib_path not in current_ld_library_path: # Avoid duplicate entries
+            if current_ld_library_path:
+                os.environ["LD_LIBRARY_PATH"] = f"{cuda_lib_path}:{current_ld_library_path}"
+            else:
+                os.environ["LD_LIBRARY_PATH"] = cuda_lib_path
+        print(f"[*] LD_LIBRARY_PATH set to: {os.environ.get('LD_LIBRARY_PATH')}")
+    else:
+        print(f"[!] Warning: CUDA library path not found: {cuda_lib_path}. LD_LIBRARY_PATH not modified for CUDA.")
 
     # --- GPU Activation (User Provided) ---
     print("[*] Verifying hardware...")

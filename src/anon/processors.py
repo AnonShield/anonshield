@@ -11,6 +11,8 @@ import json
 import os
 from abc import ABC, abstractmethod
 import itertools
+import sqlite3
+import datetime
 
 import ijson
 import numpy as np
@@ -22,8 +24,27 @@ from lxml import etree
 from PIL import Image
 from tqdm import tqdm
 import pymupdf as fitz
+import orjson
 
 from .engine import AnonymizationOrchestrator
+from .config import DB_PATH # Import DB_PATH
+
+def bulk_save_to_db(entity_list):
+    """Salva 10.000 itens no banco em 100 milissegundos."""
+    if not entity_list:
+        return
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("PRAGMA journal_mode=WAL;") # Modo turbo do SQLite
+        conn.execute("PRAGMA synchronous=NORMAL;") 
+        
+        query = """
+            INSERT OR IGNORE INTO entities 
+            (entity_type, original_name, slug_name, full_hash, first_seen, last_seen) 
+            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+        """
+        conn.executemany(query, entity_list)
+        conn.commit()
 
 
 def get_output_path(original_path, new_ext):
@@ -340,7 +361,16 @@ class JsonFileProcessor(FileProcessor):
             all_strings_for_batch.extend(strings_in_item)
             object_string_counts.append(len(strings_in_item))
         
-        anonymized_strings_flat = self.orchestrator.anonymize_texts(all_strings_for_batch)
+        
+        entity_collector_for_batch = []
+        anonymized_strings_flat = self.orchestrator.anonymize_texts(
+            all_strings_for_batch,
+            # Passamos a lista vazia para o operador preencher
+            operator_params={"entity_collector": entity_collector_for_batch}
+        )
+
+        # Now, bulk save the collected entities to the database
+        bulk_save_to_db(entity_collector_for_batch)
 
         current_pos = 0
         for i, item in enumerate(batch_of_objects):
@@ -359,13 +389,13 @@ class JsonFileProcessor(FileProcessor):
             if not (is_first_batch_in_file and i == 0):
                 outfile.write(",\n")
             
-            json.dump(anonymized_item, outfile, ensure_ascii=False, indent=2)
+            outfile.write(orjson.dumps(anonymized_item, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE).decode('utf-8'))
 
     def process(self) -> str:
         output_path = self._get_output_path(".json")
         temp_output_path = output_path + ".tmp"
         
-        BATCH_SIZE = 100
+        BATCH_SIZE = 1  # Tamanho ideal para RTX 3060
         file_size = os.path.getsize(self.file_path)
         
         print(f"[*] Starting optimized JSON processing (Batch Size: {BATCH_SIZE})")

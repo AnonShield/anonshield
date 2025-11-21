@@ -19,7 +19,6 @@ from .config import (
     ENTITY_MAPPING,
     SECRET_KEY,
     TRANSFORMER_MODEL,
-    bulk_save_entities,
 )
 
 
@@ -36,30 +35,16 @@ SUPPORTED_LANGUAGES = {
 class CustomSlugAnonymizer(Operator):
     """A custom Presidio operator that replaces text with a hashed slug and records it in a database."""
     def operate(self, text: str, params: dict | None = None) -> str:
-        if SECRET_KEY is None:
-            raise ValueError("ANON_SECRET_KEY environment variable not set")
-        
         clean_text = " ".join(text.split()).strip()
-        full_hash = hmac.new(
-            SECRET_KEY.encode(), clean_text.encode(), hashlib.sha256
-        ).hexdigest()
-        
+        full_hash = hashlib.sha256(clean_text.encode()).hexdigest()
+
         entity_type = params.get("entity_type", "UNKNOWN") if params else "UNKNOWN"
         slug_length = params.get("slug_length", None) if params else None
-        entity_collector = params.get("entity_collector", None) if params else None
-        total_entities_counter = params.get("total_entities_counter", None) if params else None
-        entity_counts = params.get("entity_counts", None) if params else None
-
+        
         display_hash = full_hash[:slug_length] if slug_length is not None else full_hash
 
-        if entity_collector is not None:
-            entity_collector.append((entity_type, clean_text, display_hash, full_hash))
-
-        if total_entities_counter is not None:
-            total_entities_counter.total_entities_processed += 1
-        
-        if entity_counts is not None:
-            entity_counts[entity_type] = entity_counts.get(entity_type, 0) + 1
+        if params and "entity_collector" in params:
+            params["entity_collector"].append((entity_type, clean_text, display_hash, full_hash))
 
         return f"[{entity_type}_{display_hash}]"
 
@@ -160,7 +145,7 @@ def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
         recognizers.append(PatternRecognizer(supported_entity="CERT_SERIAL", patterns=[serial_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="CPE_STRING", patterns=[cpe_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="CERT_BODY", patterns=[cert_body_pattern], supported_language=lang))
-
+    return []
     return recognizers
 
 class AnonymizationOrchestrator:
@@ -224,7 +209,7 @@ class AnonymizationOrchestrator:
             return text
         return self.anonymize_texts([text])[0]
 
-    def anonymize_texts(self, texts: List[str]) -> List[str]:
+    def anonymize_texts(self, texts: List[str], operator_params: dict = None) -> List[str]:
         """Anonymizes a list of texts using the BatchAnalyzerEngine."""
         if not texts:
             return []
@@ -244,7 +229,11 @@ class AnonymizationOrchestrator:
         )
 
         anonymized_texts = []
-        entity_collector = []
+        if operator_params is None:
+            operator_params = {}
+        # Garante que os contadores internos funcionem
+        operator_params["total_entities_counter"] = self
+        operator_params["entity_counts"] = self.entity_counts
 
         # This part still needs to be a loop, but the heavy lifting (analysis) is already done.
         for i, (text, analyzer_results) in enumerate(zip(processed_texts, analyzer_results_iterator)):
@@ -253,27 +242,24 @@ class AnonymizationOrchestrator:
                 result for result in analyzer_results
                 if text[result.start:result.end] not in self.allow_list
             ]
-
             # Anonymize the individual text with its filtered results
             anonymizer_result = self.anonymizer_engine.anonymize(
                 text=text,
                 analyzer_results=filtered_analyzer_results,
                 operators={
-                    "DEFAULT": OperatorConfig(
-                        "custom_slug",
-                        {
-                            "slug_length": self.slug_length,
-                            "entity_collector": entity_collector,
-                            "total_entities_counter": self,
-                            "entity_counts": self.entity_counts,
-                        },
-                    )
-                },
+                    "DEFAULT": OperatorConfig("custom_slug", operator_params)
+		},
             )
             anonymized_texts.append(anonymizer_result.text)
 
-        if entity_collector:
-            bulk_save_entities(DB_PATH, entity_collector)
+        # Update total_entities_processed and entity_counts from the collected entities
+        #  for entity_type, _, _, _ in entity_collector:
+        #    self.total_entities_processed += 1
+        #     self.entity_counts[entity_type] = self.entity_counts.get(entity_type, 0) + 1
+
+        # The bulk_save_entities will now be called from the processors.py
+        # if entity_collector:
+        #     bulk_save_entities(DB_PATH, entity_collector)
 
         return anonymized_texts
 

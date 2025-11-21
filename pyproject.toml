@@ -20,5 +20,6 @@ dependencies = [
     "lxml>=5.2.2",
     "tqdm>=4.66.0",
     "ijson>=3.3.0",
+    "orjson>=3.10.3",
     "spacy[cuda12x,transformers]>=3.8.4",
 ]
