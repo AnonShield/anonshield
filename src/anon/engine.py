@@ -3,11 +3,13 @@
 import hashlib
 import hmac
 import sys
-from typing import List
+from typing import Dict, Iterable, List
 
 import pandas as pd
 import spacy
+import torch
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
+from presidio_analyzer.batch_analyzer_engine import BatchAnalyzerEngine
 from presidio_analyzer.nlp_engine import NerModelConfiguration, TransformersNlpEngine
 from presidio_anonymizer import AnonymizerEngine, OperatorConfig
 from presidio_anonymizer.operators import Operator, OperatorType
@@ -173,15 +175,18 @@ class AnonymizationOrchestrator:
         self.entity_counts = {}
         self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
 
-    def _setup_engines(self) -> tuple[AnalyzerEngine, AnonymizerEngine]:
+    def _setup_engines(self) -> tuple[BatchAnalyzerEngine, AnonymizerEngine]:
         """Initializes and configures the Presidio Analyzer and Anonymizer engines."""
         lang_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
-        spacy_model_name = lang_model_map.get(self.lang, f"{self.lang}_core_news_lg")
+        
+        supported_langs = set(["en", self.lang])
 
-        trf_model_config = [
-            {"lang_code": "en", "model_name": {"spacy": "en_core_web_lg", "transformers": TRANSFORMER_MODEL}},
-            {"lang_code": self.lang, "model_name": {"spacy": spacy_model_name, "transformers": TRANSFORMER_MODEL}}
-        ]
+        trf_model_config = []
+        for lang_code in supported_langs:
+            spacy_model_name = lang_model_map.get(lang_code, f"{lang_code}_core_news_lg")
+            trf_model_config.append(
+                {"lang_code": lang_code, "model_name": {"spacy": spacy_model_name, "transformers": TRANSFORMER_MODEL}}
+            )
 
         ner_config = NerModelConfiguration(
             model_to_presidio_entity_mapping=ENTITY_MAPPING, 
@@ -190,125 +195,91 @@ class AnonymizationOrchestrator:
         )
         
         nlp_engine = TransformersNlpEngine(models=trf_model_config, ner_model_configuration=ner_config)
-        analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=[self.lang, "en"])
         
-        # Remove built-in recognizers that are not desired
+        # 1. Create a standard AnalyzerEngine
+        core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=list(supported_langs))
+        
+        # 2. Add recognizers to the standard engine
         try:
-            analyzer.registry.remove_recognizer("DateRecognizer")
-            analyzer.registry.remove_recognizer("MedicalLicenseRecognizer")
-            analyzer.registry.remove_recognizer("IpRecognizer")
+            core_analyzer.registry.remove_recognizer("DateRecognizer")
+            core_analyzer.registry.remove_recognizer("MedicalLicenseRecognizer")
+            core_analyzer.registry.remove_recognizer("IpRecognizer")
         except Exception:
-            # Recognizer might not exist for the selected language, fail silently
             pass
 
-        for recognizer in load_custom_recognizers(langs=analyzer.supported_languages):
-            analyzer.registry.add_recognizer(recognizer)
+        for recognizer in load_custom_recognizers(langs=core_analyzer.supported_languages):
+            core_analyzer.registry.add_recognizer(recognizer)
+        
+        # 3. Wrap the standard engine with BatchAnalyzerEngine
+        batch_analyzer = BatchAnalyzerEngine(analyzer_engine=core_analyzer)
             
         anonymizer = AnonymizerEngine()
         anonymizer.add_anonymizer(CustomSlugAnonymizer)
         
-        return analyzer, anonymizer
+        return batch_analyzer, anonymizer
 
     def anonymize_text(self, text: str) -> str:
-        """Anonymizes a single block of text."""
+        """Anonymizes a single block of text by wrapping it in a list."""
         if not isinstance(text, str) or not text.strip():
             return text
+        return self.anonymize_texts([text])[0]
 
-        entity_collector = []
-        entities = self._get_entities_to_anonymize()
-        analyzer_results = self.analyzer_engine.analyze(
-            text=text, language=self.lang, score_threshold=0.6, entities=entities
-        )
+    def anonymize_texts(self, texts: List[str]) -> List[str]:
+        """Anonymizes a list of texts using the BatchAnalyzerEngine."""
+        if not texts:
+            return []
 
-        # Filter out results that are in the allow_list
-        filtered_analyzer_results = []
-        for result in analyzer_results:
-            result_text = text[result.start:result.end]
-            if result_text not in self.allow_list:
-                filtered_analyzer_results.append(result)
-
-        anonymizer_results = self.anonymizer_engine.anonymize(
-            text=text, analyzer_results=filtered_analyzer_results,  # Use filtered results
-            operators={
-                "DEFAULT": OperatorConfig(
-                    "custom_slug",
-                    {
-                        "slug_length": self.slug_length,
-                        "entity_collector": entity_collector,
-                        "total_entities_counter": self,
-                        "entity_counts": self.entity_counts
-                    }
-                )
-            }
-        )
+        # Ensure all items are strings
+        processed_texts = [str(text) if pd.notna(text) else "" for text in texts]
         
-        if entity_collector:
-            bulk_save_entities(DB_PATH, entity_collector)
-
-        return anonymizer_results.text
-
-    def anonymize_texts(self, texts: List[str], batch_size: int = 32) -> List[str]:
-        """Anonymizes a list of texts in batches."""
-        results = []
-        entity_collector = []
+        # Get entities to anonymize
         entities_to_anonymize = self._get_entities_to_anonymize()
+        
+        # Use the batch analyzer to get results for all texts
+        analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
+            processed_texts,
+            language=self.lang,
+            entities=entities_to_anonymize,
+            score_threshold=0.6,
+        )
 
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-            batch = [str(text) if pd.notna(text) else "" for text in batch]
+        anonymized_texts = []
+        entity_collector = []
 
-            analyzer_results_batch = [
-                self.analyzer_engine.analyze(
-                    text=text, language=self.lang, score_threshold=0.6, entities=entities_to_anonymize
-                )
-                for text in batch
+        # This part still needs to be a loop, but the heavy lifting (analysis) is already done.
+        for i, (text, analyzer_results) in enumerate(zip(processed_texts, analyzer_results_iterator)):
+            # Filter results based on the allow_list
+            filtered_analyzer_results = [
+                result for result in analyzer_results
+                if text[result.start:result.end] not in self.allow_list
             ]
 
-            analyzer_results_batch = [
-                self.analyzer_engine.analyze(
-                    text=text, language=self.lang, score_threshold=0.6, entities=entities_to_anonymize
-                )
-                for text in batch
-            ]
-
-            # Filter out results that are in the allow_list
-            filtered_analyzer_results_batch = []
-            for i, analyzer_results in enumerate(analyzer_results_batch):
-                filtered_results = []
-                for result in analyzer_results:
-                    result_text = batch[i][result.start:result.end]
-                    if result_text not in self.allow_list:
-                        filtered_results.append(result)
-                filtered_analyzer_results_batch.append(filtered_results)
-
-
-            anonymized_texts = [
-                self.anonymizer_engine.anonymize(
-                    text=batch[j], analyzer_results=filtered_analyzer_results_batch[j], # type: ignore
-                    operators={
-                        "DEFAULT": OperatorConfig(
-                            "custom_slug", 
-                            {
-                                "slug_length": self.slug_length, 
-                                "entity_collector": entity_collector,
-                                "total_entities_counter": self,
-                                "entity_counts": self.entity_counts
-                            }
-                        )
-                    }
-                ).text
-                for j in range(len(batch))
-            ]
-            results.extend(anonymized_texts)
+            # Anonymize the individual text with its filtered results
+            anonymizer_result = self.anonymizer_engine.anonymize(
+                text=text,
+                analyzer_results=filtered_analyzer_results,
+                operators={
+                    "DEFAULT": OperatorConfig(
+                        "custom_slug",
+                        {
+                            "slug_length": self.slug_length,
+                            "entity_collector": entity_collector,
+                            "total_entities_counter": self,
+                            "entity_counts": self.entity_counts,
+                        },
+                    )
+                },
+            )
+            anonymized_texts.append(anonymizer_result.text)
 
         if entity_collector:
             bulk_save_entities(DB_PATH, entity_collector)
 
-        return results
+        return anonymized_texts
 
     def _get_entities_to_anonymize(self) -> List[str]:
         """Gets the list of entities to anonymize based on the preserve list."""
-        all_entities = self.analyzer_engine.get_supported_entities()
+        all_entities = self.analyzer_engine.analyzer_engine.get_supported_entities()
         return [
             ent for ent in all_entities 
             if not self.entities_to_preserve or ent not in self.entities_to_preserve

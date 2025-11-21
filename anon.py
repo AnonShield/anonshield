@@ -12,6 +12,8 @@ import subprocess
 import sys
 import time
 import warnings
+import spacy
+import torch
 
 from src.anon.config import (
     ENTITY_MAPPING,
@@ -124,6 +126,18 @@ def _handle_list_languages():
 def main():
     """Main function to orchestrate the anonymization process."""
     args = _parse_arguments()
+
+    # --- GPU Activation (User Provided) ---
+    print("[*] Verifying hardware...")
+    if torch.cuda.is_available():
+        try:
+            spacy.require_gpu()
+            print(f"[+] GPU activated successfully! (Device: {torch.cuda.get_device_name(0)})")
+        except Exception as e:
+            print(f"[!] GPU detected, but failed to activate in Spacy: {e}")
+    else:
+        print("[!] CUDA not detected by PyTorch. Running on CPU.")
+    # -------------------------------------
 
     if not SECRET_KEY:
         print("[!] Error: ANON_SECRET_KEY environment variable not set.", file=sys.stderr)

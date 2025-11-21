@@ -10,7 +10,9 @@ import io
 import json
 import os
 from abc import ABC, abstractmethod
+import itertools
 
+import ijson
 import numpy as np
 import openpyxl
 import pandas as pd
@@ -18,6 +20,7 @@ import pytesseract
 from docx import Document
 from lxml import etree
 from PIL import Image
+from tqdm import tqdm
 import pymupdf as fitz
 
 from .engine import AnonymizationOrchestrator
@@ -58,15 +61,25 @@ class FileProcessor(ABC):
 
 
 class TextFileProcessor(FileProcessor):
-    """Processor for plain text files (.txt)."""
+    """Processor for plain text files (.txt), processing line-by-line."""
 
     def process(self) -> str:
-        with open(self.file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        anonymized_content = self.orchestrator.anonymize_text(content)
         output_path = self._get_output_path(".txt")
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(anonymized_content)
+        
+        # Get total line count for tqdm
+        with open(self.file_path, "r", encoding="utf-8") as f:
+            total_lines = sum(1 for line in f)
+
+        with open(self.file_path, "r", encoding="utf-8") as infile, \
+             open(output_path, "w", encoding="utf-8") as outfile:
+            
+            progress_bar = tqdm(total=total_lines, desc=f"Processing {os.path.basename(self.file_path)}", unit="lines")
+            for line in infile:
+                anonymized_line = self.orchestrator.anonymize_text(line)
+                outfile.write(anonymized_line)
+                progress_bar.update(1)
+            progress_bar.close()
+            
         return output_path
 
 
@@ -76,7 +89,7 @@ class PdfFileProcessor(FileProcessor):
     def process(self) -> str:
         parts: list[str] = []
         with fitz.open(self.file_path) as doc:
-            for page in doc:
+            for page in tqdm(doc, desc=f"Extracting text from {os.path.basename(self.file_path)}"):
                 content_items = []
                 text_blocks = page.get_text("dict").get("blocks", [])
                 for block in text_blocks:
@@ -125,7 +138,7 @@ class DocxFileProcessor(FileProcessor):
         doc = Document(self.file_path)
         data_parts = []
 
-        for para in doc.paragraphs:
+        for para in tqdm(doc.paragraphs, desc=f"Processing {os.path.basename(self.file_path)}"):
             para_content_parts = []
             for run in para.runs:
                 drawings = run._r.xpath(".//w:drawing")
@@ -156,16 +169,30 @@ class CsvFileProcessor(FileProcessor):
     """Processor for CSV files, processed in batches."""
 
     def process(self) -> str:
-        df = pd.read_csv(self.file_path, dtype=str)
-        all_values = [str(val) if val is not None else "" for val in df.values.flatten().tolist()]
-        
-        anonymized_values = self.orchestrator.anonymize_texts(all_values)
-        
-        anonymized_array = np.array(anonymized_values).reshape(df.shape)
-        anonymized_df = pd.DataFrame(anonymized_array, columns=df.columns, index=df.index)
-        
         output_path = self._get_output_path(".csv")
-        anonymized_df.to_csv(output_path, index=False, encoding="utf-8")
+        
+        # Get total rows for tqdm
+        with open(self.file_path, "r", encoding="utf-8") as f:
+            total_rows = sum(1 for row in f) - 1 # Exclude header
+
+        chunk_size = 1000  # Adjustable
+        
+        header_written = False
+        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='skip') as reader:
+            progress_bar = tqdm(total=total_rows, desc=f"Processing {os.path.basename(self.file_path)}", unit="rows")
+            for chunk in reader:
+                all_values = [str(val) if val is not None else "" for val in chunk.values.flatten().tolist()]
+                
+                anonymized_values = self.orchestrator.anonymize_texts(all_values)
+                
+                anonymized_array = np.array(anonymized_values).reshape(chunk.shape)
+                anonymized_df = pd.DataFrame(anonymized_array, columns=chunk.columns, index=chunk.index)
+                
+                anonymized_df.to_csv(output_path, mode='a', index=False, header=not header_written, encoding="utf-8")
+                header_written = True
+                progress_bar.update(len(chunk))
+            progress_bar.close()
+
         return output_path
 
 
@@ -177,41 +204,48 @@ class XlsxFileProcessor(FileProcessor):
         all_texts = []
         cell_map = {}
 
-        for sheet_idx, sheet in enumerate(wb.worksheets):
-            # Collect cell text
-            for row_idx, row in enumerate(sheet.iter_rows()):
-                for col_idx, cell in enumerate(row):
-                    if cell.value and isinstance(cell.value, str):
-                        all_texts.append(cell.value)
-                        cell_map[(sheet_idx, row_idx, col_idx)] = len(all_texts) - 1
+        # The nature of XLSX makes streaming reads/writes difficult with openpyxl.
+        # We'll show progress on a sheet/row basis for the collection part.
+        print("Collecting text from XLSX file (progress based on rows)...")
+        total_rows = sum(sheet.max_row for sheet in wb.worksheets)
+        
+        with tqdm(total=total_rows, desc="Collecting text", unit="rows") as progress_bar:
+            for sheet_idx, sheet in enumerate(wb.worksheets):
+                for row_idx, row in enumerate(sheet.iter_rows()):
+                    for col_idx, cell in enumerate(row):
+                        if cell.value and isinstance(cell.value, str):
+                            all_texts.append(cell.value)
+                            cell_map[(sheet_idx, row_idx, col_idx)] = len(all_texts) - 1
+                    progress_bar.update(1)
 
-        # Anonymize all texts at once
+        print("Anonymizing collected texts...")
         anonymized_texts = self.orchestrator.anonymize_texts(all_texts)
         translation_map = dict(zip(all_texts, anonymized_texts))
 
-        # Reconstruct the workbook
-        for sheet_idx, sheet in enumerate(wb.worksheets):
-            for row_idx, row in enumerate(sheet.iter_rows()):
-                for col_idx, cell in enumerate(row):
-                    if (sheet_idx, row_idx, col_idx) in cell_map:
-                        original_text = all_texts[cell_map[(sheet_idx, row_idx, col_idx)]]
-                        cell.value = translation_map[original_text]
+        print("Reconstructing anonymized XLSX file...")
+        with tqdm(total=total_rows, desc="Reconstructing file", unit="rows") as progress_bar:
+            for sheet_idx, sheet in enumerate(wb.worksheets):
+                for row_idx, row in enumerate(sheet.iter_rows()):
+                    for col_idx, cell in enumerate(row):
+                        if (sheet_idx, row_idx, col_idx) in cell_map:
+                            original_text = all_texts[cell_map[(sheet_idx, row_idx, col_idx)]]
+                            cell.value = translation_map[original_text]
+                    progress_bar.update(1)
 
-            # Clear old images and handle OCR text as before
-            if hasattr(sheet, '_images') and sheet._images:
-                ocr_texts = []
-                for image in list(sheet._images):
-                    img_bytes = image._data()
-                    ocr_text = extract_text_from_image(img_bytes)
-                    if ocr_text.strip():
-                        ocr_texts.append(ocr_text)
-                
-                if ocr_texts:
-                    anonymized_ocr_texts = self.orchestrator.anonymize_texts(ocr_texts)
-                    for anonymized_text in anonymized_ocr_texts:
-                        sheet.append(["Anonymized image text:", anonymized_text])
-                
-                sheet._images.clear()
+                if hasattr(sheet, '_images') and sheet._images:
+                    ocr_texts = []
+                    for image in list(sheet._images):
+                        img_bytes = image._data()
+                        ocr_text = extract_text_from_image(img_bytes)
+                        if ocr_text.strip():
+                            ocr_texts.append(ocr_text)
+                    
+                    if ocr_texts:
+                        anonymized_ocr_texts = self.orchestrator.anonymize_texts(ocr_texts)
+                        for anonymized_text in anonymized_ocr_texts:
+                            sheet.append(["Anonymized image text:", anonymized_text])
+                    
+                    sheet._images.clear()
 
         output_path = self._get_output_path(".xlsx")
         wb.save(output_path)
@@ -222,23 +256,28 @@ class XmlFileProcessor(FileProcessor):
     """Processor for XML files."""
 
     def process(self) -> str:
+        # XML processing is also difficult to stream for writing with standard libraries.
+        # We read all text, anonymize, then reconstruct. Progress is shown for the iteration phases.
         parser = etree.XMLParser(recover=True, strip_cdata=False)
         tree = etree.parse(self.file_path, parser)
         all_texts = []
 
-        # Collect all text content
-        for element in tree.iter():
+        print("Collecting text from XML file...")
+        iterator = tree.iter()
+        all_elements = list(iterator)
+        
+        for element in tqdm(all_elements, desc="Collecting text", unit="elements"):
             if element.text and element.text.strip():
                 all_texts.append(element.text)
             if element.tail and element.tail.strip():
                 all_texts.append(element.tail)
 
-        # Anonymize in a single batch
+        print("Anonymizing collected texts...")
         anonymized_texts = self.orchestrator.anonymize_texts(all_texts)
         translation_map = dict(zip(all_texts, anonymized_texts))
 
-        # Reconstruct the XML
-        for element in tree.iter():
+        print("Reconstructing anonymized XML file...")
+        for element in tqdm(all_elements, desc="Reconstructing file", unit="elements"):
             if element.text and element.text.strip() in translation_map:
                 element.text = translation_map[element.text]
             if element.tail and element.tail.strip() in translation_map:
@@ -249,42 +288,122 @@ class XmlFileProcessor(FileProcessor):
         return output_path
 
 
+import itertools
+
+import itertools
+import ijson
+from tqdm import tqdm
+import os
+import json
+
 class JsonFileProcessor(FileProcessor):
-    """Processor for JSON files."""
+    """
+    Processor for large JSON files, using streaming, a wrapped reader for
+    progress tracking, and object batching for performance.
+    """
+
+    def _collect_strings_recursive(self, obj):
+        """Helper to recursively collect all strings from a JSON object."""
+        strings = []
+        if isinstance(obj, dict):
+            for v in obj.values():
+                strings.extend(self._collect_strings_recursive(v))
+        elif isinstance(obj, list):
+            for item in obj:
+                strings.extend(self._collect_strings_recursive(item))
+        elif isinstance(obj, str):
+            strings.append(obj)
+        return strings
+
+    def _reconstruct_recursive(self, obj, translation_map):
+        """Helper to recursively reconstruct the object with anonymized strings."""
+        if isinstance(obj, dict):
+            return {k: self._reconstruct_recursive(v, translation_map) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._reconstruct_recursive(item, translation_map) for item in obj]
+        elif isinstance(obj, str) and obj in translation_map:
+            return translation_map[obj]
+        return obj
+
+    def _process_and_write_batch(self, batch_of_objects, outfile, is_first_batch_in_file):
+        """
+        Extracts texts from N objects, sends them to the GPU at once,
+        reconstructs the objects, and writes them to disk.
+        """
+        if not batch_of_objects:
+            return
+
+        all_strings_for_batch = []
+        object_string_counts = []
+        for item in batch_of_objects:
+            strings_in_item = self._collect_strings_recursive(item)
+            all_strings_for_batch.extend(strings_in_item)
+            object_string_counts.append(len(strings_in_item))
+        
+        anonymized_strings_flat = self.orchestrator.anonymize_texts(all_strings_for_batch)
+
+        current_pos = 0
+        for i, item in enumerate(batch_of_objects):
+            num_strings = object_string_counts[i]
+            
+            original_strings_for_item = all_strings_for_batch[current_pos : current_pos + num_strings]
+            anonymized_strings_for_item = anonymized_strings_flat[current_pos : current_pos + num_strings]
+            
+            anonymized_item = item
+            if original_strings_for_item:
+                translation_map = dict(zip(original_strings_for_item, anonymized_strings_for_item))
+                anonymized_item = self._reconstruct_recursive(item, translation_map)
+            
+            current_pos += num_strings
+
+            if not (is_first_batch_in_file and i == 0):
+                outfile.write(",\n")
+            
+            json.dump(anonymized_item, outfile, ensure_ascii=False, indent=2)
 
     def process(self) -> str:
-        with open(self.file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        all_strings = []
-        def collect_strings(obj):
-            if isinstance(obj, dict):
-                for v in obj.values():
-                    collect_strings(v)
-            elif isinstance(obj, list):
-                for item in obj:
-                    collect_strings(item)
-            elif isinstance(obj, str):
-                all_strings.append(obj)
-
-        collect_strings(data)
-        anonymized_strings = self.orchestrator.anonymize_texts(all_strings)
-        translation_map = dict(zip(all_strings, anonymized_strings))
-
-        def recursive_reconstruct(obj):
-            if isinstance(obj, dict):
-                return {k: recursive_reconstruct(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [recursive_reconstruct(item) for item in obj]
-            elif isinstance(obj, str) and obj in translation_map:
-                return translation_map[obj]
-            return obj
-
-        anonymized_data = recursive_reconstruct(data)
         output_path = self._get_output_path(".json")
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(anonymized_data, f, indent=4, ensure_ascii=False)
+        temp_output_path = output_path + ".tmp"
+        
+        BATCH_SIZE = 100
+        file_size = os.path.getsize(self.file_path)
+        
+        print(f"[*] Starting optimized JSON processing (Batch Size: {BATCH_SIZE})")
+
+        with open(self.file_path, "rb") as f_in, open(temp_output_path, "w", encoding="utf-8") as f_out:
+            f_out.write("[\n")
+            
+            with tqdm(total=file_size, unit='B', unit_scale=True, desc=f"Anonymizing {os.path.basename(self.file_path)}") as pbar:
+                
+                class FileWrapper:
+                    def __init__(self, file, pbar):
+                        self.file = file
+                        self.pbar = pbar
+                    def read(self, size=-1):
+                        data = self.file.read(size)
+                        self.pbar.update(len(data))
+                        return data
+
+                wrapped_file = FileWrapper(f_in, pbar)
+                
+                objects = ijson.items(wrapped_file, 'item', use_float=True)
+                
+                is_first_batch = True
+                while True:
+                    batch_of_objects = list(itertools.islice(objects, BATCH_SIZE))
+                    if not batch_of_objects:
+                        break
+                    
+                    self._process_and_write_batch(batch_of_objects, f_out, is_first_batch)
+                    is_first_batch = False
+
+            f_out.write("\n]")
+        
+        os.replace(temp_output_path, output_path)
+        
+        print(f"[*] Optimized processing complete. Output at: {output_path}")
         return output_path
+
 
 
 class ImageFileProcessor(FileProcessor):
