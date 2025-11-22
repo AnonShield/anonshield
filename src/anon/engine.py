@@ -239,7 +239,7 @@ class AnonymizationOrchestrator:
         if operator_params is None: operator_params = {}
         entity_collector = operator_params.get("entity_collector")
         entities_to_anonymize = self._get_entities_to_anonymize()
-        nlp = self.analyzer_engine.analyzer_engine.nlp_engine.nlp
+        nlp = self.analyzer_engine.analyzer_engine.nlp_engine.nlp[self.lang]
         
         docs = nlp.pipe(unique_texts_to_process, batch_size=500)
 
