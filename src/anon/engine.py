@@ -2,11 +2,13 @@
 
 import hashlib
 import hmac
+import re
 import sys
 from typing import Dict, Iterable, List
 
 import pandas as pd
 import spacy
+import spacy_huggingface_pipelines
 import torch
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
 from presidio_analyzer.batch_analyzer_engine import BatchAnalyzerEngine
@@ -147,6 +149,206 @@ def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
         recognizers.append(PatternRecognizer(supported_entity="CERT_BODY", patterns=[cert_body_pattern], supported_language=lang))
     return recognizers
 
+class AnonymizationOrchestrator:
+    """Orchestrates the text anonymization process using Presidio with optimized Regex + SpaCy pipe."""
+
+    def __init__(self, lang: str, allow_list: List[str], entities_to_preserve: List[str], slug_length: int | None = None):
+        self.lang = lang
+        self.allow_list = set(allow_list) # Set para busca O(1)
+        self.entities_to_preserve = set(entities_to_preserve)
+        self.slug_length = slug_length
+        self.total_entities_processed = 0
+        self.entity_counts = {}
+        self.cache = {}
+        
+        # Carrega engines
+        self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
+        
+        # OTIMIZAÇÃO SENIOR: Compilar Regex Customizados para uso manual rápido
+        # Isso permite usar o nlp.pipe do Spacy (rápido) sem perder a detecção de IPs/Hashes
+        self.compiled_patterns = []
+        custom_recognizers = load_custom_recognizers([self.lang])
+        for recognizer in custom_recognizers:
+            if recognizer.supported_entity in self.entities_to_preserve:
+                continue
+            for pattern in recognizer.patterns:
+                # Compila o regex para performance máxima
+                try:
+                    self.compiled_patterns.append({
+                        "label": recognizer.supported_entity,
+                        "regex": re.compile(pattern.regex, flags=re.DOTALL | re.IGNORECASE),
+                        "score": pattern.score
+                    })
+                except re.error:
+                    pass
+
+    def _setup_engines(self) -> tuple[BatchAnalyzerEngine, AnonymizerEngine]:
+        """Initializes and configures the Presidio Analyzer and Anonymizer engines."""
+        lang_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
+        supported_langs = set(["en", self.lang])
+
+        trf_model_config = []
+        for lang_code in supported_langs:
+            spacy_model_name = lang_model_map.get(lang_code, f"{lang_code}_core_news_lg")
+            trf_model_config.append(
+                {"lang_code": lang_code, "model_name": {"spacy": spacy_model_name, "transformers": TRANSFORMER_MODEL}}
+            )
+
+        ner_config = NerModelConfiguration(
+            model_to_presidio_entity_mapping=ENTITY_MAPPING, 
+            aggregation_strategy="max", 
+            labels_to_ignore=["O"]
+        )
+        
+        nlp_engine = TransformersNlpEngine(models=trf_model_config, ner_model_configuration=ner_config)
+        core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=list(supported_langs))
+        
+        # Não precisamos adicionar recognizers ao core_analyzer aqui se formos usar o modo otimizado,
+        # mas mantemos para compatibilidade com o modo legacy se necessário.
+        for recognizer in load_custom_recognizers(langs=core_analyzer.supported_languages):
+            core_analyzer.registry.add_recognizer(recognizer)
+        
+        batch_analyzer = BatchAnalyzerEngine(analyzer_engine=core_analyzer)
+        anonymizer = AnonymizerEngine()
+        anonymizer.add_anonymizer(CustomSlugAnonymizer)
+        
+        return batch_analyzer, anonymizer
+
+    def anonymize_text(self, text: str, operator_params: dict = None) -> str:
+        if not isinstance(text, str) or not text.strip():
+            return text
+        return self.anonymize_texts([text], operator_params=operator_params)[0]
+
+    def anonymize_texts(self, texts: List[str], operator_params: dict = None) -> List[str]:
+        """
+        Versão Otimizada "Senior": Usa Spacy Pipe para IA + Regex Compilado Nativo.
+        Evita o overhead absurdo do Presidio Analyzer wrapper.
+        """
+        if not texts:
+            return []
+
+        # 1. Prepara lista e verifica Cache
+        original_texts = [str(text) if pd.notna(text) else "" for text in texts]
+        final_anonymized_list = [""] * len(original_texts)
+        
+        texts_to_process_indices = {} # Map {text_content: [list_of_indices]}
+        unique_texts_list = []
+
+        for i, text in enumerate(original_texts):
+            if not text: continue
+            
+            if text in self.cache:
+                final_anonymized_list[i] = self.cache[text]
+            else:
+                if text not in texts_to_process_indices:
+                    texts_to_process_indices[text] = []
+                    unique_texts_list.append(text)
+                texts_to_process_indices[text].append(i)
+
+        if not unique_texts_list:
+            return final_anonymized_list
+
+        # 2. Configuração
+        if operator_params is None: operator_params = {}
+        entity_collector = operator_params.get("entity_collector")
+        entities_to_preserve = self.entities_to_preserve
+        
+        # --- CORREÇÃO DO ERRO 'DICT' ---
+        # O atributo .nlp do TransformersNlpEngine é um dicionário {'en': model, ...}
+        # Precisamos selecionar o modelo correto para a língua atual.
+        nlp_engine = self.analyzer_engine.analyzer_engine.nlp_engine
+        nlp_model = nlp_engine.nlp[self.lang] 
+
+        # 3. Pipeline Híbrida (IA + Regex)
+        # Processa em batch na GPU
+        docs = nlp_model.pipe(unique_texts_list, batch_size=50) # Batch 50 é seguro para textos grandes "packed"
+
+        for doc in docs:
+            original_doc_text = doc.text
+            detected_entities = []
+
+            # A. Coleta Entidades da IA (Transformer)
+            for ent in doc.ents:
+                if ent.label_ not in entities_to_preserve and ent.text not in self.allow_list:
+                    detected_entities.append({
+                        "start": ent.start_char,
+                        "end": ent.end_char,
+                        "label": ent.label_,
+                        "text": ent.text,
+                        "score": 1.0 # IA tem prioridade
+                    })
+
+            # B. Coleta Entidades de Regex (Manual e Rápido)
+            for pat in self.compiled_patterns:
+                for match in pat["regex"].finditer(original_doc_text):
+                    match_text = match.group()
+                    if match_text not in self.allow_list:
+                        detected_entities.append({
+                            "start": match.start(),
+                            "end": match.end(),
+                            "label": pat["label"],
+                            "text": match_text,
+                            "score": pat["score"]
+                        })
+
+            # C. Resolve sobreposições (Overlap Resolution)
+            # Ordena por posição inicial. Se houver conflito, escolhe o mais longo ou maior score.
+            detected_entities.sort(key=lambda x: (x["start"], -x["score"], -(x["end"] - x["start"])))
+            
+            merged_entities = []
+            last_end = -1
+            
+            for ent in detected_entities:
+                if ent["start"] >= last_end:
+                    merged_entities.append(ent)
+                    last_end = ent["end"]
+                else:
+                    # Lógica simples: se overlap parcial, ignora o segundo. 
+                    # (Poderia refinar, mas para velocidade isso basta)
+                    continue
+
+            # D. Reconstrói a String (Anonymization)
+            # Precisamos reconstruir de trás para frente ou manter rastreio de índices, 
+            # mas como temos a lista ordenada e sem overlap, podemos ir do começo ao fim.
+            
+            new_text_parts = []
+            current_idx = 0
+            
+            for ent in merged_entities:
+                # Texto antes da entidade
+                new_text_parts.append(original_doc_text[current_idx:ent["start"]])
+                
+                # Gera Hash
+                clean_text = " ".join(ent["text"].split()).strip()
+                full_hash = hashlib.sha256(clean_text.encode()).hexdigest()
+                display_hash = full_hash[:self.slug_length] if self.slug_length else full_hash
+
+                # Salva no coletor (para DB)
+                if entity_collector is not None:
+                    entity_collector.append((ent["label"], clean_text, display_hash, full_hash))
+                
+                # Adiciona tag
+                new_text_parts.append(f"[{ent['label']}_{display_hash}]")
+                
+                current_idx = ent["end"]
+            
+            # Texto restante
+            new_text_parts.append(original_doc_text[current_idx:])
+            
+            final_text = "".join(new_text_parts)
+            
+            # E. Salva no Cache e Distribui
+            self.cache[original_doc_text] = final_text
+            for idx in texts_to_process_indices[original_doc_text]:
+                final_anonymized_list[idx] = final_text
+
+        return final_anonymized_list
+
+    def _get_entities_to_anonymize(self) -> List[str]:
+        """Helper legado."""
+        all_entities = self.analyzer_engine.analyzer_engine.get_supported_entities()
+        return [ent for ent in all_entities if ent not in self.entities_to_preserve]
+		
 class AnonymizationOrchestrator:
     """Orchestrates the text anonymization process using Presidio."""
 
