@@ -74,8 +74,17 @@ def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
     )
 
     # IP address recognizers (IPv4 and IPv6)
-    ip_pattern = Pattern(name="IP Address Pattern", regex=r"(?<!\d\.)\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b(?!\.\d)", score=0.6)
-    ipv6_pattern = Pattern(name="IPv6 Address Pattern", regex=r"^((?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|:(?:(?::[0-9A-Fa-f]{1,4}){1,7}|:)|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?:(?::[0-9A-Fa-f]{1,4}){1,6})|::(?:[0-9A-Fa-f]{1,4}:){0,5}(?:[0-9A-Fa-f]{1,4}|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|(?:[0-9A-Fa-f]{1,4}:){1,4}:(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$", score=0.6)
+    ip_pattern = Pattern(
+        name="IP Address Pattern", 
+        regex=r"\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b", 
+        score=0.85
+    )
+    # IPv6 Otimizado (Detecta grupos de hex e dois pontos, sem validação estrita lenta)
+    ipv6_pattern = Pattern(
+        name="IPv6 Address Pattern", 
+        regex=r"(?<![a-zA-Z0-9])(?:[A-Fa-f0-9]{1,4}:){2,}(?:[A-Fa-f0-9]{1,4}|:)(?![a-zA-Z0-9])", 
+        score=0.6
+    )
 
     hostname_patterns = [
         Pattern(
@@ -132,11 +141,11 @@ def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
     )
     
     # Corpos de Certificado (Base64)
-    cert_body_pattern = Pattern(
-        name="Certificate Body (Base64)",
-        regex=r"\bMII[a-zA-Z0-9+/=\n]{100,}\b", 
-        score=0.8
-    )
+    # cert_body_pattern = Pattern(
+    #     name="Certificate Body (Base64)",
+    #     regex=r"\bMII[a-zA-Z0-9+/=\n]{100,}\b", 
+    #     score=0.8
+    # )
 
     # MAC Address
     mac_pattern = Pattern(
@@ -161,7 +170,7 @@ def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
         recognizers.append(PatternRecognizer(supported_entity="UUID", patterns=[uuid_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="CERT_SERIAL", patterns=[serial_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="CPE_STRING", patterns=[cpe_pattern], supported_language=lang))
-        recognizers.append(PatternRecognizer(supported_entity="CERT_BODY", patterns=[cert_body_pattern], supported_language=lang))
+        # recognizers.append(PatternRecognizer(supported_entity="CERT_BODY", patterns=[cert_body_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="MAC_ADDRESS", patterns=[mac_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="FILE_PATH", patterns=[path_pattern], supported_language=lang))
         

@@ -506,8 +506,7 @@ class JsonFileProcessor(FileProcessor):
             # GATEKEEPER LOGIC
             if (len(obj) > 3 and
                 obj.lower() not in ('true', 'false') and
-                not self.UUID_PATTERN.match(obj) and
-                any(c.isalpha() for c in obj)):
+                not self.UUID_PATTERN.match(obj)):
                 strings.append(obj)
         return strings
 
@@ -525,7 +524,7 @@ class JsonFileProcessor(FileProcessor):
         output_path = self._get_output_path(".json")
         temp_output_path = output_path + ".tmp"
         
-        BATCH_SIZE = 50 # Mantenha 50 ou teste 100 na 3060
+        BATCH_SIZE = 1 # Mantenha 50 ou teste 100 na 3060
         file_size = os.path.getsize(self.file_path)
         
         # OTIMIZAÇÃO DE MEMÓRIA: Desliga o GC automático
@@ -582,6 +581,7 @@ class JsonFileProcessor(FileProcessor):
         if not batch_of_objects:
             return
 
+        # 1. Coleta todas as strings
         all_strings_for_batch = []
         object_string_maps = [] 
 
@@ -591,50 +591,73 @@ class JsonFileProcessor(FileProcessor):
             object_string_maps.append(strings_in_item)
         
         if not all_strings_for_batch:
-            # Se não tem nada pra anonimizar, só escreve rápido
             for i, item in enumerate(batch_of_objects):
                 if not (is_first_batch_in_file and i == 0):
                     outfile.write(",\n")
                 outfile.write(orjson.dumps(item).decode('utf-8'))
             return
 
+        # 2. SMART PACKING (A Correção da Lentidão)
+        # Em vez de um texto gigante, criamos chunks de tamanho ideal para o Transformer
+        MAX_CHUNK_SIZE = 10 # Caracteres (seguro para ~512 tokens do Roberta)
         DELIMITER = " . ||| . "
-        packed_text = DELIMITER.join(all_strings_for_batch)
+        
+        text_chunks = []
+        current_chunk = []
+        current_len = 0
+        
+        # Agrupa strings em chunks limitados
+        for s in all_strings_for_batch:
+            if current_len + len(s) + len(DELIMITER) > MAX_CHUNK_SIZE and current_chunk:
+                text_chunks.append(DELIMITER.join(current_chunk))
+                current_chunk = []
+                current_len = 0
+            current_chunk.append(s)
+            current_len += len(s) + len(DELIMITER)
+        
+        if current_chunk:
+            text_chunks.append(DELIMITER.join(current_chunk))
 
+        # 3. Processamento em Batch na GPU
         entity_collector_for_batch = []
+        anonymized_chunks = []
         
-        # GPU Trabalha aqui (Bloqueante, não tem jeito)
-        anonymized_packed_list = self.orchestrator.anonymize_texts(
-            [packed_text],
-            operator_params={"entity_collector": entity_collector_for_batch}
-        )
-        anonymized_packed = anonymized_packed_list[0] if anonymized_packed_list else ""
-        
-        # OTIMIZAÇÃO: Envia para o banco em Thread separada (Não bloqueia a GPU para o próximo lote)
-        if entity_collector_for_batch:
-            # Copia a lista para evitar condição de corrida se o coletor for reusado (embora aqui seja novo)
-            data_to_save = list(entity_collector_for_batch) 
-            self.db_executor.submit(bulk_save_to_db, data_to_save)
-
-        anonymized_strings_flat = anonymized_packed.split(DELIMITER)
-        
-        # Fallback de segurança (se o split falhar por causa do modelo)
-        if len(anonymized_strings_flat) != len(all_strings_for_batch):
-             # Se falhar o packing, roda lento (fallback)
-            anonymized_strings_flat = self.orchestrator.anonymize_texts_legacy(
-                all_strings_for_batch,
-                operator_params={"entity_collector": []} # Já salvamos antes, ignora DB aqui
+        if text_chunks:
+            # Envia a lista de chunks (vários textos pequenos) em vez de um gigante
+            anonymized_chunks = self.orchestrator.anonymize_texts(
+                text_chunks,
+                operator_params={"entity_collector": entity_collector_for_batch}
             )
 
+        # 4. Desempacota os resultados (Unpack)
+        anonymized_strings_flat = []
+        for chunk in anonymized_chunks:
+            parts = chunk.split(DELIMITER)
+            anonymized_strings_flat.extend(parts)
+
+        # Fallback de segurança (caso o split falhe ou tamanhos não batam)
+        if len(anonymized_strings_flat) != len(all_strings_for_batch):
+            print(f"[!] Batch mismatch: sent {len(all_strings_for_batch)}, got {len(anonymized_strings_flat)}. Running fallback.")
+            anonymized_strings_flat = self.orchestrator.anonymize_texts_legacy(
+                all_strings_for_batch, 
+                operator_params={"entity_collector": []} # Não duplica no banco
+            )
+
+        # 5. Salva no Banco (Async)
+        if entity_collector_for_batch:
+            self.db_executor.submit(bulk_save_to_db, list(entity_collector_for_batch))
+
+        # 6. Reconstrói e Escreve
         current_pos = 0
         for i, item in enumerate(batch_of_objects):
             strings_in_item = object_string_maps[i]
             num_strings = len(strings_in_item)
             
+            # Pega a fatia correta da lista plana anonimizada
             anonymized_strings_for_item = anonymized_strings_flat[current_pos : current_pos + num_strings]
             
             anonymized_item = item
-            if strings_in_item:
+            if strings_in_item and len(anonymized_strings_for_item) == num_strings:
                 translation_map = dict(zip(strings_in_item, anonymized_strings_for_item))
                 anonymized_item = self._reconstruct_recursive(item, translation_map)
             
@@ -643,8 +666,6 @@ class JsonFileProcessor(FileProcessor):
             if not (is_first_batch_in_file and i == 0):
                 outfile.write(",\n")
             
-            # Remove formatação bonita (INDENT_2) para ganhar velocidade de escrita e espaço em disco
-            # Se precisar ler depois, use um formatador (jq). Máquinas preferem JSON minificado.
             outfile.write(orjson.dumps(anonymized_item).decode('utf-8'))
 
 
