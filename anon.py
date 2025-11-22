@@ -223,15 +223,15 @@ def main():
             output_file = processor.process()
             print(f"[*] Anonymized file saved at: {output_file}")
 
-            print("\n--- Anonymization Stats ---")
-            print(f"Total entities processed: {orchestrator.total_entities_processed}")
-            if hasattr(orchestrator, 'entity_counts') and orchestrator.entity_counts:
-                print("Entities by type:")
-                for entity_type, count in sorted(orchestrator.entity_counts.items()):
-                    print(f"  - {entity_type}: {count}")
-            print("---------------------------\n")
+        print("\n--- Anonymization Stats ---")
+        print(f"Total entities processed: {orchestrator.total_entities_processed}")
+        if hasattr(orchestrator, 'entity_counts') and orchestrator.entity_counts:
+            print("Entities by type:")
+            for entity_type, count in sorted(orchestrator.entity_counts.items()):
+                print(f"  - {entity_type}: {count}")
+        print("---------------------------\n")
 
-            write_report(args.file_path, start_time)
+        write_report(args.file_path, start_time)
 
     except Exception as e:
         print(f"[!] An error occurred during processing: {e}", file=sys.stderr)

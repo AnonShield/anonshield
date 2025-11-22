@@ -141,11 +141,11 @@ def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
     )
     
     # Corpos de Certificado (Base64)
-    # cert_body_pattern = Pattern(
-    #     name="Certificate Body (Base64)",
-    #     regex=r"\bMII[a-zA-Z0-9+/=\n]{100,}\b", 
-    #     score=0.8
-    # )
+    cert_body_pattern = Pattern(
+        name="Certificate Body (Base64)",
+        regex=r"\bMII[a-zA-Z0-9+/=\n]{100,}\b", 
+        score=0.8
+    )
 
     # MAC Address
     mac_pattern = Pattern(
@@ -170,7 +170,7 @@ def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
         recognizers.append(PatternRecognizer(supported_entity="UUID", patterns=[uuid_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="CERT_SERIAL", patterns=[serial_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="CPE_STRING", patterns=[cpe_pattern], supported_language=lang))
-        # recognizers.append(PatternRecognizer(supported_entity="CERT_BODY", patterns=[cert_body_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="CERT_BODY", patterns=[cert_body_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="MAC_ADDRESS", patterns=[mac_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="FILE_PATH", patterns=[path_pattern], supported_language=lang))
         
@@ -347,6 +347,9 @@ class AnonymizationOrchestrator:
             current_idx = 0
             
             for ent in merged_entities:
+                self.total_entities_processed += 1
+                self.entity_counts[ent["label"]] = self.entity_counts.get(ent["label"], 0) + 1
+                
                 new_text_parts.append(original_doc_text[current_idx:ent["start"]])
                 
                 clean_text = " ".join(ent["text"].split()).strip()
