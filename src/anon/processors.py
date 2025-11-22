@@ -428,8 +428,7 @@ class JsonFileProcessor(FileProcessor):
         print(f"[*] Starting optimized JSON processing (Batch Size: {BATCH_SIZE})")
 
         with open(self.file_path, "rb") as f_in, open(temp_output_path, "w", encoding="utf-8") as f_out:
-            f_out.write("[
-")
+            f_out.write("[\n")
             
             with tqdm(total=file_size, unit='B', unit_scale=True, desc=f"Anonymizing {os.path.basename(self.file_path)}") as pbar:
                 

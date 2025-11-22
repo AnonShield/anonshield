@@ -145,7 +145,6 @@ def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
         recognizers.append(PatternRecognizer(supported_entity="CERT_SERIAL", patterns=[serial_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="CPE_STRING", patterns=[cpe_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="CERT_BODY", patterns=[cert_body_pattern], supported_language=lang))
-    return []
     return recognizers
 
 class AnonymizationOrchestrator:
