@@ -14,7 +14,6 @@ import time
 import warnings
 import spacy
 import torch
-import spacy_transformers
 
 from src.anon.config import (
     ENTITY_MAPPING,

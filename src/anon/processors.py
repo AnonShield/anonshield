@@ -13,6 +13,10 @@ from abc import ABC, abstractmethod
 import itertools
 import sqlite3
 import datetime
+import re
+import gc
+from typing import List
+from concurrent.futures import ThreadPoolExecutor
 
 import ijson
 import numpy as np
@@ -28,6 +32,15 @@ import orjson
 
 from .engine import AnonymizationOrchestrator
 from .config import DB_PATH # Import DB_PATH
+
+# No topo de processors.py
+TECHNICAL_STOPLIST = {
+    "http", "https", "tcp", "udp", "port", "high", "medium", "low", "critical",
+    "cvss", "cve", "score", "severity", "description", "solution", "name", 
+    "id", "type", "true", "false", "null", "none", "n/a", "json", "xml", 
+    "string", "integer", "boolean", "date", "datetime", "timestamp"
+}
+
 
 def bulk_save_to_db(entity_list):
     """Salva 10.000 itens no banco em 100 milissegundos."""
@@ -51,8 +64,10 @@ def get_output_path(original_path, new_ext):
     """Constructs the output file path in the 'output' directory."""
     os.makedirs("output", exist_ok=True)
     base_name = os.path.splitext(os.path.basename(original_path))[0]
-    return os.path.join("output", f"anon_{{base_name}}{{new_ext}}")
-
+    
+    # CORREÇÃO: Usar apenas uma chave {} para interpolar as variáveis.
+    # Antes estava f"anon_{{base_name}}{{new_ext}}" (Errado - Texto literal)
+    return os.path.join("output", f"anon_{base_name}{new_ext}")
 
 def extract_text_from_image(image_bytes: bytes) -> str:
     """Extracts text from image bytes using OCR."""
@@ -63,43 +78,170 @@ def extract_text_from_image(image_bytes: bytes) -> str:
 
 
 class FileProcessor(ABC):
-    """Abstract base class for file processors."""
+    """
+    Classe base 'inteligente' que fornece pipeline assíncrono, 
+    gerenciamento de memória e otimização de batch para todos os filhos.
+    """
 
     def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator):
         self.file_path = file_path
         self.orchestrator = orchestrator
+        # Thread dedicada para I/O de Banco de Dados (Não bloqueia GPU)
+        self.db_executor = ThreadPoolExecutor(max_workers=1)
+        self.uuid_pattern = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+    def _setup_optimization(self):
+        """Desliga GC para evitar micro-stalls durante processamento pesado."""
+        gc.disable()
+
+    def _cleanup_optimization(self):
+        """Restaura o sistema e fecha threads."""
+        gc.enable()
+        self.db_executor.shutdown(wait=True)
+
+    def _should_anonymize(self, text: str) -> bool:
+        """GATEKEEPER: Retorna False se for lixo técnico (Economiza GPU)."""
+        # Aumentando o limite para evitar ruídos como 'org', 'com', etc.
+        if not isinstance(text, str) or len(text) <= 3:
+            return False
+        
+        text_lower = text.lower()
+        # Usando uma stoplist muito mais conservadora
+        if (text_lower in ('true', 'false', 'null', 'none', 'n/a') or 
+            text.isnumeric() or 
+            self.uuid_pattern.match(text)):
+            return False
+            
+        return True
+
+    def process_batch_smart(self, text_list: List[str]) -> List[str]:
+        """
+        O cérebro da operação:
+        1. Filtra (Gatekeeper)
+        2. Empacota em sub-lotes seguros (sub-batching)
+        3. Anonimiza (GPU)
+        4. Salva no DB (Async Thread)
+        5. Reconstrói a lista original
+        """
+        if not text_list:
+            return []
+
+        # 1. Identificar o que precisa ser processado
+        indices_to_process = []
+        values_to_process = []
+        final_list = list(text_list)
+
+        for idx, text in enumerate(text_list):
+            if self._should_anonymize(text):
+                indices_to_process.append(idx)
+                values_to_process.append(text)
+
+        if not values_to_process:
+            return final_list
+            
+        # 2. Re-introduzir o packing, mas com sub-batches seguros
+        anonymized_values = []
+        MAX_PACK_LEN = 250_000  # Limite de segurança para cada string empacotada
+        DELIMITER = " . ||| . "
+        
+        entity_collector = []
+        sub_batch = []
+        current_len = 0
+
+        for text in values_to_process:
+            # Se o próximo texto exceder o limite, processe o lote atual primeiro
+            if current_len + len(text) + len(DELIMITER) > MAX_PACK_LEN and sub_batch:
+                packed_text = DELIMITER.join(sub_batch)
+                sub_batch_entity_collector = []
+                
+                anonymized_packed_list = self.orchestrator.anonymize_texts(
+                    [packed_text],
+                    operator_params={"entity_collector": sub_batch_entity_collector}
+                )
+                entity_collector.extend(sub_batch_entity_collector)
+                
+                anonymized_packed = anonymized_packed_list[0] if anonymized_packed_list else ""
+                unpacked = anonymized_packed.split(DELIMITER)
+                
+                if len(unpacked) != len(sub_batch):
+                    unpacked = self.orchestrator.anonymize_texts_legacy(sub_batch)
+
+                anonymized_values.extend(unpacked)
+                
+                sub_batch = []
+                current_len = 0
+
+            sub_batch.append(text)
+            current_len += len(text) + len(DELIMITER)
+
+        # Processar o último sub-batch restante
+        if sub_batch:
+            packed_text = DELIMITER.join(sub_batch)
+            sub_batch_entity_collector = []
+            anonymized_packed_list = self.orchestrator.anonymize_texts(
+                [packed_text],
+                operator_params={"entity_collector": sub_batch_entity_collector}
+            )
+            entity_collector.extend(sub_batch_entity_collector)
+            
+            anonymized_packed = anonymized_packed_list[0] if anonymized_packed_list else ""
+            unpacked = anonymized_packed.split(DELIMITER)
+            
+            if len(unpacked) != len(sub_batch):
+                unpacked = self.orchestrator.anonymize_texts_legacy(sub_batch)
+                 
+            anonymized_values.extend(unpacked)
+
+        # 3. Salvar entidades no banco de forma assíncrona
+        if entity_collector:
+            self.db_executor.submit(bulk_save_to_db, list(entity_collector))
+
+        # 4. Merge back
+        if len(anonymized_values) == len(values_to_process):
+            for i, original_idx in enumerate(indices_to_process):
+                final_list[original_idx] = anonymized_values[i]
+        else:
+            print(f"[!] Warning: Mismatch in batch processing. Input count {len(values_to_process)}, output count {len(anonymized_values)}. Skipping update for this batch.")
+
+        return final_list
 
     @abstractmethod
     def process(self) -> str:
-        """
-        Processes the file, anonymizes its content, and returns the output path.
-        """
         raise NotImplementedError
 
     def _get_output_path(self, new_ext: str) -> str:
-        """Gets the standardized output path for the processed file."""
         return get_output_path(self.file_path, new_ext)
 
 
 class TextFileProcessor(FileProcessor):
-    """Processor for plain text files (.txt), processing line-by-line."""
-
     def process(self) -> str:
         output_path = self._get_output_path(".txt")
         
-        # Get total line count for tqdm
-        with open(self.file_path, "r", encoding="utf-8") as f:
-            total_lines = sum(1 for line in f)
-
-        with open(self.file_path, "r", encoding="utf-8") as infile, \
-             open(output_path, "w", encoding="utf-8") as outfile:
-            
-            progress_bar = tqdm(total=total_lines, desc=f"Processing {{os.path.basename(self.file_path)}}", unit="lines")
-            for line in infile:
-                anonymized_line = self.orchestrator.anonymize_text(line)
-                outfile.write(anonymized_line)
-                progress_bar.update(1)
-            progress_bar.close()
+        BATCH_SIZE = 200 # Agrupa 200 linhas por vez para a GPU
+        lines_buffer = []
+        
+        self._setup_optimization()
+        
+        try:
+            with open(self.file_path, "r", encoding="utf-8") as infile, \
+                 open(output_path, "w", encoding="utf-8") as outfile:
+                
+                for line in tqdm(infile, desc="Processing TXT"):
+                    lines_buffer.append(line)
+                    
+                    if len(lines_buffer) >= BATCH_SIZE:
+                        # Processa 200 linhas de uma vez
+                        anon_lines = self.process_batch_smart(lines_buffer)
+                        outfile.writelines(anon_lines)
+                        lines_buffer = []
+                
+                # Processa o resto
+                if lines_buffer:
+                    anon_lines = self.process_batch_smart(lines_buffer)
+                    outfile.writelines(anon_lines)
+                    
+        finally:
+            self._cleanup_optimization()
             
         return output_path
 
@@ -187,32 +329,52 @@ class DocxFileProcessor(FileProcessor):
 
 
 class CsvFileProcessor(FileProcessor):
-    """Processor for CSV files, processed in batches."""
-
     def process(self) -> str:
         output_path = self._get_output_path(".csv")
         
-        # Get total rows for tqdm
-        with open(self.file_path, "r", encoding="utf-8") as f:
-            total_rows = sum(1 for row in f) - 1 # Exclude header
-
-        chunk_size = 1000  # Adjustable
+        # Otimização 1: Batch mais seguro
+        chunk_size = 10
         
-        header_written = False
-        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='skip') as reader:
-            progress_bar = tqdm(total=total_rows, desc=f"Processing {{os.path.basename(self.file_path)}}", unit="rows")
-            for chunk in reader:
-                all_values = [str(val) if val is not None else "" for val in chunk.values.flatten().tolist()]
+        # Otimização 2: Contar linhas rápido (sem carregar CSV)
+        with open(self.file_path, "rb") as f:
+            total_rows = sum(1 for _ in f) - 1
+
+        self._setup_optimization() # Desliga GC
+        
+        try:
+            header_written = False
+            # Engine 'c' do pandas é mais rápida, on_bad_lines ignora erros
+            with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='skip', engine='c') as reader:
                 
-                anonymized_values = self.orchestrator.anonymize_texts(all_values)
-                
-                anonymized_array = np.array(anonymized_values).reshape(chunk.shape)
-                anonymized_df = pd.DataFrame(anonymized_array, columns=chunk.columns, index=chunk.index)
-                
-                anonymized_df.to_csv(output_path, mode='a', index=False, header=not header_written, encoding="utf-8")
-                header_written = True
-                progress_bar.update(len(chunk))
-            progress_bar.close()
+                progress_bar = tqdm(total=total_rows, desc=f"Processing CSV", unit="rows")
+                batch_counter = 0
+
+                for chunk in reader:
+                    # Achata o chunk para uma lista única de strings
+                    flat_values = [str(val) if pd.notna(val) else "" for val in chunk.values.flatten()]
+                    
+                    # A Mágica acontece aqui: chama o método inteligente da classe pai
+                    anonymized_flat = self.process_batch_smart(flat_values)
+                    
+                    # Reconstrói o DataFrame
+                    anonymized_df = pd.DataFrame(
+                        np.array(anonymized_flat).reshape(chunk.shape), 
+                        columns=chunk.columns
+                    )
+                    
+                    anonymized_df.to_csv(output_path, mode='a', index=False, header=not header_written, encoding="utf-8")
+                    header_written = True
+                    
+                    progress_bar.update(len(chunk))
+                    
+                    # Gerenciamento manual de GC a cada 50 chunks (100k linhas)
+                    batch_counter += 1
+                    if batch_counter % 50 == 0:
+                        gc.collect()
+                        
+                progress_bar.close()
+        finally:
+            self._cleanup_optimization() # Restaura sistema
 
         return output_path
 
@@ -309,21 +471,24 @@ class XmlFileProcessor(FileProcessor):
         return output_path
 
 
+import gc
+import threading
+from concurrent.futures import ThreadPoolExecutor
 import itertools
-
 import re
-import itertools
 import ijson
 from tqdm import tqdm
 import os
-import json
+
 
 class JsonFileProcessor(FileProcessor):
-    """
-    Processor for large JSON files, using streaming, a wrapped reader for
-    progress tracking, and object batching for performance.
-    """
+    # ... (Mantenha o UUID_PATTERN e _collect_strings_recursive iguais) ...
     UUID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator):
+        super().__init__(file_path, orchestrator)
+        # Cria um pool de 1 thread apenas para escrita no banco (evita lock do SQLite)
+        self.db_executor = ThreadPoolExecutor(max_workers=1)
 
     def _collect_strings_recursive(self, obj):
         """
@@ -356,11 +521,64 @@ class JsonFileProcessor(FileProcessor):
             return translation_map[obj]
         return obj
 
+    def process(self) -> str:
+        output_path = self._get_output_path(".json")
+        temp_output_path = output_path + ".tmp"
+        
+        BATCH_SIZE = 50 # Mantenha 50 ou teste 100 na 3060
+        file_size = os.path.getsize(self.file_path)
+        
+        # OTIMIZAÇÃO DE MEMÓRIA: Desliga o GC automático
+        gc.disable()
+        batch_counter = 0
+        
+        print(f"[*] Starting optimized JSON processing (Batch Size: {BATCH_SIZE}) | Async DB: ON")
+
+        try:
+            with open(self.file_path, "rb") as f_in, open(temp_output_path, "w", encoding="utf-8") as f_out:
+                f_out.write("[\n")
+                
+                with tqdm(total=file_size, unit='B', unit_scale=True, desc=f"Anonymizing {os.path.basename(self.file_path)}") as pbar:
+                    
+                    class FileWrapper:
+                        def __init__(self, file, pbar):
+                            self.file = file
+                            self.pbar = pbar
+                        def read(self, size=-1):
+                            data = self.file.read(size)
+                            self.pbar.update(len(data))
+                            return data
+
+                    wrapped_file = FileWrapper(f_in, pbar)
+                    objects = ijson.items(wrapped_file, 'item', use_float=True)
+                    
+                    is_first_batch = True
+                    while True:
+                        batch_of_objects = list(itertools.islice(objects, BATCH_SIZE))
+                        if not batch_of_objects:
+                            break
+                        
+                        # Processa o lote
+                        self._process_and_write_batch(batch_of_objects, f_out, is_first_batch)
+                        is_first_batch = False
+                        
+                        # OTIMIZAÇÃO: Coleta lixo manualmente a cada 100 lotes para não travar a CPU
+                        batch_counter += 1
+                        if batch_counter % 100 == 0:
+                            gc.collect()
+
+                f_out.write("\n]")
+        
+        finally:
+            # Garante que o GC volte e que as threads terminem
+            gc.enable()
+            self.db_executor.shutdown(wait=True)
+        
+        os.replace(temp_output_path, output_path)
+        print(f"[*] Optimized processing complete. Output at: {output_path}")
+        return output_path
+
     def _process_and_write_batch(self, batch_of_objects, outfile, is_first_batch_in_file):
-        """
-        Extracts texts, packs them into a single string, sends them to the GPU,
-        unpacks the result, reconstructs the objects, and writes them to disk.
-        """
         if not batch_of_objects:
             return
 
@@ -373,30 +591,39 @@ class JsonFileProcessor(FileProcessor):
             object_string_maps.append(strings_in_item)
         
         if not all_strings_for_batch:
+            # Se não tem nada pra anonimizar, só escreve rápido
             for i, item in enumerate(batch_of_objects):
                 if not (is_first_batch_in_file and i == 0):
                     outfile.write(",\n")
-                outfile.write(orjson.dumps(item, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE).decode('utf-8'))
+                outfile.write(orjson.dumps(item).decode('utf-8'))
             return
 
         DELIMITER = " . ||| . "
         packed_text = DELIMITER.join(all_strings_for_batch)
 
         entity_collector_for_batch = []
+        
+        # GPU Trabalha aqui (Bloqueante, não tem jeito)
         anonymized_packed_list = self.orchestrator.anonymize_texts(
             [packed_text],
             operator_params={"entity_collector": entity_collector_for_batch}
         )
         anonymized_packed = anonymized_packed_list[0] if anonymized_packed_list else ""
         
-        bulk_save_to_db(entity_collector_for_batch)
+        # OTIMIZAÇÃO: Envia para o banco em Thread separada (Não bloqueia a GPU para o próximo lote)
+        if entity_collector_for_batch:
+            # Copia a lista para evitar condição de corrida se o coletor for reusado (embora aqui seja novo)
+            data_to_save = list(entity_collector_for_batch) 
+            self.db_executor.submit(bulk_save_to_db, data_to_save)
 
         anonymized_strings_flat = anonymized_packed.split(DELIMITER)
         
+        # Fallback de segurança (se o split falhar por causa do modelo)
         if len(anonymized_strings_flat) != len(all_strings_for_batch):
-            anonymized_strings_flat = self.orchestrator.anonymize_texts(
+             # Se falhar o packing, roda lento (fallback)
+            anonymized_strings_flat = self.orchestrator.anonymize_texts_legacy(
                 all_strings_for_batch,
-                operator_params={"entity_collector": entity_collector_for_batch}
+                operator_params={"entity_collector": []} # Já salvamos antes, ignora DB aqui
             )
 
         current_pos = 0
@@ -416,50 +643,9 @@ class JsonFileProcessor(FileProcessor):
             if not (is_first_batch_in_file and i == 0):
                 outfile.write(",\n")
             
-            outfile.write(orjson.dumps(anonymized_item, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE).decode('utf-8'))
-
-    def process(self) -> str:
-        output_path = self._get_output_path(".json")
-        temp_output_path = output_path + ".tmp"
-        
-        BATCH_SIZE = 50 
-        file_size = os.path.getsize(self.file_path)
-        
-        print(f"[*] Starting optimized JSON processing (Batch Size: {BATCH_SIZE})")
-
-        with open(self.file_path, "rb") as f_in, open(temp_output_path, "w", encoding="utf-8") as f_out:
-            f_out.write("[\n")
-            
-            with tqdm(total=file_size, unit='B', unit_scale=True, desc=f"Anonymizing {os.path.basename(self.file_path)}") as pbar:
-                
-                class FileWrapper:
-                    def __init__(self, file, pbar):
-                        self.file = file
-                        self.pbar = pbar
-                    def read(self, size=-1):
-                        data = self.file.read(size)
-                        self.pbar.update(len(data))
-                        return data
-
-                wrapped_file = FileWrapper(f_in, pbar)
-                
-                objects = ijson.items(wrapped_file, 'item', use_float=True)
-                
-                is_first_batch = True
-                while True:
-                    batch_of_objects = list(itertools.islice(objects, BATCH_SIZE))
-                    if not batch_of_objects:
-                        break
-                    
-                    self._process_and_write_batch(batch_of_objects, f_out, is_first_batch)
-                    is_first_batch = False
-
-            f_out.write("\n]")
-        
-        os.replace(temp_output_path, output_path)
-        
-        print(f"[*] Optimized processing complete. Output at: {output_path}")
-        return output_path
+            # Remove formatação bonita (INDENT_2) para ganhar velocidade de escrita e espaço em disco
+            # Se precisar ler depois, use um formatador (jq). Máquinas preferem JSON minificado.
+            outfile.write(orjson.dumps(anonymized_item).decode('utf-8'))
 
 
 
