@@ -158,6 +158,8 @@ class AnonymizationOrchestrator:
         self.slug_length = slug_length
         self.total_entities_processed = 0
         self.entity_counts = {}
+        # Cache para armazenar resultados de strings já processadas
+        self.cache = {}
         self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
 
     def _setup_engines(self) -> tuple[BatchAnalyzerEngine, AnonymizerEngine]:
@@ -203,64 +205,128 @@ class AnonymizationOrchestrator:
         
         return batch_analyzer, anonymizer
 
-    def anonymize_text(self, text: str) -> str:
+    def anonymize_text(self, text: str, operator_params: dict = None) -> str:
         """Anonymizes a single block of text by wrapping it in a list."""
         if not isinstance(text, str) or not text.strip():
             return text
-        return self.anonymize_texts([text])[0]
+        return self.anonymize_texts([text], operator_params=operator_params)[0]
 
     def anonymize_texts(self, texts: List[str], operator_params: dict = None) -> List[str]:
-        """Anonymizes a list of texts using the BatchAnalyzerEngine."""
+        """
+        Anonymizes a list of texts using a fast, direct SpaCy pipeline approach,
+        combined with an instance-level cache.
+        """
         if not texts:
             return []
 
-        # Ensure all items are strings
-        processed_texts = [str(text) if pd.notna(text) else "" for text in texts]
+        original_texts = [str(text) if pd.notna(text) else "" for text in texts]
+        final_anonymized_list = [""] * len(original_texts)
         
-        # Get entities to anonymize
+        texts_to_process_map = {} 
+        for i, text in enumerate(original_texts):
+            if text in self.cache:
+                final_anonymized_list[i] = self.cache[text]
+            else:
+                if text not in texts_to_process_map:
+                    texts_to_process_map[text] = []
+                texts_to_process_map[text].append(i)
+
+        if not texts_to_process_map:
+            return final_anonymized_list
+
+        unique_texts_to_process = list(texts_to_process_map.keys())
+        
+        # Setup for anonymization
+        if operator_params is None: operator_params = {}
+        entity_collector = operator_params.get("entity_collector")
+        entities_to_anonymize = self._get_entities_to_anonymize()
+        nlp = self.analyzer_engine.analyzer_engine.nlp_engine.nlp
+        
+        docs = nlp.pipe(unique_texts_to_process, batch_size=500)
+
+        for doc in docs:
+            original_doc_text = doc.text
+            new_text_parts = []
+            last_index = 0
+            
+            sorted_ents = sorted(doc.ents, key=lambda e: e.start_char)
+
+            for ent in sorted_ents:
+                if ent.label_ not in entities_to_anonymize or ent.text in self.allow_list:
+                    continue
+
+                new_text_parts.append(original_doc_text[last_index:ent.start_char])
+                
+                clean_text = " ".join(ent.text.split()).strip()
+                full_hash = hashlib.sha256(clean_text.encode()).hexdigest()
+                display_hash = full_hash[:self.slug_length] if self.slug_length is not None else full_hash
+
+                if entity_collector is not None:
+                    entity_collector.append((ent.label_, clean_text, display_hash, full_hash))
+
+                new_text_parts.append(f"[{ent.label_}_{display_hash}]")
+                last_index = ent.end_char
+            
+            new_text_parts.append(original_doc_text[last_index:])
+            anonymized_text = "".join(new_text_parts)
+
+            self.cache[original_doc_text] = anonymized_text
+            for index in texts_to_process_map[original_doc_text]:
+                final_anonymized_list[index] = anonymized_text
+
+        return final_anonymized_list
+
+    def anonymize_texts_legacy(self, texts: List[str], operator_params: dict = None) -> List[str]:
+        """Anonymizes a list of texts using the BatchAnalyzerEngine (legacy method)."""
+        if not texts:
+            return []
+
+        original_texts = [str(text) if pd.notna(text) else "" for text in texts]
+        final_anonymized_list = [""] * len(original_texts)
+        
+        texts_to_process_map = {}
+        for i, text in enumerate(original_texts):
+            if text in self.cache:
+                final_anonymized_list[i] = self.cache[text]
+            else:
+                if text not in texts_to_process_map:
+                    texts_to_process_map[text] = []
+                texts_to_process_map[text].append(i)
+
+        if not texts_to_process_map:
+            return final_anonymized_list
+            
+        unique_texts_to_process = list(texts_to_process_map.keys())
         entities_to_anonymize = self._get_entities_to_anonymize()
         
-        # Use the batch analyzer to get results for all texts
         analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
-            processed_texts,
+            unique_texts_to_process,
             language=self.lang,
             entities=entities_to_anonymize,
             score_threshold=0.6,
         )
 
-        anonymized_texts = []
         if operator_params is None: operator_params = {}
-        # Garante que os contadores internos funcionem
         operator_params["total_entities_counter"] = self
         operator_params["entity_counts"] = self.entity_counts
 
-        # This part still needs to be a loop, but the heavy lifting (analysis) is already done.
-        for i, (text, analyzer_results) in enumerate(zip(processed_texts, analyzer_results_iterator)):
-            # Filter results based on the allow_list
+        for text, analyzer_results in zip(unique_texts_to_process, analyzer_results_iterator):
             filtered_analyzer_results = [
                 result for result in analyzer_results
                 if text[result.start:result.end] not in self.allow_list
             ]
-            # Anonymize the individual text with its filtered results
             anonymizer_result = self.anonymizer_engine.anonymize(
                 text=text,
                 analyzer_results=filtered_analyzer_results,
-                operators={
-                    "DEFAULT": OperatorConfig("custom_slug", operator_params)
-		},
+                operators={"DEFAULT": OperatorConfig("custom_slug", operator_params)},
             )
-            anonymized_texts.append(anonymizer_result.text)
-
-        # Update total_entities_processed and entity_counts from the collected entities
-        #  for entity_type, _, _, _ in entity_collector:
-        #    self.total_entities_processed += 1
-        #     self.entity_counts[entity_type] = self.entity_counts.get(entity_type, 0) + 1
-
-        # The bulk_save_entities will now be called from the processors.py
-        # if entity_collector:
-        #     bulk_save_entities(DB_PATH, entity_collector)
-
-        return anonymized_texts
+            
+            anonymized_text = anonymizer_result.text
+            self.cache[text] = anonymized_text
+            for index in texts_to_process_map[text]:
+                final_anonymized_list[index] = anonymized_text
+        
+        return final_anonymized_list
 
     def _get_entities_to_anonymize(self) -> List[str]:
         """Gets the list of entities to anonymize based on the preserve list."""

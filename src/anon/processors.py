@@ -51,7 +51,7 @@ def get_output_path(original_path, new_ext):
     """Constructs the output file path in the 'output' directory."""
     os.makedirs("output", exist_ok=True)
     base_name = os.path.splitext(os.path.basename(original_path))[0]
-    return os.path.join("output", f"anon_{base_name}{new_ext}")
+    return os.path.join("output", f"anon_{{base_name}}{{new_ext}}")
 
 
 def extract_text_from_image(image_bytes: bytes) -> str:
@@ -94,7 +94,7 @@ class TextFileProcessor(FileProcessor):
         with open(self.file_path, "r", encoding="utf-8") as infile, \
              open(output_path, "w", encoding="utf-8") as outfile:
             
-            progress_bar = tqdm(total=total_lines, desc=f"Processing {os.path.basename(self.file_path)}", unit="lines")
+            progress_bar = tqdm(total=total_lines, desc=f"Processing {{os.path.basename(self.file_path)}}", unit="lines")
             for line in infile:
                 anonymized_line = self.orchestrator.anonymize_text(line)
                 outfile.write(anonymized_line)
@@ -110,7 +110,7 @@ class PdfFileProcessor(FileProcessor):
     def process(self) -> str:
         parts: list[str] = []
         with fitz.open(self.file_path) as doc:
-            for page in tqdm(doc, desc=f"Extracting text from {os.path.basename(self.file_path)}"):
+            for page in tqdm(doc, desc=f"Extracting text from {{os.path.basename(self.file_path)}}"):
                 content_items = []
                 text_blocks = page.get_text("dict").get("blocks", [])
                 for block in text_blocks:
@@ -159,7 +159,7 @@ class DocxFileProcessor(FileProcessor):
         doc = Document(self.file_path)
         data_parts = []
 
-        for para in tqdm(doc.paragraphs, desc=f"Processing {os.path.basename(self.file_path)}"):
+        for para in tqdm(doc.paragraphs, desc=f"Processing {{os.path.basename(self.file_path)}}"):
             para_content_parts = []
             for run in para.runs:
                 drawings = run._r.xpath(".//w:drawing")
@@ -200,7 +200,7 @@ class CsvFileProcessor(FileProcessor):
         
         header_written = False
         with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='skip') as reader:
-            progress_bar = tqdm(total=total_rows, desc=f"Processing {os.path.basename(self.file_path)}", unit="rows")
+            progress_bar = tqdm(total=total_rows, desc=f"Processing {{os.path.basename(self.file_path)}}", unit="rows")
             for chunk in reader:
                 all_values = [str(val) if val is not None else "" for val in chunk.values.flatten().tolist()]
                 
@@ -323,7 +323,6 @@ class JsonFileProcessor(FileProcessor):
     Processor for large JSON files, using streaming, a wrapped reader for
     progress tracking, and object batching for performance.
     """
-    # Adicionado para a checagem de UUID
     UUID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
     def _collect_strings_recursive(self, obj):
@@ -340,10 +339,6 @@ class JsonFileProcessor(FileProcessor):
                 strings.extend(self._collect_strings_recursive(item))
         elif isinstance(obj, str):
             # GATEKEEPER LOGIC
-            # 1. É muito curto? (< 4 chars) -> Pula
-            # 2. É booleano string? -> Pula
-            # 3. É um UUID? -> Pula
-            # 4. Só tem números/símbolos ou não tem letras? -> Pula
             if (len(obj) > 3 and
                 obj.lower() not in ('true', 'false') and
                 not self.UUID_PATTERN.match(obj) and
@@ -370,7 +365,7 @@ class JsonFileProcessor(FileProcessor):
             return
 
         all_strings_for_batch = []
-        object_string_maps = [] # Para rastrear quais strings pertencem a cada objeto
+        object_string_maps = [] 
 
         for item in batch_of_objects:
             strings_in_item = self._collect_strings_recursive(item)
@@ -378,7 +373,6 @@ class JsonFileProcessor(FileProcessor):
             object_string_maps.append(strings_in_item)
         
         if not all_strings_for_batch:
-            # Se não houver strings para anonimizar, apenas escreva os objetos originais
             for i, item in enumerate(batch_of_objects):
                 if not (is_first_batch_in_file and i == 0):
                     outfile.write(",\n")
@@ -389,22 +383,17 @@ class JsonFileProcessor(FileProcessor):
         packed_text = DELIMITER.join(all_strings_for_batch)
 
         entity_collector_for_batch = []
-        # Importante: Chamar anonymize_texts (plural) com uma lista de um único item
-        # para garantir que operator_params seja processado corretamente.
         anonymized_packed_list = self.orchestrator.anonymize_texts(
             [packed_text],
             operator_params={"entity_collector": entity_collector_for_batch}
         )
         anonymized_packed = anonymized_packed_list[0] if anonymized_packed_list else ""
         
-        # Now, bulk save the collected entities to the database
         bulk_save_to_db(entity_collector_for_batch)
 
         anonymized_strings_flat = anonymized_packed.split(DELIMITER)
         
-        # Verificação de consistência
         if len(anonymized_strings_flat) != len(all_strings_for_batch):
-            # Fallback para o modo antigo se a divisão falhar
             anonymized_strings_flat = self.orchestrator.anonymize_texts(
                 all_strings_for_batch,
                 operator_params={"entity_collector": entity_collector_for_batch}
@@ -433,13 +422,14 @@ class JsonFileProcessor(FileProcessor):
         output_path = self._get_output_path(".json")
         temp_output_path = output_path + ".tmp"
         
-        BATCH_SIZE = 50  # Batch size maior para aproveitar o packing
+        BATCH_SIZE = 50 
         file_size = os.path.getsize(self.file_path)
         
         print(f"[*] Starting optimized JSON processing (Batch Size: {BATCH_SIZE})")
 
         with open(self.file_path, "rb") as f_in, open(temp_output_path, "w", encoding="utf-8") as f_out:
-            f_out.write("[\n")
+            f_out.write("[
+")
             
             with tqdm(total=file_size, unit='B', unit_scale=True, desc=f"Anonymizing {os.path.basename(self.file_path)}") as pbar:
                 
@@ -454,7 +444,6 @@ class JsonFileProcessor(FileProcessor):
 
                 wrapped_file = FileWrapper(f_in, pbar)
                 
-                # Usar 'item' como prefixo para objetos em um array JSON
                 objects = ijson.items(wrapped_file, 'item', use_float=True)
                 
                 is_first_batch = True
@@ -517,6 +506,6 @@ def get_processor(file_path: str, orchestrator: AnonymizationOrchestrator) -> Fi
     
     processor_class = processor_map.get(ext)
     if not processor_class:
-        raise ValueError(f"Unsupported file format: {ext}")
+        raise ValueError(f"Unsupported file format: {{ext}}")
         
     return processor_class(file_path, orchestrator)
