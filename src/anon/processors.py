@@ -311,6 +311,7 @@ class XmlFileProcessor(FileProcessor):
 
 import itertools
 
+import re
 import itertools
 import ijson
 from tqdm import tqdm
@@ -322,9 +323,14 @@ class JsonFileProcessor(FileProcessor):
     Processor for large JSON files, using streaming, a wrapped reader for
     progress tracking, and object batching for performance.
     """
+    # Adicionado para a checagem de UUID
+    UUID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
     def _collect_strings_recursive(self, obj):
-        """Helper to recursively collect all strings from a JSON object."""
+        """
+        Helper to recursively collect all strings from a JSON object,
+        with aggressive filtering to skip non-sensitive data.
+        """
         strings = []
         if isinstance(obj, dict):
             for v in obj.values():
@@ -333,7 +339,16 @@ class JsonFileProcessor(FileProcessor):
             for item in obj:
                 strings.extend(self._collect_strings_recursive(item))
         elif isinstance(obj, str):
-            strings.append(obj)
+            # GATEKEEPER LOGIC
+            # 1. É muito curto? (< 4 chars) -> Pula
+            # 2. É booleano string? -> Pula
+            # 3. É um UUID? -> Pula
+            # 4. Só tem números/símbolos ou não tem letras? -> Pula
+            if (len(obj) > 3 and
+                obj.lower() not in ('true', 'false') and
+                not self.UUID_PATTERN.match(obj) and
+                any(c.isalpha() for c in obj)):
+                strings.append(obj)
         return strings
 
     def _reconstruct_recursive(self, obj, translation_map):
@@ -348,40 +363,63 @@ class JsonFileProcessor(FileProcessor):
 
     def _process_and_write_batch(self, batch_of_objects, outfile, is_first_batch_in_file):
         """
-        Extracts texts from N objects, sends them to the GPU at once,
-        reconstructs the objects, and writes them to disk.
+        Extracts texts, packs them into a single string, sends them to the GPU,
+        unpacks the result, reconstructs the objects, and writes them to disk.
         """
         if not batch_of_objects:
             return
 
         all_strings_for_batch = []
-        object_string_counts = []
+        object_string_maps = [] # Para rastrear quais strings pertencem a cada objeto
+
         for item in batch_of_objects:
             strings_in_item = self._collect_strings_recursive(item)
             all_strings_for_batch.extend(strings_in_item)
-            object_string_counts.append(len(strings_in_item))
+            object_string_maps.append(strings_in_item)
         
-        
+        if not all_strings_for_batch:
+            # Se não houver strings para anonimizar, apenas escreva os objetos originais
+            for i, item in enumerate(batch_of_objects):
+                if not (is_first_batch_in_file and i == 0):
+                    outfile.write(",\n")
+                outfile.write(orjson.dumps(item, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE).decode('utf-8'))
+            return
+
+        DELIMITER = " . ||| . "
+        packed_text = DELIMITER.join(all_strings_for_batch)
+
         entity_collector_for_batch = []
-        anonymized_strings_flat = self.orchestrator.anonymize_texts(
-            all_strings_for_batch,
-            # Passamos a lista vazia para o operador preencher
+        # Importante: Chamar anonymize_texts (plural) com uma lista de um único item
+        # para garantir que operator_params seja processado corretamente.
+        anonymized_packed_list = self.orchestrator.anonymize_texts(
+            [packed_text],
             operator_params={"entity_collector": entity_collector_for_batch}
         )
-
+        anonymized_packed = anonymized_packed_list[0] if anonymized_packed_list else ""
+        
         # Now, bulk save the collected entities to the database
         bulk_save_to_db(entity_collector_for_batch)
 
+        anonymized_strings_flat = anonymized_packed.split(DELIMITER)
+        
+        # Verificação de consistência
+        if len(anonymized_strings_flat) != len(all_strings_for_batch):
+            # Fallback para o modo antigo se a divisão falhar
+            anonymized_strings_flat = self.orchestrator.anonymize_texts(
+                all_strings_for_batch,
+                operator_params={"entity_collector": entity_collector_for_batch}
+            )
+
         current_pos = 0
         for i, item in enumerate(batch_of_objects):
-            num_strings = object_string_counts[i]
+            strings_in_item = object_string_maps[i]
+            num_strings = len(strings_in_item)
             
-            original_strings_for_item = all_strings_for_batch[current_pos : current_pos + num_strings]
             anonymized_strings_for_item = anonymized_strings_flat[current_pos : current_pos + num_strings]
             
             anonymized_item = item
-            if original_strings_for_item:
-                translation_map = dict(zip(original_strings_for_item, anonymized_strings_for_item))
+            if strings_in_item:
+                translation_map = dict(zip(strings_in_item, anonymized_strings_for_item))
                 anonymized_item = self._reconstruct_recursive(item, translation_map)
             
             current_pos += num_strings
@@ -395,7 +433,7 @@ class JsonFileProcessor(FileProcessor):
         output_path = self._get_output_path(".json")
         temp_output_path = output_path + ".tmp"
         
-        BATCH_SIZE = 1  # Tamanho ideal para RTX 3060
+        BATCH_SIZE = 50  # Batch size maior para aproveitar o packing
         file_size = os.path.getsize(self.file_path)
         
         print(f"[*] Starting optimized JSON processing (Batch Size: {BATCH_SIZE})")
@@ -416,6 +454,7 @@ class JsonFileProcessor(FileProcessor):
 
                 wrapped_file = FileWrapper(f_in, pbar)
                 
+                # Usar 'item' como prefixo para objetos em um array JSON
                 objects = ijson.items(wrapped_file, 'item', use_float=True)
                 
                 is_first_batch = True

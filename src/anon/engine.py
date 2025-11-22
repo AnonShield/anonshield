@@ -229,8 +229,7 @@ class AnonymizationOrchestrator:
         )
 
         anonymized_texts = []
-        if operator_params is None:
-            operator_params = {}
+        if operator_params is None: operator_params = {}
         # Garante que os contadores internos funcionem
         operator_params["total_entities_counter"] = self
         operator_params["entity_counts"] = self.entity_counts
