@@ -25,12 +25,14 @@ class TestAnonymizationConfig(unittest.TestCase):
         # 1. Create the configuration file
         config_path = os.path.join(self.test_dir, "config.json")
         config_data = {
-            "fields_to_anonymize": {
-                "asset.name": {"entity_type": "CUSTOM_ASSET_NAME"},
-                "asset.tags.value": {},
-                "asset.ipv4_addresses": {},
-                "scan.target": {}
+            "force_anonymize": {
+                "asset.name": {"entity_type": "CUSTOM_ASSET_NAME"}
             },
+            "fields_to_anonymize": [
+                "asset.tags.value",
+                "asset.ipv4_addresses",
+                "scan.target"
+            ],
             "fields_to_exclude": [
                 "scan.id"
             ]
