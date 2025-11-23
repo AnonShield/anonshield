@@ -460,7 +460,7 @@ class TestAnonIntegration(unittest.TestCase):
         cmd = ["python", "anon.py", "--list-languages"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0)
-        self.assertIn("[*] Supported languages:", result.stdout)
+        self.assertIn("Supported languages:", result.stdout)
         self.assertIn("en: English", result.stdout)
         self.assertIn("pt: Portuguese", result.stdout)
 
