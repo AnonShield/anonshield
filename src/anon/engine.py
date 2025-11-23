@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import re
 from typing import Dict, List, Optional, Union
+from collections import OrderedDict # Add this import
 
 import pandas as pd  # type: ignore
 import spacy  # type: ignore
@@ -206,7 +207,7 @@ class AnonymizationOrchestrator:
     Combina modelos Transformer (via SpaCy) com Regex de alta performance.
     """
 
-    def __init__(self, lang: str, allow_list: List[str], entities_to_preserve: List[str], slug_length: int | None = None, strategy: str = "presidio", use_cache: bool = True, regex_priority: bool = False):
+    def __init__(self, lang: str, allow_list: List[str], entities_to_preserve: List[str], slug_length: int | None = None, strategy: str = "presidio", use_cache: bool = True, regex_priority: bool = False, max_cache_size: int = 10000):
         self.lang = lang
         self.allow_list = set(allow_list) 
         self.entities_to_preserve = set(entities_to_preserve)
@@ -216,7 +217,9 @@ class AnonymizationOrchestrator:
         self.regex_priority = regex_priority
         self.total_entities_processed = 0
         self.entity_counts: Dict[str, int] = {}
-        self.cache: Dict[str, str] = {}
+        # self.cache: Dict[str, str] = {} # Old cache
+        self.max_cache_size = max_cache_size # Store max cache size
+        self.cache: OrderedDict[str, str] = OrderedDict() # Use OrderedDict for LRU cache
         
         self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
         
@@ -236,6 +239,26 @@ class AnonymizationOrchestrator:
                     })
                 except re.error:
                     pass
+
+    def _get_from_cache(self, key: str) -> Optional[str]:
+        """Retrieves an item from the cache, moving it to the front (most recently used)."""
+        if not self.use_cache:
+            return None
+        if key in self.cache:
+            value = self.cache.pop(key) # Remove and re-insert to mark as recently used
+            self.cache[key] = value
+            return value
+        return None
+
+    def _add_to_cache(self, key: str, value: str):
+        """Adds an item to the cache, implementing LRU eviction if size limit is exceeded."""
+        if not self.use_cache:
+            return
+        if key in self.cache:
+            self.cache.pop(key) # Update value and mark as recently used
+        elif len(self.cache) >= self.max_cache_size:
+            self.cache.popitem(last=False) # Remove LRU item
+        self.cache[key] = value
 
     def _setup_engines(self) -> tuple[BatchAnalyzerEngine, AnonymizerEngine]:
         """Inicializa Engines mantendo o XLM-Roberta e configurações de segurança."""
@@ -313,8 +336,9 @@ class AnonymizationOrchestrator:
             clean_text = " ".join(text.split()).strip()
             
             cache_key = f"forced_{entity_type}_{clean_text}"
-            if self.use_cache and cache_key in self.cache:
-                anonymized_list.append(self.cache[cache_key])
+            cached_value = self._get_from_cache(cache_key) # Use helper
+            if cached_value:
+                anonymized_list.append(cached_value)
                 continue
 
             if not SECRET_KEY: raise ValueError("SECRET_KEY is not set.")
@@ -325,10 +349,69 @@ class AnonymizationOrchestrator:
                 entity_collector.append((entity_type, clean_text, display_hash, full_hash))
             
             anonymized_text = f"[{entity_type}_{display_hash}]"
-            if self.use_cache:
-                self.cache[cache_key] = anonymized_text
+            self._add_to_cache(cache_key, anonymized_text) # Use helper
             anonymized_list.append(anonymized_text)
         return anonymized_list
+
+    def _extract_entities_from_doc(self, doc, original_doc_text: str) -> List[Dict]:
+        """Extracts entities from a spaCy Doc object and custom regex patterns."""
+        detected_entities = []
+
+        # Extract entities from spaCy Doc
+        for ent in doc.ents:
+            normalized_label = ENTITY_MAPPING.get(ent.label_, ent.label_)
+            if normalized_label not in self.entities_to_preserve:
+                detected_entities.append({
+                    "start": ent.start_char, "end": ent.end_char, "label": normalized_label,
+                    "text": ent.text, "score": 1.0
+                })
+
+        # Extract entities from custom regex patterns
+        for pat in self.compiled_patterns:
+            for match in pat["regex"].finditer(original_doc_text):
+                match_text = match.group()
+                if match_text not in self.allow_list and pat["label"] not in self.entities_to_preserve:
+                    detected_entities.append({
+                        "start": match.start(), "end": match.end(), "label": pat["label"],
+                        "text": match_text, "score": pat["score"]
+                    })
+        return detected_entities
+
+    def _merge_overlapping_entities(self, detected_entities: List[Dict]) -> List[Dict]:
+        """Sorts and merges overlapping entities based on score and length."""
+        # Sort by start position, then by inverse score (higher score first), then by inverse length (longer first)
+        detected_entities.sort(key=lambda x: (x["start"], -x["score"], -(x["end"] - x["start"])))
+        
+        merged_entities = []
+        last_end = -1
+        for ent in detected_entities:
+            if ent["start"] >= last_end:
+                merged_entities.append(ent)
+                last_end = ent["end"]
+        return merged_entities
+
+    def _generate_anonymized_text(self, original_doc_text: str, merged_entities: List[Dict], entity_collector: Optional[List]) -> str:
+        """Generates the anonymized text based on merged entities."""
+        new_text_parts = []
+        current_idx = 0
+        for ent in merged_entities:
+            self.total_entities_processed += 1
+            self.entity_counts[ent["label"]] = self.entity_counts.get(ent["label"], 0) + 1
+            new_text_parts.append(original_doc_text[current_idx:ent["start"]])
+            clean_text = " ".join(ent["text"].split()).strip()
+            
+            if not SECRET_KEY: raise ValueError("SECRET_KEY is not set.")
+            full_hash = hmac.new(SECRET_KEY.encode(), clean_text.encode(), hashlib.sha256).hexdigest()
+            display_hash = full_hash[:self.slug_length] if self.slug_length else full_hash
+
+            if entity_collector is not None:
+                entity_collector.append((ent["label"], clean_text, display_hash, full_hash))
+            new_text_parts.append(f"[{ent['label']}_{display_hash}]")
+            current_idx = ent["end"]
+        
+        new_text_parts.append(original_doc_text[current_idx:])
+        return "".join(new_text_parts)
+
 
     def _anonymize_texts_fast_path(self, texts: List[str], operator_params: Optional[Dict] = None) -> List[str]:
         if not texts: return []
@@ -341,8 +424,10 @@ class AnonymizationOrchestrator:
 
         for i, text in enumerate(original_texts):
             if not text: continue
-            if self.use_cache and text in self.cache:
-                final_anonymized_list[i] = self.cache[text]
+            cached_value = self._get_from_cache(text) # Use helper
+            if cached_value:
+                final_anonymized_list[i] = cached_value
+                continue
             else:
                 if text not in texts_to_process_indices:
                     texts_to_process_indices[text] = []
@@ -359,56 +444,12 @@ class AnonymizationOrchestrator:
 
         for doc in docs:
             original_doc_text = doc.text
-            detected_entities = []
-
-            for ent in doc.ents:
-                normalized_label = ENTITY_MAPPING.get(ent.label_, ent.label_)
-                if normalized_label not in self.entities_to_preserve:
-                    detected_entities.append({
-                        "start": ent.start_char, "end": ent.end_char, "label": normalized_label,
-                        "text": ent.text, "score": 1.0
-                    })
-
-            for pat in self.compiled_patterns:
-                for match in pat["regex"].finditer(original_doc_text):
-                    match_text = match.group()
-                    if match_text not in self.allow_list and pat["label"] not in self.entities_to_preserve:
-                        detected_entities.append({
-                            "start": match.start(), "end": match.end(), "label": pat["label"],
-                            "text": match_text, "score": pat["score"]
-                        })
-
-            detected_entities.sort(key=lambda x: (x["start"], -x["score"], -(x["end"] - x["start"])))
             
-            merged_entities = []
-            last_end = -1
-            for ent in detected_entities:
-                if ent["start"] >= last_end:
-                    merged_entities.append(ent)
-                    last_end = ent["end"]
+            detected_entities = self._extract_entities_from_doc(doc, original_doc_text)
+            merged_entities = self._merge_overlapping_entities(detected_entities)
+            anonymized_text = self._generate_anonymized_text(original_doc_text, merged_entities, entity_collector)
 
-            new_text_parts = []
-            current_idx = 0
-            for ent in merged_entities:
-                self.total_entities_processed += 1
-                self.entity_counts[ent["label"]] = self.entity_counts.get(ent["label"], 0) + 1
-                new_text_parts.append(original_doc_text[current_idx:ent["start"]])
-                clean_text = " ".join(ent["text"].split()).strip()
-                
-                if not SECRET_KEY: raise ValueError("SECRET_KEY is not set.")
-                full_hash = hmac.new(SECRET_KEY.encode(), clean_text.encode(), hashlib.sha256).hexdigest()
-                display_hash = full_hash[:self.slug_length] if self.slug_length else full_hash
-
-                if entity_collector is not None:
-                    entity_collector.append((ent["label"], clean_text, display_hash, full_hash))
-                new_text_parts.append(f"[{ent['label']}_{display_hash}]")
-                current_idx = ent["end"]
-            
-            new_text_parts.append(original_doc_text[current_idx:])
-            anonymized_text = "".join(new_text_parts)
-
-            if self.use_cache:
-                self.cache[original_doc_text] = anonymized_text
+            self._add_to_cache(original_doc_text, anonymized_text) # Use helper
             for idx in texts_to_process_indices[original_doc_text]:
                 final_anonymized_list[idx] = anonymized_text
 
@@ -422,8 +463,10 @@ class AnonymizationOrchestrator:
         
         texts_to_process_map: Dict[str, List[int]] = {}
         for i, text in enumerate(original_texts):
-            if self.use_cache and text in self.cache:
-                final_anonymized_list[i] = self.cache[text]
+            cached_value = self._get_from_cache(text) # Use helper
+            if cached_value:
+                final_anonymized_list[i] = cached_value
+                continue
             else:
                 if text not in texts_to_process_map:
                     texts_to_process_map[text] = []
@@ -453,8 +496,7 @@ class AnonymizationOrchestrator:
             )
             
             anonymized_text = anonymizer_result.text
-            if self.use_cache:
-                self.cache[text] = anonymized_text
+            self._add_to_cache(text, anonymized_text) # Use helper
             for index in texts_to_process_map[text]:
                 final_anonymized_list[index] = anonymized_text
         
