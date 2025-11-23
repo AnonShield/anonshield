@@ -222,7 +222,7 @@ class DocxFileProcessor(FileProcessor):
         for para in doc.paragraphs:
             para_content_parts = []
             for run in para.runs:
-                if ".//w:drawing" in run._r.xml:
+                if run._r.xpath(".//w:drawing"):
                     for r_id in run._r.xpath(".//@r:embed"):
                         try:
                             image_part = doc.part.related_parts[r_id]
