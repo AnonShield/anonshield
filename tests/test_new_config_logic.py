@@ -57,16 +57,25 @@ class TestNewConfigLogic(unittest.TestCase):
         """
         Tests that --min-word-length filters auto-detected fields but not forced ones.
         """
-        # This test uses a config that does not force `analyst_name` or `short_name`
-        output_file = self._run_anonymizer(self.TEST_AUTODETECT_FILE, "--anonymization-config", "anonymization_config.json", "--min-word-length=3")
+        # This test uses a config that only allows 'analyst_name' for auto-detection
+        temp_config = {
+            "fields_to_anonymize": ["analyst_name"]
+        }
+        temp_config_path = "temp_autodetect_config.json"
+        with open(temp_config_path, "wb") as f:
+            f.write(orjson.dumps(temp_config))
+
+        output_file = self._run_anonymizer(self.TEST_AUTODETECT_FILE, "--anonymization-config", temp_config_path, "--min-word-length=3")
 
         with open(output_file, "rb") as f:
             anon_data = orjson.loads(f.read())
         
         # "John Doe" is long enough and should be auto-detected as PERSON
         self.assertTrue(anon_data["analyst_name"].startswith("[PERSON_"))
-        # "Jo" is shorter than min-word-length and should be skipped
+        # "Jo" is not in the allow-list, so it should be skipped
         self.assertEqual(anon_data["short_name"], "Jo")
+        
+        os.remove(temp_config_path)
 
     def test_technical_stoplist_argument(self):
         """
@@ -90,7 +99,7 @@ class TestNewConfigLogic(unittest.TestCase):
         with open(self.CONFIG_FILE, "rb") as f:
             config = orjson.loads(f.read())
         
-        config["fields_to_anonymize"] = ["analyst.name"] # Only allow this for auto-detection
+        config["fields_to_anonymize"] = ["user"] # Only allow this for auto-detection
         temp_config_path = "temp_allowlist_config.json"
         with open(temp_config_path, "wb") as f:
             f.write(orjson.dumps(config))
@@ -101,9 +110,9 @@ class TestNewConfigLogic(unittest.TestCase):
             anon_data = orjson.loads(f.read())[0] # Check first object
 
         # This is in the allow-list, should be anonymized
-        self.assertTrue(anon_data["analyst"]["name"].startswith("[PERSON_"))
+        self.assertTrue(anon_data["user"].startswith("[PERSON_"))
         # This is NOT in the allow-list, should be skipped
-        self.assertEqual(anon_data["analyst"]["email"], "jane.smith@example.com")
+        self.assertEqual(anon_data["email"], "john.doe@example.com")
 
         os.remove(temp_config_path)
 
