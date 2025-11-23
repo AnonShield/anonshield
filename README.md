@@ -248,6 +248,9 @@ uv run scripts/deanonymize.py "[PERSON_...hash...]"
 - `--preserve-entities <TYPES>`: A comma-separated list of entity types to *not* anonymize (e.g., `"LOCATION,HOSTNAME"`).
 - `--allow-list <TERMS>`: A comma-separated list of terms to ignore.
 - `--slug-length <NUM>`: Sets the character length of the hash displayed in the slug (1-64). If not specified, it defaults to 64 (the full hash), which guarantees no collisions.
+- `--anonymization-config <PATH>`: Path to a JSON file with advanced rules for structured files.
+- `--optimize`: A shorthand to enable all performance optimizations (`--anonymization-strategy fast` and `--db-mode in-memory`).
+- `--db-mode <MODE>`: Sets the database mode. `persistent` (default) saves the entity map to disk. `in-memory` uses a temporary database that is lost when the program exits.
 - `--list-entities`: Lists all supported entity types and exits.
 - `--list-languages`: Lists all supported languages and exits.
 
@@ -255,6 +258,44 @@ uv run scripts/deanonymize.py "[PERSON_...hash...]"
 ```bash
 uv run anon.py incident_report.pdf --lang en --preserve-entities "HOSTNAME" --slug-length 12
 ```
+
+### Advanced Configuration for Structured Files
+
+For structured files like `.json`, `.csv`, and `.xml`, you can gain granular control over the anonymization process using a JSON configuration file passed with the `--anonymization-config` argument.
+
+The configuration file supports two main keys:
+
+-   `fields_to_anonymize`: A dictionary where keys are dot-notation paths to fields. If this key is present, **only** fields matching these paths will be considered for anonymization.
+    -   To force a specific entity type for a field, provide an object with an `entity_type` key (e.g., `"asset.name": {"entity_type": "ASSET_NAME"}`).
+    -   To have the tool auto-detect the entity, provide an empty object (e.g., `"scan.target": {}`).
+-   `fields_to_exclude`: A list of dot-notation paths to fields that should **never** be anonymized. This acts as a deny-list and takes precedence over `fields_to_anonymize`.
+
+**Example `config.json`:**
+
+```json
+{
+  "fields_to_anonymize": {
+    "asset.name": {
+      "entity_type": "CUSTOM_ASSET_NAME"
+    },
+    "asset.tags.value": {},
+    "asset.ipv4_addresses": {},
+    "scan.target": {}
+  },
+  "fields_to_exclude": [
+    "scan.id",
+    "asset.tags.category"
+  ]
+}
+```
+
+When this configuration is used:
+- The content of `asset.name` will be anonymized with the entity type `CUSTOM_ASSET_NAME`.
+- The contents of `asset.tags.value`, `asset.ipv4_addresses`, and `scan.target` will be anonymized using the default entity detection.
+- `scan.id` and `asset.tags.category` will be ignored and left in their original state.
+- Any other field not in `fields_to_anonymize` (like `asset.display_ipv4_address`) will also be ignored.
+
+If `fields_to_anonymize` is omitted, all fields not explicitly listed in `fields_to_exclude` will be processed.
 
 ### Running Tests
 To verify the tool's integrity, run the test suite:
