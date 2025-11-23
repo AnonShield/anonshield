@@ -1,6 +1,12 @@
+import logging
 import os
 import sqlite3
 from typing import Optional
+import queue
+import sys
+import threading
+import time
+
 # --- Global Configuration ---
 SECRET_KEY = os.environ.get("ANON_SECRET_KEY")
 TECHNICAL_STOPLIST = {
@@ -9,8 +15,6 @@ TECHNICAL_STOPLIST = {
     "id", "type", "true", "false", "null", "none", "n/a", "json", "xml",
     "string", "integer", "boolean", "date", "datetime", "timestamp"
 }
-
-
 
 # --- Model Configuration ---
 TRANSFORMER_MODEL = "Davlan/xlm-roberta-base-ner-hrl"
@@ -30,40 +34,69 @@ ENTITY_MAPPING = dict(
     ORGANIZATION="ORGANIZATION",
 )
 
-
 # --- Database Configuration ---
 DB_DIR = os.path.join(os.getcwd(), "db")
-DB_PATH = None # Global variable to hold the dynamic DB path
-DB_SYNC_MODE = "NORMAL" # Global variable to hold the synchronous mode
+DB_PATH = None  # Global variable to hold the dynamic DB path
+DB_SYNC_MODE = "NORMAL"  # Global variable to hold the synchronous mode
+DB_WRITE_QUEUE = queue.Queue()
+DB_WRITER_THREAD = None
+DB_CONNECTION = None
+DB_LOCK = threading.Lock()
+
+def _db_writer():
+    """A dedicated thread to write entities to the database from a queue."""
+    # This connection is local to the thread
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.execute(f"PRAGMA synchronous={DB_SYNC_MODE};")
+
+    while True:
+        try:
+            entity_list = DB_WRITE_QUEUE.get(timeout=0.5)
+            if entity_list is None:  # Sentinel for shutdown
+                DB_WRITE_QUEUE.task_done()
+                break
+            
+            conn.executemany(
+                """
+                INSERT OR IGNORE INTO entities
+                (entity_type, original_name, slug_name, full_hash, first_seen, last_seen)
+                VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+                """,
+                entity_list
+            )
+            conn.commit()
+            logging.info("%d entities written to database.", len(entity_list))
+            DB_WRITE_QUEUE.task_done()
+        except queue.Empty:
+            continue
+        except Exception as e:
+            logging.error(f"DB Writer thread error: {e}", exc_info=True)
+    
+    conn.close()
 
 def initialize_db(mode: str = "persistent", synchronous: Optional[str] = None):
     """
-    Initializes the SQLite database and sets the global DB_PATH.
-
-    Args:
-        mode (str): 'persistent' (default) to save to a file,
-                    'in-memory' to use a non-persistent in-memory database.
-        synchronous (Optional[str]): The value for PRAGMA synchronous.
+    Initializes the SQLite database, sets the global DB_PATH, and starts the writer thread.
     """
-    global DB_PATH, DB_SYNC_MODE
+    global DB_PATH, DB_SYNC_MODE, DB_WRITER_THREAD
     
     if mode == "in-memory":
         DB_PATH = ":memory:"
-        print("[*] Using in-memory database (data will not be saved).")
+        logging.info("Using in-memory database (data will not be saved).")
     else: # persistent
         os.makedirs(DB_DIR, exist_ok=True)
         DB_PATH = os.path.join(DB_DIR, "entities.db")
 
+    # Create a temporary connection just to initialize the schema
     with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
-        # Performance and safety pragmas
         conn.execute("PRAGMA journal_mode=WAL;")
         
         sync_mode = synchronous.upper() if synchronous else "NORMAL"
-        DB_SYNC_MODE = sync_mode # Store the chosen mode globally
+        DB_SYNC_MODE = sync_mode
         conn.execute(f"PRAGMA synchronous={DB_SYNC_MODE};")
-        print(f"[*] SQLite synchronous mode set to: {DB_SYNC_MODE}")
+        logging.info(f"SQLite synchronous mode set to: {DB_SYNC_MODE}")
 
-        conn.execute("PRAGMA cache_size=-10000;") # Advise 10MB cache
+        conn.execute("PRAGMA cache_size=-10000;")
         conn.execute("PRAGMA temp_store=MEMORY;")
         
         conn.execute(
@@ -81,24 +114,28 @@ def initialize_db(mode: str = "persistent", synchronous: Optional[str] = None):
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_full_hash ON entities(full_hash);")
         conn.commit()
+
+    if not DB_WRITER_THREAD or not DB_WRITER_THREAD.is_alive():
+        DB_WRITER_THREAD = threading.Thread(target=_db_writer, daemon=True)
+        DB_WRITER_THREAD.start()
+
     return DB_PATH
 
+def shutdown_db_writer():
+    """Signals the database writer thread to shut down gracefully."""
+    global DB_WRITER_THREAD
+    
+    if not DB_WRITE_QUEUE.empty():
+        logging.info("Waiting for %d items in DB queue to be written...", DB_WRITE_QUEUE.qsize())
+        DB_WRITE_QUEUE.join()
 
+    DB_WRITE_QUEUE.put(None)
+    if DB_WRITER_THREAD:
+        DB_WRITER_THREAD.join(timeout=10)
+        DB_WRITER_THREAD = None
 
 def bulk_save_to_db(entity_list):
-    """Saves a list of entities to the database in a performant way."""
+    """Puts a list of entities into the thread-safe queue to be saved."""
     if not entity_list:
         return
-
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute(f"PRAGMA synchronous={DB_SYNC_MODE};") # Use global sync mode
-
-        query = """
-            INSERT OR IGNORE INTO entities
-            (entity_type, original_name, slug_name, full_hash, first_seen, last_seen)
-            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-        """
-        conn.executemany(query, entity_list)
-        conn.commit()
-
+    DB_WRITE_QUEUE.put(entity_list)
