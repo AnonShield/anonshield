@@ -207,7 +207,17 @@ class AnonymizationOrchestrator:
     Combina modelos Transformer (via SpaCy) com Regex de alta performance.
     """
 
-    def __init__(self, lang: str, allow_list: List[str], entities_to_preserve: List[str], slug_length: int | None = None, strategy: str = "presidio", use_cache: bool = True, regex_priority: bool = False, max_cache_size: int = 10000):
+    def __init__(self, 
+                 lang: str, 
+                 allow_list: List[str], 
+                 entities_to_preserve: List[str], 
+                 slug_length: int | None = None, 
+                 strategy: str = "presidio", 
+                 use_cache: bool = True, 
+                 regex_priority: bool = False, 
+                 max_cache_size: int = 10000,
+                 analyzer_engine: Optional[BatchAnalyzerEngine] = None,
+                 anonymizer_engine: Optional[AnonymizerEngine] = None):
         self.lang = lang
         self.allow_list = set(allow_list) 
         self.entities_to_preserve = set(entities_to_preserve)
@@ -217,11 +227,14 @@ class AnonymizationOrchestrator:
         self.regex_priority = regex_priority
         self.total_entities_processed = 0
         self.entity_counts: Dict[str, int] = {}
-        # self.cache: Dict[str, str] = {} # Old cache
-        self.max_cache_size = max_cache_size # Store max cache size
-        self.cache: OrderedDict[str, str] = OrderedDict() # Use OrderedDict for LRU cache
+        self.max_cache_size = max_cache_size
+        self.cache: OrderedDict[str, str] = OrderedDict()
         
-        self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
+        if analyzer_engine and anonymizer_engine:
+            self.analyzer_engine = analyzer_engine
+            self.anonymizer_engine = anonymizer_engine
+        else:
+            self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
         
         self.compiled_patterns = []
         custom_recognizers = load_custom_recognizers([self.lang], regex_priority=self.regex_priority)
