@@ -99,12 +99,10 @@ def _parse_arguments():
     parser.add_argument("--list-entities", action="store_true", help="List all supported entity types and exit.")
     parser.add_argument("--list-languages", action="store_true", help="List all supported languages and exit.")
     parser.add_argument("--lang", type=str, default="en", help="Language of the document.")
+    parser.add_argument("--output-dir", type=str, default="output", help="Directory to save output files. Default is 'output'.")
+    parser.add_argument("--overwrite", action="store_true", help="Allow overwriting of existing output files.")
+    parser.add_argument("--no-report", action="store_true", help="Disable the creation of a performance report in the 'logs' directory.")
     
-    # Optimization options
-    parser.add_argument("--optimize", action="store_true", help="Use all optimizations (fast strategy and in-memory DB).")
-    parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast"], help="Anonymization strategy ('presidio' for full analysis, 'fast' for an optimized path).")
-    parser.add_argument("--db-mode", type=str, default="persistent", choices=["persistent", "in-memory"], help="Database mode ('persistent' to save to disk, 'in-memory' for a temporary DB).")
-
     # Anonymization options
     parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve.")
     parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to allow.")
@@ -112,8 +110,15 @@ def _parse_arguments():
     parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a JSON file with advanced anonymization rules for structured files.")
     
     # Performance & Filtering options
-    parser.add_argument("--no-cache", action="store_true", help="Disable in-memory caching for the run.")
-    parser.add_argument("--min-word-length", type=int, default=3, help="Minimum character length for a word to be processed.")
+    parser.add_argument("--optimize", action="store_true", help="Enable all optimizations (fast strategy, cache, min-word-length=3, in-memory DB).")
+    parser.add_argument("--use-cache", action="store_true", default=False, help="Enable in-memory caching for the run. Disabled by default.")
+    parser.add_argument("--min-word-length", type=int, default=0, help="Minimum character length for a word to be processed. Default is 0 (no limit).")
+    parser.add_argument("--technical-stoplist", type=str, default="", help="Comma-separated list of custom words to add to the technical stoplist.")
+    parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized. Default is to anonymize them if other rules permit.")
+    parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast"], help="Anonymization strategy ('presidio' for full analysis, 'fast' for an optimized path).")
+    parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
+    parser.add_argument("--db-mode", type=str, default="persistent", choices=["persistent", "in-memory"], help="Database mode ('persistent' to save to disk, 'in-memory' for a temporary DB).")
+    parser.add_argument("--db-synchronous-mode", type=str, default=None, choices=["OFF", "NORMAL", "FULL", "EXTRA"], help="SQLite 'synchronous' PRAGMA mode. Overrides config file setting.")
 
     args = parser.parse_args()
 
@@ -133,6 +138,10 @@ def _parse_arguments():
     if args.optimize:
         args.anonymization_strategy = "fast"
         args.db_mode = "in-memory"
+        args.use_cache = True
+        if args.min_word_length == 0:
+            args.min_word_length = 3
+
 
     return args
 
@@ -196,7 +205,14 @@ def main():
 
     start_time = time.time()
     if not args.generate_ner_data:
-        initialize_db(mode=args.db_mode)
+        initialize_db(mode=args.db_mode, synchronous=args.db_synchronous_mode)
+    
+    # Update stoplist from CLI
+    if args.technical_stoplist:
+        from src.anon.config import TECHNICAL_STOPLIST
+        new_stopwords = {term.strip().lower() for term in args.technical_stoplist.split(',') if term.strip()}
+        TECHNICAL_STOPLIST.update(new_stopwords)
+
     models_check(args.lang)
 
     allow_list = [term.strip() for term in args.allow_list.split(',') if term]
@@ -219,14 +235,18 @@ def main():
             entities_to_preserve=entities_to_preserve,
             slug_length=args.slug_length,
             strategy=args.anonymization_strategy,
-            use_cache=(not args.no_cache)
+            use_cache=args.use_cache,
+            regex_priority=args.regex_priority
         )
         
         # --- Processing ---
         processor_factory_args = {
             "ner_data_generation": args.generate_ner_data,
             "anonymization_config": anonymization_config,
-            "min_word_length": args.min_word_length
+            "min_word_length": args.min_word_length,
+            "skip_numeric": args.skip_numeric,
+            "output_dir": args.output_dir,
+            "overwrite": args.overwrite,
         }
 
         if os.path.isdir(args.file_path):
@@ -266,7 +286,7 @@ def main():
 
 
         # --- Final Output ---
-        if not args.generate_ner_data:
+        if not args.generate_ner_data and not args.no_report:
             print("\n--- Anonymization Stats ---")
             print(f"Total entities processed: {orchestrator.total_entities_processed}")
             if hasattr(orchestrator, 'entity_counts') and orchestrator.entity_counts:

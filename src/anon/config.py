@@ -1,6 +1,6 @@
 import os
 import sqlite3
-
+from typing import Optional
 # --- Global Configuration ---
 SECRET_KEY = os.environ.get("ANON_SECRET_KEY")
 TECHNICAL_STOPLIST = {
@@ -34,16 +34,18 @@ ENTITY_MAPPING = dict(
 # --- Database Configuration ---
 DB_DIR = os.path.join(os.getcwd(), "db")
 DB_PATH = None # Global variable to hold the dynamic DB path
+DB_SYNC_MODE = "NORMAL" # Global variable to hold the synchronous mode
 
-def initialize_db(mode: str = "persistent"):
+def initialize_db(mode: str = "persistent", synchronous: Optional[str] = None):
     """
     Initializes the SQLite database and sets the global DB_PATH.
 
     Args:
         mode (str): 'persistent' (default) to save to a file,
                     'in-memory' to use a non-persistent in-memory database.
+        synchronous (Optional[str]): The value for PRAGMA synchronous.
     """
-    global DB_PATH
+    global DB_PATH, DB_SYNC_MODE
     
     if mode == "in-memory":
         DB_PATH = ":memory:"
@@ -55,7 +57,12 @@ def initialize_db(mode: str = "persistent"):
     with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
         # Performance and safety pragmas
         conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
+        
+        sync_mode = synchronous.upper() if synchronous else "NORMAL"
+        DB_SYNC_MODE = sync_mode # Store the chosen mode globally
+        conn.execute(f"PRAGMA synchronous={DB_SYNC_MODE};")
+        print(f"[*] SQLite synchronous mode set to: {DB_SYNC_MODE}")
+
         conn.execute("PRAGMA cache_size=-10000;") # Advise 10MB cache
         conn.execute("PRAGMA temp_store=MEMORY;")
         
@@ -85,7 +92,7 @@ def bulk_save_to_db(entity_list):
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute(f"PRAGMA synchronous={DB_SYNC_MODE};") # Use global sync mode
 
         query = """
             INSERT OR IGNORE INTO entities

@@ -130,7 +130,7 @@ class TestAnonIntegration(unittest.TestCase):
 
     def _get_output_file_path(self, input_file_path):
         base_name, input_ext = os.path.splitext(os.path.basename(input_file_path))
-        if input_ext.lower() in [".csv", ".xlsx", ".json", ".xml"]:
+        if input_ext.lower() in [".csv", ".xlsx", ".json", ".xml", ".jsonl"]:
             output_ext = input_ext.lower()
         else:
             output_ext = ".txt"
@@ -179,6 +179,95 @@ class TestAnonIntegration(unittest.TestCase):
         self.assertIn("[EMAIL_ADDRESS_", data["user"]["email"])
         self.assertNotIn("John Doe", data["user"]["name"])
         self.assertNotIn("test@example.com", data["user"]["email"])
+
+    def test_jsonl_anonymization(self):
+        test_file = os.path.join(self.test_data_dir, "test.jsonl")
+        jsonl_data = [
+            {"log_id": 1, "message": "User Jane Doe logged in from 192.168.0.1"},
+            {"log_id": 2, "message": "Admin Bob Smith accessed sensitive data. Email: bob.smith@example.com"}
+        ]
+        with open(test_file, "w") as f:
+            for entry in jsonl_data:
+                f.write(json.dumps(entry) + "\n")
+
+        self._run_anon_py(test_file)
+        output_file = self._get_output_file_path(test_file)
+        
+        self.assertTrue(os.path.exists(output_file))
+        with open(output_file, "r") as f:
+            lines = f.readlines()
+        
+        self.assertEqual(len(lines), 2)
+
+        data1 = json.loads(lines[0])
+        self.assertEqual(data1["log_id"], 1)
+        self.assertIn("[PERSON_", data1["message"])
+        self.assertIn("[IP_ADDRESS_", data1["message"])
+        self.assertNotIn("Jane Doe", data1["message"])
+        self.assertNotIn("192.168.0.1", data1["message"])
+
+        data2 = json.loads(lines[1])
+        self.assertEqual(data2["log_id"], 2)
+        self.assertIn("[PERSON_", data2["message"])
+        self.assertIn("[EMAIL_ADDRESS_", data2["message"])
+        self.assertNotIn("Bob Smith", data2["message"])
+        self.assertNotIn("bob.smith@example.com", data2["message"])
+
+    def test_json_array_anonymization(self):
+        # 1. Create a temporary config file for field-specific anonymization
+        config_path = os.path.join(self.test_data_dir, "json_array_config.json")
+        config_data = {
+            "fields_to_anonymize": {
+                "name": {"entity_type": "PERSON"},
+                "email": {"entity_type": "EMAIL_ADDRESS"}
+            }
+        }
+        with open(config_path, "w") as f:
+            json.dump(config_data, f)
+
+        # 2. Create the input JSON array file
+        test_file = os.path.join(self.test_data_dir, "test_array.json")
+        json_array_data = [
+            {"id": "user1", "name": "Alice Wonderland", "email": "alice@example.com"},
+            {"id": "user2", "name": "Charlie Chaplin", "email": "charlie@example.com"}
+        ]
+        with open(test_file, "w") as f:
+            json.dump(json_array_data, f)
+
+        # 3. Run the anonymization script with the config
+        cmd = [
+            "python",
+            "anon.py",
+            test_file,
+            "--lang", "en",
+            "--anonymization-config", config_path # Pass the config file
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"anon.py failed for {test_file}:")
+            print("STDOUT: {}".format(result.stdout))
+            print("STDERR: {}".format(result.stderr))
+        self.assertEqual(result.returncode, 0)
+        output_file = self._get_output_file_path(test_file)
+
+        self.assertTrue(os.path.exists(output_file))
+        with open(output_file, "r") as f:
+            output_array = json.load(f)
+        
+        self.assertTrue(isinstance(output_array, list))
+        self.assertEqual(len(output_array), 2)
+
+        self.assertEqual(output_array[0]["id"], "user1")
+        self.assertIn("[PERSON_", output_array[0]["name"])
+        self.assertIn("[EMAIL_ADDRESS_", output_array[0]["email"])
+        self.assertNotIn("Alice Wonderland", output_array[0]["name"])
+        self.assertNotIn("alice@example.com", output_array[0]["email"])
+
+        self.assertEqual(output_array[1]["id"], "user2")
+        self.assertIn("[PERSON_", output_array[1]["name"])
+        self.assertIn("[EMAIL_ADDRESS_", output_array[1]["email"])
+        self.assertNotIn("Charlie Chaplin", output_array[1]["name"])
+        self.assertNotIn("charlie@example.com", output_array[1]["email"])
 
     def test_xml_anonymization(self):
         test_file = os.path.join(self.test_data_dir, "test.xml")

@@ -3,7 +3,7 @@
 import hashlib
 import hmac
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import pandas as pd  # type: ignore
 import spacy  # type: ignore
@@ -12,6 +12,7 @@ from presidio_analyzer import (  # type: ignore
     AnalyzerEngine,
     Pattern,
     PatternRecognizer,
+    RecognizerResult,
 )
 from presidio_analyzer.batch_analyzer_engine import (  # type: ignore
     BatchAnalyzerEngine,
@@ -73,104 +74,107 @@ class CustomSlugAnonymizer(Operator):
     def operator_type(self) -> OperatorType: return OperatorType.Anonymize
 
 
-def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
+def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> List[PatternRecognizer]:
     """Carrega reconhecedores Regex otimizados para entidades de infraestrutura/cybersecurity/PII."""
     
+    # Define a score boost for regex patterns if priority is enabled
+    SCORE_BOOST = 0.15 if regex_priority else 0.0
+
     # --- 1. URL & REDE ---
     url_pattern = Pattern(
       name="URL Pattern", 
       regex=r"(?:https?://|ftp://|www\.)[^\s]+(?:\.(?:com|net|org|edu|gov|mil|int|br|app|dev|io|co|uk|de|fr|es|it|ru|cn|jp|kr|au|ca|mx|ar|cl|pe|co\.uk|com\.br|org\.br|gov\.br|edu\.br|net\.br|vercel\.app|herokuapp\.com|github\.io|gitlab\.io|netlify\.app|firebase\.app|appspot\.com|cloudfront\.net|amazonaws\.com|azure\.com|digitalocean\.com)|localhost|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))(?::[0-9]{1,5})?(?:/[^\s]*)?",
-      score=0.7
+      score=0.7 + SCORE_BOOST
     )
 
     ip_pattern = Pattern(
         name="IP Address Pattern", 
         regex=r"(?<![\.\d])(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?!\.[\d])", 
-        score=0.85
+        score=0.85 + SCORE_BOOST
     )
     
     ipv6_pattern = Pattern(
       name="IPv6 Address Pattern", 
       regex=r"(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))", 
-      score=0.6
+      score=0.6 + SCORE_BOOST
     )
     serial_pattern = Pattern(
         name="Certificate Serial",
         regex=r"\b[0-9a-fA-F]{16,40}\b",
-        score=0.75
+        score=0.75 + SCORE_BOOST
     )
     
     oid_pattern = Pattern(
         name="OID Pattern",
         regex=r"\b[0-2](?:\.\d+){3,}\b", 
-        score=0.95
+        score=0.95 + SCORE_BOOST
     )
     port_pattern = Pattern(
         name="Port/Protocol",
         regex=r"\b\d{1,5}/(?:tcp|udp|sctp)\b",
-        score=0.85
+        score=0.85 + SCORE_BOOST
     )
     hostname_patterns = [
-        Pattern(name="FQDN Pattern", regex=r"\b(?!Not-A\.Brand)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b", score=0.6),
-        Pattern(name="Certificate CN Pattern", regex=r"CN=([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]|[a-f0-9]{8,16})\b", score=0.7),
-        Pattern(name="Standalone Hex Hostname Pattern", regex=r"(?<![:/])(?<![vV])\b(?!20\d{10})[a-f0-9]{12,16}\b(?!\.)", score=0.6),
+        Pattern(name="FQDN Pattern", regex=r"\b(?!Not-A\.Brand)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b", score=0.6 + SCORE_BOOST),
+        Pattern(name="Certificate CN Pattern", regex=r"CN=([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]|[a-f0-9]{8,16})\b", score=0.7 + SCORE_BOOST),
+        Pattern(name="Standalone Hex Hostname Pattern", regex=r"(?<![:/])(?<![vV])\b(?!20\d{10})[a-f0-9]{12,16}\b(?!\.)", score=0.6 + SCORE_BOOST),
     ]
 
     hash_patterns = [
-        Pattern(name="SHA256 Hash", regex=r"\b[0-9a-fA-F]{64}\b", score=0.8),
-        Pattern(name="MD5 Colon-Separated Hash", regex=r"\b([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}\b", score=0.85)
+        Pattern(name="SHA256 Hash", regex=r"\b[0-9a-fA-F]{64}\b", score=0.8 + SCORE_BOOST),
+        Pattern(name="MD5 Colon-Separated Hash", regex=r"\b([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}\b", score=0.85 + SCORE_BOOST)
     ]
 
     cve_pattern = Pattern(
         name="CVE ID Pattern",
         regex=r"\bCVE-\d{4}-\d{4,}\b", 
-        score=0.95
+        score=0.95 + SCORE_BOOST
     )
 
     cpe_pattern = Pattern(
         name="CPE String",
         regex=r"\bcpe:(?:/|2\.3:)[aho](?::[A-Za-z0-9\._\-~%*]+){2,}\b",
-        score=0.9
+        score=0.9 + SCORE_BOOST
     )
 
     auth_token_patterns = [
-        Pattern(name="Cookie/Session Assignment", regex=r"(?<=[=])[a-zA-Z0-9\-_]{32,128}\b", score=0.9),
-        Pattern(name="Generic Auth Token", regex=r"\b[a-zA-Z0-9]{32,128}\b", score=0.5)
+        Pattern(name="Cookie/Session Assignment", regex=r"(?<=[=])[a-zA-Z0-9\-_]{32,128}\b", score=0.9 + SCORE_BOOST),
+        Pattern(name="Generic Auth Token", regex=r"\b[a-zA-Z0-9]{32,128}\b", score=0.5 + SCORE_BOOST)
     ]
 
     password_pattern = Pattern(
         name="Contextual Password",
         regex=r"(?<=password=|passwd=|pwd=|secret=|api_key=|apikey=|access_key=|client_secret=)[^\s,;\"']+\b",
-        score=0.95
+        score=0.95 + SCORE_BOOST
     )
 
     username_pattern = Pattern(
         name="Contextual Username",
         regex=r"(?<=user=|username=|uid=|login=|user_id=)[a-zA-Z0-9_.-]+\b",
-        score=0.8
+        score=0.8 + SCORE_BOOST
     )
 
-    email_pattern = Pattern(name="Email Pattern", regex=r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b", score=1.0)
+    email_pattern = Pattern(name="Email Pattern", regex=r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b", score=1.0 + SCORE_BOOST)
     
     phone_pattern = Pattern(
         name="Phone Number Pattern",
         regex=r"\b(?:\+?\d{1,3}[-. ]?)?\(?\d{2,3}\)?[-. ]?\d{4,5}[-. ]?\d{4}\b",
-        score=0.6
+        score=0.6 + SCORE_BOOST
     )
 
-    cpf_pattern = Pattern(name="CPF Pattern", regex=r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b", score=0.85)
+    cpf_pattern = Pattern(name="CPF Pattern", regex=r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b", score=0.85 + SCORE_BOOST)
 
-    cc_pattern = Pattern(name="Credit Card Pattern", regex=r"\b(?:\d{4}[- ]?){3}\d{4}\b", score=0.7)
+    cc_pattern = Pattern(name="Credit Card Pattern", regex=r"\b(?:\d{4}[- ]?){3}\d{4}\b", score=0.7 + SCORE_BOOST)
 
-    uuid_pattern = Pattern(name="UUID Pattern", regex=r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", score=0.8)
-    cert_body_pattern = Pattern(name="Certificate Body", regex=r"\bMII[a-zA-Z0-9+/=\n]{100,}\b", score=0.8)
-    mac_pattern = Pattern(name="MAC Address", regex=r"\b([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})\b", score=0.8)
-    path_pattern = Pattern(name="User Home Path", regex=r"(?:/home/|/Users/|C:\\Users\\)([^/\\]+)", score=0.6)
+    uuid_pattern = Pattern(name="UUID Pattern", regex=r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", score=0.8 + SCORE_BOOST)
+    cert_body_pattern = Pattern(name="Certificate Body", regex=r"\bMII[a-zA-Z0-9+/=\n]{100,}\b", score=0.8 + SCORE_BOOST)
+    mac_pattern = Pattern(name="MAC Address", regex=r"\b([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})\b", score=0.8 + SCORE_BOOST)
+    path_pattern = Pattern(name="User Home Path", regex=r"(?:/home/|/Users/|C:\\Users\\)([^/\\]+)", score=0.6 + SCORE_BOOST)
     
     pgp_pattern = Pattern(
         name="PGP Block",
         regex=r"-----BEGIN PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----.+?-----END PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----",
-        score=0.95
+        score=0.95 + SCORE_BOOST
     )
     recognizers = []
     for lang in langs:
@@ -192,6 +196,7 @@ def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
             PatternRecognizer(supported_entity="PHONE_NUMBER", patterns=[phone_pattern, cpf_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="CREDIT_CARD", patterns=[cc_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="UUID", patterns=[uuid_pattern], supported_language=lang),
+            PatternRecognizer(supported_entity="PGP_BLOCK", patterns=[pgp_pattern], supported_language=lang), # Added PGP_BLOCK
         ])
     return recognizers
 
@@ -201,13 +206,14 @@ class AnonymizationOrchestrator:
     Combina modelos Transformer (via SpaCy) com Regex de alta performance.
     """
 
-    def __init__(self, lang: str, allow_list: List[str], entities_to_preserve: List[str], slug_length: int | None = None, strategy: str = "presidio", use_cache: bool = True):
+    def __init__(self, lang: str, allow_list: List[str], entities_to_preserve: List[str], slug_length: int | None = None, strategy: str = "presidio", use_cache: bool = True, regex_priority: bool = False):
         self.lang = lang
         self.allow_list = set(allow_list) 
         self.entities_to_preserve = set(entities_to_preserve)
         self.slug_length = slug_length
         self.strategy = strategy
         self.use_cache = use_cache
+        self.regex_priority = regex_priority
         self.total_entities_processed = 0
         self.entity_counts: Dict[str, int] = {}
         self.cache: Dict[str, str] = {}
@@ -215,7 +221,7 @@ class AnonymizationOrchestrator:
         self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
         
         self.compiled_patterns = []
-        custom_recognizers = load_custom_recognizers([self.lang])
+        custom_recognizers = load_custom_recognizers([self.lang], regex_priority=self.regex_priority)
         
         for recognizer in custom_recognizers:
             entity_type = recognizer.supported_entities[0] 
@@ -252,7 +258,7 @@ class AnonymizationOrchestrator:
         nlp_engine = TransformersNlpEngine(models=trf_model_config, ner_model_configuration=ner_config)
         core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=list(supported_langs))
         
-        for recognizer in load_custom_recognizers(langs=core_analyzer.supported_languages):
+        for recognizer in load_custom_recognizers(langs=core_analyzer.supported_languages, regex_priority=self.regex_priority):
             core_analyzer.registry.add_recognizer(recognizer)
         
         batch_analyzer = BatchAnalyzerEngine(analyzer_engine=core_analyzer)
@@ -261,17 +267,38 @@ class AnonymizationOrchestrator:
         
         return batch_analyzer, anonymizer
 
-    def anonymize_text(self, text: str, operator_params: Optional[Dict] = None, forced_entity_type: Optional[str] = None) -> str:
+    def anonymize_text(self, text: str, operator_params: Optional[Dict] = None, forced_entity_type: Optional[Union[str, List[str]]] = None) -> str:
         if not isinstance(text, str) or not text.strip():
             return text
         return self.anonymize_texts([text], operator_params=operator_params, forced_entity_type=forced_entity_type)[0]
 
-    def anonymize_texts(self, texts: List[str], operator_params: Optional[Dict] = None, forced_entity_type: Optional[str] = None) -> List[str]:
-        if forced_entity_type:
+    def anonymize_texts(self, texts: List[str], operator_params: Optional[Dict] = None, forced_entity_type: Optional[Union[str, List[str]]] = None) -> List[str]:
+        if isinstance(forced_entity_type, list):
+            return self._anonymize_texts_pick_one(texts, forced_entity_type, operator_params)
+        if isinstance(forced_entity_type, str):
             return self._anonymize_texts_forced_type(texts, forced_entity_type, operator_params)
         if self.strategy == "fast":
             return self._anonymize_texts_fast_path(texts, operator_params)
         return self._anonymize_texts_presidio(texts, operator_params)
+
+    def _anonymize_texts_pick_one(self, texts: List[str], entity_types: List[str], operator_params: Optional[Dict] = None) -> List[str]:
+        anonymized_list = []
+        if operator_params is None: operator_params = {}
+        
+        analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
+            texts, language=self.lang, entities=entity_types
+        )
+
+        for text, analyzer_results in zip(texts, analyzer_results_iterator):
+            if not analyzer_results:
+                anonymized_list.append(text)
+                continue
+            
+            best_result: RecognizerResult = max(analyzer_results, key=lambda r: r.score)
+            anonymized_text = self._anonymize_texts_forced_type([text], best_result.entity_type, operator_params)[0]
+            anonymized_list.append(anonymized_text)
+            
+        return anonymized_list
 
     def _anonymize_texts_forced_type(self, texts: List[str], entity_type: str, operator_params: Optional[Dict] = None) -> List[str]:
         anonymized_list = []
@@ -336,15 +363,16 @@ class AnonymizationOrchestrator:
 
             for ent in doc.ents:
                 normalized_label = ENTITY_MAPPING.get(ent.label_, ent.label_)
-                detected_entities.append({
-                    "start": ent.start_char, "end": ent.end_char, "label": normalized_label,
-                    "text": ent.text, "score": 1.0
-                })
+                if normalized_label not in self.entities_to_preserve:
+                    detected_entities.append({
+                        "start": ent.start_char, "end": ent.end_char, "label": normalized_label,
+                        "text": ent.text, "score": 1.0
+                    })
 
             for pat in self.compiled_patterns:
                 for match in pat["regex"].finditer(original_doc_text):
                     match_text = match.group()
-                    if match_text not in self.allow_list:
+                    if match_text not in self.allow_list and pat["label"] not in self.entities_to_preserve:
                         detected_entities.append({
                             "start": match.start(), "end": match.end(), "label": pat["label"],
                             "text": match_text, "score": pat["score"]
@@ -409,6 +437,7 @@ class AnonymizationOrchestrator:
         analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
             unique_texts_to_process, language=self.lang,
             entities=entities_to_anonymize, score_threshold=0.6,
+            allow_list=self.allow_list
         )
 
         if operator_params is None: operator_params = {}
@@ -417,10 +446,9 @@ class AnonymizationOrchestrator:
         operator_params["slug_length"] = self.slug_length
 
         for text, analyzer_results in zip(unique_texts_to_process, analyzer_results_iterator):
-            filtered_analyzer_results = [r for r in analyzer_results if text[r.start:r.end] not in self.allow_list]
             anonymizer_result = self.anonymizer_engine.anonymize(
                 text=text,
-                analyzer_results=filtered_analyzer_results,
+                analyzer_results=analyzer_results,
                 operators={"DEFAULT": OperatorConfig("custom_slug", operator_params)},
             )
             
@@ -434,7 +462,7 @@ class AnonymizationOrchestrator:
 
     def _get_entities_to_anonymize(self) -> List[str]:
         all_entities = self.analyzer_engine.analyzer_engine.get_supported_entities()
-        return [ent for ent in all_entities if not self.entities_to_preserve or ent not in self.entities_to_preserve]
+        return [ent for ent in all_entities if ent not in self.entities_to_preserve]
 
     def detect_entities(self, texts: List[str]) -> List[dict]:
         if not texts: return []
