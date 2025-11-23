@@ -14,6 +14,7 @@ import time
 import warnings
 import spacy
 import torch
+import json
 
 from src.anon.config import (
     ENTITY_MAPPING,
@@ -88,15 +89,22 @@ def _handle_list_entities():
 
 def _parse_arguments():
     """Parses command-line arguments."""
-    parser = argparse.ArgumentParser(description="Anonymize sensitive information in various file formats.")
-    parser.add_argument("file_path", nargs='?', help="Path to the file to be anonymized.")
-    parser.add_argument("--list-entities", action="store_true", help="List all supported entity types and exit.")
-    parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve.")
-    parser.add_argument("--lang", type=str, default="en", help="Language of the document.")
-    parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to allow.")
-    parser.add_argument("--list-languages", action="store_true", help="List all supported languages and exit.")
-    parser.add_argument("--slug-length", type=int, default=None, help="Specify the length of the anonymized slug (1-64).")
+    parser = argparse.ArgumentParser(description="Anonymize sensitive information or generate NER training data.")
+    parser.add_argument("file_path", nargs='?', help="Path to the file or directory to be processed.")
     
+    # Mode selection
+    parser.add_argument("--generate-ner-data", action="store_true", help="Enable NER data generation mode instead of anonymizing.")
+
+    # General options
+    parser.add_argument("--list-entities", action="store_true", help="List all supported entity types and exit.")
+    parser.add_argument("--list-languages", action="store_true", help="List all supported languages and exit.")
+    parser.add_argument("--lang", type=str, default="en", help="Language of the document.")
+    
+    # Anonymization options
+    parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve.")
+    parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to allow.")
+    parser.add_argument("--slug-length", type=int, default=None, help="Specify the length of the anonymized slug (1-64).")
+    parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a JSON file with advanced anonymization rules for structured files.")
     args = parser.parse_args()
 
     if args.list_entities:
@@ -105,12 +113,11 @@ def _parse_arguments():
     if args.list_languages:
         _handle_list_languages()
 
-    if args.slug_length is not None:
-        if not (1 <= args.slug_length <= 64):
-            parser.error("--slug-length must be between 1 and 64.")
+    if args.slug_length is not None and not (1 <= args.slug_length <= 64):
+        parser.error("--slug-length must be between 1 and 64.")
 
-    if not args.file_path and not args.list_languages:
-        parser.error("A file path must be provided when not using --list-entities or --list-languages.")
+    if not args.file_path and not (args.list_entities or args.list_languages):
+        parser.error("A file path must be provided.")
 
     return args
 
@@ -124,41 +131,40 @@ def _handle_list_languages():
 
 
 def main():
-    """Main function to orchestrate the anonymization process."""
+    """Main function to orchestrate the anonymization or NER data generation process."""
     args = _parse_arguments()
 
-    # Dynamically set LD_LIBRARY_PATH for CUDA libraries within the venv
-    import os
-    import sys 
-    
-    # Determine the Python version in the venv dynamically
-    # This assumes the venv structure is consistent and 'sys.executable' points to the venv python
-    # Example: /tool/venv/bin/python -> .../venv/lib/python3.11
-    venv_python_path = os.path.dirname(sys.executable) # /tool/venv/bin
-    venv_lib_path = os.path.join(os.path.dirname(venv_python_path), "lib") # /tool/venv/lib
-    
-    # Find the pythonX.Y directory in venv_lib_path
-    venv_python_version_path = "python3.11" # Default fallback
-    for item in os.listdir(venv_lib_path):
-        if item.startswith("python") and os.path.isdir(os.path.join(venv_lib_path, item)):
-            venv_python_version_path = item
-            break
+    # --- Load Anonymization Config ---
+    anonymization_config = None
+    if args.anonymization_config:
+        if not os.path.exists(args.anonymization_config):
+            print(f"[!] Error: Anonymization config file not found at '{args.anonymization_config}'", file=sys.stderr)
+            sys.exit(1)
+        try:
+            with open(args.anonymization_config, 'r', encoding='utf-8') as f:
+                anonymization_config = json.load(f)
+            print(f"[*] Loaded advanced anonymization rules from '{args.anonymization_config}'.")
+        except json.JSONDecodeError:
+            print(f"[!] Error: Could not decode JSON from '{args.anonymization_config}'. Please check the file format.", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"[!] Error reading anonymization config file: {e}", file=sys.stderr)
+            sys.exit(1)
 
+    # --- Common Setup ---
+    # Dynamically set LD_LIBRARY_PATH for CUDA libraries
+    venv_python_path = os.path.dirname(sys.executable)
+    venv_lib_path = os.path.join(os.path.dirname(venv_python_path), "lib")
+    venv_python_version_path = next((d for d in os.listdir(venv_lib_path) if d.startswith("python") and os.path.isdir(os.path.join(venv_lib_path, d))), "python3.11")
     cuda_lib_path = os.path.join(venv_lib_path, venv_python_version_path, "site-packages", "nvidia", "cuda_runtime", "lib")
     
-    # Check if the path exists before adding it to LD_LIBRARY_PATH
     if os.path.exists(cuda_lib_path):
-        current_ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
-        if cuda_lib_path not in current_ld_library_path: # Avoid duplicate entries
-            if current_ld_library_path:
-                os.environ["LD_LIBRARY_PATH"] = f"{cuda_lib_path}:{current_ld_library_path}"
-            else:
-                os.environ["LD_LIBRARY_PATH"] = cuda_lib_path
+        os.environ["LD_LIBRARY_PATH"] = f"{cuda_lib_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
         print(f"[*] LD_LIBRARY_PATH set to: {os.environ.get('LD_LIBRARY_PATH')}")
     else:
-        print(f"[!] Warning: CUDA library path not found: {cuda_lib_path}. LD_LIBRARY_PATH not modified for CUDA.")
+        print(f"[!] Warning: CUDA library path not found: {cuda_lib_path}.")
 
-    # --- GPU Activation (User Provided) ---
+    # --- GPU Activation ---
     print("[*] Verifying hardware...")
     if torch.cuda.is_available():
         try:
@@ -168,14 +174,14 @@ def main():
             print(f"[!] GPU detected, but failed to activate in Spacy: {e}")
     else:
         print("[!] CUDA not detected by PyTorch. Running on CPU.")
-    # -------------------------------------
 
-    if not SECRET_KEY:
-        print("[!] Error: ANON_SECRET_KEY environment variable not set.", file=sys.stderr)
+    if not args.generate_ner_data and not SECRET_KEY:
+        print("[!] Error: ANON_SECRET_KEY environment variable not set for anonymization.", file=sys.stderr)
         sys.exit(1)
 
     start_time = time.time()
-    initialize_db()
+    if not args.generate_ner_data:
+        initialize_db()
     models_check(args.lang)
 
     allow_list = [term.strip() for term in args.allow_list.split(',') if term]
@@ -189,7 +195,9 @@ def main():
     entities_to_preserve = [e for e in requested_preserve if e in supported_entities_upper]
 
     try:
-        print(f"[+] Initializing anonymization engine for language '{args.lang}'...")
+        engine_message = "NER detection engine" if args.generate_ner_data else "anonymization engine"
+        print(f"[+] Initializing {engine_message} for language '{args.lang}'...")
+        
         orchestrator = AnonymizationOrchestrator(
             lang=args.lang, 
             allow_list=allow_list, 
@@ -197,41 +205,57 @@ def main():
             slug_length=args.slug_length
         )
         
-        print(f"[DEBUG] args.file_path: {args.file_path}")
-        print(f"[DEBUG] os.path.isdir(args.file_path): {os.path.isdir(args.file_path)}")
+        # --- Processing ---
+        processor_factory_args = {
+            "ner_data_generation": args.generate_ner_data,
+            "anonymization_config": anonymization_config,
+        }
+
         if os.path.isdir(args.file_path):
-            print(f"[+] Processing directory: {args.file_path}...")
+            mode_str = "Generating NER data from" if args.generate_ner_data else "Processing"
+            print(f"[+] {mode_str} directory: {args.file_path}...")
             processed_files = []
+            
             for root, _, files in os.walk(args.file_path):
                 for file_name in files:
                     file_path = os.path.join(root, file_name)
-                    print(f"[DEBUG] Processing file in directory: {file_path}") # Debug print
                     try:
-                        processor = get_processor(file_path, orchestrator)
+                        processor = get_processor(file_path, orchestrator, **processor_factory_args)
                         output_file = processor.process()
                         processed_files.append(output_file)
-                        print(f"[*] Anonymized file saved at: {output_file}")
+                        if args.generate_ner_data:
+                            print(f"[*] NER data for '{file_name}' saved at: {output_file}")
+                        else:
+                            print(f"[*] Anonymized file for '{file_name}' saved at: {output_file}")
                     except ValueError as ve:
                         print(f"[!] Skipping file '{file_path}': {ve}", file=sys.stderr)
                     except Exception as e:
                         print(f"[!] An error occurred processing file '{file_path}': {e}", file=sys.stderr)
+            
             if not processed_files:
                 print("[!] No files were processed in the directory.", file=sys.stderr)
+
         else:
-            print(f"[+] Processing file: {args.file_path}...")
-            processor = get_processor(args.file_path, orchestrator)
+            mode_str = "Generating NER data for" if args.generate_ner_data else "Processing"
+            print(f"[+] {mode_str} file: {args.file_path}...")
+            processor = get_processor(args.file_path, orchestrator, **processor_factory_args)
             output_file = processor.process()
-            print(f"[*] Anonymized file saved at: {output_file}")
+            if args.generate_ner_data:
+                print(f"\n[*] NER data generation complete. Saved at: {output_file}")
+            else:
+                 print(f"[*] Anonymized file saved at: {output_file}")
 
-        print("\n--- Anonymization Stats ---")
-        print(f"Total entities processed: {orchestrator.total_entities_processed}")
-        if hasattr(orchestrator, 'entity_counts') and orchestrator.entity_counts:
-            print("Entities by type:")
-            for entity_type, count in sorted(orchestrator.entity_counts.items()):
-                print(f"  - {entity_type}: {count}")
-        print("---------------------------\n")
 
-        write_report(args.file_path, start_time)
+        # --- Final Output ---
+        if not args.generate_ner_data:
+            print("\n--- Anonymization Stats ---")
+            print(f"Total entities processed: {orchestrator.total_entities_processed}")
+            if hasattr(orchestrator, 'entity_counts') and orchestrator.entity_counts:
+                print("Entities by type:")
+                for entity_type, count in sorted(orchestrator.entity_counts.items()):
+                    print(f"  - {entity_type}: {count}")
+            print("---------------------------\n")
+            write_report(args.file_path, start_time)
 
     except Exception as e:
         print(f"[!] An error occurred during processing: {e}", file=sys.stderr)

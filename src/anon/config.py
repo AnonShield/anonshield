@@ -8,22 +8,44 @@ import datetime
 SECRET_KEY = os.environ.get("ANON_SECRET_KEY")
 
 
-# --- Model Configuration ---
-TRANSFORMER_MODEL = "Davlan/xlm-roberta-base-ner-hrl"
-MODELS_DIR = "models"
-TRF_MODEL_PATH = os.path.join(MODELS_DIR, TRANSFORMER_MODEL)
+# 1. APONTE PARA A PASTA DO SEU MODELO TREINADO
+# Se o script 'train_ner.py' salvou na pasta "meu_modelo_v1" na raiz:
+TRANSFORMER_MODEL = "./meu_modelo_v1" 
 
-# Entity mappings between the transformer model's labels and Presidio's entities
+# Ou, se você moveu a pasta "meu_modelo_v1" para dentro de "models/":
+#TRANSFORMER_MODEL = "meu_modelo_v1" 
+
+MODELS_DIR = "models"
+
+# Se for caminho relativo (./), ele usa direto, senão tenta achar em models/
+if os.path.exists(TRANSFORMER_MODEL):
+    TRF_MODEL_PATH = TRANSFORMER_MODEL
+
+
+
 ENTITY_MAPPING = dict(
+    # --- NOVAS ENTIDADES (Obrigatório) ---
+    # A chave (Esquerda) deve ser IGUAL à label do Doccano
+    HOSTNAME="HOSTNAME",
+    IP_ADDRESS="IP_ADDRESS",
+    CLOUD_ID="CLOUD_ID",
+    CONTAINER_IMG="CONTAINER_IMG",
+    MAC_ADDRESS="MAC_ADDRESS",
+    ASSET_ROLE="ASSET_ROLE",
+    ASSET_TYPE="ASSET_TYPE",
+    ENVIRONMENT="ENVIRONMENT",
+    LOCATION="LOCATION",
+    ORGANIZATION="ORGANIZATION",
+    OS_NAME="OS_NAME",
+    SENSITIVE_TAG="SENSITIVE_TAG",
+    
+    # --- LEGADO/PADRÃO (Não remova) ---
+    PER="PERSON",
+    PERSON="PERSON",
     LOC="LOCATION",
     ORG="ORGANIZATION",
-    PER="PERSON",
     EMAIL="EMAIL_ADDRESS",
-    PHONE="PHONE_NUMBER",
-    PERSON="PERSON",
-    LOCATION="LOCATION",
-    GPE="LOCATION",
-    ORGANIZATION="ORGANIZATION",
+    PHONE="PHONE_NUMBER"
 )
 
 # --- Database Configuration ---

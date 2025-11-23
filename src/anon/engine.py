@@ -64,116 +64,141 @@ class CustomSlugAnonymizer(Operator):
 
 
 def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
-    """Carrega reconhecedores Regex otimizados para entidades de infraestrutura/cybersecurity."""
+    """Carrega reconhecedores Regex otimizados para entidades de infraestrutura/cybersecurity/PII."""
     
-    # URL recognizer
+    # --- 1. URL & REDE ---
     url_pattern = Pattern(
       name="URL Pattern", 
-      regex=r"(?:https?://|ftp://|www\.)[^\s]+\.(?:com|net|org|edu|gov|mil|int|br|app|dev|io|co|uk|de|fr|es|it|ru|cn|jp|kr|au|ca|mx|ar|cl|pe|co\.uk|com\.br|org\.br|gov\.br|edu\.br|net\.br|vercel\.app|herokuapp\.com|github\.io|gitlab\.io|netlify\.app|firebase\.app|appspot\.com|cloudfront\.net|amazonaws\.com|azure\.com|digitalocean\.com)[^\s]*",
+      regex=r"(?:https?://|ftp://|www\.)[^\s]+(?:\.(?:com|net|org|edu|gov|mil|int|br|app|dev|io|co|uk|de|fr|es|it|ru|cn|jp|kr|au|ca|mx|ar|cl|pe|co\.uk|com\.br|org\.br|gov\.br|edu\.br|net\.br|vercel\.app|herokuapp\.com|github\.io|gitlab\.io|netlify\.app|firebase\.app|appspot\.com|cloudfront\.net|amazonaws\.com|azure\.com|digitalocean\.com)|localhost|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))(?::[0-9]{1,5})?(?:/[^\s]*)?",
       score=0.7
     )
 
-    # IP address recognizers (IPv4 and IPv6)
     ip_pattern = Pattern(
         name="IP Address Pattern", 
-        regex=r"\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b", 
+        regex=r"(?<![\.\d])(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?![\.\d])", 
         score=0.85
     )
-    # IPv6 Otimizado (Detecta grupos de hex e dois pontos, sem validação estrita lenta)
+    
     ipv6_pattern = Pattern(
-        name="IPv6 Address Pattern", 
-        regex=r"(?<![a-zA-Z0-9])(?:[A-Fa-f0-9]{1,4}:){2,}(?:[A-Fa-f0-9]{1,4}|:)(?![a-zA-Z0-9])", 
-        score=0.6
+      name="IPv6 Address Pattern", 
+      regex=r"(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))", 
+      score=0.6
     )
-
-    hostname_patterns = [
-        Pattern(
-            name="FQDN Pattern",
-            regex=r"\b([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b",
-            score=0.6
-        ),
-        Pattern(
-            name="Common Hostname Pattern",
-            regex=r"\b(localhost)\b", 
-            score=0.65
-        ),
-        Pattern(
-            name="Certificate CN Pattern",
-            regex=r"CN=([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]|[a-f0-9]{8,16})\b",
-            score=0.7
-        ),
-        Pattern(
-            name="Standalone Hex Hostname Pattern",
-            regex=r"(?<![:/])(?<![vV])\b(?!20\d{10})[a-f0-9]{12,16}\b(?!\.)",
-            score=0.6
-        ),
-    ]
-
-    # Hashes (SHA256 e MD5 com dois-pontos)
-    hash_patterns = [
-        Pattern(name="SHA256 Hash", regex=r"\b[0-9a-fA-F]{64}\b", score=0.8),
-        Pattern(
-            name="MD5 Colon-Separated Hash",
-            regex=r"\b([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}\b",
-            score=0.85 
-        )
-    ]
-
-    # UUIDs
-    uuid_pattern = Pattern(
-        name="UUID Pattern",
-        regex=r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b",
-        score=0.8
-    )
-
-    # Seriais de Certificado
     serial_pattern = Pattern(
-        name="Certificate Serial (40-char Hex)",
-        regex=r"\b[0-9a-fA-F]{40}\b",
+        name="Certificate Serial",
+        regex=r"\b[0-9a-fA-F]{16,40}\b",  # Mudado de {40} para {16,40}
         score=0.75
     )
+    
+    # OID (Object Identifier) - Garantindo que pegue a estrutura hierárquica
+    oid_pattern = Pattern(
+        name="OID Pattern",
+        regex=r"\b[0-2](?:\.\d+){3,}\b", 
+        score=0.95
+    )
+    port_pattern = Pattern(
+        name="Port/Protocol",
+        regex=r"\b\d{1,5}/(?:tcp|udp|sctp)\b",
+        score=0.85
+    )
+    hostname_patterns = [
+        Pattern(name="FQDN Pattern", regex=r"\b(?!Not-A\.Brand)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b", score=0.6),
+        Pattern(name="Certificate CN Pattern", regex=r"CN=([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]|[a-f0-9]{8,16})\b", score=0.7),
+        Pattern(name="Standalone Hex Hostname Pattern", regex=r"(?<![:/])(?<![vV])\b(?!20\d{10})[a-f0-9]{12,16}\b(?!\.)", score=0.6),
+    ]
 
-    # Strings CPE
+    # --- 2. CRIPTOGRAFIA & SEGURANÇA ---
+    hash_patterns = [
+        Pattern(name="SHA256 Hash", regex=r"\b[0-9a-fA-F]{64}\b", score=0.8),
+        Pattern(name="MD5 Colon-Separated Hash", regex=r"\b([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}\b", score=0.85)
+    ]
+
+    # CVE ID (Novo)
+    cve_pattern = Pattern(
+        name="CVE ID Pattern",
+        regex=r"\bCVE-\d{4}-\d{4,}\b", 
+        score=0.95
+    )
+
+    # CPE String
     cpe_pattern = Pattern(
         name="CPE String",
-        regex=r"\bcpe:/[a-z]:[^:]+:[^:]+(:[^:]+){0,4}\b",
-        score=0.7
+        regex=r"\bcpe:(?:/|2\.3:)[aho](?::[A-Za-z0-9\._\-~%*]+){2,}\b",
+        score=0.9
     )
+
+    # Tokens de Sessão (Auth Tokens)
+    auth_token_patterns = [
+        Pattern(name="Cookie/Session Assignment", regex=r"(?<=[=])[a-zA-Z0-9\-_]{32,128}\b", score=0.9),
+        Pattern(name="Generic Auth Token", regex=r"\b[a-zA-Z0-9]{32,128}\b", score=0.5)
+    ]
+
+    # --- 3. CREDENCIAIS & SEGREDOS (Novo) ---
+    password_pattern = Pattern(
+        name="Contextual Password",
+        regex=r"(?<=password=|passwd=|pwd=|secret=|api_key=|apikey=|access_key=|client_secret=)[^\s,;\"']+\b",
+        score=0.95
+    )
+
+    username_pattern = Pattern(
+        name="Contextual Username",
+        regex=r"(?<=user=|username=|uid=|login=|user_id=)[a-zA-Z0-9_.-]+\b",
+        score=0.8
+    )
+
+    # --- 4. DADOS PESSOAIS (PII) ---
+    email_pattern = Pattern(name="Email Pattern", regex=r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b", score=1.0)
     
-    # Corpos de Certificado (Base64)
-    cert_body_pattern = Pattern(
-        name="Certificate Body (Base64)",
-        regex=r"\bMII[a-zA-Z0-9+/=\n]{100,}\b", 
-        score=0.8
-    )
-
-    # MAC Address
-    mac_pattern = Pattern(
-        name="MAC Address",
-        regex=r"\b([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})\b",
-        score=0.8
-    )
-
-    # File Paths (Unix/Windows)
-    path_pattern = Pattern(
-        name="User Home Path",
-        regex=r"(?:/home/|/Users/|C:\\Users\\)([^/\\]+)",
+    phone_pattern = Pattern(
+        name="Phone Number Pattern",
+        regex=r"\b(?:\+?\d{1,3}[-. ]?)?\(?\d{2,3}\)?[-. ]?\d{4,5}[-. ]?\d{4}\b",
         score=0.6
     )
 
+    # CPF (Simplificado)
+    cpf_pattern = Pattern(name="CPF Pattern", regex=r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b", score=0.85)
+
+    cc_pattern = Pattern(name="Credit Card Pattern", regex=r"\b(?:\d{4}[- ]?){3}\d{4}\b", score=0.7)
+
+    # --- 5. IDENTIFICADORES DIVERSOS ---
+    uuid_pattern = Pattern(name="UUID Pattern", regex=r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", score=0.8)
+    cert_body_pattern = Pattern(name="Certificate Body", regex=r"\bMII[a-zA-Z0-9+/=\n]{100,}\b", score=0.8)
+    mac_pattern = Pattern(name="MAC Address", regex=r"\b([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})\b", score=0.8)
+    path_pattern = Pattern(name="User Home Path", regex=r"(?:/home/|/Users/|C:\\Users\\)([^/\\]+)", score=0.6)
+    # Captura blocos de Assinatura ou Chave Pública PGP
+    pgp_pattern = Pattern(
+        name="PGP Block",
+        # Pega desde o BEGIN até o END, incluindo quebras de linha (DOTALL)
+        regex=r"-----BEGIN PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----.*?-----END PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----",
+        score=0.95
+    )
     recognizers = []
     for lang in langs:
+        # Infra
         recognizers.append(PatternRecognizer(supported_entity="URL", patterns=[url_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="IP_ADDRESS", patterns=[ip_pattern, ipv6_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="HOSTNAME", patterns=hostname_patterns, supported_language=lang))
-        recognizers.append(PatternRecognizer(supported_entity="HASH", patterns=hash_patterns, supported_language=lang))
-        recognizers.append(PatternRecognizer(supported_entity="UUID", patterns=[uuid_pattern], supported_language=lang))
-        recognizers.append(PatternRecognizer(supported_entity="CERT_SERIAL", patterns=[serial_pattern], supported_language=lang))
-        recognizers.append(PatternRecognizer(supported_entity="CPE_STRING", patterns=[cpe_pattern], supported_language=lang))
-        recognizers.append(PatternRecognizer(supported_entity="CERT_BODY", patterns=[cert_body_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="MAC_ADDRESS", patterns=[mac_pattern], supported_language=lang))
         recognizers.append(PatternRecognizer(supported_entity="FILE_PATH", patterns=[path_pattern], supported_language=lang))
         
+        # Segurança
+        recognizers.append(PatternRecognizer(supported_entity="HASH", patterns=hash_patterns, supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="AUTH_TOKEN", patterns=auth_token_patterns, supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="CVE_ID", patterns=[cve_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="CPE_STRING", patterns=[cpe_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="CERT_SERIAL", patterns=[serial_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="CERT_BODY", patterns=[cert_body_pattern], supported_language=lang))
+        
+        # Credenciais & PII
+        recognizers.append(PatternRecognizer(supported_entity="PASSWORD", patterns=[password_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="USERNAME", patterns=[username_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="EMAIL_ADDRESS", patterns=[email_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="PHONE_NUMBER", patterns=[phone_pattern, cpf_pattern], supported_language=lang))
+        recognizers.append(PatternRecognizer(supported_entity="CREDIT_CARD", patterns=[cc_pattern], supported_language=lang))
+        
+        # Diversos
+        recognizers.append(PatternRecognizer(supported_entity="UUID", patterns=[uuid_pattern], supported_language=lang))
+
     return recognizers
 
 class AnonymizationOrchestrator:
@@ -304,8 +329,8 @@ class AnonymizationOrchestrator:
                 # Normaliza etiquetas (PER -> PERSON, LOC -> LOCATION)
                 normalized_label = ENTITY_MAPPING.get(ent.label_, ent.label_)
 
-                if normalized_label not in entities_to_anonymize or ent.text in self.allow_list:
-                    continue
+                # if normalized_label not in entities_to_anonymize or ent.text in self.allow_list:
+                #    continue
 
                 detected_entities.append({
                     "start": ent.start_char,
@@ -441,3 +466,71 @@ class AnonymizationOrchestrator:
             ent for ent in all_entities 
             if not self.entities_to_preserve or ent not in self.entities_to_preserve
         ]
+
+    def detect_entities(self, texts: List[str]) -> List[dict]:
+        """
+        Detects entities in a list of texts and returns them in a format
+        suitable for NER training data.
+        """
+        if not texts:
+            return []
+
+        # 1. Prepare list, skipping cache for fresh analysis
+        original_texts = [str(text) if pd.notna(text) else "" for text in texts]
+        
+        unique_texts_to_process = sorted(list(set(t for t in original_texts if t)))
+
+        if not unique_texts_to_process:
+            return []
+
+        # 2. Setup NLP model
+        nlp_engine = self.analyzer_engine.analyzer_engine.nlp_engine
+        nlp_model = nlp_engine.nlp[self.lang]
+
+        # 3. Process in batches (GPU)
+        docs = nlp_model.pipe(unique_texts_to_process, batch_size=500)
+        
+        results = []
+
+        for doc in docs:
+            original_doc_text = doc.text
+            detected_entities = []
+
+            # A. Detect with Transformer model
+            for ent in doc.ents:
+                normalized_label = ENTITY_MAPPING.get(ent.label_, ent.label_)
+                detected_entities.append({
+                    "start": ent.start_char, "end": ent.end_char,
+                    "label": normalized_label, "score": 1.0
+                })
+
+            # B. Detect with compiled Regex
+            for pat in self.compiled_patterns:
+                for match in pat["regex"].finditer(original_doc_text):
+                    detected_entities.append({
+                        "start": match.start(), "end": match.end(),
+                        "label": pat["label"], "score": pat["score"]
+                    })
+
+            # C. Resolve overlaps
+            detected_entities.sort(key=lambda x: (x["start"], -x["score"], -(x["end"] - x["start"])))
+            
+            merged_entities = []
+            last_end = -1
+            for ent in detected_entities:
+                if ent["start"] >= last_end:
+                    # Filter out preserved entities and allowed terms
+                    if ent["label"] in self.entities_to_preserve:
+                        continue
+                    if original_doc_text[ent['start']:ent['end']] in self.allow_list:
+                        continue
+                    
+                    merged_entities.append(ent)
+                    last_end = ent["end"]
+
+            # D. Format for NER training if entities were found
+            if merged_entities:
+                labels = [[ent['start'], ent['end'], ent['label']] for ent in merged_entities]
+                results.append({"text": original_doc_text, "label": labels})
+        
+        return results
