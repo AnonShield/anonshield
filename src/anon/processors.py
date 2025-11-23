@@ -10,6 +10,8 @@ import gc
 import io
 import os
 import sys
+import ijson
+import shutil
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -47,7 +49,7 @@ def extract_text_from_image(image_bytes: bytes) -> str:
 class FileProcessor(ABC):
     DEFAULT_BATCH_SIZE = 200
 
-    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False, anonymization_config: Optional[Dict] = None, min_word_length: int = 3, skip_numeric: bool = False, output_dir: str = "output", overwrite: bool = False):
+    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False, anonymization_config: Optional[Dict] = None, min_word_length: int = 3, skip_numeric: bool = False, output_dir: str = "output", overwrite: bool = False, disable_gc: bool = False):
         self.file_path = file_path
         self.orchestrator = orchestrator
         self.ner_data_generation = ner_data_generation
@@ -56,6 +58,7 @@ class FileProcessor(ABC):
         self.skip_numeric = skip_numeric
         self.output_dir = output_dir
         self.overwrite = overwrite
+        self.disable_gc = disable_gc
         self.db_executor = ThreadPoolExecutor(max_workers=1)
         self.ner_output_file: Optional[str] = None
         if self.ner_data_generation:
@@ -67,11 +70,13 @@ class FileProcessor(ABC):
         return get_output_path(self.file_path, ".jsonl", prefix="ner_data_anon_", output_dir=self.output_dir)
 
     def _setup_optimization(self):
-        gc.disable()
+        if self.disable_gc:
+            gc.disable()
 
     def _cleanup_optimization(self):
-        gc.collect()
-        gc.enable()
+        if self.disable_gc:
+            gc.collect()
+            gc.enable()
         self.db_executor.shutdown(wait=True)
         if hasattr(self, 'ner_file_handle') and self.ner_file_handle:
             self.ner_file_handle.close()
@@ -502,90 +507,237 @@ class XmlFileProcessor(FileProcessor):
 
 
 class JsonFileProcessor(FileProcessor):
+    """
+    Optimized JSON/JSONL processor that uses a hybrid approach.
+    - For .jsonl files, it streams line by line.
+    - For .json files, it uses a fast in-memory approach for small files and a
+      memory-efficient streaming approach for large files.
+    """
+    JSON_STREAM_THRESHOLD_BYTES = 100 * 1024 * 1024  # 100 MB
+
     def _get_output_extension(self) -> str:
         return ".json" if not self.file_path.endswith(".jsonl") else ".jsonl"
 
-    def _process_json_recursive(self, obj, path_prefix: str = ""):
+    def _process_anonymization(self, output_path: str):
+        """Dispatcher for JSON processing based on file type and size."""
+        if self.file_path.endswith(".jsonl"):
+            self._process_anonymization_jsonl(output_path)
+        else:
+            file_size = os.path.getsize(self.file_path)
+            if file_size < self.JSON_STREAM_THRESHOLD_BYTES:
+                self._process_anonymization_in_memory(output_path)
+            else:
+                print(f"[*] Large JSON file detected ({file_size / 1024 / 1024:.1f} MB). Switching to memory-efficient streaming mode.")
+                self._process_anonymization_streaming(output_path)
+
+    # --- In-Memory Processing for Small Files ---
+
+    def _process_anonymization_in_memory(self, output_path: str):
+        """Fast in-memory processing for files smaller than the threshold."""
+        with open(self.file_path, "rb") as f:
+            try:
+                data = orjson.loads(f.read())
+            except orjson.JSONDecodeError:
+                print(f"[!] Invalid JSON in {self.file_path}. Aborting.", file=sys.stderr)
+                # Write an empty object/array to the output to signify failure
+                with open(output_path, "wb") as out_f:
+                    out_f.write(b"{}")
+                return
+
+        text_groups = self._collect_strings_from_object(data)
+        translation_map = self._build_translation_map(text_groups)
+        
+        if not translation_map:
+            with open(output_path, "wb") as f:
+                f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2))
+            return
+
+        reconstructed_data = self._reconstruct_object(data, translation_map)
+        with open(output_path, "wb") as f:
+            f.write(orjson.dumps(reconstructed_data, option=orjson.OPT_INDENT_2))
+    
+    def _collect_strings_from_object(self, obj, path_prefix: str = "") -> Dict[str, List[str]]:
+        text_groups = defaultdict(list)
+        
+        def _walk(sub_obj, current_path):
+            if isinstance(sub_obj, dict):
+                for k, v in sub_obj.items():
+                    _walk(v, f"{current_path}.{k}")
+            elif isinstance(sub_obj, list):
+                # For lists, the path doesn't append the index, as rules often apply to all items.
+                for item in sub_obj:
+                    _walk(item, current_path)
+            elif isinstance(sub_obj, str):
+                should_anon, forced_type = self._should_anonymize(sub_obj, current_path)
+                if should_anon:
+                    group_key = "auto"
+                    if isinstance(forced_type, str):
+                        group_key = forced_type
+                    elif isinstance(forced_type, list):
+                        # Use a tuple to make it hashable for dict keys
+                        group_key = tuple(sorted(forced_type))
+                    
+                    text_groups[group_key].append(sub_obj)
+
+        _walk(obj, path_prefix.lstrip('.'))
+        return text_groups
+    
+    def _reconstruct_object(self, obj, translation_map: Dict, path_prefix: str = ""):
         current_path = path_prefix.lstrip('.')
-        
         if isinstance(obj, dict):
-            return {k: self._process_json_recursive(v, f"{current_path}.{k}") for k, v in obj.items()}
-        
+            return {k: self._reconstruct_object(v, translation_map, f"{current_path}.{k}") for k, v in obj.items()}
         elif isinstance(obj, list):
-            # Maintain the same path for list items to match config like "asset.tags.category"
-            return [self._process_json_recursive(item, current_path) for item in obj]
-        
+            return [self._reconstruct_object(item, translation_map, current_path) for item in obj]
         elif isinstance(obj, str):
-            should_anon, forced_type = self._should_anonymize(obj, current_path)
-            if should_anon:
-                # Process this value immediately with the context of this specific path
-                return self._anonymize_single_value(obj, forced_type)
-            return obj
-            
+            # Check should_anonymize again to be certain
+            should_anon, _ = self._should_anonymize(obj, current_path)
+            if should_anon and obj in translation_map:
+                return translation_map[obj]
         return obj
 
-    def _anonymize_single_value(self, text: str, forced_type: Optional[Union[str, List[str]]]) -> str:
-        # Wrapper to call the orchestrator for a single value
-        entity_collector: List = [] # Create a new collector for each call if needed for DB persistence
-        result = self.orchestrator.anonymize_text(
-            text, 
-            operator_params={"entity_collector": entity_collector}, 
-            forced_entity_type=forced_type
-        )
-        if entity_collector:
-            self.db_executor.submit(bulk_save_to_db, list(entity_collector))
-        return result
+    # --- Streaming Processing for Large Files ---
 
-    def _process_anonymization(self, output_path: str):
-        is_jsonl = self.file_path.endswith(".jsonl")
+    def _process_anonymization_streaming(self, output_path: str):
+        """Memory-efficient streaming processor for large JSON files."""
+        text_groups = self._collect_strings_streaming()
+        translation_map = self._build_translation_map(text_groups)
+
+        if not translation_map:
+            import shutil
+            shutil.copyfile(self.file_path, output_path)
+            return
         
+        # Stream-read again, this time replacing and writing to output
+        with open(self.file_path, "rb") as in_f, open(output_path, "wb") as out_f:
+            is_first_in_container = [True]  # Stack to manage comma placement
+            
+            # Use ijson.parse to get path context during writing
+            for path, event, value in ijson.parse(in_f, use_float=True):
+                # Add comma if not the first item in a container
+                if event in ('string', 'number', 'boolean', 'null', 'start_map', 'start_array'):
+                    if not is_first_in_container[-1]:
+                        out_f.write(b",")
+                    is_first_in_container[-1] = False
+
+                if event == 'start_map':
+                    out_f.write(b"{")
+                    is_first_in_container.append(True)
+                elif event == 'end_map':
+                    out_f.write(b"}")
+                    is_first_in_container.pop()
+                elif event == 'start_array':
+                    out_f.write(b"[")
+                    is_first_in_container.append(True)
+                elif event == 'end_array':
+                    out_f.write(b"]")
+                    is_first_in_container.pop()
+                elif event == 'map_key':
+                    out_f.write(orjson.dumps(value) + b":")
+                    is_first_in_container[-1] = True  # Value after key is always "first"
+                elif event == 'string':
+                    # Normalize path and re-check rules before replacing
+                    normalized_path = path.replace('.item', '')
+                    should_anon, _ = self._should_anonymize(value, normalized_path)
+                    if should_anon and value in translation_map:
+                        out_f.write(orjson.dumps(translation_map[value]))
+                    else:
+                        out_f.write(orjson.dumps(value))
+                elif event in ('number', 'boolean', 'null'):
+                    out_f.write(orjson.dumps(value))
+
+    def _collect_strings_streaming(self) -> Dict[str, List[str]]:
+        """Reads the file using a stream and collects all strings that need anonymization."""
+        text_groups = defaultdict(list)
+        with open(self.file_path, "rb") as f:
+            # ijson.kvitems provides (path, value) for leaf nodes
+            for path, value in ijson.kvitems(f, "", use_float=True, multiple_values=True):
+                if isinstance(value, str):
+                    # Normalize the path from ijson (e.g., 'item.key' -> 'key')
+                    normalized_path = path.replace('.item', '')
+                    should_anon, forced_type = self._should_anonymize(value, normalized_path)
+                    if should_anon:
+                        group_key = "auto"
+                        if isinstance(forced_type, str):
+                            group_key = forced_type
+                        elif isinstance(forced_type, list):
+                            group_key = tuple(sorted(forced_type))
+                        text_groups[group_key].append(value)
+        return text_groups
+    
+    def _build_translation_map(self, text_groups: Dict) -> Dict[str, str]:
+        """Anonymizes collected strings and returns a translation map."""
+        translation_map = {}
+        if not text_groups:
+            return translation_map
+
+        # Create a progress bar if there are many unique strings
+        total_unique_strings = sum(len(set(v)) for v in text_groups.values())
+        progress = tqdm(total=total_unique_strings, desc="Anonymizing collected strings", unit="str", leave=False)
+
+        for group_key, string_list in text_groups.items():
+            unique_strings = sorted(list(set(string_list)))
+            if not unique_strings: continue
+
+            forced_type = group_key if group_key != "auto" else None
+            if isinstance(forced_type, tuple): # Convert back to list for orchestrator
+                forced_type = list(forced_type)
+
+            anonymized_strings = self._process_batch_smart(unique_strings, forced_entity_type=forced_type)
+            translation_map.update(dict(zip(unique_strings, anonymized_strings)))
+            progress.update(len(unique_strings))
+        
+        progress.close()
+        return translation_map
+
+    # --- JSONL Processing ---
+
+    def _process_anonymization_jsonl(self, output_path: str):
+        """Processes .jsonl files line by line for maximum memory efficiency."""
         with open(output_path, "wb") as out_f:
             with open(self.file_path, "rb") as in_f:
-                if is_jsonl:
-                    for line in in_f:
-                        if not line.strip(): continue
-                        try:
-                            data = orjson.loads(line)
-                            processed_data = self._process_json_recursive(data)
-                            out_f.write(orjson.dumps(processed_data) + b'\n')
-                        except orjson.JSONDecodeError:
-                            print(f"[!] Warning: Skipping invalid JSON line in {self.file_path}", file=sys.stderr)
-                            out_f.write(line) # Write invalid lines as is
-                else:
+                for line in in_f:
+                    if not line.strip(): continue
                     try:
-                        data = orjson.loads(in_f.read())
-                        processed_data = self._process_json_recursive(data)
-                        out_f.write(orjson.dumps(processed_data, option=orjson.OPT_INDENT_2))
+                        data = orjson.loads(line)
+                        # Since each line is a small object, in-memory processing is fine.
+                        text_groups = self._collect_strings_from_object(data)
+                        translation_map = self._build_translation_map(text_groups)
+                        processed_data = self._reconstruct_object(data, translation_map)
+                        out_f.write(orjson.dumps(processed_data) + b'\n')
                     except orjson.JSONDecodeError:
-                         print(f"[!] Invalid JSON in {self.file_path}", file=sys.stderr)
-
+                        print(f"[!] Warning: Skipping invalid JSON line in {self.file_path}", file=sys.stderr)
+                        out_f.write(line) # Write invalid lines as is
+    
     def _extract_texts(self) -> Iterable[str]:
-        # This method is used for NER data generation and for pre-calculating the total number of items
+        # This method is used for NER data generation. Streaming is essential here.
         if self.file_path.endswith(".jsonl"):
              with open(self.file_path, "rb") as f:
                 for line in f:
                     if not line.strip(): continue
                     try:
                         data = orjson.loads(line)
-                        yield from self._yield_strings(data)
+                        yield from self._yield_strings_from_obj(data)
                     except orjson.JSONDecodeError:
-                        continue # Skip invalid JSON lines during extraction
-        else:
+                        continue
+        else: # .json
              with open(self.file_path, "rb") as f:
-                data = orjson.loads(f.read())
-                yield from self._yield_strings(data)
+                for path, value in ijson.kvitems(f, "", multiple_values=True):
+                     if isinstance(value, str):
+                        should, _ = self._should_anonymize(value, path)
+                        if should: yield value
 
-    def _yield_strings(self, obj, path=""):
+    def _yield_strings_from_obj(self, obj, path=""):
         path = path.lstrip(".")
         if isinstance(obj, dict):
             for k, v in obj.items():
-                yield from self._yield_strings(v, f"{path}.{k}")
+                yield from self._yield_strings_from_obj(v, f"{path}.{k}")
         elif isinstance(obj, list):
             for item in obj:
-                yield from self._yield_strings(item, path)
+                yield from self._yield_strings_from_obj(item, path)
         elif isinstance(obj, str):
              should, _ = self._should_anonymize(obj, path)
              if should: yield obj
+
 
 
 def get_processor(file_path: str, orchestrator: AnonymizationOrchestrator, **kwargs) -> Optional[FileProcessor]:
