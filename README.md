@@ -112,19 +112,27 @@ The results confirm the engine's accuracy and the value of the specialized OCR a
 
 #### Entities
 By default, the tool is configured to detect and anonymize a wide range of PII and cybersecurity-related entities:
-- `PERSON`
-- `LOCATION`
-- `ORGANIZATION`
-- `EMAIL_ADDRESS`
-- `PHONE_NUMBER`
-- `IP_ADDRESS`
-- `URL`
-- `HOSTNAME`
-- `HASH` (e.g., SHA256, MD5)
-- `UUID`
+- `AUTH_TOKEN`
+- `CERT_BODY` (Base64 Certificate Bodies)
 - `CERT_SERIAL` (Certificate Serials)
 - `CPE_STRING` (Common Platform Enumeration)
-- `CERT_BODY` (Base64 Certificate Bodies)
+- `CREDIT_CARD`
+- `CVE_ID`
+- `EMAIL_ADDRESS`
+- `FILE_PATH`
+- `HASH` (e.g., SHA256, MD5)
+- `HOSTNAME`
+- `IP_ADDRESS`
+- `LOCATION`
+- `MAC_ADDRESS`
+- `ORGANIZATION`
+- `PASSWORD`
+- `PERSON`
+- `PGP_BLOCK`
+- `PHONE_NUMBER`
+- `URL`
+- `USERNAME`
+- `UUID`
 
 *This list can be retrieved by running `uv run anon.py --list-entities`.*
 
@@ -243,16 +251,28 @@ uv run scripts/deanonymize.py "[PERSON_...hash...]"
 ```
 
 **Command-Line Options:**
-- `file_path`: The path to the target file or directory to be anonymized.
-- `--lang <code>`: Sets the document's language (e.g., `en`, `pt`). Default: `en`.
-- `--preserve-entities <TYPES>`: A comma-separated list of entity types to *not* anonymize (e.g., `"LOCATION,HOSTNAME"`).
-- `--allow-list <TERMS>`: A comma-separated list of terms to ignore.
-- `--slug-length <NUM>`: Sets the character length of the hash displayed in the slug (1-64). If not specified, it defaults to 64 (the full hash), which guarantees no collisions.
+- `file_path`: The path to the target file or directory to be processed.
+- `--allow-list <TERMS>`: A comma-separated list of terms to ignore during anonymization.
 - `--anonymization-config <PATH>`: Path to a JSON file with advanced rules for structured files.
-- `--optimize`: A shorthand to enable all performance optimizations (`--anonymization-strategy fast` and `--db-mode in-memory`).
-- `--db-mode <MODE>`: Sets the database mode. `persistent` (default) saves the entity map to disk. `in-memory` uses a temporary database that is lost when the program exits.
+- `--anonymization-strategy <strategy>`: Anonymization strategy. Use `presidio` for full analysis or `fast` for an optimized path (default: `presidio`).
+- `--db-mode <MODE>`: Sets the database mode. `persistent` saves the entity map to disk, while `in-memory` uses a temporary database (default: `persistent`).
+- `--db-synchronous-mode <MODE>`: Sets the SQLite `synchronous` PRAGMA for the database connection (`OFF`, `NORMAL`, `FULL`, `EXTRA`).
+- `--disable-gc`: Disables automatic garbage collection. May boost speed for large single files but increases memory usage.
+- `--generate-ner-data`: Enables NER data generation mode instead of anonymizing.
+- `--lang <code>`: Sets the document's language (e.g., `en`, `pt`). Default: `en`.
 - `--list-entities`: Lists all supported entity types and exits.
 - `--list-languages`: Lists all supported languages and exits.
+- `--min-word-length <NUM>`: Minimum character length for a word to be processed (default: 0).
+- `--no-report`: Disables the creation of a performance report.
+- `--optimize`: A shorthand to enable all performance optimizations (`--anonymization-strategy fast`, `--db-mode in-memory`, `--use-cache`, and `--min-word-length 3`).
+- `--output-dir <PATH>`: Directory to save output files (default: `output`).
+- `--overwrite`: Allows overwriting of existing output files.
+- `--preserve-entities <TYPES>`: A comma-separated list of entity types to *not* anonymize (e.g., `"LOCATION,HOSTNAME"`).
+- `--regex-priority`: Gives priority to custom regex recognizers over model-based ones.
+- `--skip-numeric`: If set, numeric-only strings will not be anonymized.
+- `--slug-length <NUM>`: Sets the character length of the hash in the slug (1-64). Defaults to the full 64-character hash.
+- `--technical-stoplist <TERMS>`: A comma-separated list of custom words to add to the technical stoplist.
+- `--use-cache`: Enables in-memory caching for the run to speed up repeated anonymizations.
 
 **Example with Options:**
 ```bash
@@ -263,39 +283,42 @@ uv run anon.py incident_report.pdf --lang en --preserve-entities "HOSTNAME" --sl
 
 For structured files like `.json`, `.csv`, and `.xml`, you can gain granular control over the anonymization process using a JSON configuration file passed with the `--anonymization-config` argument.
 
-The configuration file supports two main keys:
+The configuration file supports three main keys:
 
--   `fields_to_anonymize`: A dictionary where keys are dot-notation paths to fields. If this key is present, **only** fields matching these paths will be considered for anonymization.
-    -   To force a specific entity type for a field, provide an object with an `entity_type` key (e.g., `"asset.name": {"entity_type": "ASSET_NAME"}`).
-    -   To have the tool auto-detect the entity, provide an empty object (e.g., `"scan.target": {}`).
--   `fields_to_exclude`: A list of dot-notation paths to fields that should **never** be anonymized. This acts as a deny-list and takes precedence over `fields_to_anonymize`.
+-   `fields_to_exclude`: A list of dot-notation paths to fields that should **never** be anonymized (e.g., `["metadata.id"]`). This acts as a high-priority deny-list.
+-   `fields_to_anonymize`: A list of dot-notation paths to fields that should be anonymized using the tool's automatic entity detection. If this key or `force_anonymize` is present, the tool enters **explicit mode**, and only fields matching these lists will be considered for anonymization.
+-   `force_anonymize`: A dictionary where keys are dot-notation paths and values are objects specifying a forced `entity_type`. This is useful for custom entities or for improving accuracy on fields with known formats.
+
+**Explicit vs. Implicit Mode:**
+-   **Implicit Mode (Default):** If neither `fields_to_anonymize` nor `force_anonymize` is in the config, the tool attempts to anonymize all fields except those in `fields_to_exclude`.
+-   **Explicit Mode:** If `fields_to_anonymize` or `force_anonymize` is present, only fields listed in one of them will be processed. All other fields are ignored.
 
 **Example `config.json`:**
 
 ```json
 {
-  "fields_to_anonymize": {
-    "asset.name": {
-      "entity_type": "CUSTOM_ASSET_NAME"
-    },
-    "asset.tags.value": {},
-    "asset.ipv4_addresses": {},
-    "scan.target": {}
-  },
   "fields_to_exclude": [
     "scan.id",
     "asset.tags.category"
-  ]
+  ],
+  "fields_to_anonymize": [
+    "asset.tags.value",
+    "asset.ipv4_addresses",
+    "scan.target"
+  ],
+  "force_anonymize": {
+    "asset.name": {
+      "entity_type": "CUSTOM_ASSET_NAME"
+    }
+  }
 }
 ```
 
 When this configuration is used:
+- `scan.id` and `asset.tags.category` will be ignored because they are in the deny-list.
 - The content of `asset.name` will be anonymized with the entity type `CUSTOM_ASSET_NAME`.
 - The contents of `asset.tags.value`, `asset.ipv4_addresses`, and `scan.target` will be anonymized using the default entity detection.
-- `scan.id` and `asset.tags.category` will be ignored and left in their original state.
-- Any other field not in `fields_to_anonymize` (like `asset.display_ipv4_address`) will also be ignored.
-
-If `fields_to_anonymize` is omitted, all fields not explicitly listed in `fields_to_exclude` will be processed.
+- Any other field not listed in `fields_to_anonymize` or `force_anonymize` (like `asset.display_ipv4_address`) will also be ignored because the configuration enables explicit mode.
 
 ### Running Tests
 To verify the tool's integrity, run the test suite:
