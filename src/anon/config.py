@@ -1,11 +1,10 @@
 import logging
 import os
-import sqlite3
-from typing import Optional
 import queue
-import sys
 import threading
-import time
+from typing import Optional
+
+from .repository import EntityRepository
 
 # --- Global Configuration ---
 SECRET_KEY = os.environ.get("ANON_SECRET_KEY")
@@ -34,115 +33,98 @@ ENTITY_MAPPING = dict(
     ORGANIZATION="ORGANIZATION",
 )
 
-# --- Database Configuration ---
+# --- Database Configuration & State ---
 DB_DIR = os.path.join(os.getcwd(), "db")
-DB_PATH = None  # Global variable to hold the dynamic DB path
-DB_SYNC_MODE = "NORMAL"  # Global variable to hold the synchronous mode
+DB_PATH: Optional[str] = None
 DB_WRITE_QUEUE = queue.Queue()
-DB_WRITER_THREAD = None
-DB_CONNECTION = None
-DB_LOCK = threading.Lock()
+DB_WRITER_THREAD: Optional[threading.Thread] = None
+ENTITY_REPOSITORY: Optional[EntityRepository] = None
 
 def _db_writer():
-    """A dedicated thread to write entities to the database from a queue."""
-    # This connection is local to the thread
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.execute(f"PRAGMA synchronous={DB_SYNC_MODE};")
+    """
+    A dedicated thread that consumes entities from a queue and uses the repository to save them.
+    This is the only thread that performs database writes.
+    """
+    if not ENTITY_REPOSITORY:
+        logging.critical("Repository not initialized. DB writer thread cannot start.")
+        return
 
     while True:
         try:
             entity_list = DB_WRITE_QUEUE.get(timeout=0.5)
         except queue.Empty:
-            continue  # Go back to waiting for an item
+            continue
 
         try:
             if entity_list is None:  # Sentinel for shutdown
-                break  # Exit loop
+                logging.info("DB writer thread received shutdown signal.")
+                break
 
-            conn.executemany(
-                """
-                INSERT OR IGNORE INTO entities
-                (entity_type, original_name, slug_name, full_hash, first_seen, last_seen)
-                VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-                """,
-                entity_list
-            )
-            conn.commit()
-            logging.info("%d entities written to database.", len(entity_list))
+            ENTITY_REPOSITORY.save_batch(entity_list)
 
         except Exception as e:
-            logging.error(f"DB Writer thread error processing batch: {e}", exc_info=True)
+            # The repository handles its own logging, but we log here too for thread context
+            logging.error(f"DB Writer thread encountered an unhandled error: {e}", exc_info=True)
         finally:
-            DB_WRITE_QUEUE.task_done()  # Crucial: always mark task as done
+            DB_WRITE_QUEUE.task_done()
 
-    conn.close()
     logging.info("DB writer thread finished.")
-
 
 def initialize_db(mode: str = "persistent", synchronous: Optional[str] = None):
     """
-    Initializes the SQLite database, sets the global DB_PATH, and starts the writer thread.
+    Initializes the database repository, schema, and starts the writer thread.
     """
-    global DB_PATH, DB_SYNC_MODE, DB_WRITER_THREAD
+    global DB_PATH, ENTITY_REPOSITORY, DB_WRITER_THREAD
     
     if mode == "in-memory":
         DB_PATH = ":memory:"
-        logging.info("Using in-memory database (data will not be saved).")
     else: # persistent
         os.makedirs(DB_DIR, exist_ok=True)
         DB_PATH = os.path.join(DB_DIR, "entities.db")
 
-    # Create a temporary connection just to initialize the schema
-    with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        
-        sync_mode = synchronous.upper() if synchronous else "NORMAL"
-        DB_SYNC_MODE = sync_mode
-        conn.execute(f"PRAGMA synchronous={DB_SYNC_MODE};")
-        logging.info(f"SQLite synchronous mode set to: {DB_SYNC_MODE}")
+    # 1. Initialize the repository
+    ENTITY_REPOSITORY = EntityRepository(DB_PATH)
+    
+    # 2. Set up the database schema
+    sync_mode = synchronous.upper() if synchronous else "NORMAL"
+    ENTITY_REPOSITORY.initialize_schema(synchronous=sync_mode)
 
-        conn.execute("PRAGMA cache_size=-10000;")
-        conn.execute("PRAGMA temp_store=MEMORY;")
-        
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS entities (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                entity_type TEXT NOT NULL,
-                original_name TEXT NOT NULL,
-                slug_name TEXT NOT NULL,
-                full_hash TEXT NOT NULL UNIQUE,
-                first_seen TEXT NOT NULL,
-                last_seen TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_full_hash ON entities(full_hash);")
-        conn.commit()
-
+    # 3. Start the writer thread if it's not already running
     if not DB_WRITER_THREAD or not DB_WRITER_THREAD.is_alive():
         DB_WRITER_THREAD = threading.Thread(target=_db_writer, daemon=True)
         DB_WRITER_THREAD.start()
+        logging.info("DB writer thread started.")
 
     return DB_PATH
 
 def shutdown_db_writer():
-    """Signals the database writer thread to shut down gracefully."""
-    global DB_WRITER_THREAD
+    """
+    Signals the database writer thread to shut down gracefully and closes the repository.
+    """
+    global DB_WRITER_THREAD, ENTITY_REPOSITORY
     
-    if not DB_WRITE_QUEUE.empty():
-        logging.info("Waiting for %d items in DB queue to be written...", DB_WRITE_QUEUE.qsize())
-        DB_WRITE_QUEUE.join()
-
+    # Signal the thread to stop
     DB_WRITE_QUEUE.put(None)
+    
     if DB_WRITER_THREAD:
+        logging.info("Waiting for DB writer thread to finish...")
         DB_WRITER_THREAD.join(timeout=10)
         if DB_WRITER_THREAD.is_alive():
             logging.warning("DB writer thread did not shut down in time.")
         DB_WRITER_THREAD = None
+    
+    # Wait for all items in the queue to be processed
+    if not DB_WRITE_QUEUE.empty():
+        logging.info("Waiting for %d final items in DB queue to be processed...", DB_WRITE_QUEUE.qsize())
+        DB_WRITE_QUEUE.join()
+
+    # Close the repository connection
+    if ENTITY_REPOSITORY:
+        ENTITY_REPOSITORY.close()
+        ENTITY_REPOSITORY = None
 
 def bulk_save_to_db(entity_list):
-    """Puts a list of entities into the thread-safe queue to be saved."""
+    """Puts a list of entities into the thread-safe queue to be saved by the writer thread."""
     if not entity_list:
         return
     DB_WRITE_QUEUE.put(entity_list)
