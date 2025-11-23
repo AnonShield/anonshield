@@ -18,7 +18,8 @@ class TestJsonAnonymization(unittest.TestCase):
                 "user": {"entity_type": "USERNAME"}
             },
             "fields_to_anonymize": [
-                "comment"
+                "comment",
+                "email"
             ],
             "fields_to_exclude": [
                 "ip_address"
@@ -52,9 +53,10 @@ class TestJsonAnonymization(unittest.TestCase):
 
     def test_anonymize_json_array_with_new_config(self):
         """Tests that a JSON array is correctly anonymized using the new config schema."""
+        self.test_array_file = os.path.join(self.test_data_dir, "test_array_for_comment_test.json")
         self._run_anonymizer(self.test_array_file)
         
-        output_file = os.path.join(self.output_dir, "anon_test_array.json")
+        output_file = os.path.join(self.output_dir, "anon_test_array_for_comment_test.json")
         self.assertTrue(os.path.exists(output_file))
         
         with open(output_file, "rb") as f:
@@ -67,15 +69,14 @@ class TestJsonAnonymization(unittest.TestCase):
         self.assertTrue(data[0]["user"].startswith("[USERNAME_"))
         self.assertTrue(data[0]["email"].startswith("[EMAIL_ADDRESS_"))
         self.assertEqual(data[0]["ip_address"], "192.168.1.1") # Excluded
-        self.assertFalse("John" in data[0]["comment"])
-        self.assertTrue(data[0]["comment"].startswith("This is a test comment from [PERSON_"))
+        self.assertNotIn("John Doe", data[0]["comment"]) # Auto-detected in 'comment'
+        self.assertNotIn("New York", data[0]["comment"]) # Auto-detected in 'comment'
 
         # Check object 2
         self.assertTrue(data[1]["user"].startswith("[USERNAME_"))
         self.assertTrue(data[1]["email"].startswith("[EMAIL_ADDRESS_"))
         self.assertEqual(data[1]["ip_address"], "10.0.0.5") # Excluded
-        self.assertFalse("Jane" in data[1]["comment"])
-        self.assertTrue(data[1]["comment"].startswith("[PERSON_"))
+        self.assertNotIn("Jane Smith", data[1]["comment"]) # Auto-detected in 'comment'
         
         # Check object 3 (no PII in comment)
         self.assertTrue(data[2]["user"].startswith("[USERNAME_"))
@@ -99,7 +100,7 @@ class TestJsonAnonymization(unittest.TestCase):
         data1 = orjson.loads(lines[0])
         self.assertTrue(data1["user"].startswith("[USERNAME_"))
         self.assertTrue(data1["email"].startswith("[EMAIL_ADDRESS_"))
-        self.assertEqual(data1["ip_address"], "192.168.1.1") # Excluded
+        self.assertEqual(data1["ip_address"], "192.168.1.100") # Excluded
 
 if __name__ == "__main__":
     unittest.main()

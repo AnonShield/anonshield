@@ -52,10 +52,13 @@ def _db_writer():
     while True:
         try:
             entity_list = DB_WRITE_QUEUE.get(timeout=0.5)
+        except queue.Empty:
+            continue  # Go back to waiting for an item
+
+        try:
             if entity_list is None:  # Sentinel for shutdown
-                DB_WRITE_QUEUE.task_done()
-                break
-            
+                break  # Exit loop
+
             conn.executemany(
                 """
                 INSERT OR IGNORE INTO entities
@@ -66,13 +69,15 @@ def _db_writer():
             )
             conn.commit()
             logging.info("%d entities written to database.", len(entity_list))
-            DB_WRITE_QUEUE.task_done()
-        except queue.Empty:
-            continue
+
         except Exception as e:
-            logging.error(f"DB Writer thread error: {e}", exc_info=True)
-    
+            logging.error(f"DB Writer thread error processing batch: {e}", exc_info=True)
+        finally:
+            DB_WRITE_QUEUE.task_done()  # Crucial: always mark task as done
+
     conn.close()
+    logging.info("DB writer thread finished.")
+
 
 def initialize_db(mode: str = "persistent", synchronous: Optional[str] = None):
     """
@@ -132,6 +137,8 @@ def shutdown_db_writer():
     DB_WRITE_QUEUE.put(None)
     if DB_WRITER_THREAD:
         DB_WRITER_THREAD.join(timeout=10)
+        if DB_WRITER_THREAD.is_alive():
+            logging.warning("DB writer thread did not shut down in time.")
         DB_WRITER_THREAD = None
 
 def bulk_save_to_db(entity_list):
