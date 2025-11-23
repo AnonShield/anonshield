@@ -12,9 +12,9 @@ import os
 import sys
 import ijson
 import shutil
+import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 from typing import Iterable, List, Generator, Optional, Dict, Tuple, Union
 
 import numpy as np  # type: ignore
@@ -33,16 +33,43 @@ from .engine import AnonymizationOrchestrator
 
 
 def get_output_path(original_path: str, new_ext: str, prefix: str = "anon_", output_dir: str = "output") -> str:
-    """Constructs the output file path in the specified output directory."""
-    os.makedirs(output_dir, exist_ok=True)
-    base_name = os.path.splitext(os.path.basename(original_path))[0]
-    return os.path.join(output_dir, f"{prefix}{base_name}{new_ext}")
+    """Constructs a secure output file path, preventing path traversal."""
+    
+    # 1. Resolve and validate the output directory path
+    real_project_dir = os.path.realpath(os.getcwd())
+    real_output_dir = os.path.realpath(output_dir)
+    
+    # Ensure the resolved output directory is inside the project directory
+    if not real_output_dir.startswith(real_project_dir):
+        raise ValueError(f"Path traversal attempt detected: Output directory '{output_dir}' is outside the project boundary.")
+
+    os.makedirs(real_output_dir, exist_ok=True)
+    
+    # 2. Sanitize filename from original_path to prevent it from being used for traversal
+    base_name = os.path.basename(original_path)
+    if not base_name or base_name in ('.', '..'):
+        raise ValueError(f"Invalid original path provided: '{original_path}'")
+
+    safe_filename = f"{prefix}{os.path.splitext(base_name)[0]}{new_ext}"
+    
+    # 3. Construct the final candidate path and perform the final check
+    candidate_path = os.path.join(real_output_dir, safe_filename)
+    real_candidate_path = os.path.realpath(candidate_path)
+
+    # Final check to ensure the candidate path is within the resolved output directory.
+    # This is a defense-in-depth measure.
+    if not real_candidate_path.startswith(real_output_dir + os.sep) and real_candidate_path != real_output_dir:
+         raise ValueError(f"Path traversal attempt detected for final path of file: '{original_path}'")
+        
+    return candidate_path
 
 def extract_text_from_image(image_bytes: bytes) -> str:
     """Extracts text from image bytes using OCR."""
     try:
-        return pytesseract.image_to_string(Image.open(io.BytesIO(image_bytes)))
-    except Exception:
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            return pytesseract.image_to_string(img)
+    except Exception as e:
+        logging.exception(f"Error during OCR extraction: {e}")
         return ""
 
 
@@ -59,12 +86,8 @@ class FileProcessor(ABC):
         self.output_dir = output_dir
         self.overwrite = overwrite
         self.disable_gc = disable_gc
-        self.db_executor = ThreadPoolExecutor(max_workers=1)
         self.ner_output_file: Optional[str] = None
-        if self.ner_data_generation:
-            self.ner_output_file = self._get_ner_output_path()
-            os.makedirs(os.path.dirname(self.ner_output_file), exist_ok=True)
-            self.ner_file_handle = open(self.ner_output_file, "w", encoding="utf-8")
+        self.ner_file_handle = None # Initialize to None
 
     def _get_ner_output_path(self) -> str:
         return get_output_path(self.file_path, ".jsonl", prefix="ner_data_anon_", output_dir=self.output_dir)
@@ -77,7 +100,6 @@ class FileProcessor(ABC):
         if self.disable_gc:
             gc.collect()
             gc.enable()
-        self.db_executor.shutdown(wait=True)
         if hasattr(self, 'ner_file_handle') and self.ner_file_handle:
             self.ner_file_handle.close()
 
@@ -98,14 +120,19 @@ class FileProcessor(ABC):
             if self.ner_data_generation:
                 output_path = self.ner_output_file or self._get_ner_output_path()
                 if os.path.exists(output_path) and not self.overwrite:
-                    print(f"[!] Output file '{output_path}' already exists. Use --overwrite to replace it.", file=sys.stderr)
+                    logging.warning(f"Output file '{output_path}' already exists. Use --overwrite to replace it.")
                     return output_path
+                
+                # Open the file handle here, within the try block
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                self.ner_file_handle = open(output_path, "w", encoding="utf-8")
+                
                 all_texts = self._extract_all_texts()
                 self._run_ner_pipeline(all_texts)
             else:
                 output_path = get_output_path(self.file_path, self._get_output_extension(), output_dir=self.output_dir)
                 if os.path.exists(output_path) and not self.overwrite:
-                    print(f"[!] Output file '{output_path}' already exists. Use --overwrite to replace it.", file=sys.stderr)
+                    logging.warning(f"Output file '{output_path}' already exists. Use --overwrite to replace it.")
                     return output_path
                 self._process_anonymization(output_path)
         finally:
@@ -136,39 +163,57 @@ class FileProcessor(ABC):
         raise NotImplementedError
 
     def _should_anonymize(self, text: str, path: str = "") -> Tuple[bool, Optional[Union[str, List[str]]]]:
+        """
+        Determines if a given text should be anonymized based on a rich configuration.
+
+        The logic follows a clear priority:
+        1. Explicit exclusion (`fields_to_exclude`) always prevents anonymization.
+        2. Forced anonymization (`force_anonymize`) always triggers anonymization, bypassing text-based filters
+           like `min_word_length`.
+        3. Text-based filtering (stop-words, numeric-only, `min_word_length`) is applied.
+        4. In "explicit mode" (when `force_anonymize` or `fields_to_anonymize` is set), only fields explicitly
+           listed for anonymization are processed.
+        5. In "implicit mode" (default), any text that passes all the above checks is anonymized.
+        """
+        current_path = path.lstrip('.')
+
+        # --- Configuration-based logic ---
+        if self.anonymization_config:
+            # 1. Highest priority: explicit exclusion
+            if any(current_path == rule or current_path.startswith(f"{rule}.")
+                   for rule in self.anonymization_config.get('fields_to_exclude', [])):
+                return False, None
+
+            # 2. Second highest priority: forced anonymization (bypasses text filters)
+            force_config = self.anonymization_config.get('force_anonymize', {})
+            if current_path in force_config:
+                return True, force_config[current_path].get("entity_type")
+
+        # --- Text-based filtering for auto-detection ---
         if not isinstance(text, str) or len(text.strip()) < self.min_word_length:
             return False, None
-
+        
         stripped_text = text.strip()
         if self.skip_numeric and stripped_text.isnumeric():
             return False, None
+        
+        if stripped_text.lower() in TECHNICAL_STOPLIST:
+            return False, None
+
+        # --- Mode-based logic (explicit vs. implicit) ---
+        if self.anonymization_config:
+            is_explicit_mode = 'force_anonymize' in self.anonymization_config or \
+                               'fields_to_anonymize' in self.anonymization_config
             
-        text_lower = stripped_text.lower()
-        if text_lower in TECHNICAL_STOPLIST:
-            return False, None
+            if is_explicit_mode:
+                # In explicit mode, only auto-anonymize if it's in the allow-list.
+                if any(current_path == rule or current_path.startswith(f"{rule}.")
+                       for rule in self.anonymization_config.get('fields_to_anonymize', [])):
+                    return True, None
+                else:
+                    return False, None
 
-        if not self.anonymization_config:
-            return True, None
-
-        current_path = path.lstrip('.')
-
-        if 'fields_to_exclude' in self.anonymization_config:
-            if any(current_path == rule or current_path.startswith(f"{rule}.") for rule in self.anonymization_config.get('fields_to_exclude', [])):
-                return False, None
-
-        is_explicit_mode = 'force_anonymize' in self.anonymization_config or \
-                           'fields_to_anonymize' in self.anonymization_config
-
-        if 'force_anonymize' in self.anonymization_config and current_path in self.anonymization_config['force_anonymize']:
-            entity_type = self.anonymization_config['force_anonymize'][current_path].get("entity_type")
-            return True, entity_type
-
-        if 'fields_to_anonymize' in self.anonymization_config and current_path in self.anonymization_config.get('fields_to_anonymize', []):
-            return True, None
-
-        if is_explicit_mode:
-            return False, None
-
+        # Default to anonymizing if it passed all checks in implicit mode.
         return True, None
 
     def _process_batch_smart(self, text_list: List[str], forced_entity_type: Optional[Union[str, List[str]]] = None) -> List[str]:
@@ -183,11 +228,12 @@ class FileProcessor(ABC):
         )
 
         if entity_collector:
-            self.db_executor.submit(bulk_save_to_db, list(entity_collector))
+            bulk_save_to_db(list(entity_collector))
 
         if len(anonymized_values) != len(text_list):
-            print(f"[!] Warning: Mismatch in batch processing for {self.file_path}. Skipping update for this batch.", file=sys.stderr)
-            return text_list
+            logging.critical(f"PII leakage detected in {self.file_path}: batch size mismatch. "
+                             f"Input length: {len(text_list)}, Output length: {len(anonymized_values)}")
+            raise RuntimeError("Anonymization failed to prevent data leak. Halting execution.")
 
         return anonymized_values
 
@@ -278,7 +324,7 @@ class PdfFileProcessor(FileProcessor):
 
     def _extract_texts(self) -> Iterable[str]:
         with fitz.open(self.file_path) as doc:
-            for page in doc:
+            for page_num, page in enumerate(doc):
                 content_items = []
                 text_blocks = page.get_text("dict").get("blocks", [])
                 for block in text_blocks:
@@ -299,6 +345,14 @@ class PdfFileProcessor(FileProcessor):
                 for item in content_items:
                     if item['content']:
                         yield item['content'] + "\n"
+                
+                # Explicitly clean up PyMuPDF page objects to prevent memory leaks
+                page.clean_contents()
+                del page # Ensure the page object is released
+
+                # Periodically force garbage collection for long-running processes
+                if page_num % 50 == 0:
+                    gc.collect()
 
 
 class CsvFileProcessor(FileProcessor):
@@ -306,64 +360,81 @@ class CsvFileProcessor(FileProcessor):
         return ".csv"
     
     def _process_anonymization(self, output_path: str):
-        chunk_size = 50
+        chunk_size = 1000 # Increased chunk size
         header_written = False
         
         try:
+            # Efficiently get total_rows for tqdm
             with open(self.file_path, "rb") as f:
-                total_rows = sum(1 for _ in f) -1
+                total_rows = sum(1 for _ in f) -1 # Subtract 1 for header
         except (IOError, FileNotFoundError):
             total_rows = 0
         
-        if total_rows <= 0: return
+        if total_rows <= 0:
+            if not header_written: # Ensure empty file still gets a header if input had one
+                try:
+                    df_header = pd.read_csv(self.file_path, nrows=0)
+                    df_header.to_csv(output_path, mode='a', index=False, header=True)
+                except Exception:
+                    pass # Ignore if file doesn't exist or is truly empty
+            return
 
-        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='skip', engine='c', lineterminator='\n') as reader:
+        # Use engine='python' for better handling of different CSV formats, though slower
+        # Explicitly setting dtype=str to prevent type inference issues, and low_memory=False for large files
+        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
             progress_bar = tqdm(total=total_rows, desc=f"Processing CSV {os.path.basename(self.file_path)}", unit="rows", leave=False)
             for chunk in reader:
                 anonymized_chunk = chunk.copy()
+                
+                texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
+                
+                # Collect all unique strings per column and forced_type group
                 for col in chunk.columns:
-                    texts_by_type: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
-                    
-                    for val in chunk[col].dropna():
+                    for val in chunk[col].dropna().unique(): # Process unique values per column for efficiency
                         val_str = str(val)
                         should_anon, forced_type = self._should_anonymize(val_str, col)
                         if should_anon:
-                            if isinstance(forced_type, list):
-                                group_key = tuple(forced_type)
-                            else:
-                                group_key = forced_type if forced_type is not None else "auto"
-                            texts_by_type[group_key].append(val_str)
+                            group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
+                            texts_to_anonymize_map[group_key][col].append(val_str)
+
+                translation_map: Dict[str, str] = {}
+                for group_key, cols_data in texts_to_anonymize_map.items():
+                    current_forced_type = group_key if group_key != "auto" else None
+                    if isinstance(current_forced_type, tuple):
+                        current_forced_type = list(current_forced_type)
                     
-                    if not texts_by_type:
-                        continue
+                    # Flatten the unique texts for batch processing
+                    unique_texts_for_group = list(set(val for sublist in cols_data.values() for val in sublist))
+                    
+                    if unique_texts_for_group:
+                        anonymized_texts = self._process_batch_smart(unique_texts_for_group, forced_entity_type=current_forced_type)
+                        translation_map.update(dict(zip(unique_texts_for_group, anonymized_texts)))
 
-                    translation_map = {}
-                    for group_key, texts in texts_by_type.items():
-                        unique_texts = list(set(texts))
-                        
-                        current_forced_type = group_key if group_key != "auto" else None
-                        if isinstance(current_forced_type, tuple):
-                            current_forced_type = list(current_forced_type)
+                # Apply translations using a vectorized approach if possible, or apply per column
+                if translation_map:
+                    for col in chunk.columns:
+                        # Using map is generally faster than replace with a dict for Pandas Series
+                        anonymized_chunk[col] = anonymized_chunk[col].map(lambda x: translation_map.get(x, x)).fillna(anonymized_chunk[col])
 
-                        anonymized_texts = self._process_batch_smart(unique_texts, forced_entity_type=current_forced_type)
-                        translation_map.update(dict(zip(unique_texts, anonymized_texts)))
 
-                    if translation_map:
-                        anonymized_chunk[col] = anonymized_chunk[col].replace(translation_map)
-
-                anonymized_chunk.to_csv(output_path, mode='a', index=False, header=not header_written)
+                anonymized_chunk.to_csv(output_path, mode='a', index=False, header=not header_written, encoding='utf-8')
                 header_written = True
                 progress_bar.update(len(chunk))
             progress_bar.close()
 
     def _extract_texts(self) -> Iterable[str]:
-        with pd.read_csv(self.file_path, dtype=str, chunksize=50, on_bad_lines='skip', engine='c') as reader:
+        chunk_size = 1000 # Increased chunk size
+        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
             for chunk in reader:
+                batch_values = []
                 for col in chunk.columns:
-                    for val in chunk[col]:
-                        should_anon, _ = self._should_anonymize(str(val), col)
+                    for val in chunk[col].dropna():
+                        val_str = str(val)
+                        should_anon, _ = self._should_anonymize(val_str, col)
                         if should_anon:
-                            yield str(val)
+                            batch_values.append(val_str)
+                if batch_values:
+                    yield "\n".join(batch_values) + "\n" # Yield batch of values separated by newline
 
 
 class XlsxFileProcessor(FileProcessor):
@@ -449,8 +520,17 @@ class XmlFileProcessor(FileProcessor):
 
     def _process_anonymization(self, output_path: str):
         parser = etree.XMLParser(recover=True, strip_cdata=False)
-        tree = etree.parse(self.file_path, parser)
-        
+        try:
+            tree = etree.parse(self.file_path, parser)
+            if parser.error_log:
+                for error in parser.error_log:
+                    logging.warning(f"XML parsing error in {self.file_path} on line {error.line}: {error.message}")
+        except etree.XMLSyntaxError as e:
+            logging.error(f"Fatal XML syntax error in {self.file_path}: {e}", exc_info=True)
+            with open(output_path, "w") as f:
+                f.write(f"<!-- Could not parse XML file {os.path.basename(self.file_path)} due to syntax errors. -->")
+            return
+
         text_groups: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
         for element in tree.iter():
             path = self._get_xpath(element)
@@ -536,7 +616,7 @@ class JsonFileProcessor(FileProcessor):
 
         if is_large_file:
             if self._is_json_array():
-                print(f"[*] Large JSON array detected ({file_size / 1024 / 1024:.1f} MB). Switching to memory-efficient array streaming mode.")
+                logging.info("Large JSON array detected (%.1f MB). Switching to memory-efficient array streaming mode.", file_size / 1024 / 1024)
                 self._process_json_array_streaming(output_path, self.JSON_CHUNK_SIZE)
             else:
                 raise ValueError(f"Streaming for large single JSON objects ({file_size / 1024 / 1024:.1f} MB) is not supported due to memory safety. Only large arrays are streamable.")
@@ -570,8 +650,8 @@ class JsonFileProcessor(FileProcessor):
                         out_f.write(orjson.dumps(reconstructed_obj, option=orjson.OPT_INDENT_2))
                         is_first_chunk = False
             
-            except ijson.JSONError as e:
-                print(f"[!] Error streaming JSON file {self.file_path}: {e}", file=sys.stderr)
+            except (ijson.JSONError, MemoryError) as e:
+                logging.error(f"Error streaming JSON file {self.file_path}: {e}", exc_info=True)
                 out_f.truncate()
                 out_f.write(b'{"error": "Failed to parse source JSON file"}')
 
@@ -583,7 +663,7 @@ class JsonFileProcessor(FileProcessor):
             try:
                 data = orjson.loads(f.read())
             except orjson.JSONDecodeError:
-                print(f"[!] Invalid JSON in {self.file_path}. Aborting.", file=sys.stderr)
+                logging.error(f"Invalid JSON in {self.file_path}. Aborting.")
                 with open(output_path, "wb") as out_f:
                     out_f.write(b"{}")
                 return
@@ -683,7 +763,7 @@ class JsonFileProcessor(FileProcessor):
                         processed_data = self._reconstruct_object(data, path_aware_map)
                         out_f.write(orjson.dumps(processed_data) + b'\n')
                     except orjson.JSONDecodeError:
-                        print(f"[!] Warning: Skipping invalid JSON line in {self.file_path}", file=sys.stderr)
+                        logging.warning(f"Skipping invalid JSON line in {self.file_path}")
                         out_f.write(line)
     
     def _extract_texts(self) -> Iterable[str]:
@@ -701,7 +781,8 @@ class JsonFileProcessor(FileProcessor):
                 with open(self.file_path, 'rb') as f:
                     for obj in ijson.items(f, 'item', use_float=True, multiple_values=self._is_json_array()):
                         yield from self._yield_strings_from_obj(obj)
-            except Exception:
+            except Exception as e:
+                 logging.warning("Failed to stream JSON, falling back to in-memory loading. Error: %s", e)
                  with open(self.file_path, "rb") as f:
                     data = orjson.loads(f.read())
                     yield from self._yield_strings_from_obj(data)
