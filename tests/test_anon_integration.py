@@ -217,7 +217,7 @@ class TestAnonIntegration(unittest.TestCase):
         # 1. Create a temporary config file for field-specific anonymization
         config_path = os.path.join(self.test_data_dir, "json_array_config.json")
         config_data = {
-            "fields_to_anonymize": {
+            "force_anonymize": {
                 "name": {"entity_type": "PERSON"},
                 "email": {"entity_type": "EMAIL_ADDRESS"}
             }
