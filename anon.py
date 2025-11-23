@@ -34,9 +34,9 @@ def models_check(lang: str):
     import spacy.util
     from huggingface_hub import snapshot_download
 
-    spacy_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
-    en_model = spacy_model_map["en"]
-    requested = spacy_model_map.get(lang) or f"{lang}_core_news_lg"
+    SPACY_MODEL_MAP = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
+    en_model = SPACY_MODEL_MAP["en"]
+    requested = SPACY_MODEL_MAP.get(lang) or f"{lang}_core_news_lg"
 
     for model in (en_model, requested):
         if model and not spacy.util.is_package(model):

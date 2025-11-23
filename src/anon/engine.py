@@ -44,16 +44,16 @@ SUPPORTED_LANGUAGES = {
 
 class CustomSlugAnonymizer(Operator):
     """
-    Operador customizado do Presidio que substitui o texto por um slug com HMAC.
+    Custom Presidio operator that replaces text with an HMAC-based slug.
     """
     def operate(self, text: str, params: dict | None = None) -> str:
-        # 1. Limpa o texto (remove espaços extras)
+        # 1. Clean the text (remove extra spaces)
         clean_text = " ".join(text.split()).strip()
         
         if not SECRET_KEY:
             raise ValueError("SECRET_KEY is not set.")
 
-        # 2. Gera HMAC seguro (usando a chave secreta)
+        # 2. Generate a secure HMAC (using the secret key)
         full_hash = hmac.new(
             SECRET_KEY.encode(), 
             clean_text.encode(), 
@@ -76,12 +76,12 @@ class CustomSlugAnonymizer(Operator):
 
 
 def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> List[PatternRecognizer]:
-    """Carrega reconhecedores Regex otimizados para entidades de infraestrutura/cybersecurity/PII."""
+    """Loads Regex recognizers optimized for infrastructure/cybersecurity/PII entities."""
     
     # Define a score boost for regex patterns if priority is enabled
     SCORE_BOOST = 0.15 if regex_priority else 0.0
 
-    # --- 1. URL & REDE ---
+    # --- 1. URL & NETWORK ---
     url_pattern = Pattern(
       name="URL Pattern", 
       regex=r"(?:https?://|ftp://|www\.)[^\s]+(?:\.(?:com|net|org|edu|gov|mil|int|br|app|dev|io|co|uk|de|fr|es|it|ru|cn|jp|kr|au|ca|mx|ar|cl|pe|co\.uk|com\.br|org\.br|gov\.br|edu\.br|net\.br|vercel\.app|herokuapp\.com|github\.io|gitlab\.io|netlify\.app|firebase\.app|appspot\.com|cloudfront\.net|amazonaws\.com|azure\.com|digitalocean\.com)|localhost|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))(?::[0-9]{1,5})?(?:/[^\s]*)?",
@@ -203,8 +203,8 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
 
 class AnonymizationOrchestrator:
     """
-    Orquestrador de Anonimização Seguro e Otimizado.
-    Combina modelos Transformer (via SpaCy) com Regex de alta performance.
+    Secure and Optimized Anonymization Orchestrator.
+    Combines Transformer models (via SpaCy) with high-performance Regex.
     """
 
     def __init__(self, 
@@ -274,7 +274,7 @@ class AnonymizationOrchestrator:
         self.cache[key] = value
 
     def _setup_engines(self) -> tuple[BatchAnalyzerEngine, AnonymizerEngine]:
-        """Inicializa Engines mantendo o XLM-Roberta e configurações de segurança."""
+        """Initializes the Presidio engines, keeping the XLM-Roberta model and security settings."""
         lang_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
         supported_langs = set(["en", self.lang])
 
