@@ -80,11 +80,12 @@ class FileProcessor(ABC):
     gerenciamento de memória e otimização de batch para todos os filhos.
     """
 
-    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False):
+    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False, anonymization_config: dict = None):
         self.file_path = file_path
         self.orchestrator = orchestrator
         self.db_executor = ThreadPoolExecutor(max_workers=1)
         self.ner_data_generation = ner_data_generation
+        self.anonymization_config = anonymization_config
         self.ner_output_file = None
         if self.ner_data_generation:
             self.ner_output_file = self._get_ner_output_path()
@@ -410,28 +411,73 @@ class PdfFileProcessor(FileProcessor):
 
 
 class DocxFileProcessor(FileProcessor):
+    """Processor for DOCX files, including OCR for images."""
+
     def process(self) -> str:
         if self.ner_data_generation:
             return self._process_for_ner()
 
         doc = Document(self.file_path)
-        # ... (original logic)
         data_parts = []
-        for para in tqdm(doc.paragraphs, desc=f"Processing {os.path.basename(self.file_path)}"):
-            # ...
+
+        for para in tqdm(doc.paragraphs, desc=f"Processing DOCX content in {os.path.basename(self.file_path)}", leave=False):
+            para_content_parts = []
+            for run in para.runs:
+                # Check for drawing elements (which contain images) within the run
+                drawings = run._r.xpath(".//w:drawing")
+                if drawings:
+                    for inline in drawings:
+                        # Find the relationship ID of the embedded image
+                        blip_embeds = inline.xpath(".//a:blip/@r:embed")
+                        if blip_embeds:
+                            r_id = blip_embeds[0]
+                            try:
+                                # Get the image part from the relationship ID
+                                image_part = doc.part.related_parts[r_id]
+                                image_bytes = image_part.blob
+                                para_content_parts.append(extract_text_from_image(image_bytes))
+                            except (KeyError, AttributeError):
+                                # Skip if the relationship ID is not found
+                                continue
+                else:
+                    para_content_parts.append(run.text)
             data_parts.append("".join(para_content_parts))
+
         full_content = "\n".join(filter(None, data_parts))
         anonymized_content = self.orchestrator.anonymize_text(full_content)
         output_path = self._get_output_path(".txt")
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(anonymized_content)
         return output_path
-        
+
     def _process_for_ner(self) -> str:
         self._setup_optimization()
         try:
             doc = Document(self.file_path)
-            all_texts = [para.text for para in doc.paragraphs if para.text]
+            all_texts = []
+
+            for para in doc.paragraphs:
+                para_content_parts = []
+                for run in para.runs:
+                    drawings = run._r.xpath(".//w:drawing")
+                    if drawings:
+                        for inline in drawings:
+                            blip_embeds = inline.xpath(".//a:blip/@r:embed")
+                            if blip_embeds:
+                                r_id = blip_embeds[0]
+                                try:
+                                    image_part = doc.part.related_parts[r_id]
+                                    image_bytes = image_part.blob
+                                    para_content_parts.append(extract_text_from_image(image_bytes))
+                                except (KeyError, AttributeError):
+                                    continue
+                    else:
+                        para_content_parts.append(run.text)
+                
+                para_full_text = "".join(para_content_parts)
+                if para_full_text:
+                    all_texts.append(para_full_text)
+
             self._process_ner_texts_with_packing(all_texts, self.file_path)
         finally:
             self._cleanup_optimization()
@@ -576,8 +622,8 @@ class XmlFileProcessor(FileProcessor):
 
 
 class JsonFileProcessor(FileProcessor):
-    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False):
-        super().__init__(file_path, orchestrator, ner_data_generation=ner_data_generation)
+    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False, anonymization_config: dict = None):
+        super().__init__(file_path, orchestrator, ner_data_generation=ner_data_generation, anonymization_config=anonymization_config)
         self.db_executor = ThreadPoolExecutor(max_workers=1)
 
     def _collect_strings_recursive(self, obj):
@@ -606,40 +652,46 @@ class JsonFileProcessor(FileProcessor):
     def process(self) -> str:
         if self.ner_data_generation:
             return self._process_for_ner()
-            
+
         output_path = self._get_output_path(".json")
-        temp_output_path = output_path + ".tmp"
-        BATCH_SIZE = 1 
-        gc.disable()
-        batch_counter = 0
+        
         try:
-            with open(self.file_path, "rb") as f_in, open(temp_output_path, "w", encoding="utf-8") as f_out:
-                f_out.write("[\n")
+            with open(self.file_path, "rb") as f:
+                data = orjson.loads(f.read())
+        except orjson.JSONDecodeError:
+            print(f"[!] Invalid JSON file: {self.file_path}", file=sys.stderr)
+            return None # Or raise an exception
 
-                objects = ijson.items(f_in, 'item', use_float=True)
-                object_iterator = tqdm(objects, desc=f"Anonymizing {os.path.basename(self.file_path)}")
+        was_list = isinstance(data, list)
+        items_to_process = data if was_list else [data]
 
-                is_first_batch = True
-                while True:
-                    batch_of_objects = list(itertools.islice(object_iterator, BATCH_SIZE))
-                    if not batch_of_objects:
-                        break
-                    
-                    # This method is not fully visible, but the logic to call it remains the same.
-                    # I am assuming the existence of _process_and_write_batch based on context.
-                    if hasattr(self, '_process_and_write_batch'):
-                        self._process_and_write_batch(batch_of_objects, f_out, is_first_batch)
-                    
-                    is_first_batch = False
-                    batch_counter +=1
-                    if batch_counter % 50 == 0:
-                        gc.collect()
+        all_strings = []
+        for item in tqdm(items_to_process, desc=f"Collecting strings from {os.path.basename(self.file_path)}", leave=False):
+            all_strings.extend(self._collect_strings_recursive(item))
+        
+        unique_strings = sorted(list(set(all_strings)))
+        
+        entity_collector = []
+        anonymized_strings = self.orchestrator.anonymize_texts(
+            unique_strings,
+            operator_params={"entity_collector": entity_collector}
+        )
 
-                f_out.write("\n]")
-        finally:
-            gc.enable()
-            self.db_executor.shutdown(wait=True)
-        os.replace(temp_output_path, output_path)
+        if entity_collector:
+            self.db_executor.submit(bulk_save_to_db, list(entity_collector))
+        
+        translation_map = dict(zip(unique_strings, anonymized_strings))
+
+        # Reconstruct the original data structure
+        reconstructed_items = []
+        for item in tqdm(items_to_process, desc=f"Reconstructing {os.path.basename(self.file_path)}", leave=False):
+            reconstructed_items.append(self._reconstruct_recursive(item, translation_map))
+
+        final_data = reconstructed_items if was_list else reconstructed_items[0]
+
+        with open(output_path, "wb") as f:
+            f.write(orjson.dumps(final_data, option=orjson.OPT_INDENT_2))
+
         return output_path
         
     def _process_for_ner(self) -> str:
@@ -709,7 +761,7 @@ class ImageFileProcessor(FileProcessor):
         return self.ner_output_file
 
 
-def get_processor(file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False) -> FileProcessor:
+def get_processor(file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False, anonymization_config: dict = None) -> FileProcessor:
     """Factory function to get the correct file processor based on file extension."""
     ext = os.path.splitext(file_path)[1].lower()
     
@@ -731,4 +783,4 @@ def get_processor(file_path: str, orchestrator: AnonymizationOrchestrator, ner_d
     if not processor_class:
         raise ValueError(f"Unsupported file format: {ext}")
         
-    return processor_class(file_path, orchestrator, ner_data_generation=ner_data_generation)
+    return processor_class(file_path, orchestrator, ner_data_generation=ner_data_generation, anonymization_config=anonymization_config)

@@ -101,6 +101,7 @@ def _parse_arguments():
     parser.add_argument("--lang", type=str, default="en", help="Language of the document.")
     
     # Anonymization options
+    parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast"], help="Anonymization strategy ('presidio' for full analysis, 'fast' for an optimized path).")
     parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve.")
     parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to allow.")
     parser.add_argument("--slug-length", type=int, default=None, help="Specify the length of the anonymized slug (1-64).")
@@ -202,7 +203,8 @@ def main():
             lang=args.lang, 
             allow_list=allow_list, 
             entities_to_preserve=entities_to_preserve,
-            slug_length=args.slug_length
+            slug_length=args.slug_length,
+            strategy=args.anonymization_strategy
         )
         
         # --- Processing ---

@@ -75,7 +75,7 @@ def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
 
     ip_pattern = Pattern(
         name="IP Address Pattern", 
-        regex=r"(?<![\.\d])(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?![\.\d])", 
+        regex=r"(?<![\.\d])(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?!\.[\d])", 
         score=0.85
     )
     
@@ -169,7 +169,7 @@ def load_custom_recognizers(langs: List[str]) -> List[PatternRecognizer]:
     pgp_pattern = Pattern(
         name="PGP Block",
         # Pega desde o BEGIN até o END, incluindo quebras de linha (DOTALL)
-        regex=r"-----BEGIN PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----.*?-----END PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----",
+        regex=r"-----BEGIN PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----.+?-----END PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----",
         score=0.95
     )
     recognizers = []
@@ -207,11 +207,12 @@ class AnonymizationOrchestrator:
     Combina modelos Transformer (via SpaCy) com Regex de alta performance.
     """
 
-    def __init__(self, lang: str, allow_list: List[str], entities_to_preserve: List[str], slug_length: int | None = None):
+    def __init__(self, lang: str, allow_list: List[str], entities_to_preserve: List[str], slug_length: int | None = None, strategy: str = "presidio"):
         self.lang = lang
         self.allow_list = set(allow_list) 
         self.entities_to_preserve = set(entities_to_preserve)
         self.slug_length = slug_length
+        self.strategy = strategy
         self.total_entities_processed = 0
         self.entity_counts = {}
         self.cache = {}
@@ -278,6 +279,11 @@ class AnonymizationOrchestrator:
         return self.anonymize_texts([text], operator_params=operator_params)[0]
 
     def anonymize_texts(self, texts: List[str], operator_params: dict = None) -> List[str]:
+        if self.strategy == "fast":
+            return self._anonymize_texts_fast_path(texts, operator_params)
+        return self._anonymize_texts_presidio(texts, operator_params)
+
+    def _anonymize_texts_fast_path(self, texts: List[str], operator_params: dict = None) -> List[str]:
         """
         Pipeline Otimizada: Usa SpaCy Pipe + Regex Compilado + HMAC Seguro.
         Evita o overhead do Presidio Analyzer wrapper, mas mantém a precisão.
@@ -404,7 +410,7 @@ class AnonymizationOrchestrator:
 
         return final_anonymized_list
 
-    def anonymize_texts_legacy(self, texts: List[str], operator_params: dict = None) -> List[str]:
+    def _anonymize_texts_presidio(self, texts: List[str], operator_params: dict = None) -> List[str]:
         """
         Método legado (mais lento) para fallback.
         Mantém compatibilidade mas usa a engine padrão do Presidio.
@@ -440,6 +446,7 @@ class AnonymizationOrchestrator:
         if operator_params is None: operator_params = {}
         operator_params["total_entities_counter"] = self
         operator_params["entity_counts"] = self.entity_counts
+        operator_params["slug_length"] = self.slug_length
 
         for text, analyzer_results in zip(unique_texts_to_process, analyzer_results_iterator):
             filtered_analyzer_results = [
