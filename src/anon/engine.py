@@ -3,8 +3,7 @@
 import hashlib
 import hmac
 import re
-import sys
-from typing import Dict, Iterable, List
+from typing import List
 
 import pandas as pd
 import spacy
@@ -273,15 +272,60 @@ class AnonymizationOrchestrator:
         
         return batch_analyzer, anonymizer
 
-    def anonymize_text(self, text: str, operator_params: dict = None) -> str:
+    def anonymize_text(self, text: str, operator_params: dict = None, forced_entity_type: str = None) -> str:
         if not isinstance(text, str) or not text.strip():
             return text
-        return self.anonymize_texts([text], operator_params=operator_params)[0]
+        return self.anonymize_texts([text], operator_params=operator_params, forced_entity_type=forced_entity_type)[0]
 
-    def anonymize_texts(self, texts: List[str], operator_params: dict = None) -> List[str]:
+    def anonymize_texts(self, texts: List[str], operator_params: dict = None, forced_entity_type: str = None) -> List[str]:
+        """
+        Anonymizes a list of texts.
+        If a `forced_entity_type` is provided, it bypasses detection and applies
+        the specified type directly. Otherwise, it uses the configured strategy.
+        """
+        if forced_entity_type:
+            return self._anonymize_texts_forced_type(texts, forced_entity_type, operator_params)
+        
         if self.strategy == "fast":
             return self._anonymize_texts_fast_path(texts, operator_params)
         return self._anonymize_texts_presidio(texts, operator_params)
+
+    def _anonymize_texts_forced_type(self, texts: List[str], entity_type: str, operator_params: dict = None) -> List[str]:
+        """Anonymizes texts using a predefined entity type, bypassing analysis."""
+        anonymized_list = []
+        if operator_params is None: operator_params = {}
+        entity_collector = operator_params.get("entity_collector")
+
+        for text in texts:
+            if not isinstance(text, str) or not text.strip():
+                anonymized_list.append(text)
+                continue
+
+            clean_text = " ".join(text.split()).strip()
+            
+            # Use cache if available
+            cache_key = f"forced_{entity_type}_{clean_text}"
+            if cache_key in self.cache:
+                anonymized_list.append(self.cache[cache_key])
+                continue
+
+            full_hash = hmac.new(
+                SECRET_KEY.encode(),
+                clean_text.encode(),
+                hashlib.sha256
+            ).hexdigest()
+
+            display_hash = full_hash[:self.slug_length] if self.slug_length is not None else full_hash
+
+            if entity_collector is not None:
+                entity_collector.append((entity_type, clean_text, display_hash, full_hash))
+            
+            anonymized_text = f"[{entity_type}_{display_hash}]"
+            self.cache[cache_key] = anonymized_text
+            anonymized_list.append(anonymized_text)
+
+        return anonymized_list
+
 
     def _anonymize_texts_fast_path(self, texts: List[str], operator_params: dict = None) -> List[str]:
         """

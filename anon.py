@@ -100,8 +100,12 @@ def _parse_arguments():
     parser.add_argument("--list-languages", action="store_true", help="List all supported languages and exit.")
     parser.add_argument("--lang", type=str, default="en", help="Language of the document.")
     
-    # Anonymization options
+    # Optimization options
+    parser.add_argument("--optimize", action="store_true", help="Use all optimizations (fast strategy and in-memory DB).")
     parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast"], help="Anonymization strategy ('presidio' for full analysis, 'fast' for an optimized path).")
+    parser.add_argument("--db-mode", type=str, default="persistent", choices=["persistent", "in-memory"], help="Database mode ('persistent' to save to disk, 'in-memory' for a temporary DB).")
+
+    # Anonymization options
     parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve.")
     parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to allow.")
     parser.add_argument("--slug-length", type=int, default=None, help="Specify the length of the anonymized slug (1-64).")
@@ -119,6 +123,11 @@ def _parse_arguments():
 
     if not args.file_path and not (args.list_entities or args.list_languages):
         parser.error("A file path must be provided.")
+
+    # Handle the --optimize flag
+    if args.optimize:
+        args.anonymization_strategy = "fast"
+        args.db_mode = "in-memory"
 
     return args
 
@@ -182,7 +191,7 @@ def main():
 
     start_time = time.time()
     if not args.generate_ner_data:
-        initialize_db()
+        initialize_db(mode=args.db_mode)
     models_check(args.lang)
 
     allow_list = [term.strip() for term in args.allow_list.split(',') if term]

@@ -3,6 +3,13 @@ import sqlite3
 
 # --- Global Configuration ---
 SECRET_KEY = os.environ.get("ANON_SECRET_KEY")
+TECHNICAL_STOPLIST = {
+    "http", "https", "tcp", "udp", "port", "high", "medium", "low", "critical",
+    "cvss", "cve", "score", "severity", "description", "solution", "name",
+    "id", "type", "true", "false", "null", "none", "n/a", "json", "xml",
+    "string", "integer", "boolean", "date", "datetime", "timestamp"
+}
+
 
 
 # --- Model Configuration ---
@@ -26,15 +33,30 @@ ENTITY_MAPPING = dict(
 
 # --- Database Configuration ---
 DB_DIR = os.path.join(os.getcwd(), "db")
-DB_PATH = os.path.join(DB_DIR, "entities.db")
+DB_PATH = None # Global variable to hold the dynamic DB path
 
-def initialize_db():
-    """Initializes the SQLite database and creates the entities table if it doesn't exist."""
-    os.makedirs(DB_DIR, exist_ok=True)
+def initialize_db(mode: str = "persistent"):
+    """
+    Initializes the SQLite database and sets the global DB_PATH.
+
+    Args:
+        mode (str): 'persistent' (default) to save to a file,
+                    'in-memory' to use a non-persistent in-memory database.
+    """
+    global DB_PATH
+    
+    if mode == "in-memory":
+        DB_PATH = ":memory:"
+        print("[*] Using in-memory database (data will not be saved).")
+    else: # persistent
+        os.makedirs(DB_DIR, exist_ok=True)
+        DB_PATH = os.path.join(DB_DIR, "entities.db")
+
     with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
+        # Performance and safety pragmas
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
-        conn.execute("PRAGMA cache_size=10000;")
+        conn.execute("PRAGMA cache_size=-10000;") # Advise 10MB cache
         conn.execute("PRAGMA temp_store=MEMORY;")
         
         conn.execute(
@@ -53,3 +75,23 @@ def initialize_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_full_hash ON entities(full_hash);")
         conn.commit()
     return DB_PATH
+
+
+
+def bulk_save_to_db(entity_list):
+    """Saves a list of entities to the database in a performant way."""
+    if not entity_list:
+        return
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+
+        query = """
+            INSERT OR IGNORE INTO entities
+            (entity_type, original_name, slug_name, full_hash, first_seen, last_seen)
+            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+        """
+        conn.executemany(query, entity_list)
+        conn.commit()
+
