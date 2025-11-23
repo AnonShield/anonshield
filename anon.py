@@ -110,6 +110,11 @@ def _parse_arguments():
     parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to allow.")
     parser.add_argument("--slug-length", type=int, default=None, help="Specify the length of the anonymized slug (1-64).")
     parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a JSON file with advanced anonymization rules for structured files.")
+    
+    # Performance & Filtering options
+    parser.add_argument("--no-cache", action="store_true", help="Disable in-memory caching for the run.")
+    parser.add_argument("--min-word-length", type=int, default=3, help="Minimum character length for a word to be processed.")
+
     args = parser.parse_args()
 
     if args.list_entities:
@@ -213,13 +218,15 @@ def main():
             allow_list=allow_list, 
             entities_to_preserve=entities_to_preserve,
             slug_length=args.slug_length,
-            strategy=args.anonymization_strategy
+            strategy=args.anonymization_strategy,
+            use_cache=(not args.no_cache)
         )
         
         # --- Processing ---
         processor_factory_args = {
             "ner_data_generation": args.generate_ner_data,
             "anonymization_config": anonymization_config,
+            "min_word_length": args.min_word_length
         }
 
         if os.path.isdir(args.file_path):
@@ -232,6 +239,7 @@ def main():
                     file_path = os.path.join(root, file_name)
                     try:
                         processor = get_processor(file_path, orchestrator, **processor_factory_args)
+                        if not processor: continue # Skip unsupported files
                         output_file = processor.process()
                         processed_files.append(output_file)
                         if args.generate_ner_data:

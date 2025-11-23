@@ -13,24 +13,24 @@ import sys
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Iterable, List, Generator
+from typing import Iterable, List, Generator, Optional, Dict
 
-import numpy as np
-import openpyxl
-import orjson
-import pandas as pd
-import pytesseract
-from docx import Document
-from lxml import etree
-from PIL import Image
-from tqdm import tqdm
-import pymupdf as fitz
+import numpy as np  # type: ignore
+import openpyxl  # type: ignore
+import orjson  # type: ignore
+import pandas as pd  # type: ignore
+import pytesseract  # type: ignore
+from docx import Document  # type: ignore
+from lxml import etree  # type: ignore
+from PIL import Image  # type: ignore
+from tqdm import tqdm  # type: ignore
+import pymupdf as fitz  # type: ignore
 
 from .config import bulk_save_to_db, TECHNICAL_STOPLIST
 from .engine import AnonymizationOrchestrator
 
 
-def get_output_path(original_path, new_ext, prefix="anon_"):
+def get_output_path(original_path: str, new_ext: str, prefix: str = "anon_") -> str:
     """Constructs the output file path in the 'output' directory."""
     os.makedirs("output", exist_ok=True)
     base_name = os.path.splitext(os.path.basename(original_path))[0]
@@ -45,26 +45,16 @@ def extract_text_from_image(image_bytes: bytes) -> str:
 
 
 class FileProcessor(ABC):
-    """
-    Abstract Base Class for file processing using a Template Method Pattern.
-
-    The `process` method orchestrates the high-level workflow:
-    1. Setup optimizations (e.g., disable garbage collection).
-    2. Delegate to specific processing logic (anonymization or NER).
-    3. Clean up resources.
-
-    Subclasses must implement `_extract_texts` and `_get_output_extension`.
-    They can also override `_process_anonymization` for complex structured data.
-    """
     DEFAULT_BATCH_SIZE = 200
 
-    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False, anonymization_config: dict = None):
+    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False, anonymization_config: Optional[Dict] = None, min_word_length: int = 3):
         self.file_path = file_path
         self.orchestrator = orchestrator
         self.ner_data_generation = ner_data_generation
         self.anonymization_config = anonymization_config or {}
+        self.min_word_length = min_word_length
         self.db_executor = ThreadPoolExecutor(max_workers=1)
-        self.ner_output_file = None
+        self.ner_output_file: Optional[str] = None
         if self.ner_data_generation:
             self.ner_output_file = self._get_ner_output_path()
             os.makedirs(os.path.dirname(self.ner_output_file), exist_ok=True)
@@ -74,11 +64,9 @@ class FileProcessor(ABC):
         return get_output_path(self.file_path, ".jsonl", prefix="ner_data_anon_")
 
     def _setup_optimization(self):
-        """Disables GC for performance."""
         gc.disable()
 
     def _cleanup_optimization(self):
-        """Re-enables GC and shuts down executors."""
         gc.collect()
         gc.enable()
         self.db_executor.shutdown(wait=True)
@@ -86,7 +74,6 @@ class FileProcessor(ABC):
             self.ner_file_handle.close()
 
     def _batch_iterator(self, iterator: Iterable[str], size: int) -> Generator[List[str], None, None]:
-        """Batches an iterator into lists of a given size."""
         batch = []
         for item in iterator:
             batch.append(item)
@@ -97,15 +84,11 @@ class FileProcessor(ABC):
             yield batch
 
     def process(self) -> str:
-        """
-        Template Method: Main entry point for processing a file.
-        Orchestrates the setup, processing, and cleanup.
-        """
         self._setup_optimization()
-        output_path = ""
+        output_path: str = ""
         try:
             if self.ner_data_generation:
-                output_path = self.ner_output_file
+                output_path = self.ner_output_file or ""
                 all_texts = self._extract_all_texts()
                 self._run_ner_pipeline(all_texts)
             else:
@@ -116,10 +99,6 @@ class FileProcessor(ABC):
         return output_path
 
     def _process_anonymization(self, output_path: str):
-        """
-        Default anonymization process for unstructured text files.
-        Subclasses for structured data (JSON, CSV, etc.) should override this.
-        """
         with open(output_path, "w", encoding="utf-8") as outfile:
             text_iterator = self._extract_texts()
             for text_batch in self._batch_iterator(text_iterator, self.DEFAULT_BATCH_SIZE):
@@ -128,66 +107,41 @@ class FileProcessor(ABC):
 
     @abstractmethod
     def _extract_texts(self) -> Iterable[str]:
-        """
-        Abstract method for subclasses to implement.
-        Should yield chunks of text from the file.
-        """
         raise NotImplementedError
 
     def _extract_all_texts(self) -> List[str]:
-        """Default implementation to collect all texts for NER processing."""
         return list(self._extract_texts())
 
     @abstractmethod
     def _get_output_extension(self) -> str:
-        """Returns the output file extension (e.g., '.txt', '.json')."""
         raise NotImplementedError
 
     def _should_anonymize(self, text: str, path: str = "") -> bool:
-        """
-        Gatekeeper to prevent processing of non-PII technical terms or
-        fields based on user configuration.
-        The logic is as follows:
-        1. If a field is in 'fields_to_exclude', never anonymize it.
-        2. If 'fields_to_anonymize' is defined, only anonymize fields in that list.
-        3. If 'fields_to_anonymize' is NOT defined, anonymize all fields not in 'fields_to_exclude'.
-        """
-        if not isinstance(text, str) or len(text.strip()) <= 3:
+        if not isinstance(text, str) or len(text.strip()) < self.min_word_length:
             return False
             
         text_lower = text.lower().strip()
         if text_lower.isnumeric() or text_lower in TECHNICAL_STOPLIST:
             return False
 
-        # Rule 1: Explicitly excluded fields
         if path and self.anonymization_config.get('fields_to_exclude'):
-            # Use dot-prefix matching for parent paths
             if any(path.lstrip('.').startswith(p) for p in self.anonymization_config['fields_to_exclude']):
                 return False
         
-        # Rule 2: If an include list is present, only anonymize fields from that list
         fields_to_anonymize = self.anonymization_config.get('fields_to_anonymize')
         if path and fields_to_anonymize:
             return path.lstrip('.') in fields_to_anonymize
 
-        # Rule 3: If no include list, anonymize everything not excluded (default behavior)
         if not fields_to_anonymize:
             return True
             
         return False
 
-    def _process_batch_smart(self, text_list: List[str], forced_entity_type: str = None) -> List[str]:
-        """
-        Anonymizes a batch of texts, automatically handling packing for efficiency
-        and saving entities to the database asynchronously.
-        """
+    def _process_batch_smart(self, text_list: List[str], forced_entity_type: Optional[str] = None) -> List[str]:
         if not text_list:
             return []
-
-        # This method is now a direct pass-through to the orchestrator.
-        # Filtering should happen before calling it.
         
-        entity_collector = []
+        entity_collector: List = []
         anonymized_values = self.orchestrator.anonymize_texts(
             text_list,
             operator_params={"entity_collector": entity_collector},
@@ -199,26 +153,21 @@ class FileProcessor(ABC):
 
         if len(anonymized_values) != len(text_list):
             print(f"[!] Warning: Mismatch in batch processing for {self.file_path}. Skipping update for this batch.", file=sys.stderr)
-            return text_list # Return original text on error
+            return text_list
 
         return anonymized_values
 
     def _run_ner_pipeline(self, text_list: List[str]):
-        """
-        Packs a list of texts into larger chunks and writes the
-        NER data for those chunks to a file.
-        """
         if not text_list: return
 
         MAX_CHUNK_SIZE = 1500 
         DELIMITER = " . ||| . "
         
-        text_chunks = []
-        current_chunk = []
+        text_chunks: List[str] = []
+        current_chunk: List[str] = []
         current_len = 0
         
         for s in text_list:
-            # We still use should_anonymize here to filter out junk before NER
             if not self._should_anonymize(s): continue
             s = s.strip()
             if not s: continue
@@ -243,7 +192,6 @@ class FileProcessor(ABC):
 
 
 class TextFileProcessor(FileProcessor):
-    """Processes plain text files line by line."""
     def _get_output_extension(self) -> str:
         return ".txt"
 
@@ -254,7 +202,6 @@ class TextFileProcessor(FileProcessor):
 
 
 class ImageFileProcessor(FileProcessor):
-    """Extracts text from images using OCR and processes it."""
     def _get_output_extension(self) -> str:
         return ".txt"
 
@@ -267,7 +214,6 @@ class ImageFileProcessor(FileProcessor):
 
 
 class DocxFileProcessor(FileProcessor):
-    """Processes DOCX files, including text from embedded images."""
     def _get_output_extension(self) -> str:
         return ".txt"
 
@@ -292,7 +238,6 @@ class DocxFileProcessor(FileProcessor):
 
 
 class PdfFileProcessor(FileProcessor):
-    """Processes PDF files by extracting text and images page by page."""
     def _get_output_extension(self) -> str:
         return ".txt"
 
@@ -302,7 +247,7 @@ class PdfFileProcessor(FileProcessor):
                 content_items = []
                 text_blocks = page.get_text("dict").get("blocks", [])
                 for block in text_blocks:
-                    if block["type"] == 0: # Text block
+                    if block["type"] == 0:
                         block_text = "".join(span["text"] for line in block.get("lines", []) for span in line.get("spans", []) if "text" in span)
                         if block_text.strip():
                             content_items.append({"bbox": block["bbox"], "content": block_text})
@@ -311,7 +256,8 @@ class PdfFileProcessor(FileProcessor):
                     xref = img[0]
                     base_image = doc.extract_image(xref)
                     if base_image:
-                        content_items.append({"bbox": page.get_image_bbox(img), "content": extract_text_from_image(base_image["image"])})
+                        bbox = page.get_image_bbox(img)
+                        content_items.append({"bbox": bbox, "content": extract_text_from_image(base_image["image"])})
 
                 content_items.sort(key=lambda item: (item["bbox"][1], item["bbox"][0]))
                 
@@ -321,7 +267,6 @@ class PdfFileProcessor(FileProcessor):
 
 
 class CsvFileProcessor(FileProcessor):
-    """Processes CSV files in chunks for memory efficiency."""
     def _get_output_extension(self) -> str:
         return ".csv"
     
@@ -333,21 +278,19 @@ class CsvFileProcessor(FileProcessor):
             with open(self.file_path, "rb") as f:
                 total_rows = sum(1 for _ in f) -1
         except (IOError, FileNotFoundError):
-            total_rows = 0 # Handle empty or non-existent files
+            total_rows = 0
         
         if total_rows <= 0: return
 
         with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='skip', engine='c', lineterminator='\n') as reader:
             progress_bar = tqdm(total=total_rows, desc=f"Processing CSV {os.path.basename(self.file_path)}", unit="rows", leave=False)
             for chunk in reader:
-                # Here, path is the column name
                 anonymized_chunk = chunk.copy()
                 for col in chunk.columns:
                     texts_to_process = [str(val) for val in chunk[col] if self._should_anonymize(str(val), col)]
                     if not texts_to_process: continue
                     
                     anonymized_texts = self._process_batch_smart(texts_to_process)
-                    
                     translation_map = dict(zip(texts_to_process, anonymized_texts))
                     anonymized_chunk[col] = anonymized_chunk[col].replace(translation_map)
 
@@ -361,13 +304,11 @@ class CsvFileProcessor(FileProcessor):
             for chunk in reader:
                 for col in chunk.columns:
                     for val in chunk[col]:
-                         # For NER, we check should_anonymize with the column name as path
                         if self._should_anonymize(str(val), col):
                             yield str(val)
 
 
 class XlsxFileProcessor(FileProcessor):
-    """Processes XLSX files cell by cell."""
     def _get_output_extension(self) -> str:
         return ".xlsx"
 
@@ -377,7 +318,6 @@ class XlsxFileProcessor(FileProcessor):
             for row in sheet.iter_rows():
                 for cell in row:
                     if cell.value and isinstance(cell.value, str):
-                        # Path can be sheet_name.column_letter
                         path = f"{sheet.title}.{cell.column_letter}"
                         if self._should_anonymize(cell.value, path):
                             yield cell.value
@@ -397,19 +337,17 @@ class XlsxFileProcessor(FileProcessor):
         for sheet in wb.worksheets:
             for row in sheet.iter_rows():
                 for cell in row:
-                    if cell.value in translation_map:
+                    if isinstance(cell.value, str) and cell.value in translation_map:
                         cell.value = translation_map[cell.value]
         
         wb.save(output_path)
 
 
 class XmlFileProcessor(FileProcessor):
-    """Processes XML files using event-driven parsing for memory efficiency."""
     def _get_output_extension(self) -> str:
         return ".xml"
 
-    def _get_xpath(self, elem):
-        """Helper to generate a simple XPath for an element."""
+    def _get_xpath(self, elem) -> str:
         return "/".join(e.tag for e in elem.iterancestors()) + "/" + elem.tag
 
     def _extract_texts(self) -> Iterable[str]:
@@ -421,6 +359,11 @@ class XmlFileProcessor(FileProcessor):
             if element.tail and element.tail.strip():
                  if self._should_anonymize(element.tail, path + "/tail()"):
                     yield element.tail
+            
+            for key, value in element.attrib.items():
+                attr_path = f"{path}[@{key}]"
+                if self._should_anonymize(value, attr_path):
+                    yield value
             element.clear()
 
     def _process_anonymization(self, output_path: str):
@@ -436,33 +379,25 @@ class XmlFileProcessor(FileProcessor):
         translation_map = dict(zip(all_texts, anonymized_texts))
 
         for element in tree.iter():
-            path = self._get_xpath(element)
             if element.text in translation_map:
                 element.text = translation_map[element.text]
             if element.tail in translation_map:
                 element.tail = translation_map[element.tail]
             
             for key, value in element.attrib.items():
-                attr_path = f"{path}[@{key}]"
-                if self._should_anonymize(value, attr_path) and value in translation_map:
+                if value in translation_map:
                     element.set(key, translation_map[value])
 
         tree.write(output_path, encoding="utf-8", xml_declaration=True)
 
 
 class JsonFileProcessor(FileProcessor):
-    """Processes JSON files with field-specific anonymization rules."""
     def _get_output_extension(self) -> str:
         return ".json"
 
-    def _walk_and_collect_strings(self, obj, path_prefix="", out_dict=None):
-        """
-        Recursively walks a JSON object, collecting strings to anonymize and
-        grouping them by the entity type specified in the config.
-        """
+    def _walk_and_collect_strings(self, obj, path_prefix: str = "", out_dict: Optional[Dict] = None) -> Dict:
         if out_dict is None: 
             out_dict = defaultdict(list)
-
         current_path = path_prefix.lstrip('.')
 
         if isinstance(obj, dict):
@@ -470,21 +405,17 @@ class JsonFileProcessor(FileProcessor):
                 self._walk_and_collect_strings(v, f"{current_path}.{k}", out_dict)
         elif isinstance(obj, list):
             for item in obj:
-                # We don't include list indices in the path for matching,
-                # as rules are typically applied to all items in a list.
                 self._walk_and_collect_strings(item, current_path, out_dict)
         elif isinstance(obj, str):
             if self._should_anonymize(obj, current_path):
                 fields_to_anonymize = self.anonymization_config.get("fields_to_anonymize", {})
                 field_config = fields_to_anonymize.get(current_path, {})
                 entity_type = field_config.get("entity_type")
-
                 group = entity_type if entity_type else "auto"
                 out_dict[group].append(obj)
         return out_dict
 
-    def _walk_and_reconstruct(self, obj, translation_map, path_prefix=""):
-        """Recursively walks and reconstructs the JSON object with anonymized values."""
+    def _walk_and_reconstruct(self, obj, translation_map: Dict, path_prefix: str = ""):
         current_path = path_prefix.lstrip('.')
         if isinstance(obj, dict):
             return {k: self._walk_and_reconstruct(v, translation_map, f"{current_path}.{k}") for k, v in obj.items()}
@@ -496,10 +427,8 @@ class JsonFileProcessor(FileProcessor):
         return obj
 
     def _extract_all_texts(self) -> List[str]:
-        """Extract all string values from the JSON file for NER."""
         with open(self.file_path, "rb") as f:
             data = orjson.loads(f.read())
-        
         strings_by_type = self._walk_and_collect_strings(data)
         all_strings = []
         for string_list in strings_by_type.values():
@@ -507,7 +436,6 @@ class JsonFileProcessor(FileProcessor):
         return all_strings
 
     def _process_anonymization(self, output_path: str):
-        """Overrides base method to handle JSON's structured nature."""
         with open(self.file_path, "rb") as f:
             data = orjson.loads(f.read())
 
@@ -516,31 +444,21 @@ class JsonFileProcessor(FileProcessor):
 
         for entity_type, string_list in strings_by_type.items():
             unique_strings = sorted(list(set(string_list)))
-            if not unique_strings:
-                continue
+            if not unique_strings: continue
 
             forced_type = entity_type if entity_type != "auto" else None
-            
-            anonymized_strings = self._process_batch_smart(
-                unique_strings,
-                forced_entity_type=forced_type
-            )
-            
+            anonymized_strings = self._process_batch_smart(unique_strings, forced_entity_type=forced_type)
             translation_map.update(dict(zip(unique_strings, anonymized_strings)))
         
         reconstructed_data = self._walk_and_reconstruct(data, translation_map)
-
         with open(output_path, "wb") as f:
             f.write(orjson.dumps(reconstructed_data, option=orjson.OPT_INDENT_2))
 
     def _extract_texts(self) -> Iterable[str]:
-        # This is tricky for JSON anonymization as we need to reconstruct it.
-        # So we override _process_anonymization instead and this can be a no-op.
         yield from ()
 
 
-def get_processor(file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False, anonymization_config: dict = None) -> FileProcessor:
-    """Factory function to get the correct file processor based on file extension."""
+def get_processor(file_path: str, orchestrator: AnonymizationOrchestrator, **kwargs) -> Optional[FileProcessor]:
     ext = os.path.splitext(file_path)[1].lower()
     
     processor_map = {
@@ -559,6 +477,6 @@ def get_processor(file_path: str, orchestrator: AnonymizationOrchestrator, ner_d
     
     processor_class = processor_map.get(ext)
     if not processor_class:
-        raise ValueError(f"Unsupported file format: {ext}")
+        return None
         
-    return processor_class(file_path, orchestrator, ner_data_generation=ner_data_generation, anonymization_config=anonymization_config)
+    return processor_class(file_path, orchestrator, **kwargs)  # type: ignore
