@@ -118,6 +118,7 @@ def _parse_arguments():
     parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast"], help="Anonymization strategy ('presidio' for full analysis, 'fast' for an optimized path).")
     parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
     parser.add_argument("--db-mode", type=str, default="persistent", choices=["persistent", "in-memory"], help="Database mode ('persistent' to save to disk, 'in-memory' for a temporary DB).")
+    parser.add_argument("--disable-gc", action="store_true", help="Disable automatic garbage collection during processing. May boost speed for single large files but increases memory usage.")
     parser.add_argument("--db-synchronous-mode", type=str, default=None, choices=["OFF", "NORMAL", "FULL", "EXTRA"], help="SQLite 'synchronous' PRAGMA mode. Overrides config file setting.")
 
     args = parser.parse_args()
@@ -247,6 +248,7 @@ def main():
             "skip_numeric": args.skip_numeric,
             "output_dir": args.output_dir,
             "overwrite": args.overwrite,
+            "disable_gc": args.disable_gc,
         }
 
         if os.path.isdir(args.file_path):
