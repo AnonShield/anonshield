@@ -404,6 +404,10 @@ class AnonymizationOrchestrator:
                 anonymized_list.append(text)
                 continue
 
+            # This path treats the entire text as a single entity, so we count it here.
+            self.total_entities_processed += 1
+            self.entity_counts[entity_type] = self.entity_counts.get(entity_type, 0) + 1
+
             clean_text = " ".join(text.split()).strip()
             
             cache_key = f"forced_{entity_type}_{clean_text}"
@@ -560,6 +564,12 @@ class AnonymizationOrchestrator:
         operator_params["slug_length"] = self.slug_length
 
         for text, analyzer_results in zip(unique_texts_to_process, analyzer_results_iterator):
+            # Increment counters based on analyzer_results
+            for res in analyzer_results:
+                if res.entity_type not in self.entities_to_preserve:
+                    self.total_entities_processed += 1
+                    self.entity_counts[res.entity_type] = self.entity_counts.get(res.entity_type, 0) + 1
+
             anonymizer_result = self.anonymizer_engine.anonymize(
                 text=text,
                 analyzer_results=analyzer_results,
