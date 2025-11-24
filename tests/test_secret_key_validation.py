@@ -21,13 +21,21 @@ class TestSecretKeyValidation(unittest.TestCase):
                 del os.environ["ANON_SECRET_KEY"]
 
     def test_anonymization_fails_without_secret_key(self):
+        # Create a dummy file so the path check passes
+        dummy_file = "dummy_for_fail_test.txt"
+        with open(dummy_file, "w") as f:
+            f.write("Some text.")
+
         # Run anon.py in anonymization mode (default) without SECRET_KEY
         # Expect it to exit with an error code and print the specific error message
-        command = [sys.executable, "anon.py", "some_file.txt"]
+        command = [sys.executable, "anon.py", dummy_file]
         result = subprocess.run(command, capture_output=True, text=True)
         
         self.assertNotEqual(result.returncode, 0, "anon.py should fail without SECRET_KEY")
         self.assertIn("ANON_SECRET_KEY environment variable not set for anonymization", result.stderr)
+        
+        # Clean up dummy file
+        os.remove(dummy_file)
 
     def test_ner_data_generation_succeeds_without_secret_key(self):
         # Run anon.py in NER data generation mode without SECRET_KEY
