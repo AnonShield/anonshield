@@ -513,17 +513,24 @@ The `AnonymizationOrchestrator` is the core engine:
 
 **Anonymization Strategies:**
 
-1. **Presidio Strategy (Default):**
-   - Uses full Presidio analyzer pipeline
-   - Transformer model + spaCy + regex patterns
-   - Highest accuracy, slower performance
-   - Recommended for mixed content
+1.  **Presidio Strategy (Comprehensive):**
+    -   **How it works:** Uses the full Presidio `AnalyzerEngine` pipeline. This involves a comprehensive analysis by **all** available recognizers: the **Transformer model + spaCy** pipeline, the **custom regex patterns**, and **dozens of Presidio's built-in recognizers** (for specific national IDs, credit cards, etc.). Results from all these sources are then aggregated by a sophisticated logic to resolve conflicts and determine the best entity.
+    -   **Pros:** Highest accuracy and broadest detection capability.
+    -   **Cons:** Slower due to the extensive analysis and complex aggregation.
 
-2. **Fast Strategy:**
-   - Bypasses Presidio, uses spaCy directly
-   - Custom regex patterns applied separately
-   - Faster processing, good accuracy
-   - Recommended for large datasets with optimization flag
+2.  **Fast Strategy (Optimized for Speed):**
+    -   **How it works:** This strategy is designed for maximum speed by completely bypassing the full `AnalyzerEngine`. It runs a direct, manual pipeline:
+        1.  Passes the text through the **spaCy + Transformer** pipeline (as configured by Presidio's `TransformersNlpEngine`).
+        2.  In parallel, passes the text through the **custom regex patterns**.
+        3.  Uses a simpler, custom merge logic (`_merge_overlapping_entities`) to combine the results from these two sources.
+        4.  Reconstructs the text manually without the `AnonymizerEngine`'s full pipeline.
+    -   **Pros:** Significantly faster by eliminating the `AnalyzerEngine`'s overhead and its numerous internal recognizers.
+    -   **Cons:** Less robust in resolving entity conflicts and does not benefit from the full range of Presidio's additional recognizers.
+
+3.  **Balanced Strategy ( Optimal Balance):**
+    -   **How it works:** This strategy offers a smart middle ground. It *uses* the Presidio `AnalyzerEngine` (thus benefiting from its more robust result aggregation logic than `fast` mode), but it invokes it selectively. Instead of using all recognizers, it instructs the engine to use **only** the main **spaCy + Transformer** pipeline and the **custom regex patterns**, effectively disabling Presidio's other built-in recognizers.
+    -   **Pros:** Offers an ideal balance, being faster than `presidio` (by ignoring many internal recognizers) and more robust than `fast` (by using Presidio's superior aggregation logic).
+    -   **Cons:** May not detect very specific entities that only the full `presidio` strategy would cover.
 
 #### 3. File Processors (`processors.py`)
 
