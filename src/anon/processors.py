@@ -14,7 +14,7 @@ import ijson
 import shutil
 import logging
 from abc import ABC, abstractmethod
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import Iterable, List, Generator, Optional, Dict, Tuple, Union
 
 import numpy as np  # type: ignore
@@ -390,6 +390,7 @@ class CsvFileProcessor(FileProcessor):
     def _process_anonymization(self, output_path: str):
         chunk_size = 1000 # Increased chunk size
         header_written = False
+        use_deduplication = self.orchestrator.use_cache
         
         try:
             # Efficiently get total_rows for tqdm
@@ -407,43 +408,55 @@ class CsvFileProcessor(FileProcessor):
                     pass # Ignore if file doesn't exist or is truly empty
             return
 
-        # Use engine='python' for better handling of different CSV formats, though slower
-        # Explicitly setting dtype=str to prevent type inference issues, and low_memory=False for large files
         with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
             progress_bar = tqdm(total=total_rows, desc=f"Processing CSV {os.path.basename(self.file_path)}", unit="rows", leave=False)
             for chunk in reader:
                 anonymized_chunk = chunk.copy()
                 
-                texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
-                
-                # Collect all unique strings per column and forced_type group
-                for col in chunk.columns:
-                    for val in chunk[col].dropna().unique(): # Process unique values per column for efficiency
-                        val_str = str(val)
-                        should_anon, forced_type = self._should_anonymize(val_str, col)
-                        if should_anon:
-                            group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
-                            texts_to_anonymize_map[group_key][col].append(val_str)
-
-                translation_map: Dict[str, str] = {}
-                for group_key, cols_data in texts_to_anonymize_map.items():
-                    current_forced_type = group_key if group_key != "auto" else None
-                    if isinstance(current_forced_type, tuple):
-                        current_forced_type = list(current_forced_type)
-                    
-                    # Flatten the unique texts for batch processing
-                    unique_texts_for_group = list(set(val for sublist in cols_data.values() for val in sublist))
-                    
-                    if unique_texts_for_group:
-                        anonymized_texts = self._process_batch_smart(unique_texts_for_group, forced_entity_type=current_forced_type)
-                        translation_map.update(dict(zip(unique_texts_for_group, anonymized_texts)))
-
-                # Apply translations using a vectorized approach if possible, or apply per column
-                if translation_map:
+                if use_deduplication:
+                    # Original fast path: process unique values only
+                    texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
                     for col in chunk.columns:
-                        # Using map is generally faster than replace with a dict for Pandas Series
-                        anonymized_chunk[col] = anonymized_chunk[col].map(lambda x: translation_map.get(x, x)).fillna(anonymized_chunk[col])
+                        for val in chunk[col].dropna().unique():
+                            val_str = str(val)
+                            should_anon, forced_type = self._should_anonymize(val_str, col)
+                            if should_anon:
+                                group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
+                                texts_to_anonymize_map[group_key][col].append(val_str)
 
+                    translation_map: Dict[str, str] = {}
+                    for group_key, cols_data in texts_to_anonymize_map.items():
+                        current_forced_type = group_key if group_key != "auto" else None
+                        if isinstance(current_forced_type, tuple): current_forced_type = list(current_forced_type)
+                        
+                        unique_texts_for_group = list(set(val for sublist in cols_data.values() for val in sublist))
+                        if unique_texts_for_group:
+                            anonymized_texts = self._process_batch_smart(unique_texts_for_group, forced_entity_type=current_forced_type)
+                            translation_map.update(dict(zip(unique_texts_for_group, anonymized_texts)))
+
+                    if translation_map:
+                        for col in chunk.columns:
+                            anonymized_chunk[col] = anonymized_chunk[col].map(lambda x: translation_map.get(str(x), x))
+                else:
+                    # New context-aware path: process all values
+                    for col in chunk.columns:
+                        series = chunk[col].dropna()
+                        if series.empty: continue
+                        
+                        # Check if any value in the series should be anonymized
+                        # This is an optimization to avoid processing columns with no PII
+                        if not any(self._should_anonymize(str(val), col)[0] for val in series):
+                            continue
+
+                        values_to_process = series.tolist()
+                        # We assume all values in a column share the same forced_type for simplicity in batching
+                        _, forced_type = self._should_anonymize(values_to_process[0], col)
+                        
+                        anonymized_values = self._process_batch_smart(values_to_process, forced_entity_type=forced_type)
+                        
+                        # Use a series to map anonymized values back using original indexes
+                        anonymized_series = pd.Series(anonymized_values, index=series.index)
+                        anonymized_chunk[col].update(anonymized_series)
 
                 anonymized_chunk.to_csv(output_path, mode='a', index=False, header=not header_written, encoding='utf-8')
                 header_written = True
@@ -482,6 +495,7 @@ class XlsxFileProcessor(FileProcessor):
     
     def _process_anonymization(self, output_path: str):
         wb = openpyxl.load_workbook(self.file_path)
+        use_deduplication = self.orchestrator.use_cache
         
         all_texts_map: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
         for sheet in wb.worksheets:
@@ -497,15 +511,18 @@ class XlsxFileProcessor(FileProcessor):
                                 group_key = forced_type if forced_type is not None else "auto"
                             all_texts_map[group_key].append(cell.value)
         
-        translation_map = {}
+        translation_map: Dict[str, deque] = defaultdict(deque)
         for group_key, texts in all_texts_map.items():
             forced_type = group_key if group_key != "auto" else None
             if isinstance(forced_type, tuple):
                 forced_type = list(forced_type)
             
-            unique_texts = list(set(texts))
-            anonymized_texts = self._process_batch_smart(unique_texts, forced_entity_type=forced_type)
-            translation_map.update(dict(zip(unique_texts, anonymized_texts)))
+            strings_to_process = sorted(list(set(texts))) if use_deduplication else texts
+            if not strings_to_process: continue
+            
+            anonymized_texts = self._process_batch_smart(strings_to_process, forced_entity_type=forced_type)
+            for original, anonymized in zip(strings_to_process, anonymized_texts):
+                translation_map[original].append(anonymized)
 
         if not translation_map:
             wb.save(output_path)
@@ -515,7 +532,10 @@ class XlsxFileProcessor(FileProcessor):
             for row in sheet.iter_rows():
                 for cell in row:
                     if isinstance(cell.value, str) and cell.value in translation_map:
-                        cell.value = translation_map[cell.value]
+                        try:
+                            cell.value = translation_map[cell.value].popleft()
+                        except IndexError:
+                            logging.error("Mismatch in anonymized XLSX cell counts. Using original value as fallback.")
         
         wb.save(output_path)
 
@@ -559,6 +579,7 @@ class XmlFileProcessor(FileProcessor):
                 f.write(f"<!-- Could not parse XML file {os.path.basename(self.file_path)} due to syntax errors. -->")
             return
 
+        use_deduplication = self.orchestrator.use_cache
         text_groups: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
         for element in tree.iter():
             path = self._get_xpath(element)
@@ -581,15 +602,18 @@ class XmlFileProcessor(FileProcessor):
                     group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
                     text_groups[group_key].append(value)
 
-        translation_map = {}
+        translation_map: Dict[str, deque] = defaultdict(deque)
         for group_key, texts in text_groups.items():
             forced_type = group_key if group_key != "auto" else None
             if isinstance(forced_type, tuple):
                 forced_type = list(forced_type)
             
-            unique_texts = list(set(texts))
-            anonymized_texts = self._process_batch_smart(unique_texts, forced_entity_type=forced_type)
-            translation_map.update(dict(zip(unique_texts, anonymized_texts)))
+            strings_to_process = sorted(list(set(texts))) if use_deduplication else texts
+            if not strings_to_process: continue
+
+            anonymized_texts = self._process_batch_smart(strings_to_process, forced_entity_type=forced_type)
+            for original, anonymized in zip(strings_to_process, anonymized_texts):
+                translation_map[original].append(anonymized)
 
         if not translation_map:
             tree.write(output_path, encoding="utf-8", xml_declaration=True)
@@ -597,13 +621,23 @@ class XmlFileProcessor(FileProcessor):
 
         for element in tree.iter():
             if element.text in translation_map:
-                element.text = translation_map[element.text]
+                try:
+                    element.text = translation_map[element.text].popleft()
+                except IndexError:
+                    logging.error("Mismatch in anonymized XML text counts. Using original value as fallback.")
+
             if element.tail in translation_map:
-                element.tail = translation_map[element.tail]
+                try:
+                    element.tail = translation_map[element.tail].popleft()
+                except IndexError:
+                    logging.error("Mismatch in anonymized XML tail counts. Using original value as fallback.")
             
             for key, value in element.attrib.items():
                 if value in translation_map:
-                    element.set(key, translation_map[value])
+                    try:
+                        element.set(key, translation_map[value].popleft())
+                    except IndexError:
+                        logging.error("Mismatch in anonymized XML attribute counts. Using original value as fallback.")
 
         tree.write(output_path, encoding="utf-8", xml_declaration=True)
 
@@ -736,7 +770,7 @@ class JsonFileProcessor(FileProcessor):
         if isinstance(obj, dict):
             return {k: self._reconstruct_object(v, path_aware_map, f"{current_path}.{k}") for k, v in obj.items()}
         elif isinstance(obj, list):
-            return [self._reconstruct_object(item, path_aware_map, current_path) for item in obj]
+            return [self._reconstruct_object(item, path_aware_map, f"{current_path}[{i}]") for i, item in enumerate(obj)]
         elif isinstance(obj, str):
             should_anon, group_key_or_list = self._should_anonymize(obj, current_path)
             if not should_anon:
@@ -749,32 +783,42 @@ class JsonFileProcessor(FileProcessor):
                 final_group_key = tuple(sorted(group_key_or_list))
 
             if final_group_key in path_aware_map and obj in path_aware_map[final_group_key]:
-                return path_aware_map[final_group_key][obj]
+                try:
+                    return path_aware_map[final_group_key][obj].popleft()
+                except IndexError:
+                    logging.error(f"Mismatch in anonymized string counts for string '{obj}' in group '{final_group_key}'. Using original value as fallback.")
+                    return obj
         return obj
 
-    def _build_path_aware_translation_map(self, text_groups: Dict) -> Dict[Union[str, tuple], Dict[str, str]]:
-        path_aware_map: Dict[Union[str, tuple], Dict[str, str]] = defaultdict(dict)
+    def _build_path_aware_translation_map(self, text_groups: Dict) -> Dict[Union[str, tuple], Dict[str, 'deque']]:
+        path_aware_map: Dict[Union[str, tuple], Dict[str, 'deque']] = defaultdict(lambda: defaultdict(deque))
         if not text_groups:
             return path_aware_map
 
-        total_unique_strings = sum(len(set(v)) for v in text_groups.values())
-        if not total_unique_strings:
+        use_deduplication = self.orchestrator.use_cache
+        total_strings = sum(len(v) if not use_deduplication else len(set(v)) for v in text_groups.values())
+        if not total_strings:
             return path_aware_map
             
-        progress = tqdm(total=total_unique_strings, desc="Anonymizing collected strings", unit="str", leave=False)
+        progress_desc = "Anonymizing (cached)" if use_deduplication else "Anonymizing (full context)"
+        progress = tqdm(total=total_strings, desc=progress_desc, unit="str", leave=False)
 
         for group_key, string_list in text_groups.items():
-            unique_strings = sorted(list(set(string_list)))
-            if not unique_strings: continue
+            strings_to_process = sorted(list(set(string_list))) if use_deduplication else string_list
+            if not strings_to_process: continue
 
             forced_type: Optional[Union[str, List[str]]] = group_key if group_key != "auto" else None
             if isinstance(forced_type, tuple): 
                 forced_type = list(forced_type)
 
-            for chunk in self._batch_iterator(unique_strings, self.DEFAULT_BATCH_SIZE):
-                anonymized_strings = self._process_batch_smart(chunk, forced_entity_type=forced_type)
-                path_aware_map[group_key].update(dict(zip(chunk, anonymized_strings)))
+            anonymized_strings = []
+            for chunk in self._batch_iterator(strings_to_process, self.DEFAULT_BATCH_SIZE):
+                anonymized_chunk = self._process_batch_smart(chunk, forced_entity_type=forced_type)
+                anonymized_strings.extend(anonymized_chunk)
                 progress.update(len(chunk))
+            
+            for original, anonymized in zip(strings_to_process, anonymized_strings):
+                path_aware_map[group_key][original].append(anonymized)
         
         progress.close()
         return path_aware_map
