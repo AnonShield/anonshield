@@ -123,6 +123,7 @@ def _parse_arguments():
     parser.add_argument("--log-level", type=str, default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level (default: WARNING).")
 
     args = parser.parse_args()
+    logging.debug(f"Parsed arguments: {args}")
 
     if args.list_entities:
         _handle_list_entities()
@@ -138,6 +139,7 @@ def _parse_arguments():
 
     # Handle the --optimize flag
     if args.optimize:
+        logging.info("Optimization mode enabled: setting fast strategy, in-memory DB, cache, and min-word-length=3.")
         args.anonymization_strategy = "fast"
         args.db_mode = "in-memory"
         args.use_cache = True
@@ -161,6 +163,8 @@ def main():
     if not isinstance(numeric_level, int):
         raise ValueError(f"Invalid log level: {args.log_level}")
     logging.basicConfig(level=numeric_level, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.debug(f"Resolved log level to: {numeric_level}")
+    logging.info("Starting anonymization process...")
 
     if not os.path.exists(args.file_path):
         logging.critical(f"Input path not found: {args.file_path}")
@@ -182,6 +186,8 @@ def main():
         except Exception as e:
             logging.error(f"Error reading anonymization config file: {e}")
             sys.exit(1)
+    else:
+        logging.info("Anonymization config not provided. Proceeding without specific rules for structured files.")
 
     # --- Common Setup ---
     # Dynamically set LD_LIBRARY_PATH for CUDA libraries
@@ -215,24 +221,30 @@ def main():
     start_time = time.time()
     if not args.generate_ner_data:
         initialize_db(mode=args.db_mode, synchronous=args.db_synchronous_mode)
+        logging.info(f"Database initialized in '{args.db_mode}' mode with synchronous PRAGMA set to '{args.db_synchronous_mode or 'NORMAL'}'.")
     
     # Update stoplist from CLI
     if args.technical_stoplist:
         from src.anon.config import TECHNICAL_STOPLIST
         new_stopwords = {term.strip().lower() for term in args.technical_stoplist.split(',') if term.strip()}
-        TECHNICAL_STOPLIST.update(new_stopwords)
+        if new_stopwords:
+            TECHNICAL_STOPLIST.update(new_stopwords)
+            logging.info(f"Updated TECHNICAL_STOPLIST with {len(new_stopwords)} custom words.")
 
     models_check(args.lang)
 
     allow_list = [term.strip() for term in args.allow_list.split(',') if term]
+    logging.debug(f"Allow list: {allow_list}")
     
     requested_preserve = [e.strip().upper() for e in args.preserve_entities.split(',') if e and e.strip()]
+    logging.debug(f"Requested entities to preserve: {requested_preserve}")
     supported_entities_upper = {s.upper() for s in get_supported_entities()}
     unknown_entities = [e for e in requested_preserve if e not in supported_entities_upper]
     if unknown_entities:
         logging.warning(f"Unsupported entities will be ignored: {', '.join(unknown_entities)}")
 
     entities_to_preserve = [e for e in requested_preserve if e in supported_entities_upper]
+    logging.debug(f"Effective entities to preserve: {entities_to_preserve}")
 
     try:
         engine_message = "NER detection engine" if args.generate_ner_data else "anonymization engine"
@@ -259,31 +271,38 @@ def main():
             "overwrite": args.overwrite,
             "disable_gc": args.disable_gc,
         }
+        logging.debug(f"Processor factory arguments: {processor_factory_args}")
 
         if os.path.isdir(args.file_path):
             mode_str = "Generating NER data from" if args.generate_ner_data else "Processing"
             logging.info(f"{mode_str} directory: {args.file_path}...")
-            processed_files = []
+            processed_files_count = 0
             
             for root, _, files in os.walk(args.file_path):
                 for file_name in files:
-                    file_path = os.path.join(root, file_name)
+                    file_full_path = os.path.join(root, file_name)
+                    logging.debug(f"Attempting to get processor for file: {file_full_path}")
                     try:
-                        processor = get_processor(file_path, orchestrator, **processor_factory_args)
-                        if not processor: continue # Skip unsupported files
+                        processor = get_processor(file_full_path, orchestrator, **processor_factory_args)
+                        if not processor: 
+                            logging.debug(f"No suitable processor found for file: {file_full_path}. Skipping.")
+                            continue
+                        
                         output_file = processor.process()
-                        processed_files.append(output_file)
+                        processed_files_count += 1
                         if args.generate_ner_data:
                             logging.info(f"NER data for '{file_name}' saved at: {output_file}")
                         else:
                             logging.info(f"Anonymized file for '{file_name}' saved at: {output_file}")
                     except ValueError as ve:
-                        logging.warning(f"Skipping file '{file_path}': {ve}")
+                        logging.warning(f"Skipping file '{file_full_path}': {ve}")
                     except Exception as e:
-                        logging.error(f"An error occurred processing file '{file_path}': {e}", exc_info=True)
+                        logging.error(f"An error occurred processing file '{file_full_path}': {e}", exc_info=True)
             
-            if not processed_files:
-                logging.warning("No files were processed in the directory.")
+            if processed_files_count == 0:
+                logging.warning(f"No files were processed in the directory: {args.file_path}")
+            else:
+                logging.info(f"Finished processing {processed_files_count} files in directory: {args.file_path}")
 
         else:
             mode_str = "Generating NER data for" if args.generate_ner_data else "Processing"
@@ -297,6 +316,8 @@ def main():
                     logging.info(f"Anonymized file saved at: {output_file}")
             else:
                 logging.warning(f"Skipping unsupported file: {args.file_path}")
+
+        logging.info("Processing complete.")
 
 
 

@@ -51,6 +51,9 @@ class CustomSlugAnonymizer(Operator):
         # 1. Clean the text (remove extra spaces)
         clean_text = " ".join(text.split()).strip()
         
+        entity_type = params.get("entity_type", "UNKNOWN") if params else "UNKNOWN"
+        logging.debug(f"Anonymizing text '{clean_text}' with entity type '{entity_type}'.")
+
         if not SECRET_KEY:
             raise ValueError("SECRET_KEY is not set.")
 
@@ -233,9 +236,13 @@ class AnonymizationOrchestrator:
         self.max_cache_size = max_cache_size
         self.cache: OrderedDict[str, str] = OrderedDict()
         
+        logging.debug(f"AnonymizationOrchestrator initialized with: lang='{lang}', strategy='{strategy}', use_cache={use_cache}, max_cache_size={max_cache_size}, regex_priority={regex_priority}, slug_length={slug_length}.")
+        logging.debug(f"Allow list: {self.allow_list}, Entities to preserve: {self.entities_to_preserve}")
+
         if analyzer_engine and anonymizer_engine:
             self.analyzer_engine = analyzer_engine
             self.anonymizer_engine = anonymizer_engine
+            logging.debug("Using pre-provided analyzer and anonymizer engines.")
         else:
             self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
         
@@ -254,7 +261,9 @@ class AnonymizationOrchestrator:
                         "score": pattern.score
                     })
                 except re.error:
-                    pass
+                    logging.warning(f"Invalid regex pattern skipped: {pattern.regex}")
+        logging.debug(f"Loaded {len(custom_recognizers)} custom recognizers and compiled {len(self.compiled_patterns)} regex patterns.")
+
 
     def _get_from_cache(self, key: str) -> Optional[str]:
         """Retrieves an item from the cache, moving it to the front (most recently used)."""
@@ -263,7 +272,9 @@ class AnonymizationOrchestrator:
         if key in self.cache:
             value = self.cache.pop(key) # Remove and re-insert to mark as recently used
             self.cache[key] = value
+            logging.debug(f"Cache hit for key: '{key}'")
             return value
+        logging.debug(f"Cache miss for key: '{key}'")
         return None
 
     def _add_to_cache(self, key: str, value: str):
@@ -272,12 +283,17 @@ class AnonymizationOrchestrator:
             return
         if key in self.cache:
             self.cache.pop(key) # Update value and mark as recently used
+            logging.debug(f"Updating cache for existing key: '{key}'")
         elif len(self.cache) >= self.max_cache_size:
-            self.cache.popitem(last=False) # Remove LRU item
+            lru_key = self.cache.popitem(last=False)[0] # Remove LRU item
+            logging.debug(f"Cache full (max size {self.max_cache_size}), evicting LRU item: '{lru_key}' to add key: '{key}'")
+        else:
+            logging.debug(f"Adding new item to cache for key: '{key}'")
         self.cache[key] = value
 
     def _setup_engines(self) -> tuple[BatchAnalyzerEngine, AnonymizerEngine]:
         """Initializes the Presidio engines, keeping the XLM-Roberta model and security settings."""
+        logging.info("Setting up Presidio analyzer and anonymizer engines.")
         lang_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
         supported_langs = set(["en", self.lang])
 
@@ -287,12 +303,14 @@ class AnonymizationOrchestrator:
             trf_model_config.append(
                 {"lang_code": lang_code, "model_name": {"spacy": spacy_model_name, "transformers": TRANSFORMER_MODEL}}
             )
+        logging.debug(f"Transformer model config: {trf_model_config}")
 
         ner_config = NerModelConfiguration(
             model_to_presidio_entity_mapping=ENTITY_MAPPING, 
             aggregation_strategy="max", 
             labels_to_ignore=["O"]
         )
+        logging.debug(f"NER model configuration: {ner_config}")
         
         nlp_engine = TransformersNlpEngine(models=trf_model_config, ner_model_configuration=ner_config)
         core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=list(supported_langs))
@@ -304,6 +322,7 @@ class AnonymizationOrchestrator:
         anonymizer = AnonymizerEngine()
         anonymizer.add_anonymizer(CustomSlugAnonymizer)
         
+        logging.info("Presidio engines setup complete.")
         return batch_analyzer, anonymizer
 
     def anonymize_text(self, text: str, operator_params: Optional[Dict] = None, forced_entity_type: Optional[Union[str, List[str]]] = None) -> str:
@@ -325,17 +344,23 @@ class AnonymizationOrchestrator:
         This method dispatches to the appropriate internal method ('presidio', 'fast', 'balanced', etc.)
         and includes a fallback mechanism to ensure data integrity.
         """
+        logging.debug(f"Anonymizing {len(texts)} texts using strategy: '{self.strategy}'. Forced entity type: '{forced_entity_type}'")
         if isinstance(forced_entity_type, list):
+            logging.debug("Dispatching to _anonymize_texts_pick_one strategy.")
             results = self._anonymize_texts_pick_one(texts, forced_entity_type, operator_params)
         elif isinstance(forced_entity_type, str):
+            logging.debug("Dispatching to _anonymize_texts_forced_type strategy.")
             results = self._anonymize_texts_forced_type(texts, forced_entity_type, operator_params)
         elif self.strategy == "fast":
+            logging.debug("Dispatching to 'fast' anonymization strategy.")
             results = self._anonymize_texts_fast_path(texts, operator_params)
         elif self.strategy == "balanced":
+            logging.debug("Dispatching to 'balanced' anonymization strategy.")
             core_entities = self._get_core_entities()
             entities_to_anonymize = [e for e in core_entities if e not in self.entities_to_preserve]
             results = self._anonymize_texts_presidio(texts, operator_params, entities=entities_to_anonymize)
         else: # "presidio" strategy
+            logging.debug("Dispatching to 'presidio' anonymization strategy (default).")
             entities_to_anonymize = self._get_entities_to_anonymize()
             results = self._anonymize_texts_presidio(texts, operator_params, entities=entities_to_anonymize)
 
@@ -530,6 +555,8 @@ class AnonymizationOrchestrator:
         if not texts_to_process_in_batch:
             return [res if res is not None else "" for res in anonymized_results]
 
+        logging.debug(f"Processing batch of {len(texts_to_process_in_batch)} texts in fast path.")
+
         if operator_params is None: operator_params = {}
         entity_collector = operator_params.get("entity_collector")
         nlp_engine = self.analyzer_engine.analyzer_engine.nlp_engine
@@ -563,6 +590,7 @@ class AnonymizationOrchestrator:
 
         # If no specific entities are passed, use the default logic for the "presidio" strategy.
         entities_to_use = entities if entities is not None else self._get_entities_to_anonymize()
+        logging.debug(f"[_anonymize_texts_presidio] Entities to use for analysis: {entities_to_use}")
         
         if operator_params is None: operator_params = {}
         operator_params["total_entities_counter"] = self
@@ -618,6 +646,7 @@ class AnonymizationOrchestrator:
     def detect_entities(self, texts: List[str]) -> List[dict]:
         if not texts: return []
 
+        logging.debug(f"Detecting entities for {len(texts)} texts.")
         original_texts = [str(text) if pd.notna(text) else "" for text in texts]
         unique_texts_to_process = sorted(list(set(t for t in original_texts if t)))
 
