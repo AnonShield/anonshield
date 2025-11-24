@@ -329,6 +329,8 @@ uv run anon.py --list-languages
 
 - `--optimize`: A shorthand to enable all performance optimizations (`--anonymization-strategy fast`, `--db-mode in-memory`, `--use-cache`, and `--min-word-length 3`).
 - `--use-cache`: Enables in-memory caching for the run to speed up repeated anonymizations. Disabled by default.
+- `--preserve-row-context`: For CSV/XLSX files, process every value to preserve row context, which is more accurate but slower. The default behavior is to only process unique values, which is faster.
+- `--json-stream-threshold-mb <NUM>`: Sets the threshold (in MB) for streaming JSON files. Files larger than this will be streamed from disk to conserve memory. Default: `100`.
 - `--max-cache-size <NUM>`: Maximum number of items to store in the in-memory cache. Default: `10000`.
 - `--min-word-length <NUM>`: Minimum character length for a word to be processed. Default: `0` (no limit).
 - `--technical-stoplist <TERMS>`: A comma-separated list of custom words to add to the technical stoplist.

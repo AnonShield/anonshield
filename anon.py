@@ -21,9 +21,8 @@ from src.anon.config import (
     SECRET_KEY,
     TRANSFORMER_MODEL,
     TRF_MODEL_PATH,
-    initialize_db,
-    shutdown_db_writer,
 )
+from src.anon.database import DatabaseContext
 from src.anon.engine import AnonymizationOrchestrator, load_custom_recognizers, SUPPORTED_LANGUAGES
 from src.anon.processors import get_processor
 
@@ -109,6 +108,8 @@ def _parse_arguments():
     parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a JSON file with advanced anonymization rules for structured files.")
     
     # Performance & Filtering options
+    parser.add_argument("--preserve-row-context", action="store_true", help="For CSV/XLSX, process all values to preserve context instead of only unique values. Slower but more accurate.")
+    parser.add_argument("--json-stream-threshold-mb", type=int, default=100, help="JSON streaming threshold in MB. Files larger than this will be streamed from disk.")
     parser.add_argument("--optimize", action="store_true", help="Enable all optimizations (fast strategy, cache, min-word-length=3, in-memory DB).")
     parser.add_argument("--use-cache", action="store_true", default=False, help="Enable in-memory caching for the run. Disabled by default.")
     parser.add_argument("--max-cache-size", type=int, default=10000, help="Maximum number of items to store in the in-memory cache. Default is 10000.")
@@ -121,6 +122,14 @@ def _parse_arguments():
     parser.add_argument("--disable-gc", action="store_true", help="Disable automatic garbage collection during processing. May boost speed for single large files but increases memory usage.")
     parser.add_argument("--db-synchronous-mode", type=str, default=None, choices=["OFF", "NORMAL", "FULL", "EXTRA"], help="SQLite 'synchronous' PRAGMA mode. Overrides config file setting.")
     parser.add_argument("--log-level", type=str, default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level (default: WARNING).")
+
+    # Chunking & Batching Options
+    chunk_group = parser.add_argument_group('Chunking and Batching')
+    chunk_group.add_argument("--batch-size", type=int, default=200, help="Default batch size for processing text chunks. Default: 200.")
+    chunk_group.add_argument("--csv-chunk-size", type=int, default=1000, help="Chunk size for reading CSV files with pandas. Default: 1000.")
+    chunk_group.add_argument("--json-chunk-size", type=int, default=1000, help="Chunk size for streaming large JSON arrays. Default: 1000.")
+    chunk_group.add_argument("--ner-chunk-size", type=int, default=1500, help="Max character size for text chunks in NER data generation. Default: 1500.")
+    chunk_group.add_argument("--nlp-batch-size", type=int, default=500, help="Batch size for spaCy's nlp.pipe() processing. Default: 500.")
 
     args = parser.parse_args()
     logging.debug(f"Parsed arguments: {args}")
@@ -219,10 +228,13 @@ def main():
         sys.exit(1)
 
     start_time = time.time()
-    if not args.generate_ner_data:
-        initialize_db(mode=args.db_mode, synchronous=args.db_synchronous_mode)
-        logging.info(f"Database initialized in '{args.db_mode}' mode with synchronous PRAGMA set to '{args.db_synchronous_mode or 'NORMAL'}'.")
     
+    db_context = None
+    if not args.generate_ner_data:
+        db_context = DatabaseContext(mode=args.db_mode)
+        db_context.initialize(synchronous=args.db_synchronous_mode)
+        logging.info(f"Database initialized in '{args.db_mode}' mode with synchronous PRAGMA set to '{args.db_synchronous_mode or 'NORMAL'}'.")
+
     # Update stoplist from CLI
     if args.technical_stoplist:
         from src.anon.config import TECHNICAL_STOPLIST
@@ -251,14 +263,16 @@ def main():
         logging.info(f"Initializing {engine_message} for language '{args.lang}'...")
         
         orchestrator = AnonymizationOrchestrator(
-            lang=args.lang, 
+            lang=args.lang,
+            db_context=db_context,
             allow_list=allow_list, 
             entities_to_preserve=entities_to_preserve,
             slug_length=args.slug_length,
             strategy=args.anonymization_strategy,
             use_cache=args.use_cache,
             regex_priority=args.regex_priority,
-            max_cache_size=args.max_cache_size
+            max_cache_size=args.max_cache_size,
+            nlp_batch_size=args.nlp_batch_size
         )
         
         # --- Processing ---
@@ -270,6 +284,12 @@ def main():
             "output_dir": args.output_dir,
             "overwrite": args.overwrite,
             "disable_gc": args.disable_gc,
+            "json_stream_threshold_mb": args.json_stream_threshold_mb,
+            "preserve_row_context": args.preserve_row_context,
+            "batch_size": args.batch_size,
+            "csv_chunk_size": args.csv_chunk_size,
+            "json_chunk_size": args.json_chunk_size,
+            "ner_chunk_size": args.ner_chunk_size,
         }
         logging.debug(f"Processor factory arguments: {processor_factory_args}")
 
@@ -336,10 +356,9 @@ def main():
         logging.error(f"An error occurred during processing: {e}", exc_info=True)
         sys.exit(1)
     finally:
-        if not args.generate_ner_data:
-            logging.info("Shutting down database writer...")
-            shutdown_db_writer()
-            logging.info("Database writer shut down.")
+        if db_context:
+            db_context.shutdown()
+
 
 
 if __name__ == "__main__":

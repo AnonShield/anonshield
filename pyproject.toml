@@ -21,4 +21,5 @@ dependencies = [
     "lxml>=5.2.2",
     "ijson>=3.4.0.post0",
     "orjson>=3.11.4",
+    "tenacity",
 ]

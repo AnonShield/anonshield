@@ -42,6 +42,7 @@ class TestPiiLeak(unittest.TestCase):
         # Instantiate a REAL orchestrator. The fallback logic we want to test is inside it.
         orchestrator = AnonymizationOrchestrator(
             lang="en",
+            db_context=None, # Pass None for db_context as this test doesn't require actual DB interaction
             allow_list=[],
             entities_to_preserve=[]
         )

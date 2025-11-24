@@ -27,7 +27,7 @@ from PIL import Image  # type: ignore
 from tqdm import tqdm  # type: ignore
 import pymupdf as fitz  # type: ignore
 
-from .config import bulk_save_to_db, TECHNICAL_STOPLIST
+from .config import TECHNICAL_STOPLIST
 from .engine import AnonymizationOrchestrator
 
 
@@ -83,7 +83,20 @@ def extract_text_from_image(image_bytes: bytes) -> str:
 class FileProcessor(ABC):
     DEFAULT_BATCH_SIZE = 200
 
-    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator, ner_data_generation: bool = False, anonymization_config: Optional[Dict] = None, min_word_length: int = 3, skip_numeric: bool = False, output_dir: str = "output", overwrite: bool = False, disable_gc: bool = False):
+    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator, 
+                 ner_data_generation: bool = False, 
+                 anonymization_config: Optional[Dict] = None, 
+                 min_word_length: int = 3, 
+                 skip_numeric: bool = False, 
+                 output_dir: str = "output", 
+                 overwrite: bool = False, 
+                 disable_gc: bool = False,
+                 json_stream_threshold_mb: int = 100,
+                 preserve_row_context: bool = False,
+                 batch_size: int = 200,
+                 csv_chunk_size: int = 1000,
+                 json_chunk_size: int = 1000,
+                 ner_chunk_size: int = 1500):
         self.file_path = file_path
         self.orchestrator = orchestrator
         self.ner_data_generation = ner_data_generation
@@ -93,6 +106,12 @@ class FileProcessor(ABC):
         self.output_dir = output_dir
         self.overwrite = overwrite
         self.disable_gc = disable_gc
+        self.json_stream_threshold_bytes = json_stream_threshold_mb * 1024 * 1024
+        self.preserve_row_context = preserve_row_context
+        self.batch_size = batch_size
+        self.csv_chunk_size = csv_chunk_size
+        self.json_chunk_size = json_chunk_size
+        self.ner_chunk_size = ner_chunk_size
         self.ner_output_file: Optional[str] = None
         self.ner_file_handle = None # Initialize to None
         logging.debug(f"FileProcessor initialized for '{file_path}' with: ner_data_generation={ner_data_generation}, min_word_length={min_word_length}, skip_numeric={skip_numeric}, output_dir='{output_dir}', overwrite={overwrite}, disable_gc={disable_gc}.")
@@ -159,7 +178,7 @@ class FileProcessor(ABC):
         with open(output_path, "w", encoding="utf-8") as outfile:
             text_iterator = self._extract_texts()
             batch_count = 0
-            for text_batch in self._batch_iterator(text_iterator, self.DEFAULT_BATCH_SIZE):
+            for text_batch in self._batch_iterator(text_iterator, self.batch_size):
                 if not text_batch: continue
                 batch_count += 1
                 logging.debug(f"Processing batch {batch_count} for anonymization (size: {len(text_batch)}).")
@@ -254,28 +273,24 @@ class FileProcessor(ABC):
             return []
         
         logging.debug(f"Processing smart batch of {len(text_list)} items. Forced entity type: {forced_entity_type}")
-        entity_collector: List = []
+        
         anonymized_values = self.orchestrator.anonymize_texts(
             text_list,
-            operator_params={"entity_collector": entity_collector},
             forced_entity_type=forced_entity_type
         )
-
-        if entity_collector:
-            bulk_save_to_db(list(entity_collector))
-            logging.debug(f"Bulk saved {len(entity_collector)} entities to DB.")
 
         if len(anonymized_values) != len(text_list):
             logging.critical(f"PII leakage detected in {self.file_path}: batch size mismatch. "
                              f"Input length: {len(text_list)}, Output length: {len(anonymized_values)}")
             raise RuntimeError("Anonymization failed to prevent data leak. Halting execution.")
+        
         logging.debug(f"Smart batch processed successfully. Anonymized {len(text_list)} items.")
         return anonymized_values
 
     def _run_ner_pipeline(self, text_list: List[str]):
         if not text_list: return
 
-        MAX_CHUNK_SIZE = 1500 
+        MAX_CHUNK_SIZE = self.ner_chunk_size
         DELIMITER = " . ||| . "
         
         text_chunks: List[str] = []
@@ -414,19 +429,18 @@ class PdfFileProcessor(FileProcessor):
                 page.clean_contents()
                 del page # Ensure the page object is released
 
-                # Periodically force garbage collection for long-running processes
-                if page_num % 50 == 0:
-                    gc.collect()
-
 
 class CsvFileProcessor(FileProcessor):
     def _get_output_extension(self) -> str:
         return ".csv"
     
     def _process_anonymization(self, output_path: str):
-        chunk_size = 1000 # Increased chunk size
+        chunk_size = self.csv_chunk_size
         header_written = False
-        use_deduplication = self.orchestrator.use_cache
+        
+        # The logic is now inverted: by default we use deduplication (faster).
+        # Full context processing is enabled only when the flag is explicitly set.
+        use_deduplication = not self.preserve_row_context
         
         try:
             # Efficiently get total_rows for tqdm
@@ -451,7 +465,7 @@ class CsvFileProcessor(FileProcessor):
                 anonymized_chunk = chunk.copy()
                 
                 if use_deduplication:
-                    logging.debug("CSV processing with deduplication enabled (cache active).")
+                    logging.debug("CSV processing with value deduplication (faster, context-unaware).")
                     # Original fast path: process unique values only
                     texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
                     for col in chunk.columns:
@@ -478,7 +492,7 @@ class CsvFileProcessor(FileProcessor):
                             logging.debug(f"Applying anonymization map to column '{col}'.")
                             anonymized_chunk[col] = anonymized_chunk[col].map(lambda x: translation_map.get(str(x), x))
                 else:
-                    logging.debug("CSV processing without deduplication (cache inactive), processing all values.")
+                    logging.debug("CSV processing with row context preservation (slower, context-aware).")
                     # New context-aware path: process all values
                     for col in chunk.columns:
                         series = chunk[col].dropna()
@@ -509,7 +523,7 @@ class CsvFileProcessor(FileProcessor):
             progress_bar.close()
 
     def _extract_texts(self) -> Iterable[str]:
-        chunk_size = 1000 # Increased chunk size
+        chunk_size = self.csv_chunk_size
         with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
             for chunk in reader:
                 batch_values = []
@@ -539,25 +553,38 @@ class XlsxFileProcessor(FileProcessor):
                             yield cell.value
     
     def _process_anonymization(self, output_path: str):
-        wb = openpyxl.load_workbook(self.file_path)
-        use_deduplication = self.orchestrator.use_cache
-        logging.debug(f"XLSX processing with deduplication: {use_deduplication}.")
+        """
+        Process an XLSX file in a memory-efficient way.
+        It makes two passes: one to collect texts and another to write the anonymized file.
+        """
+        # Pass 1: Collect all unique strings that need to be anonymized.
+        try:
+            read_only_wb = openpyxl.load_workbook(self.file_path, read_only=True)
+        except Exception as e:
+            logging.error(f"Failed to open XLSX file {self.file_path} in read-only mode: {e}")
+            shutil.copy(self.file_path, output_path) # Copy original on failure to open
+            return
+
+        # The logic is now inverted: by default we use deduplication (faster).
+        # Full context processing is enabled only when the flag is explicitly set.
+        use_deduplication = not self.preserve_row_context
+        logging.debug(f"XLSX processing pass 1 (collecting texts) with deduplication: {use_deduplication}.")
         
         all_texts_map: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
-        for sheet_idx, sheet in enumerate(wb.worksheets):
-            logging.debug(f"Collecting texts from sheet '{sheet.title}' ({sheet_idx + 1}/{len(wb.worksheets)}).")
-            for row_idx, row in enumerate(sheet.iter_rows()):
-                for col_idx, cell in enumerate(row):
-                    if cell.value and isinstance(cell.value, str):
-                        path = f"{sheet.title}.{cell.column_letter}"
-                        should_anon, forced_type = self._should_anonymize(cell.value, path)
-                        if should_anon:
-                            if isinstance(forced_type, list):
-                                group_key = tuple(forced_type)
-                            else:
-                                group_key = forced_type if forced_type is not None else "auto"
-                            all_texts_map[group_key].append(cell.value)
-        
+        try:
+            for sheet in read_only_wb.worksheets:
+                for row in sheet.iter_rows():
+                    for cell in row:
+                        if cell.value and isinstance(cell.value, str):
+                            path = f"{sheet.title}.{cell.column_letter}"
+                            should_anon, forced_type = self._should_anonymize(cell.value, path)
+                            if should_anon:
+                                group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type or "auto")
+                                all_texts_map[group_key].append(cell.value)
+        finally:
+            read_only_wb.close() # Ensure read-only workbook is closed
+
+        # Anonymize all collected texts at once.
         translation_map: Dict[str, deque] = defaultdict(deque)
         if all_texts_map:
             for group_key, texts in all_texts_map.items():
@@ -568,35 +595,59 @@ class XlsxFileProcessor(FileProcessor):
                 strings_to_process = sorted(list(set(texts))) if use_deduplication else texts
                 if not strings_to_process: continue
                 
-                logging.debug(f"Anonymizing {len(strings_to_process)} unique texts for group '{group_key}' in XLSX.")
+                logging.debug(f"Anonymizing {len(strings_to_process)} texts for group '{group_key}' in XLSX.")
                 anonymized_texts = self._process_batch_smart(strings_to_process, forced_entity_type=forced_type)
                 for original, anonymized in zip(strings_to_process, anonymized_texts):
                     translation_map[original].append(anonymized)
 
         if not translation_map:
-            logging.info("No PII found for anonymization in XLSX. Saving original file.")
-            wb.save(output_path)
+            logging.info("No PII found for anonymization in XLSX. Copying original file.")
+            shutil.copy(self.file_path, output_path)
             return
+            
+        # Pass 2: Create a new workbook and write the anonymized content.
+        try:
+            read_only_wb = openpyxl.load_workbook(self.file_path, read_only=True)
+        except Exception as e:
+            logging.error(f"Failed to re-open XLSX file {self.file_path} for pass 2: {e}")
+            # At this point, we can't create the anonymized file, so we copy the original.
+            shutil.copy(self.file_path, output_path)
+            return
+            
+        write_wb = openpyxl.Workbook()
+        if "Sheet" in write_wb.sheetnames and len(write_wb.sheetnames) == 1:
+            write_wb.remove(write_wb["Sheet"])
 
-        for sheet_idx, sheet in enumerate(wb.worksheets):
-            logging.debug(f"Applying anonymization to sheet '{sheet.title}' ({sheet_idx + 1}/{len(wb.worksheets)}).")
-            for row_idx, row in enumerate(sheet.iter_rows()):
-                for col_idx, cell in enumerate(row):
-                    if isinstance(cell.value, str) and cell.value in translation_map:
-                        try:
-                            if use_deduplication:
-                                cell.value = translation_map[cell.value][0]
-                            else:
-                                cell.value = translation_map[cell.value].popleft()
-                            logging.debug(f"Anonymized cell at {sheet.title}!{cell.column_letter}{cell.row}.")
-                        except IndexError:
-                            logging.error(f"Mismatch in anonymized XLSX cell counts for '{cell.value}' at {sheet.title}!{cell.column_letter}{cell.row}. Using original value as fallback.")
+        logging.debug("XLSX processing pass 2 (writing anonymized file).")
+        try:
+            for read_sheet in read_only_wb.worksheets:
+                write_sheet = write_wb.create_sheet(title=read_sheet.title)
+                for row_idx, row in enumerate(read_sheet.iter_rows(), 1):
+                    for col_idx, cell in enumerate(row, 1):
+                        new_cell = write_sheet.cell(row=row_idx, column=col_idx)
+                        
+                        original_value = cell.value
+                        if isinstance(original_value, str) and original_value in translation_map:
+                            try:
+                                if use_deduplication:
+                                    new_cell.value = translation_map[original_value][0]
+                                else:
+                                    new_cell.value = translation_map[original_value].popleft()
+                            except IndexError:
+                                logging.error(f"Mismatch in anonymized XLSX cell counts for '{original_value}'. Using original value as fallback.")
+                                new_cell.value = original_value
+                        else:
+                            new_cell.value = original_value
+        finally:
+            read_only_wb.close()
         
         logging.info(f"Anonymized XLSX file saved to: {output_path}")
-        wb.save(output_path)
+        write_wb.save(output_path)
 
 
 class XmlFileProcessor(FileProcessor):
+    XML_MEMORY_THRESHOLD_BYTES = 200 * 1024 * 1024 # 200 MB
+
     def _get_output_extension(self) -> str:
         return ".xml"
 
@@ -623,6 +674,16 @@ class XmlFileProcessor(FileProcessor):
             element.clear()
 
     def _process_anonymization(self, output_path: str):
+        file_size = os.path.getsize(self.file_path)
+        if file_size > self.XML_MEMORY_THRESHOLD_BYTES:
+            logging.warning(
+                f"XML file '{os.path.basename(self.file_path)}' ({file_size / 1024**2:.1f} MB) "
+                f"exceeds the memory safety threshold of {self.XML_MEMORY_THRESHOLD_BYTES / 1024**2:.1f} MB. "
+                "Skipping anonymization to prevent potential Out-of-Memory errors. The original file will be copied."
+            )
+            shutil.copy(self.file_path, output_path)
+            return
+
         parser = etree.XMLParser(recover=True, strip_cdata=False)
         try:
             tree = etree.parse(self.file_path, parser)
@@ -725,9 +786,6 @@ class JsonFileProcessor(FileProcessor):
     - For .json files, it uses a fast in-memory approach for small files and a
       memory-efficient streaming approach for large files that are root-level arrays.
     """
-    JSON_STREAM_THRESHOLD_BYTES = 100 * 1024 * 1024  # 100 MB
-    JSON_CHUNK_SIZE = 1000 # Number of objects to process per batch in array streaming mode
-
     def _get_output_extension(self) -> str:
         return ".json" if not self.file_path.endswith(".jsonl") else ".jsonl"
 
@@ -751,13 +809,13 @@ class JsonFileProcessor(FileProcessor):
             return
 
         file_size = os.path.getsize(self.file_path)
-        is_large_file = file_size >= self.JSON_STREAM_THRESHOLD_BYTES
-        logging.debug(f"JSON file size: {file_size / (1024 * 1024):.2f} MB. Large file threshold: {self.JSON_STREAM_THRESHOLD_BYTES / (1024 * 1024):.2f} MB.")
+        is_large_file = file_size >= self.json_stream_threshold_bytes
+        logging.debug(f"JSON file size: {file_size / (1024 * 1024):.2f} MB. Large file threshold: {self.json_stream_threshold_bytes / (1024 * 1024):.2f} MB.")
 
         if is_large_file:
             if self._is_json_array():
                 logging.info("Large JSON array detected (%.1f MB). Switching to memory-efficient array streaming mode.", file_size / 1024 / 1024)
-                self._process_json_array_streaming(output_path, self.JSON_CHUNK_SIZE)
+                self._process_json_array_streaming(output_path, self.json_chunk_size)
             else:
                 logging.error(f"Streaming for large single JSON objects ({file_size / 1024 / 1024:.1f} MB) is not supported due to memory safety. Only large arrays are streamable.")
                 raise ValueError(f"Streaming for large single JSON objects ({file_size / 1024 / 1024:.1f} MB) is not supported due to memory safety. Only large arrays are streamable.")
