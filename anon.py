@@ -158,6 +158,10 @@ def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     args = _parse_arguments()
 
+    if not os.path.exists(args.file_path):
+        logging.critical(f"Input path not found: {args.file_path}")
+        sys.exit(1)
+
     # --- Load Anonymization Config ---
     anonymization_config = None
     if args.anonymization_config:
@@ -281,11 +285,15 @@ def main():
             mode_str = "Generating NER data for" if args.generate_ner_data else "Processing"
             logging.info(f"{mode_str} file: {args.file_path}...")
             processor = get_processor(args.file_path, orchestrator, **processor_factory_args)
-            output_file = processor.process()
-            if args.generate_ner_data:
-                logging.info(f"NER data generation complete. Saved at: {output_file}")
+            if processor:
+                output_file = processor.process()
+                if args.generate_ner_data:
+                    logging.info(f"NER data generation complete. Saved at: {output_file}")
+                else:
+                    logging.info(f"Anonymized file saved at: {output_file}")
             else:
-                 logging.info(f"Anonymized file saved at: {output_file}")
+                logging.warning(f"Skipping unsupported file: {args.file_path}")
+
 
 
         # --- Final Output ---
