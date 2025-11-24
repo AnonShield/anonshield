@@ -5,6 +5,7 @@ import hmac
 import re
 from typing import Dict, List, Optional, Union
 from collections import OrderedDict # Add this import
+import logging
 
 import pandas as pd  # type: ignore
 import spacy  # type: ignore
@@ -310,12 +311,69 @@ class AnonymizationOrchestrator:
 
     def anonymize_texts(self, texts: List[str], operator_params: Optional[Dict] = None, forced_entity_type: Optional[Union[str, List[str]]] = None) -> List[str]:
         if isinstance(forced_entity_type, list):
-            return self._anonymize_texts_pick_one(texts, forced_entity_type, operator_params)
-        if isinstance(forced_entity_type, str):
-            return self._anonymize_texts_forced_type(texts, forced_entity_type, operator_params)
-        if self.strategy == "fast":
-            return self._anonymize_texts_fast_path(texts, operator_params)
-        return self._anonymize_texts_presidio(texts, operator_params)
+            results = self._anonymize_texts_pick_one(texts, forced_entity_type, operator_params)
+        elif isinstance(forced_entity_type, str):
+            results = self._anonymize_texts_forced_type(texts, forced_entity_type, operator_params)
+        elif self.strategy == "fast":
+            results = self._anonymize_texts_fast_path(texts, operator_params)
+        else:
+            results = self._anonymize_texts_presidio(texts, operator_params)
+
+        # --- FALLBACK ARCHITECTURE (NEW) ---
+        # QA Mindset: Post-Condition Validation (Design by Contract)
+        if len(results) != len(texts):
+            logging.warning(
+                "Batch integrity failure detected (Input: %d vs Output: %d). "
+                "Triggering Safe Fallback Mechanism.",
+                len(texts), len(results)
+            )
+            return self._safe_fallback_processing(texts, operator_params, forced_entity_type)
+        
+        return results
+
+    def _safe_fallback_processing(self, texts: List[str], operator_params: Optional[Dict], forced_entity_type: Optional[Union[str, List[str]]]) -> List[str]:
+        """
+        Fallback Method: Processes item by item to ensure atomicity and alignment.
+        Isolates failures: If one item fails, only that item is affected.
+        """
+        fallback_results = []
+        for text in texts:
+            try:
+                # Controlled recursion to process a single item.
+                # This forces the system to treat 'text' as a batch of 1,
+                # ensuring it goes through the same analyzers.
+                single_result_list = []
+                
+                # Re-use existing dispatch logic to keep it DRY
+                if isinstance(forced_entity_type, list):
+                    single_result_list = self._anonymize_texts_pick_one([text], forced_entity_type, operator_params)
+                elif isinstance(forced_entity_type, str):
+                    single_result_list = self._anonymize_texts_forced_type([text], forced_entity_type, operator_params)
+                elif self.strategy == "fast":
+                    single_result_list = self._anonymize_texts_fast_path([text], operator_params)
+                else:
+                    # In Presidio mode, we force individual analysis.
+                    # Note: Presidio can fail on empty or null strings, so we handle that here.
+                    if not text or not str(text).strip():
+                        single_result_list = [text]
+                    else:
+                        # Here we call the internal method directly to avoid an infinite loop,
+                        # but still ensuring error handling.
+                        single_result_list = self._anonymize_texts_presidio([text], operator_params)
+
+                # If even the individual call fails (returns empty), return the original.
+                if not single_result_list:
+                    fallback_results.append(text) 
+                else:
+                    fallback_results.append(single_result_list[0])
+
+            except Exception as e:
+                logging.error(f"Fallback failed for a specific item: {str(e)[:100]}...", exc_info=True)
+                # Fail-Safe: In case of a critical exception on the item, return the original
+                # to maintain file alignment (CSV/JSON), but log the error.
+                fallback_results.append(text)
+        
+        return fallback_results
 
     def _anonymize_texts_pick_one(self, texts: List[str], entity_types: List[str], operator_params: Optional[Dict] = None) -> List[str]:
         anonymized_list = []

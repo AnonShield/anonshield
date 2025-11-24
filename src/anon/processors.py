@@ -281,6 +281,34 @@ class TextFileProcessor(FileProcessor):
             for line in f:
                 yield line
 
+    def _process_anonymization(self, output_path: str):
+        """
+        Custom anonymization processing for text files to handle newlines correctly.
+        """
+        with open(output_path, "w", encoding="utf-8") as outfile:
+            # The base iterator yields lines with newlines attached.
+            text_iterator = self._extract_texts()
+
+            for text_batch in self._batch_iterator(text_iterator, self.DEFAULT_BATCH_SIZE):
+                if not text_batch:
+                    continue
+
+                # The orchestrator expects clean text, so we strip trailing newlines.
+                lines_to_process = [line.rstrip("\r\n") for line in text_batch]
+
+                # Heuristic: Check the first line of the batch to decide if we should anonymize.
+                # This assumes batches are reasonably homogenous.
+                should_anonymize, forced_type = self._should_anonymize(lines_to_process[0])
+                
+                if should_anonymize:
+                    anonymized_lines = self._process_batch_smart(lines_to_process, forced_entity_type=forced_type)
+                    for line in anonymized_lines:
+                        outfile.write(line + '\n')
+                else:
+                    # If the batch is skipped, write the original lines back.
+                    for line in text_batch:
+                        outfile.write(line)
+
 
 class ImageFileProcessor(FileProcessor):
     def _get_output_extension(self) -> str:

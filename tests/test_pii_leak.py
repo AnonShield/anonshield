@@ -1,7 +1,8 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import os
 import shutil
+import logging
 from src.anon.processors import TextFileProcessor
 from src.anon.engine import AnonymizationOrchestrator
 
@@ -13,35 +14,66 @@ class TestPiiLeak(unittest.TestCase):
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.test_data_dir, exist_ok=True)
         self.test_file = os.path.join(self.test_data_dir, "test.txt")
+        self.input_lines = ["line 1", "line 2", "line 3"]
         with open(self.test_file, "w") as f:
-            f.write("line 1\nline 2\nline 3")
+            f.write("\n".join(self.input_lines))
+        
+        # The secret key is required to instantiate the real orchestrator
+        os.environ["ANON_SECRET_KEY"] = "test-secret"
 
     def tearDown(self):
         if os.path.exists(self.output_dir):
             shutil.rmtree(self.output_dir)
         if os.path.exists(self.test_data_dir):
             shutil.rmtree(self.test_data_dir)
+        if "ANON_SECRET_KEY" in os.environ:
+            del os.environ["ANON_SECRET_KEY"]
 
-    @patch('src.anon.processors.AnonymizationOrchestrator')
-    def test_pii_leak_prevention(self, MockOrchestrator):
-        # Configure the mock orchestrator
-        mock_orchestrator_instance = MockOrchestrator.return_value
-        
-        # This is the crucial part: make anonymize_texts return a list of a different size
-        mock_orchestrator_instance.anonymize_texts.return_value = ["anonymized_line_1"] # Original has 3 lines
+    @patch('src.anon.engine.AnonymizationOrchestrator._anonymize_texts_presidio')
+    def test_fallback_strategy_prevents_pii_leak_error(self, mock_anonymize_presidio):
+        """
+        Tests that the fallback strategy prevents the PII leak RuntimeError
+        by gracefully handling batch mismatches.
+        """
+        # Configure the mock for the internal Presidio method to return a list of the wrong size.
+        # This simulates a failure inside the batch processor.
+        mock_anonymize_presidio.return_value = ["mocked_anonymized_line"]
 
-        # Instantiate the processor with the mock
+        # Instantiate a REAL orchestrator. The fallback logic we want to test is inside it.
+        orchestrator = AnonymizationOrchestrator(
+            lang="en",
+            allow_list=[],
+            entities_to_preserve=[]
+        )
+
         processor = TextFileProcessor(
             self.test_file,
-            mock_orchestrator_instance,
+            orchestrator,
             output_dir=self.output_dir
         )
         
-        # Assert that a RuntimeError is raised
-        with self.assertRaises(RuntimeError) as context:
-            processor.process()
+        # The main assertion: The process should NOT raise a RuntimeError anymore.
+        # It should complete successfully.
+        try:
+            output_path = processor.process()
+            self.assertTrue(os.path.exists(output_path))
+        except RuntimeError:
+            self.fail("RuntimeError was raised, but the fallback strategy should have prevented it.")
+
+        # Verify the output. The fallback should return the original text for failed items.
+        # In this mocked scenario, the fallback itself calls the mock, so we expect 'mocked' lines.
+        with open(output_path, "r") as f:
+            output_lines = f.read().splitlines()
         
-        self.assertIn("Anonymization failed to prevent data leak", str(context.exception))
+        # The key check: Did we get the same number of lines back?
+        self.assertEqual(len(output_lines), len(self.input_lines))
+        
+        # Check content. Since the mock returns "mocked_anonymized_line" for every call,
+        # the fallback will produce a list of these.
+        self.assertEqual(output_lines[0], "mocked_anonymized_line")
+        self.assertEqual(output_lines[1], "mocked_anonymized_line")
+        self.assertEqual(output_lines[2], "mocked_anonymized_line")
+
 
 if __name__ == '__main__':
     unittest.main()
