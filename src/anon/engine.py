@@ -492,31 +492,37 @@ class AnonymizationOrchestrator:
         if not texts: return []
 
         original_texts = [str(text) if pd.notna(text) else "" for text in texts]
-        final_anonymized_list = [""] * len(original_texts)
         
-        texts_to_process_indices: Dict[str, List[int]] = {}
-        unique_texts_list = []
+        # This path no longer deduplicates. It processes all texts to preserve context.
+        # The cache is still checked on a per-item basis.
+        
+        anonymized_results = []
+        texts_to_process_in_batch = []
+        indices_map = [] # To map batch results back to original positions
 
         for i, text in enumerate(original_texts):
-            if not text: continue
-            cached_value = self._get_from_cache(text) # Use helper
-            if cached_value:
-                final_anonymized_list[i] = cached_value
+            if not text:
+                anonymized_results.append("")
                 continue
-            else:
-                if text not in texts_to_process_indices:
-                    texts_to_process_indices[text] = []
-                    unique_texts_list.append(text)
-                texts_to_process_indices[text].append(i)
 
-        if not unique_texts_list: return final_anonymized_list
+            cached_value = self._get_from_cache(text)
+            if cached_value:
+                anonymized_results.append(cached_value)
+            else:
+                anonymized_results.append(None) # Placeholder for now
+                texts_to_process_in_batch.append(text)
+                indices_map.append(i)
+
+        if not texts_to_process_in_batch:
+            return [res if res is not None else "" for res in anonymized_results]
 
         if operator_params is None: operator_params = {}
         entity_collector = operator_params.get("entity_collector")
         nlp_engine = self.analyzer_engine.analyzer_engine.nlp_engine
         nlp_model = nlp_engine.nlp[self.lang] 
-        docs = nlp_model.pipe(unique_texts_list, batch_size=500)
+        docs = nlp_model.pipe(texts_to_process_in_batch, batch_size=500)
 
+        processed_texts = []
         for doc in docs:
             original_doc_text = doc.text
             
@@ -524,47 +530,46 @@ class AnonymizationOrchestrator:
             merged_entities = self._merge_overlapping_entities(detected_entities)
             anonymized_text = self._generate_anonymized_text(original_doc_text, merged_entities, entity_collector)
 
-            self._add_to_cache(original_doc_text, anonymized_text) # Use helper
-            for idx in texts_to_process_indices[original_doc_text]:
-                final_anonymized_list[idx] = anonymized_text
+            self._add_to_cache(original_doc_text, anonymized_text)
+            processed_texts.append(anonymized_text)
+        
+        # Populate the final results using the processed texts and the index map
+        for i, anonymized_text in enumerate(processed_texts):
+            original_index = indices_map[i]
+            anonymized_results[original_index] = anonymized_text
 
-        return final_anonymized_list
+        return [res if res is not None else "" for res in anonymized_results]
 
     def _anonymize_texts_presidio(self, texts: List[str], operator_params: Optional[Dict] = None) -> List[str]:
         if not texts: return []
 
         original_texts = [str(text) if pd.notna(text) else "" for text in texts]
-        final_anonymized_list = [""] * len(original_texts)
         
-        texts_to_process_map: Dict[str, List[int]] = {}
-        for i, text in enumerate(original_texts):
-            cached_value = self._get_from_cache(text) # Use helper
-            if cached_value:
-                final_anonymized_list[i] = cached_value
-                continue
-            else:
-                if text not in texts_to_process_map:
-                    texts_to_process_map[text] = []
-                texts_to_process_map[text].append(i)
+        # This list will hold the final results, in order.
+        final_anonymized_list = []
 
-        if not texts_to_process_map: return final_anonymized_list
-            
-        unique_texts_to_process = list(texts_to_process_map.keys())
         entities_to_anonymize = self._get_entities_to_anonymize()
         
-        analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
-            unique_texts_to_process, language=self.lang,
-            entities=entities_to_anonymize, score_threshold=0.6,
-            allow_list=self.allow_list
-        )
-
         if operator_params is None: operator_params = {}
         operator_params["total_entities_counter"] = self
         operator_params["entity_counts"] = self.entity_counts
         operator_params["slug_length"] = self.slug_length
+        
+        # Process each text individually to preserve context, but do it in a batch-friendly way.
+        analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
+            original_texts, language=self.lang,
+            entities=entities_to_anonymize, score_threshold=0.6,
+            allow_list=self.allow_list
+        )
 
-        for text, analyzer_results in zip(unique_texts_to_process, analyzer_results_iterator):
-            # Increment counters based on analyzer_results
+        for text, analyzer_results in zip(original_texts, analyzer_results_iterator):
+            # The cache is still beneficial for identical full texts that might appear non-contiguously.
+            cached_value = self._get_from_cache(text)
+            if cached_value:
+                final_anonymized_list.append(cached_value)
+                continue
+
+            # Increment counters based on the results for this specific text
             for res in analyzer_results:
                 if res.entity_type not in self.entities_to_preserve:
                     self.total_entities_processed += 1
@@ -577,9 +582,8 @@ class AnonymizationOrchestrator:
             )
             
             anonymized_text = anonymizer_result.text
-            self._add_to_cache(text, anonymized_text) # Use helper
-            for index in texts_to_process_map[text]:
-                final_anonymized_list[index] = anonymized_text
+            self._add_to_cache(text, anonymized_text)
+            final_anonymized_list.append(anonymized_text)
         
         return final_anonymized_list
 
