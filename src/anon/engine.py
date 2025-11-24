@@ -91,7 +91,7 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
 
     ip_pattern = Pattern(
         name="IP Address Pattern", 
-        regex=r"(?<![\.\d])(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?!\.[\d])", 
+        regex=r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b", 
         score=0.85 + SCORE_BOOST
     )
     
@@ -199,6 +199,8 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
             PatternRecognizer(supported_entity="CREDIT_CARD", patterns=[cc_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="UUID", patterns=[uuid_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="PGP_BLOCK", patterns=[pgp_pattern], supported_language=lang), # Added PGP_BLOCK
+            PatternRecognizer(supported_entity="PORT", patterns=[port_pattern], supported_language=lang),
+            PatternRecognizer(supported_entity="OID", patterns=[oid_pattern], supported_language=lang),
         ])
     return recognizers
 
@@ -555,18 +557,31 @@ class AnonymizationOrchestrator:
         operator_params["entity_counts"] = self.entity_counts
         operator_params["slug_length"] = self.slug_length
         
+        logging.debug(f"[_anonymize_texts_presidio] Input texts count: {len(original_texts)}")
+
         # Process each text individually to preserve context, but do it in a batch-friendly way.
         analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
             original_texts, language=self.lang,
             entities=entities_to_anonymize, score_threshold=0.6,
             allow_list=self.allow_list
         )
+        # Convert iterator to list to check its length, as per debug plan
+        analyzer_results_list = list(analyzer_results_iterator)
+        logging.debug(f"[_anonymize_texts_presidio] Analyzer results count: {len(analyzer_results_list)}")
 
-        for text, analyzer_results in zip(original_texts, analyzer_results_iterator):
+        if len(analyzer_results_list) != len(original_texts):
+            logging.error(f"[_anonymize_texts_presidio] Mismatch between original_texts and analyzer_results_list! Input: {len(original_texts)}, Analyzer Results: {len(analyzer_results_list)}. This will lead to batch integrity failure.")
+
+
+        for text, analyzer_results in zip(original_texts, analyzer_results_list):
+            logging.debug(f"[_anonymize_texts_presidio] Processing text: '{text}'")
+            logging.debug(f"[_anonymize_texts_presidio]   Analyzer Results for text: {analyzer_results}")
+
             # The cache is still beneficial for identical full texts that might appear non-contiguously.
             cached_value = self._get_from_cache(text)
             if cached_value:
                 final_anonymized_list.append(cached_value)
+                logging.debug(f"[_anonymize_texts_presidio]   Cache hit for '{text}'. Anonymized: '{cached_value}'")
                 continue
 
             # Increment counters based on the results for this specific text
@@ -584,6 +599,7 @@ class AnonymizationOrchestrator:
             anonymized_text = anonymizer_result.text
             self._add_to_cache(text, anonymized_text)
             final_anonymized_list.append(anonymized_text)
+            logging.debug(f"[_anonymize_texts_presidio]   Final anonymized text: '{anonymized_text}'")
         
         return final_anonymized_list
 

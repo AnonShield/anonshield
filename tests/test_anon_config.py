@@ -5,9 +5,13 @@ import subprocess
 import sys
 import tempfile
 import shutil
+import logging
 
 class TestAnonymizationConfig(unittest.TestCase):
     def setUp(self):
+        # Configure logging to DEBUG level for tests
+        logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
+        
         self.test_dir = tempfile.mkdtemp()
         self.output_dir = os.path.join(self.test_dir, "output")
         self.original_cwd = os.getcwd()
@@ -17,6 +21,9 @@ class TestAnonymizationConfig(unittest.TestCase):
         sys.path.insert(0, self.original_cwd)
 
     def tearDown(self):
+        # Reset logging configuration to avoid affecting other tests or subsequent runs
+        logging.basicConfig(level=logging.WARNING, force=True) # Reset to default or preferred quiet level
+
         os.chdir(self.original_cwd)
         shutil.rmtree(self.test_dir)
         sys.path.pop(0)
@@ -66,7 +73,8 @@ class TestAnonymizationConfig(unittest.TestCase):
             "uv", "run", "python", script_path,
             input_path,
             "--anonymization-config", config_path,
-            "--lang", "en"
+            "--lang", "en",
+            "--log-level", "DEBUG"
         ]
         
         # Set the secret key for the subprocess

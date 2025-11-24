@@ -11,6 +11,7 @@ import io
 import os
 import sys
 import ijson
+import re
 import shutil
 import logging
 from abc import ABC, abstractmethod
@@ -162,32 +163,32 @@ class FileProcessor(ABC):
     def _get_output_extension(self) -> str:
         raise NotImplementedError
 
+
     def _should_anonymize(self, text: str, path: str = "") -> Tuple[bool, Optional[Union[str, List[str]]]]:
         """
         Determines if a given text should be anonymized based on a rich configuration.
-
-        The logic follows a clear priority:
-        1. Explicit exclusion (`fields_to_exclude`) always prevents anonymization.
-        2. Forced anonymization (`force_anonymize`) always triggers anonymization, bypassing text-based filters
-           like `min_word_length`.
-        3. Text-based filtering (stop-words, numeric-only, `min_word_length`) is applied.
-        4. In "explicit mode" (when `force_anonymize` or `fields_to_anonymize` is set), only fields explicitly
-           listed for anonymization are processed.
-        5. In "implicit mode" (default), any text that passes all the above checks is anonymized.
+        This version correctly handles path matching for array elements.
         """
         current_path = path.lstrip('.')
+        # Create a "generalized" path for matching rules that don't care about list indices.
+        # e.g., "asset.tags[1].value" -> "asset.tags.value"
+        generalized_path = re.sub(r'\[\d+\]', '', current_path).lstrip('.')
 
         # --- Configuration-based logic ---
         if self.anonymization_config:
-            # 1. Highest priority: explicit exclusion
-            if any(current_path == rule or current_path.startswith(f"{rule}.")
-                   for rule in self.anonymization_config.get('fields_to_exclude', [])):
-                return False, None
+            # 1. Highest priority: explicit exclusion.
+            # A rule "asset.tags" should exclude "asset.tags[0].value".
+            for rule in self.anonymization_config.get('fields_to_exclude', []):
+                if generalized_path == rule or generalized_path.startswith(f"{rule}."):
+                    return False, None
 
-            # 2. Second highest priority: forced anonymization (bypasses text filters)
+            # 2. Second highest priority: forced anonymization (bypasses text filters).
+            # An exact match on the specific or generalized path triggers this.
             force_config = self.anonymization_config.get('force_anonymize', {})
             if current_path in force_config:
                 return True, force_config[current_path].get("entity_type")
+            if generalized_path in force_config:
+                return True, force_config[generalized_path].get("entity_type")
 
         # --- Text-based filtering for auto-detection ---
         if not isinstance(text, str) or len(text.strip()) < self.min_word_length:
@@ -206,12 +207,14 @@ class FileProcessor(ABC):
                                'fields_to_anonymize' in self.anonymization_config
             
             if is_explicit_mode:
-                # In explicit mode, only auto-anonymize if it's in the allow-list.
-                if any(current_path == rule or current_path.startswith(f"{rule}.")
-                       for rule in self.anonymization_config.get('fields_to_anonymize', [])):
-                    return True, None
-                else:
-                    return False, None
+                # In explicit mode, we only auto-anonymize if the path is in the allow-list.
+                # Note: The forced anonymization check above already handled explicit entity types.
+                # This block is for fields marked for auto-detection.
+                for rule in self.anonymization_config.get('fields_to_anonymize', []):
+                    if generalized_path == rule or generalized_path.startswith(f"{rule}."):
+                        return True, None
+                # If in explicit mode and no rule matched (neither force nor fields_to_anonymize), do not anonymize.
+                return False, None
 
         # Default to anonymizing if it passed all checks in implicit mode.
         return True, None
@@ -533,7 +536,10 @@ class XlsxFileProcessor(FileProcessor):
                 for cell in row:
                     if isinstance(cell.value, str) and cell.value in translation_map:
                         try:
-                            cell.value = translation_map[cell.value].popleft()
+                            if use_deduplication:
+                                cell.value = translation_map[cell.value][0]
+                            else:
+                                cell.value = translation_map[cell.value].popleft()
                         except IndexError:
                             logging.error("Mismatch in anonymized XLSX cell counts. Using original value as fallback.")
         
@@ -622,20 +628,29 @@ class XmlFileProcessor(FileProcessor):
         for element in tree.iter():
             if element.text in translation_map:
                 try:
-                    element.text = translation_map[element.text].popleft()
+                    if use_deduplication:
+                        element.text = translation_map[element.text][0]
+                    else:
+                        element.text = translation_map[element.text].popleft()
                 except IndexError:
                     logging.error("Mismatch in anonymized XML text counts. Using original value as fallback.")
 
             if element.tail in translation_map:
                 try:
-                    element.tail = translation_map[element.tail].popleft()
+                    if use_deduplication:
+                        element.tail = translation_map[element.tail][0]
+                    else:
+                        element.tail = translation_map[element.tail].popleft()
                 except IndexError:
                     logging.error("Mismatch in anonymized XML tail counts. Using original value as fallback.")
             
             for key, value in element.attrib.items():
                 if value in translation_map:
                     try:
-                        element.set(key, translation_map[value].popleft())
+                        if use_deduplication:
+                            element.set(key, translation_map[value][0])
+                        else:
+                            element.set(key, translation_map[value].popleft())
                     except IndexError:
                         logging.error("Mismatch in anonymized XML attribute counts. Using original value as fallback.")
 
@@ -749,8 +764,8 @@ class JsonFileProcessor(FileProcessor):
                 for k, v in sub_obj.items():
                     _walk(v, f"{current_path}.{k}")
             elif isinstance(sub_obj, list):
-                for item in sub_obj:
-                    _walk(item, current_path)
+                for i, item in enumerate(sub_obj):
+                    _walk(item, f"{current_path}[{i}]")
             elif isinstance(sub_obj, str):
                 should_anon, forced_type = self._should_anonymize(sub_obj, current_path)
                 if should_anon:
@@ -784,7 +799,12 @@ class JsonFileProcessor(FileProcessor):
 
             if final_group_key in path_aware_map and obj in path_aware_map[final_group_key]:
                 try:
-                    return path_aware_map[final_group_key][obj].popleft()
+                    if self.orchestrator.use_cache:
+                        # In cache mode, replacement is static (peek at the first item).
+                        return path_aware_map[final_group_key][obj][0]
+                    else:
+                        # In full context mode, consume from the queue.
+                        return path_aware_map[final_group_key][obj].popleft()
                 except IndexError:
                     logging.error(f"Mismatch in anonymized string counts for string '{obj}' in group '{final_group_key}'. Using original value as fallback.")
                     return obj
