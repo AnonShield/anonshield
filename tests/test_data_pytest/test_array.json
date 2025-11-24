@@ -1,0 +1,20 @@
+[
+    {
+        "user": "John Doe",
+        "email": "john.doe@example.com",
+        "ip_address": "192.168.1.1",
+        "comment": "This is a test comment from John."
+    },
+    {
+        "user": "Jane Smith",
+        "email": "jane.smith@example.com",
+        "ip_address": "10.0.0.5",
+        "comment": "Jane's comment here."
+    },
+    {
+        "user": "test-user",
+        "email": "test@test.com",
+        "ip_address": "8.8.8.8",
+        "comment": "Google's DNS"
+    }
+]

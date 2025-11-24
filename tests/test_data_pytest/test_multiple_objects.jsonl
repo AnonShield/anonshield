@@ -1,0 +1,3 @@
+{"id": "line1", "asset": {"name": "d428c099b748f369476ccf5c4eb6e6a6", "host_name": "server-01.example.com"}, "container_image": {"name": "another_hash_value"}, "vulnerability": {"description": "SQL injection vulnerability found by John Doe (john.doe@example.com)."}}
+{"id": "line2", "asset": {"name": "some_other_name"}, "container_image": {"name": "d428c099b748f369476ccf5c4eb6e6a6"}, "notes": {"content": "Contact admin at admin@example.com or call 123-456-7890."}}
+{"id": "line3", "scan": {"target": "192.168.1.1"}, "asset": {"ipv4_addresses": ["192.168.1.1", "10.0.0.1"]}, "output": "This field should be excluded."}

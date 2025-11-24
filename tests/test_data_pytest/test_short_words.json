@@ -1,0 +1,15 @@
+{
+    "asset": {
+        "tags": [
+            {
+                "category": "status",
+                "value": "OK"
+            },
+            {
+                "category": "review",
+                "value": "YES"
+            }
+        ]
+    },
+    "comment": "This is a test"
+}

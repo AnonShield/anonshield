@@ -1,0 +1,20 @@
+{
+    "rules": [
+        {
+            "path": "name",
+            "action": "anonymize",
+            "params": {
+                "strategy": "force",
+                "entity_type": "PERSON"
+            }
+        },
+        {
+            "path": "email",
+            "action": "anonymize",
+            "params": {
+                "strategy": "force",
+                "entity_type": "EMAIL_ADDRESS"
+            }
+        }
+    ]
+}

@@ -1,0 +1,33 @@
+[
+  {
+    "id": "obj1",
+    "asset": {
+      "name": "d428c099b748f369476ccf5c4eb6e6a6",
+      "host_name": "server-01.example.com",
+      "tags": [
+        { "category": "OS", "value": "Linux" },
+        { "category": "CRITICALITY", "value": "HIGH" }
+      ]
+    },
+    "container_image": {
+      "name": "another_hash_value"
+    },
+    "vulnerability": {
+      "description": "Cross-site scripting found by Jane Smith in New York."
+    }
+  },
+  {
+    "id": "obj2",
+    "asset": {
+      "name": "some_other_name",
+       "ipv4_addresses": ["192.168.1.100", "10.0.0.5"]
+    },
+    "container_image": {
+      "name": "d428c099b748f369476ccf5c4eb6e6a6"
+    },
+    "notes": {
+      "content": "This is a note from the security team at ACME Corp."
+    },
+    "output": "This output should be ignored."
+  }
+]
