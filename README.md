@@ -341,6 +341,14 @@ uv run anon.py --list-languages
 - `--db-synchronous-mode <MODE>`: Sets the SQLite `synchronous` PRAGMA for the database connection. Options: `OFF`, `NORMAL`, `FULL`, `EXTRA`. Overrides config file setting.
 - `--disable-gc`: Disables automatic garbage collection during processing. May boost speed for large single files but increases memory usage.
 
+#### Chunking & Batching Options
+
+- `--batch-size <NUM>`: Default batch size for processing text chunks. Default: `200`.
+- `--csv-chunk-size <NUM>`: Chunk size for reading CSV files with pandas. Default: `1000`.
+- `--json-chunk-size <NUM>`: Chunk size for streaming large JSON arrays. Default: `1000`.
+- `--ner-chunk-size <NUM>`: Max character size for text chunks in NER data generation. Default: `1500`.
+- `--nlp-batch-size <NUM>`: Batch size for spaCy's nlp.pipe() processing. Default: `500`.
+
 #### Example Commands
 
 **Basic anonymization with custom slug length:**
