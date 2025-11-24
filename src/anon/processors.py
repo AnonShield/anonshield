@@ -771,9 +771,10 @@ class JsonFileProcessor(FileProcessor):
             if isinstance(forced_type, tuple): 
                 forced_type = list(forced_type)
 
-            anonymized_strings = self._process_batch_smart(unique_strings, forced_entity_type=forced_type)
-            path_aware_map[group_key].update(dict(zip(unique_strings, anonymized_strings)))
-            progress.update(len(unique_strings))
+            for chunk in self._batch_iterator(unique_strings, self.DEFAULT_BATCH_SIZE):
+                anonymized_strings = self._process_batch_smart(chunk, forced_entity_type=forced_type)
+                path_aware_map[group_key].update(dict(zip(chunk, anonymized_strings)))
+                progress.update(len(chunk))
         
         progress.close()
         return path_aware_map
