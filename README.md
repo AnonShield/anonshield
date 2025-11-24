@@ -527,7 +527,7 @@ The `AnonymizationOrchestrator` is the core engine:
     -   **Pros:** Significantly faster by eliminating the `AnalyzerEngine`'s overhead and its numerous internal recognizers.
     -   **Cons:** Less robust in resolving entity conflicts and does not benefit from the full range of Presidio's additional recognizers.
 
-3.  **Balanced Strategy ( Optimal Balance):**
+3.  **Balanced Strategy (Optimal Balance):**
     -   **How it works:** This strategy offers a smart middle ground. It *uses* the Presidio `AnalyzerEngine` (thus benefiting from its more robust result aggregation logic than `fast` mode), but it invokes it selectively. Instead of using all recognizers, it instructs the engine to use **only** the main **spaCy + Transformer** pipeline and the **custom regex patterns**, effectively disabling Presidio's other built-in recognizers.
     -   **Pros:** Offers an ideal balance, being faster than `presidio` (by ignoring many internal recognizers) and more robust than `fast` (by using Presidio's superior aggregation logic).
     -   **Cons:** May not detect very specific entities that only the full `presidio` strategy would cover.
