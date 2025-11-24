@@ -105,7 +105,7 @@ class TestAnonIntegration(unittest.TestCase):
             shutil.rmtree(self.output_dir)
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def _run_anon_py(self, path, lang="en", preserve_entities="", allow_list="", slug_length=None):
+    def _run_anon_py(self, path, lang="en", preserve_entities="", allow_list="", slug_length=None, anonymization_strategy="presidio"):
         cmd = [
             "python",
             "anon.py",
@@ -119,6 +119,8 @@ class TestAnonIntegration(unittest.TestCase):
             cmd.extend(["--allow-list", allow_list])
         if slug_length is not None:
             cmd.extend(["--slug-length", str(slug_length)])
+        if anonymization_strategy:
+            cmd.extend(["--anonymization-strategy", anonymization_strategy])
         
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -145,6 +147,22 @@ class TestAnonIntegration(unittest.TestCase):
         with open(output_file, "r") as f:
             content = f.read()
         
+        self.assertIn("[PERSON_", content)
+        self.assertIn("[EMAIL_ADDRESS_", content)
+        self.assertNotIn("John Doe", content)
+        self.assertNotIn("test@example.com", content)
+
+    def test_balanced_anonymization(self):
+        test_file = os.path.join(self.test_data_dir, "test.txt")
+        # Run with the new 'balanced' strategy
+        self._run_anon_py(test_file, anonymization_strategy="balanced")
+        output_file = self._get_output_file_path(test_file)
+        
+        self.assertTrue(os.path.exists(output_file))
+        with open(output_file, "r") as f:
+            content = f.read()
+        
+        # Verify that PERSON and EMAIL_ADDRESS are anonymized
         self.assertIn("[PERSON_", content)
         self.assertIn("[EMAIL_ADDRESS_", content)
         self.assertNotIn("John Doe", content)

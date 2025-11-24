@@ -180,3 +180,4 @@ cython_debug/
 .pypirc
 output/*example*
 Vulnerabilidades-CAIS/
+*meu_modelo_*

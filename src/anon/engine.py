@@ -311,18 +311,35 @@ class AnonymizationOrchestrator:
             return text
         return self.anonymize_texts([text], operator_params=operator_params, forced_entity_type=forced_entity_type)[0]
 
+    def _get_core_entities(self) -> List[str]:
+        """Returns a curated list of entities supported by our core recognizers (NLP + Custom Regex)."""
+        core_entities = set(ENTITY_MAPPING.values())
+        for recognizer in load_custom_recognizers(langs=[self.lang]):
+            core_entities.update(recognizer.supported_entities)
+        return list(core_entities)
+
     def anonymize_texts(self, texts: List[str], operator_params: Optional[Dict] = None, forced_entity_type: Optional[Union[str, List[str]]] = None) -> List[str]:
+        """
+        Anonymizes a list of texts based on the configured strategy.
+
+        This method dispatches to the appropriate internal method ('presidio', 'fast', 'balanced', etc.)
+        and includes a fallback mechanism to ensure data integrity.
+        """
         if isinstance(forced_entity_type, list):
             results = self._anonymize_texts_pick_one(texts, forced_entity_type, operator_params)
         elif isinstance(forced_entity_type, str):
             results = self._anonymize_texts_forced_type(texts, forced_entity_type, operator_params)
         elif self.strategy == "fast":
             results = self._anonymize_texts_fast_path(texts, operator_params)
-        else:
-            results = self._anonymize_texts_presidio(texts, operator_params)
+        elif self.strategy == "balanced":
+            core_entities = self._get_core_entities()
+            entities_to_anonymize = [e for e in core_entities if e not in self.entities_to_preserve]
+            results = self._anonymize_texts_presidio(texts, operator_params, entities=entities_to_anonymize)
+        else: # "presidio" strategy
+            entities_to_anonymize = self._get_entities_to_anonymize()
+            results = self._anonymize_texts_presidio(texts, operator_params, entities=entities_to_anonymize)
 
-        # --- FALLBACK ARCHITECTURE (NEW) ---
-        # QA Mindset: Post-Condition Validation (Design by Contract)
+        # --- FALLBACK ARCHITECTURE ---
         if len(results) != len(texts):
             logging.warning(
                 "Batch integrity failure detected (Input: %d vs Output: %d). "
@@ -341,9 +358,6 @@ class AnonymizationOrchestrator:
         fallback_results = []
         for text in texts:
             try:
-                # Controlled recursion to process a single item.
-                # This forces the system to treat 'text' as a batch of 1,
-                # ensuring it goes through the same analyzers.
                 single_result_list = []
                 
                 # Re-use existing dispatch logic to keep it DRY
@@ -353,17 +367,17 @@ class AnonymizationOrchestrator:
                     single_result_list = self._anonymize_texts_forced_type([text], forced_entity_type, operator_params)
                 elif self.strategy == "fast":
                     single_result_list = self._anonymize_texts_fast_path([text], operator_params)
-                else:
-                    # In Presidio mode, we force individual analysis.
-                    # Note: Presidio can fail on empty or null strings, so we handle that here.
+                elif self.strategy == "balanced":
+                    core_entities = self._get_core_entities()
+                    entities_to_anonymize = [e for e in core_entities if e not in self.entities_to_preserve]
+                    single_result_list = self._anonymize_texts_presidio([text], operator_params, entities=entities_to_anonymize)
+                else: # "presidio"
                     if not text or not str(text).strip():
                         single_result_list = [text]
                     else:
-                        # Here we call the internal method directly to avoid an infinite loop,
-                        # but still ensuring error handling.
-                        single_result_list = self._anonymize_texts_presidio([text], operator_params)
+                        entities_to_anonymize = self._get_entities_to_anonymize()
+                        single_result_list = self._anonymize_texts_presidio([text], operator_params, entities=entities_to_anonymize)
 
-                # If even the individual call fails (returns empty), return the original.
                 if not single_result_list:
                     fallback_results.append(text) 
                 else:
@@ -371,8 +385,6 @@ class AnonymizationOrchestrator:
 
             except Exception as e:
                 logging.error(f"Fallback failed for a specific item: {str(e)[:100]}...", exc_info=True)
-                # Fail-Safe: In case of a critical exception on the item, return the original
-                # to maintain file alignment (CSV/JSON), but log the error.
                 fallback_results.append(text)
         
         return fallback_results
@@ -542,15 +554,15 @@ class AnonymizationOrchestrator:
 
         return [res if res is not None else "" for res in anonymized_results]
 
-    def _anonymize_texts_presidio(self, texts: List[str], operator_params: Optional[Dict] = None) -> List[str]:
+    def _anonymize_texts_presidio(self, texts: List[str], operator_params: Optional[Dict] = None, entities: Optional[List[str]] = None) -> List[str]:
         if not texts: return []
 
         original_texts = [str(text) if pd.notna(text) else "" for text in texts]
         
-        # This list will hold the final results, in order.
         final_anonymized_list = []
 
-        entities_to_anonymize = self._get_entities_to_anonymize()
+        # If no specific entities are passed, use the default logic for the "presidio" strategy.
+        entities_to_use = entities if entities is not None else self._get_entities_to_anonymize()
         
         if operator_params is None: operator_params = {}
         operator_params["total_entities_counter"] = self
@@ -559,32 +571,28 @@ class AnonymizationOrchestrator:
         
         logging.debug(f"[_anonymize_texts_presidio] Input texts count: {len(original_texts)}")
 
-        # Process each text individually to preserve context, but do it in a batch-friendly way.
         analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
             original_texts, language=self.lang,
-            entities=entities_to_anonymize, score_threshold=0.6,
+            entities=entities_to_use, score_threshold=0.6,
             allow_list=self.allow_list
         )
-        # Convert iterator to list to check its length, as per debug plan
+        
         analyzer_results_list = list(analyzer_results_iterator)
         logging.debug(f"[_anonymize_texts_presidio] Analyzer results count: {len(analyzer_results_list)}")
 
         if len(analyzer_results_list) != len(original_texts):
             logging.error(f"[_anonymize_texts_presidio] Mismatch between original_texts and analyzer_results_list! Input: {len(original_texts)}, Analyzer Results: {len(analyzer_results_list)}. This will lead to batch integrity failure.")
 
-
         for text, analyzer_results in zip(original_texts, analyzer_results_list):
             logging.debug(f"[_anonymize_texts_presidio] Processing text: '{text}'")
             logging.debug(f"[_anonymize_texts_presidio]   Analyzer Results for text: {analyzer_results}")
 
-            # The cache is still beneficial for identical full texts that might appear non-contiguously.
             cached_value = self._get_from_cache(text)
             if cached_value:
                 final_anonymized_list.append(cached_value)
                 logging.debug(f"[_anonymize_texts_presidio]   Cache hit for '{text}'. Anonymized: '{cached_value}'")
                 continue
 
-            # Increment counters based on the results for this specific text
             for res in analyzer_results:
                 if res.entity_type not in self.entities_to_preserve:
                     self.total_entities_processed += 1
