@@ -13,10 +13,11 @@ import ijson
 import re
 import shutil
 import logging
-import unicodedata # Added for Unicode normalization
+import unicodedata 
 from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from typing import Iterable, List, Generator, Optional, Dict, Tuple, Union
+from pathlib import Path # Added Path import
 
 import openpyxl  # type: ignore
 import orjson  # type: ignore
@@ -35,44 +36,53 @@ def get_output_path(original_path: str, new_ext: str, prefix: str = "anon_", out
     """Constructs a secure output file path, preventing path traversal."""
     
     # 1. Resolve and validate the output directory path
-    real_project_dir = os.path.realpath(os.getcwd())
-    real_output_dir = os.path.realpath(output_dir)
-    logging.debug(f"Resolved project directory: {real_project_dir}")
-    logging.debug(f"Resolved output directory: {real_output_dir}")
+    project_root = Path(os.getcwd()).resolve()
+    output_path_obj = Path(output_dir).resolve()
     
-    # Ensure the resolved output directory is inside the project directory
-    if not real_output_dir.startswith(real_project_dir):
-        logging.error(f"Path traversal attempt detected: Output directory '{output_dir}' is outside the project boundary.")
+    # Ensure the resolved output directory is inside the project root
+    if not output_path_obj.is_relative_to(project_root):
+        logging.error(f"Path traversal attempt detected: Output directory '{output_dir}' is outside the project boundary '{project_root}'.")
         raise ValueError(f"Path traversal attempt detected: Output directory '{output_dir}' is outside the project boundary.")
 
-    os.makedirs(real_output_dir, exist_ok=True)
+    output_path_obj.mkdir(parents=True, exist_ok=True)
     
     # 2. Sanitize filename from original_path to prevent it from being used for traversal
-    base_name = os.path.basename(original_path)
+    original_base_name = Path(original_path).name # Get only the filename from the path
     
     # Normalize Unicode (NFD) and remove dangerous characters for robust sanitization
-    base_name = unicodedata.normalize('NFKD', base_name).encode('ascii', 'ignore').decode('utf-8')
-    base_name = re.sub(r'[^\w\s\-.]', '_', base_name).strip() # Whitelist approach, allowing only alphanumeric, whitespace, hyphen, dot
+    # Allow only alphanumeric, hyphen, underscore, and a single dot for extension
+    sanitized_base_name = unicodedata.normalize('NFKD', original_base_name).encode('ascii', 'ignore').decode('utf-8')
     
-    if not base_name or base_name in ('.', '..') or base_name.startswith('.'):
-        logging.error(f"Invalid or sanitized-away filename from original path: '{original_path}' resulted in '{base_name}'")
+    # Separate base name and extension to sanitize them individually
+    name_part, ext_part = os.path.splitext(sanitized_base_name)
+    
+    # Sanitize the name part: remove any character that is not alphanumeric or hyphen/underscore
+    name_part = re.sub(r'[^\w\-]', '', name_part)
+    
+    # Sanitize the extension part (optional, as new_ext will overwrite it anyway)
+    # For extra safety, ensure ext_part does not contain path separators or dangerous chars
+    ext_part = re.sub(r'[^\w\.]', '', ext_part) # Keep only alphanumeric and dot for extension
+
+    # Reconstruct a safe base name; new_ext will be the final extension
+    safe_base_name = f"{name_part}{ext_part}" 
+
+    if not safe_base_name or safe_base_name in (".", ".."):
+        logging.error(f"Invalid or sanitized-away filename from original path: '{original_path}' resulted in an empty or invalid name.")
         raise ValueError(f"Invalid filename derived from original path: '{original_path}'")
 
-    safe_filename = f"{prefix}{os.path.splitext(base_name)[0]}{new_ext}"
+    # Construct the final filename: prefix + sanitized_name + new_ext
+    final_filename = f"{prefix}{name_part}{new_ext}"
     
-    # 3. Construct the final candidate path and perform the final check
-    candidate_path = os.path.join(real_output_dir, safe_filename)
-    real_candidate_path = os.path.realpath(candidate_path)
-    logging.debug(f"Candidate output path: {candidate_path}")
-    logging.debug(f"Resolved candidate output path: {real_candidate_path}")
-
+    # 3. Construct the full candidate path and perform the final check
+    candidate_file_path = output_path_obj / final_filename
+    resolved_candidate_file_path = candidate_file_path.resolve()
+    
     # Final check to ensure the candidate path is within the resolved output directory.
-    # This is a defense-in-depth measure.
-    if not real_candidate_path.startswith(real_output_dir + os.sep) and real_candidate_path != real_output_dir:
-         logging.error(f"Path traversal attempt detected for final path of file: '{original_path}'")
-         raise ValueError(f"Path traversal attempt detected for final path of file: '{original_path}'")
+    if not resolved_candidate_file_path.is_relative_to(output_path_obj):
+        logging.error(f"Path traversal attempt detected for final file path: '{resolved_candidate_file_path}' is outside output directory '{output_path_obj}'.")
+        raise ValueError(f"Path traversal attempt detected for final file path: '{resolved_candidate_file_path}'.")
         
-    return candidate_path
+    return str(resolved_candidate_file_path)
 
 
 def extract_text_from_image(image_bytes: bytes) -> str:
@@ -327,6 +337,7 @@ class FileProcessor(ABC):
             ner_records = self.orchestrator.detect_entities([chunk])
             for record in ner_records:
                 self.ner_file_handle.write(orjson.dumps(record).decode('utf-8') + "\n")
+                self.ner_file_handle.flush()
 
 
 class TextFileProcessor(FileProcessor):
@@ -1100,25 +1111,9 @@ class ProcessorRegistry:
     @classmethod
     def get_processor(cls, file_path: str, orchestrator: AnonymizationOrchestrator, **kwargs) -> Optional[FileProcessor]:
         """
-        Determines the correct processor for a file based on its true file type,
-        falling back to the file extension if necessary.
+        Determines the correct processor for a file based on its file extension.
         """
-        initial_ext = os.path.splitext(file_path)[1].lower()
-        true_ext_from_magic = cls._file_type_validator.get_file_extension_from_magic(file_path)
-
-        ext_to_use = initial_ext
-        if true_ext_from_magic:
-            ext_to_use = true_ext_from_magic
-            if initial_ext and initial_ext != true_ext_from_magic:
-                logging.warning(
-                    f"File extension mismatch for '{os.path.basename(file_path)}': "
-                    f"declared '{initial_ext}', detected '{true_ext_from_magic}'. Using detected type."
-                )
-        else:
-            logging.warning(
-                f"Could not determine file type for '{os.path.basename(file_path)}' using magic bytes. "
-                "Falling back to file extension. Processing may be inaccurate."
-            )
+        ext_to_use = os.path.splitext(file_path)[1].lower()
 
         processor_class = cls._processors.get(ext_to_use)
         if not processor_class:

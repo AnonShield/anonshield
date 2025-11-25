@@ -22,4 +22,6 @@ dependencies = [
     "ijson>=3.4.0.post0",
     "orjson>=3.11.4",
     "tenacity",
+    "PyYAML>=6.0.1",
+    "python-magic>=0.4.27"
 ]

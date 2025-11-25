@@ -43,4 +43,3 @@ class HashGenerator:
         display_hash = full_hash[:slug_length] if slug_length is not None else full_hash
         
         return display_hash, full_hash
-

@@ -82,6 +82,7 @@ class PresidioStrategy(AnonymizationStrategy):
                 final_anonymized_list.append(cached_value)
                 continue
 
+            
             anonymizer_result = self.anonymizer_engine.anonymize(
                 text=text,
                 analyzer_results=analyzer_results,
@@ -116,7 +117,7 @@ class FastStrategy(AnonymizationStrategy):
         new_text_parts = []
         current_idx = 0
         collected_entities_for_text: List[Tuple] = []
-        slug_length = operator_params.get("slug_length")
+        slug_length = operator_params.get("custom_slug_length")
 
         for ent in merged_entities:
             new_text_parts.append(original_doc_text[current_idx:ent["start"]])

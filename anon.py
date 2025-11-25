@@ -121,6 +121,7 @@ def _parse_arguments():
     parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast", "balanced"], help="Anonymization strategy ('presidio' for full analysis, 'fast' for an optimized path, 'balanced' for a mix of speed and accuracy).")
     parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
     parser.add_argument("--db-mode", type=str, default="persistent", choices=["persistent", "in-memory"], help="Database mode ('persistent' to save to disk, 'in-memory' for a temporary DB).")
+    parser.add_argument("--db-dir", type=str, default="db", help="Directory for the database file.")
     parser.add_argument("--disable-gc", action="store_true", help="Disable automatic garbage collection during processing. May boost speed for single large files but increases memory usage.")
     parser.add_argument("--db-synchronous-mode", type=str, default=None, choices=["OFF", "NORMAL", "FULL", "EXTRA"], help="SQLite 'synchronous' PRAGMA mode. Overrides config file setting.")
     parser.add_argument("--log-level", type=str, default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level (default: WARNING).")
@@ -234,7 +235,7 @@ def main():
     
     db_context = None
     if not args.generate_ner_data:
-        db_context = DatabaseContext(mode=args.db_mode)
+        db_context = DatabaseContext(mode=args.db_mode, db_dir=args.db_dir)
         db_context.initialize(synchronous=args.db_synchronous_mode)
         logging.info(f"Database initialized in '{args.db_mode}' mode with synchronous PRAGMA set to '{args.db_synchronous_mode or 'NORMAL'}'.")
 
@@ -294,6 +295,7 @@ def main():
             allow_list=set(allow_list)
         )
         
+        
         orchestrator = AnonymizationOrchestrator(
             lang=args.lang,
             db_context=db_context,
@@ -305,7 +307,8 @@ def main():
             nlp_batch_size=args.nlp_batch_size,
             cache_manager=cache_manager,
             hash_generator=hash_generator,
-            entity_detector=entity_detector
+            entity_detector=entity_detector,
+            ner_data_generation=args.generate_ner_data
         )
         
         # --- Processing ---

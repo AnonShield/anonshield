@@ -4,18 +4,15 @@ import os
 import sys
 import logging
 
-# It's important to initialize the DB to set the global DB_PATH
-from src.anon.config import initialize_db, SECRET_KEY
+from src.anon.config import SECRET_KEY
 from src.anon.repository import EntityRepository
 
-def find_original_text(slug: str) -> str:
+def find_original_text(slug: str, db_dir: str) -> str:
     """Queries the database via the repository to find the original text for a given slug."""
     
-    # Initialize the database to get the correct path, but use in-memory mode if not found
-    # as we are only reading.
-    db_path = initialize_db()
-    if not db_path or (db_path != ":memory:" and not os.path.exists(db_path)):
-        return "Database file not found. Please run the anonymizer first to create the database."
+    db_path = os.path.join(db_dir, "entities.db")
+    if not os.path.exists(db_path):
+        return f"Database file not found at '{db_path}'. Please run the anonymizer first to create the database."
 
     repo = EntityRepository(db_path)
 
@@ -34,7 +31,7 @@ def find_original_text(slug: str) -> str:
 
     try:
         result = repo.find_by_slug(display_hash)
-        repo.close()
+        repo.close_thread_connection()
 
         if result:
             original_name, entity_type, first, last = result
@@ -61,15 +58,15 @@ def main():
         description="De-anonymize a slug to find its original text. Requires ANON_SECRET_KEY."
     )
     parser.add_argument("slug", help="The anonymized slug to look up (e.g., '[PERSON_...hash...]').")
+    parser.add_argument("--db-dir", default="db", help="Directory where the database file is located. Defaults to 'db'.")
     args = parser.parse_args()
 
     if not SECRET_KEY:
         print("[!] Error: ANON_SECRET_KEY environment variable must be set to run this tool.", file=sys.stderr)
         sys.exit(1)
 
-    result = find_original_text(args.slug)
+    result = find_original_text(args.slug, args.db_dir)
     print(result)
 
 if __name__ == "__main__":
     main()
-

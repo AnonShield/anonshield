@@ -20,6 +20,7 @@ from presidio_analyzer.batch_analyzer_engine import (  # type: ignore
 )
 from presidio_analyzer.nlp_engine import (  # type: ignore
     NerModelConfiguration,
+    SpacyNlpEngine,
     TransformersNlpEngine,
 )
 from presidio_anonymizer import AnonymizerEngine, OperatorConfig  # type: ignore
@@ -57,6 +58,7 @@ class CustomSlugAnonymizer(Operator):
         # 1. Clean the text (remove extra spaces)
         clean_text = " ".join(text.split()).strip()
         
+        
         params = params or {}
         entity_type = params.get("entity_type", "UNKNOWN")
         logging.debug(f"Anonymizing text '{clean_text}' with entity type '{entity_type}'.")
@@ -65,7 +67,9 @@ class CustomSlugAnonymizer(Operator):
         if not hash_generator:
             raise ValueError("HashGenerator instance not provided in operator params.")
 
-        slug_length = params.get("slug_length")
+        # Try to get the slug length from our custom parameter first.
+        slug_length = params.get("custom_slug_length")
+        logging.debug(f"CustomSlugAnonymizer.operate, received slug_length = {slug_length}")
         
         display_hash, full_hash = hash_generator.generate_slug(clean_text, slug_length)
 
@@ -120,7 +124,7 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
         score=0.85 + SCORE_BOOST
     )
     hostname_patterns = [
-        Pattern(name="FQDN Pattern", regex=r"\b(?!Not-A\.Brand)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b", score=0.6 + SCORE_BOOST),
+        Pattern(name="FQDN Pattern", regex=r"\b(?<!@)(?!Not-A\.Brand)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b", score=0.6 + SCORE_BOOST),
         Pattern(name="Certificate CN Pattern", regex=r"CN=([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]|[a-f0-9]{8,16})\b", score=0.7 + SCORE_BOOST),
         Pattern(name="Standalone Hex Hostname Pattern", regex=r"(?<![:/])(?<![vV])\b(?!20\d{10})[a-f0-9]{12,16}\b(?!\.)", score=0.6 + SCORE_BOOST),
     ]
@@ -149,7 +153,7 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
 
     password_pattern = Pattern(
         name="Contextual Password",
-        regex=r"(?:password=|passwd=|pwd=|secret=|api_key=|apikey=|access_key=|client_secret=)([^\s,;\"']+)\b",
+        regex=r"(?:password=|passwd=|pwd=|secret=|api_key=|apikey=|access_key=|client_secret=)([^\",;']+)\b",
         score=0.95 + SCORE_BOOST
     )
 
@@ -227,7 +231,8 @@ class AnonymizationOrchestrator:
                  nlp_batch_size: int = 500,
                  cache_manager: Optional[CacheStrategy] = None,
                  hash_generator: Optional[HashingStrategy] = None,
-                 entity_detector: Optional[EntityDetector] = None):
+                 entity_detector: Optional[EntityDetector] = None,
+                 ner_data_generation: bool = False):
 
         self.lang = lang
         self.db_context = db_context
@@ -236,6 +241,7 @@ class AnonymizationOrchestrator:
         self.slug_length = slug_length
         self.nlp_batch_size = nlp_batch_size
         self.regex_priority = regex_priority
+        self.ner_data_generation = ner_data_generation
 
         self.total_entities_processed = 0
         self.entity_counts: Dict[str, int] = {}
@@ -293,30 +299,34 @@ class AnonymizationOrchestrator:
 
 
     def _setup_engines(self) -> tuple[BatchAnalyzerEngine, AnonymizerEngine]:
-        """Initializes the Presidio engines, keeping the XLM-Roberta model and security settings."""
+        """Initializes the Presidio engines, switching between models based on `ner_data_generation`."""
         logging.info("Setting up Presidio analyzer and anonymizer engines.")
         lang_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
-        supported_langs = set(["en", self.lang])
+        
+        # Determine the effective language for model loading, prioritizing self.lang
+        effective_lang = self.lang if self.lang in lang_model_map else 'en'
+        
+        spacy_model_name = lang_model_map.get(effective_lang, f"{effective_lang}_core_news_lg")
 
-        trf_model_config = []
-        for lang_code in supported_langs:
-            spacy_model_name = lang_model_map.get(lang_code, f"{lang_code}_core_news_lg")
-            trf_model_config.append(
-                {"lang_code": lang_code, "model_name": {"spacy": spacy_model_name, "transformers": TRANSFORMER_MODEL}}
+        if self.ner_data_generation:
+            logging.info(f"NER data generation mode: Initializing SpacyNlpEngine for '{effective_lang}'.")
+            nlp_engine = SpacyNlpEngine(models=[{"lang_code": effective_lang, "model_name": spacy_model_name}])
+            core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=[effective_lang])
+        else:
+            logging.info(f"Anonymization mode: Initializing TransformersNlpEngine for '{effective_lang}'.")
+            trf_model_config = [
+                {"lang_code": effective_lang, "model_name": {"spacy": spacy_model_name, "transformers": TRANSFORMER_MODEL}}
+            ]
+            ner_config = NerModelConfiguration(
+                model_to_presidio_entity_mapping=ENTITY_MAPPING, 
+                aggregation_strategy="max", 
+                labels_to_ignore=["O"]
             )
-        logging.debug(f"Transformer model config: {trf_model_config}")
-
-        ner_config = NerModelConfiguration(
-            model_to_presidio_entity_mapping=ENTITY_MAPPING, 
-            aggregation_strategy="max", 
-            labels_to_ignore=["O"]
-        )
-        logging.debug(f"NER model configuration: {ner_config}")
+            nlp_engine = TransformersNlpEngine(models=trf_model_config, ner_model_configuration=ner_config)
+            core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=[effective_lang])
         
-        nlp_engine = TransformersNlpEngine(models=trf_model_config, ner_model_configuration=ner_config)
-        core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=list(supported_langs))
-        
-        for recognizer in load_custom_recognizers(langs=core_analyzer.supported_languages, regex_priority=self.regex_priority):
+        # Load custom recognizers only for the effective_lang
+        for recognizer in load_custom_recognizers(langs=[effective_lang], regex_priority=self.regex_priority):
             core_analyzer.registry.add_recognizer(recognizer)
         
         batch_analyzer = BatchAnalyzerEngine(analyzer_engine=core_analyzer)
@@ -341,7 +351,7 @@ class AnonymizationOrchestrator:
         all_collected_entities: List[Tuple] = [] # Orchestrator's master collector for micro-batching
         operator_params = {
             "hash_generator": self.hash_generator,
-            "slug_length": self.slug_length,
+            "custom_slug_length": self.slug_length,
             # entity_collector will be passed to CustomSlugAnonymizer via operator_params in strategies
         }
 
@@ -489,19 +499,37 @@ class AnonymizationOrchestrator:
         return anonymized_list, collected_entities_from_forced
 
     def detect_entities(self, texts: List[str]) -> List[dict]:
-        if not texts: return []
+        if not texts:
+            return []
 
-        logging.debug(f"Detecting entities for {len(texts)} texts.")
-        original_texts = [str(text) if pd.notna(text) else "" for text in texts]
-        unique_texts_to_process = sorted(list(set(t for t in original_texts if t)))
-
-        if not unique_texts_to_process: return []
-
-        nlp_engine = self.analyzer_engine.analyzer_engine.nlp_engine
-        nlp_model = nlp_engine.nlp[self.lang]
-        docs = nlp_model.pipe(unique_texts_to_process, batch_size=self.nlp_batch_size)
+        logging.debug(f"Detecting entities for {len(texts)} texts using analyzer_engine.")
         
-        return self.entity_detector.detect_entities_in_docs(docs)
+        results = []
+        
+        # Get all supported entities, but filter out those the user wants to preserve.
+        all_entities = self.analyzer_engine.analyzer_engine.get_supported_entities()
+        entities_to_analyze = [e for e in all_entities if e not in self.entities_to_preserve]
+
+        analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
+            texts,
+            language=self.lang,
+            entities=entities_to_analyze,
+            allow_list=self.allow_list,
+            score_threshold=0.1
+        )
+
+        for i, analyzer_results in enumerate(analyzer_results_iterator):
+            text = texts[i]
+            # Even if there are no PIIs, we might want to return the text.
+            # The current NER implementation expects a "label" key.
+            # We will only append if entities are found.
+            if analyzer_results:
+                # Sort by start offset to ensure labels are ordered
+                sorted_results = sorted(analyzer_results, key=lambda r: r.start)
+                labels = [[res.start, res.end, res.entity_type] for res in sorted_results]
+                results.append({"text": text, "label": labels})
+        
+        return results
 
     def _save_and_clear_entities(self, entities: List[Tuple]):
         """Saves a batch of entities to the database and clears the list."""
