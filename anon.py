@@ -41,20 +41,20 @@ def models_check(lang: str):
 
     for model in (en_model, requested):
         if model and not spacy.util.is_package(model):
-            logging.warning(f"Spacy model '{model}' not found. SKIPPING download due to test environment issue.")
-            # try:
-            #     subprocess.run(
-            #         [sys.executable, "-m", "spacy", "download", model],
-            #         check=True, capture_output=True, text=True,
-            #     )
-            #     logging.info(f"Successfully downloaded '{model}'.")
-            # except Exception as e:
-            #     logging.error(f"Failed to download spaCy model '{model}': {e}")
-            #     sys.exit(1)
+            logging.info(f"Spacy model '{model}' not found. Downloading...")
+            try:
+                subprocess.run(
+                    [sys.executable, "-m", "spacy", "download", model],
+                    check=True, capture_output=True, text=True,
+                )
+                logging.info(f"Successfully downloaded '{model}'.")
+            except Exception as e:
+                logging.error(f"Failed to download spaCy model '{model}': {e}")
+                sys.exit(1)
 
     if not os.path.exists(TRF_MODEL_PATH):
-        logging.warning(f"Transformer model '{TRANSFORMER_MODEL}' not found. SKIPPING download due to test environment issue.")
-        # snapshot_download(repo_id=TRANSFORMER_MODEL, cache_dir=TRF_MODEL_PATH, max_workers=10)
+        logging.info(f"Transformer model '{TRANSFORMER_MODEL}' not found. Downloading...")
+        snapshot_download(repo_id=TRANSFORMER_MODEL, cache_dir=TRF_MODEL_PATH, max_workers=10)
 
 
 def write_report(file_path, start_time):

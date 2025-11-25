@@ -37,7 +37,7 @@ class TestPiiLeak(unittest.TestCase):
         """
         # Configure the mock for the strategy's anonymize method to return a list of the wrong size.
         # This simulates a failure inside the batch processor.
-        mock_anonymize_strategy.return_value = ["mocked_anonymized_line"]
+        mock_anonymize_strategy.return_value = (["mocked_anonymized_line"], [])
 
         # Instantiate a REAL orchestrator. The fallback logic we want to test is inside it.
         # The orchestrator will use the default 'presidio' strategy, which we have mocked.

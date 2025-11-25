@@ -235,6 +235,7 @@ class AnonymizationOrchestrator:
         self.entities_to_preserve = set(entities_to_preserve)
         self.slug_length = slug_length
         self.nlp_batch_size = nlp_batch_size
+        self.regex_priority = regex_priority
 
         self.total_entities_processed = 0
         self.entity_counts: Dict[str, int] = {}

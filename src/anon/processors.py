@@ -715,7 +715,7 @@ class XmlFileProcessor(FileProcessor):
                 f.write(f"<!-- Could not parse XML file {os.path.basename(self.file_path)} due to syntax errors. -->")
             return
 
-        use_deduplication = self.orchestrator.use_cache
+        use_deduplication = self.orchestrator.cache_manager.use_cache
         text_groups: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
         logging.debug(f"XML processing with deduplication: {use_deduplication}.")
 
@@ -968,7 +968,7 @@ class JsonFileProcessor(FileProcessor):
 
             if final_group_key in path_aware_map and obj in path_aware_map[final_group_key]:
                 try:
-                    if self.orchestrator.use_cache:
+                    if self.orchestrator.cache_manager.use_cache:
                         # In cache mode, replacement is static (peek at the first item).
                         return path_aware_map[final_group_key][obj][0]
                     else:
@@ -985,7 +985,7 @@ class JsonFileProcessor(FileProcessor):
             logging.debug("No text groups found for translation map.")
             return path_aware_map
 
-        use_deduplication = self.orchestrator.use_cache
+        use_deduplication = self.orchestrator.cache_manager.use_cache
         total_strings = sum(len(v) if not use_deduplication else len(set(v)) for v in text_groups.values())
         if not total_strings:
             logging.debug("No strings to process for translation map.")
