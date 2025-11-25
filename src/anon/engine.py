@@ -3,7 +3,7 @@
 import hashlib
 import hmac
 import re
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple
 import logging
 
 import pandas as pd  # type: ignore
@@ -29,12 +29,14 @@ from .config import (
     ENTITY_MAPPING,
     SECRET_KEY,
     TRANSFORMER_MODEL,
+    ProcessingLimits,
 )
 from .database import DatabaseContext
 from .cache_manager import CacheManager
 from .hash_generator import HashGenerator
 from .strategies import strategy_factory
 from .entity_detector import EntityDetector
+from .core.protocols import EntityStorage, CacheStrategy, HashingStrategy, AnonymizationStrategy
 
 
 SUPPORTED_LANGUAGES = {
@@ -59,7 +61,7 @@ class CustomSlugAnonymizer(Operator):
         entity_type = params.get("entity_type", "UNKNOWN")
         logging.debug(f"Anonymizing text '{clean_text}' with entity type '{entity_type}'.")
 
-        hash_generator = params.get("hash_generator")
+        hash_generator: HashingStrategy = params.get("hash_generator")
         if not hash_generator:
             raise ValueError("HashGenerator instance not provided in operator params.")
 
@@ -207,72 +209,86 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
 
 class AnonymizationOrchestrator:
     """
-    Secure and Optimized Anonymization Orchestrator.
-    Combines Transformer models (via SpaCy) with high-performance Regex.
+    Coordinates the anonymization process by selecting and executing a strategy.
+    This class is responsible for high-level workflow, dependency injection,
+    and fallback mechanisms, but delegates the core logic to strategy objects.
     """
 
-    def __init__(self, 
-                 lang: str, 
-                 db_context: Optional[DatabaseContext],
-                 allow_list: List[str], 
-                 entities_to_preserve: List[str], 
-                 slug_length: int | None = None, 
-                 strategy: str = "presidio", 
-                 use_cache: bool = True, 
-                 regex_priority: bool = False, 
-                 max_cache_size: int = 10000,
+    def __init__(self,
+                 lang: str,
+                 db_context: Optional[EntityStorage],
+                 allow_list: List[str],
+                 entities_to_preserve: List[str],
+                 slug_length: Optional[int] = None,
+                 strategy_name: str = "presidio",
+                 regex_priority: bool = False,
                  analyzer_engine: Optional[BatchAnalyzerEngine] = None,
                  anonymizer_engine: Optional[AnonymizerEngine] = None,
-                 nlp_batch_size: int = 500):
+                 nlp_batch_size: int = 500,
+                 cache_manager: Optional[CacheStrategy] = None,
+                 hash_generator: Optional[HashingStrategy] = None,
+                 entity_detector: Optional[EntityDetector] = None):
+
         self.lang = lang
         self.db_context = db_context
-        self.allow_list = set(allow_list) 
+        self.allow_list = set(allow_list)
         self.entities_to_preserve = set(entities_to_preserve)
         self.slug_length = slug_length
-        self.strategy_name = strategy
-        self.use_cache = use_cache # Keep for passing to CacheManager
-        self.regex_priority = regex_priority
         self.nlp_batch_size = nlp_batch_size
+
         self.total_entities_processed = 0
         self.entity_counts: Dict[str, int] = {}
-        
-        self.cache_manager = CacheManager(use_cache, max_cache_size)
-        self.hash_generator = HashGenerator()
-        
-        logging.debug(f"AnonymizationOrchestrator initialized with: lang='{lang}', strategy='{strategy}', use_cache={use_cache}, max_cache_size={max_cache_size}, regex_priority={regex_priority}, slug_length={slug_length}.")
-        logging.debug(f"Allow list: {self.allow_list}, Entities to preserve: {self.entities_to_preserve}")
+
+        # --- Dependency Injection and Engine Setup ---
+        self.cache_manager = cache_manager or CacheManager(use_cache=False, max_cache_size=0)
+        self.hash_generator = hash_generator or HashGenerator()
 
         if analyzer_engine and anonymizer_engine:
             self.analyzer_engine = analyzer_engine
             self.anonymizer_engine = anonymizer_engine
-            logging.debug("Using pre-provided analyzer and anonymizer engines.")
         else:
             self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
-        
-        compiled_patterns = []
-        custom_recognizers = load_custom_recognizers([self.lang], regex_priority=self.regex_priority)
-        
-        for recognizer in custom_recognizers:
-            entity_type = recognizer.supported_entities[0] 
-            if entity_type in self.entities_to_preserve:
-                continue
-            for pattern in recognizer.patterns:
-                try:
-                    compiled_patterns.append({
-                        "label": entity_type,
-                        "regex": re.compile(pattern.regex, flags=re.DOTALL | re.IGNORECASE),
-                        "score": pattern.score
-                    })
-                except re.error:
-                    logging.warning(f"Invalid regex pattern skipped: {pattern.regex}")
-        logging.debug(f"Loaded {len(custom_recognizers)} custom recognizers and compiled {len(compiled_patterns)} regex patterns.")
-        
-        self.entity_detector = EntityDetector(
-            compiled_patterns=compiled_patterns,
+
+        # If entity_detector was not provided, create a default one.
+        if entity_detector:
+            self.entity_detector = entity_detector
+        else:
+            custom_recognizers = load_custom_recognizers([self.lang], regex_priority=regex_priority)
+            compiled_patterns = []
+            for recognizer in custom_recognizers:
+                entity_type = recognizer.supported_entities[0]
+                if entity_type in self.entities_to_preserve:
+                    continue
+                for pattern in recognizer.patterns:
+                    try:
+                        compiled_patterns.append({
+                            "label": entity_type,
+                            "regex": re.compile(pattern.regex, flags=re.DOTALL | re.IGNORECASE),
+                            "score": pattern.score
+                        })
+                    except re.error as e:
+                        logging.warning(f"Invalid regex pattern skipped: {pattern.regex} - {e}")
+            self.entity_detector = EntityDetector(
+                compiled_patterns=compiled_patterns,
+                entities_to_preserve=self.entities_to_preserve,
+                allow_list=self.allow_list
+            )
+
+        # --- Strategy Factory ---
+        # The factory is now called from the orchestrator, which injects dependencies into the strategy.
+        self.anonymization_strategy = strategy_factory(
+            strategy_name=strategy_name,
+            analyzer_engine=self.analyzer_engine,
+            anonymizer_engine=self.anonymizer_engine,
+            entity_detector=self.entity_detector,
+            hash_generator=self.hash_generator,
+            cache_manager=self.cache_manager,
+            lang=self.lang,
             entities_to_preserve=self.entities_to_preserve,
-            allow_list=self.allow_list
+            allow_list=self.allow_list,
+            nlp_batch_size=self.nlp_batch_size
         )
-        self.anonymization_strategy = strategy_factory(strategy, self)
+        logging.info(f"Anonymization strategy '{strategy_name}' initialized.")
 
 
     def _setup_engines(self) -> tuple[BatchAnalyzerEngine, AnonymizerEngine]:
@@ -312,95 +328,100 @@ class AnonymizationOrchestrator:
     def anonymize_text(self, text: str, forced_entity_type: Optional[Union[str, List[str]]] = None) -> str:
         if not isinstance(text, str) or not text.strip():
             return text
-        return self.anonymize_texts([text], forced_entity_type=forced_entity_type)[0]
-
-    def _get_core_entities(self) -> List[str]:
-        """Returns a curated list of entities supported by our core recognizers (NLP + Custom Regex)."""
-        core_entities = set(ENTITY_MAPPING.values())
-        for recognizer in load_custom_recognizers(langs=[self.lang]):
-            core_entities.update(recognizer.supported_entities)
-        return list(core_entities)
+        anonymized_texts, _ = self.anonymize_texts([text], forced_entity_type=forced_entity_type)
+        return anonymized_texts[0]
 
     def anonymize_texts(self, texts: List[str], forced_entity_type: Optional[Union[str, List[str]]] = None) -> List[str]:
         """
         Anonymizes a list of texts and saves the generated entity mappings to the database.
-
         This method dispatches to the appropriate internal method, collects all generated
-        entities, and then uses the injected DatabaseContext to persist them.
+        entities, and handles micro-batching persistence and entity counting.
         """
-        entity_collector: List = []
+        all_collected_entities: List[Tuple] = [] # Orchestrator's master collector for micro-batching
         operator_params = {
-            "entity_collector": entity_collector,
             "hash_generator": self.hash_generator,
-            "slug_length": self.slug_length
+            "slug_length": self.slug_length,
+            # entity_collector will be passed to CustomSlugAnonymizer via operator_params in strategies
         }
 
-        logging.debug(f"Anonymizing {len(texts)} texts using strategy: '{self.strategy_name}'. Forced entity type: '{forced_entity_type}'")
+        logging.debug(f"Anonymizing {len(texts)} texts using strategy: '{self.anonymization_strategy.__class__.__name__}'. Forced entity type: '{forced_entity_type}'")
         
+        anonymized_results: List[str]
+        collected_from_current_run: List[Tuple] = []
+
         if isinstance(forced_entity_type, list):
             logging.debug("Dispatching to _anonymize_texts_pick_one strategy.")
-            results = self._anonymize_texts_pick_one(texts, forced_entity_type, operator_params)
+            anonymized_results, collected_from_current_run = self._anonymize_texts_pick_one(texts, forced_entity_type, operator_params)
         elif isinstance(forced_entity_type, str):
             logging.debug("Dispatching to _anonymize_texts_forced_type strategy.")
-            results = self._anonymize_texts_forced_type(texts, forced_entity_type, operator_params)
+            anonymized_results, collected_from_current_run = self._anonymize_texts_forced_type(texts, forced_entity_type, operator_params)
         else:
-            results = self.anonymization_strategy.anonymize(texts, operator_params)
+            anonymized_results, collected_from_current_run = self.anonymization_strategy.anonymize(texts, operator_params)
+
+        all_collected_entities.extend(collected_from_current_run)
+        
+        # Implement micro-batching: save entities if the collector grows large
+        if self.db_context and len(all_collected_entities) >= ProcessingLimits.MICRO_BATCH_SAVE_SIZE:
+            self._save_and_clear_entities(all_collected_entities)
 
         # --- FALLBACK ARCHITECTURE ---
-        if len(results) != len(texts):
+        if len(anonymized_results) != len(texts):
             logging.warning(
                 "Batch integrity failure detected (Input: %d vs Output: %d). "
                 "Triggering Safe Fallback Mechanism.",
-                len(texts), len(results)
+                len(texts), len(anonymized_results)
             )
             # The fallback will manage its own entity collection and saving.
-            results = self._safe_fallback_processing(texts, operator_params, forced_entity_type)
+            anonymized_results, collected_from_fallback = self._safe_fallback_processing(texts, operator_params, forced_entity_type)
+            all_collected_entities.extend(collected_from_fallback) # Add any entities collected during fallback
 
-        # --- DATABASE PERSISTENCE ---
-        if self.db_context and entity_collector:
-            self.db_context.save_entities(entity_collector)
-            logging.debug(f"Saved {len(entity_collector)} entities to the database.")
+        # --- DATABASE PERSISTENCE (Final Flush) ---
+        # Any remaining entities from fallback or prior micro-batches will be flushed here.
+        self._save_and_clear_entities(all_collected_entities) 
 
-        return results
+        return anonymized_results
 
-    def _safe_fallback_processing(self, texts: List[str], operator_params: Optional[Dict], forced_entity_type: Optional[Union[str, List[str]]]) -> List[str]:
+    def _safe_fallback_processing(self, texts: List[str], operator_params: Optional[Dict], forced_entity_type: Optional[Union[str, List[str]]]) -> Tuple[List[str], List[Tuple]]:
         """
         Fallback Method: Processes item by item to ensure atomicity and alignment,
         with a circuit breaker to prevent runaway failures.
         """
         fallback_results = []
+        collected_entities_fallback: List[Tuple] = []
         failure_count = 0
-        # Circuit breaker activates if more than 20% of the batch fails, with a minimum of 5 failures.
-        failure_threshold = max(5, int(len(texts) * 0.2))
+        # Circuit breaker activates if a defined percentage of the batch fails.
+        failure_threshold = max(
+            ProcessingLimits.CIRCUIT_BREAKER_MIN_FAILURES,
+            int(len(texts) * ProcessingLimits.CIRCUIT_BREAKER_FAILURE_RATE)
+        )
 
         for text in texts:
+            single_item_collected_entities: List[Tuple] = []
+            single_item_operator_params = operator_params.copy() if operator_params else {}
+            single_item_operator_params["entity_collector"] = single_item_collected_entities # Pass collector to the operator
+            
+            single_anonymized_list = []
+            
             try:
-                # We manage a separate collector inside the loop to save entities per item
-                # to avoid data loss if a subsequent item fails.
-                single_item_collector: List = []
-                single_item_params = {
-                    "entity_collector": single_item_collector,
-                    "hash_generator": self.hash_generator,
-                    "slug_length": self.slug_length
-                }
-                single_result_list = []
-                
                 # Re-use existing dispatch logic to keep it DRY
                 if isinstance(forced_entity_type, list):
-                    single_result_list = self._anonymize_texts_pick_one([text], forced_entity_type, single_item_params)
+                    single_anonymized_list, collected_for_item = self._anonymize_texts_pick_one([text], forced_entity_type, single_item_operator_params)
                 elif isinstance(forced_entity_type, str):
-                    single_result_list = self._anonymize_texts_forced_type([text], forced_entity_type, single_item_params)
+                    single_anonymized_list, collected_for_item = self._anonymize_texts_forced_type([text], forced_entity_type, single_item_operator_params)
                 else:
                     # Use the strategy for the single text
-                    single_result_list = self.anonymization_strategy.anonymize([text], single_item_params)
+                    single_anonymized_list, collected_for_item = self.anonymization_strategy.anonymize([text], single_item_operator_params)
 
-                if self.db_context and single_item_collector:
-                    self.db_context.save_entities(single_item_collector)
+                if collected_for_item:
+                    collected_entities_fallback.extend(collected_for_item)
+                    # Micro-batch save for fallback items
+                    if self.db_context and len(collected_entities_fallback) >= ProcessingLimits.MICRO_BATCH_SAVE_SIZE:
+                        self._save_and_clear_entities(collected_entities_fallback)
 
-                if not single_result_list:
+                if not single_anonymized_list:
                     fallback_results.append(text) 
                 else:
-                    fallback_results.append(single_result_list[0])
+                    fallback_results.append(single_anonymized_list[0])
 
             except Exception as e:
                 logging.error(f"Fallback failed for a specific item: {str(e)[:100]}...", exc_info=True)
@@ -414,11 +435,12 @@ class AnonymizationOrchestrator:
                     # Re-raise the last exception to halt processing of this file
                     raise e
         
-        return fallback_results
+        return fallback_results, collected_entities_fallback
 
 
-    def _anonymize_texts_pick_one(self, texts: List[str], entity_types: List[str], operator_params: Optional[Dict] = None) -> List[str]:
+    def _anonymize_texts_pick_one(self, texts: List[str], entity_types: List[str], operator_params: Optional[Dict] = None) -> Tuple[List[str], List[Tuple]]:
         anonymized_list = []
+        collected_entities_from_pick_one: List[Tuple] = []
         if operator_params is None: operator_params = {}
         
         analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
@@ -431,24 +453,21 @@ class AnonymizationOrchestrator:
                 continue
             
             best_result: RecognizerResult = max(analyzer_results, key=lambda r: r.score)
-            anonymized_text = self._anonymize_texts_forced_type([text], best_result.entity_type, operator_params)[0]
-            anonymized_list.append(anonymized_text)
+            anonymized_text_list, collected_from_forced = self._anonymize_texts_forced_type([text], best_result.entity_type, operator_params)
+            anonymized_list.append(anonymized_text_list[0])
+            collected_entities_from_pick_one.extend(collected_from_forced)
             
-        return anonymized_list
+        return anonymized_list, collected_entities_from_pick_one
 
-    def _anonymize_texts_forced_type(self, texts: List[str], entity_type: str, operator_params: Optional[Dict] = None) -> List[str]:
+    def _anonymize_texts_forced_type(self, texts: List[str], entity_type: str, operator_params: Optional[Dict] = None) -> Tuple[List[str], List[Tuple]]:
         anonymized_list = []
+        collected_entities_from_forced: List[Tuple] = []
         if operator_params is None: operator_params = {}
-        entity_collector = operator_params.get("entity_collector")
-
+        
         for text in texts:
             if not isinstance(text, str) or not text.strip():
                 anonymized_list.append(text)
                 continue
-
-            # This path treats the entire text as a single entity, so we count it here.
-            self.total_entities_processed += 1
-            self.entity_counts[entity_type] = self.entity_counts.get(entity_type, 0) + 1
 
             clean_text = " ".join(text.split()).strip()
             
@@ -456,158 +475,17 @@ class AnonymizationOrchestrator:
             cached_value = self.cache_manager.get(cache_key) # Use CacheManager
             if cached_value:
                 anonymized_list.append(cached_value)
+                # No entities collected if from cache
                 continue
 
             display_hash, full_hash = self.hash_generator.generate_slug(clean_text, self.slug_length)
 
-            if entity_collector is not None:
-                entity_collector.append((entity_type, clean_text, display_hash, full_hash))
+            collected_entities_from_forced.append((entity_type, clean_text, display_hash, full_hash))
             
             anonymized_text = f"[{entity_type}_{display_hash}]"
             self.cache_manager.add(cache_key, anonymized_text) # Use CacheManager
             anonymized_list.append(anonymized_text)
-        return anonymized_list
-
-    def _generate_anonymized_text(self, original_doc_text: str, merged_entities: List[Dict], entity_collector: Optional[List]) -> str:
-        """Generates the anonymized text based on merged entities."""
-        new_text_parts = []
-        current_idx = 0
-        for ent in merged_entities:
-            self.total_entities_processed += 1
-            self.entity_counts[ent["label"]] = self.entity_counts.get(ent["label"], 0) + 1
-            new_text_parts.append(original_doc_text[current_idx:ent["start"]])
-            clean_text = " ".join(ent["text"].split()).strip()
-            
-            display_hash, full_hash = self.hash_generator.generate_slug(clean_text, self.slug_length)
-
-            if entity_collector is not None:
-                entity_collector.append((ent["label"], clean_text, display_hash, full_hash))
-            new_text_parts.append(f"[{ent['label']}_{display_hash}]")
-            current_idx = ent["end"]
-        
-        new_text_parts.append(original_doc_text[current_idx:])
-        return "".join(new_text_parts)
-
-
-    def _anonymize_texts_fast_path(self, texts: List[str], operator_params: Optional[Dict] = None) -> List[str]:
-        if not texts: return []
-
-        original_texts = [str(text) if pd.notna(text) else "" for text in texts]
-        
-        # This path no longer deduplicates. It processes all texts to preserve context.
-        # The cache is still checked on a per-item basis.
-        
-        anonymized_results = []
-        texts_to_process_in_batch = []
-        indices_map = [] # To map batch results back to original positions
-
-        for i, text in enumerate(original_texts):
-            if not text:
-                anonymized_results.append("")
-                continue
-
-            cached_value = self.cache_manager.get(text)
-            if cached_value:
-                anonymized_results.append(cached_value)
-            else:
-                anonymized_results.append(None) # Placeholder for now
-                texts_to_process_in_batch.append(text)
-                indices_map.append(i)
-
-        if not texts_to_process_in_batch:
-            return [res if res is not None else "" for res in anonymized_results]
-
-        logging.debug(f"Processing batch of {len(texts_to_process_in_batch)} texts in fast path.")
-
-        if operator_params is None: operator_params = {}
-        entity_collector = operator_params.get("entity_collector")
-        nlp_engine = self.analyzer_engine.analyzer_engine.nlp_engine
-        nlp_model = nlp_engine.nlp[self.lang] 
-        docs = nlp_model.pipe(texts_to_process_in_batch, batch_size=self.nlp_batch_size)
-
-        processed_texts = []
-        for doc in docs:
-            original_doc_text = doc.text
-            
-            detected_entities = self.entity_detector.extract_entities(doc, original_doc_text)
-            merged_entities = self.entity_detector.merge_overlapping_entities(detected_entities)
-            
-            anonymized_text = self._generate_anonymized_text(original_doc_text, merged_entities, entity_collector)
-
-            self.cache_manager.add(original_doc_text, anonymized_text)
-            processed_texts.append(anonymized_text)
-        
-        # Populate the final results using the processed texts and the index map
-        for i, anonymized_text in enumerate(processed_texts):
-            original_index = indices_map[i]
-            anonymized_results[original_index] = anonymized_text
-
-        return [res if res is not None else "" for res in anonymized_results]
-
-    def _anonymize_texts_presidio(self, texts: List[str], operator_params: Optional[Dict] = None, entities: Optional[List[str]] = None) -> List[str]:
-        if not texts: return []
-
-        original_texts = [str(text) if pd.notna(text) else "" for text in texts]
-        
-        final_anonymized_list = []
-
-        # If no specific entities are passed, use the default logic for the "presidio" strategy.
-        entities_to_use = entities if entities is not None else self._get_entities_to_anonymize()
-        logging.debug(f"[_anonymize_texts_presidio] Entities to use for analysis: {entities_to_use}")
-        
-        if operator_params is None: operator_params = {}
-        # Ensure the essential params are always present for the operator
-        operator_params["hash_generator"] = self.hash_generator
-        operator_params["slug_length"] = self.slug_length
-        if "total_entities_counter" not in operator_params: operator_params["total_entities_counter"] = self
-        if "entity_counts" not in operator_params: operator_params["entity_counts"] = self.entity_counts
-
-        
-        logging.debug(f"[_anonymize_texts_presidio] Input texts count: {len(original_texts)}")
-
-        analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
-            original_texts, language=self.lang,
-            entities=entities_to_use, score_threshold=0.6,
-            allow_list=self.allow_list
-        )
-        
-        analyzer_results_list = list(analyzer_results_iterator)
-        logging.debug(f"[_anonymize_texts_presidio] Analyzer results count: {len(analyzer_results_list)}")
-
-        if len(analyzer_results_list) != len(original_texts):
-            logging.error(f"[_anonymize_texts_presidio] Mismatch between original_texts and analyzer_results_list! Input: {len(original_texts)}, Analyzer Results: {len(analyzer_results_list)}. This will lead to batch integrity failure.")
-
-        for text, analyzer_results in zip(original_texts, analyzer_results_list):
-            logging.debug(f"[_anonymize_texts_presidio] Processing text: '{text}'")
-            logging.debug(f"[_anonymize_texts_presidio]   Analyzer Results for text: {analyzer_results}")
-
-            cached_value = self.cache_manager.get(text)
-            if cached_value:
-                final_anonymized_list.append(cached_value)
-                logging.debug(f"[_anonymize_texts_presidio]   Cache hit for '{text}'. Anonymized: '{cached_value}'")
-                continue
-
-            for res in analyzer_results:
-                if res.entity_type not in self.entities_to_preserve:
-                    self.total_entities_processed += 1
-                    self.entity_counts[res.entity_type] = self.entity_counts.get(res.entity_type, 0) + 1
-
-            anonymizer_result = self.anonymizer_engine.anonymize(
-                text=text,
-                analyzer_results=analyzer_results,
-                operators={"DEFAULT": OperatorConfig("custom_slug", operator_params)},
-            )
-            
-            anonymized_text = anonymizer_result.text
-            self.cache_manager.add(text, anonymized_text)
-            final_anonymized_list.append(anonymized_text)
-            logging.debug(f"[_anonymize_texts_presidio]   Final anonymized text: '{anonymized_text}'")
-        
-        return final_anonymized_list
-
-    def _get_entities_to_anonymize(self) -> List[str]:
-        all_entities = self.analyzer_engine.analyzer_engine.get_supported_entities()
-        return [ent for ent in all_entities if ent not in self.entities_to_preserve]
+        return anonymized_list, collected_entities_from_forced
 
     def detect_entities(self, texts: List[str]) -> List[dict]:
         if not texts: return []
@@ -623,3 +501,17 @@ class AnonymizationOrchestrator:
         docs = nlp_model.pipe(unique_texts_to_process, batch_size=self.nlp_batch_size)
         
         return self.entity_detector.detect_entities_in_docs(docs)
+
+    def _save_and_clear_entities(self, entities: List[Tuple]):
+        """Saves a batch of entities to the database and clears the list."""
+        if self.db_context and entities:
+            self.db_context.save_entities(entities)
+            self._increment_entity_counters_for_batch(entities)
+            entities.clear() # Clear the list to free memory
+
+    def _increment_entity_counters_for_batch(self, entities: List[Tuple]):
+        """Increments internal counters for a batch of entities."""
+        for entity in entities:
+            entity_type = entity[0] # entity_type is the first element of the tuple
+            self.total_entities_processed += 1
+            self.entity_counts[entity_type] = self.entity_counts.get(entity_type, 0) + 1

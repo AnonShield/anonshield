@@ -1,13 +1,36 @@
 import os
+import logging
+from .security import SecretManagerImpl # Import the manager
 
 # --- Global Configuration ---
-SECRET_KEY = os.environ.get("ANON_SECRET_KEY")
-TECHNICAL_STOPLIST = {
-    "http", "https", "tcp", "udp", "port", "high", "medium", "low", "critical",
-    "cvss", "cve", "score", "severity", "description", "solution", "name",
-    "id", "type", "true", "false", "null", "none", "n/a", "json", "xml",
-    "string", "integer", "boolean", "date", "datetime", "timestamp"
-}
+_secret_manager = SecretManagerImpl()
+SECRET_KEY = _secret_manager.get_secret_key()
+
+class Global:
+    """Global constants for the application."""
+    TECHNICAL_STOPLIST = {
+        "http", "https", "tcp", "udp", "port", "high", "medium", "low", "critical",
+        "cvss", "cve", "score", "severity", "description", "solution", "name",
+        "id", "type", "true", "false", "null", "none", "n/a", "json", "xml",
+        "string", "integer", "boolean", "date", "datetime", "timestamp"
+    }
+
+class ProcessingLimits:
+    """Memory and throughput limits for file processing and other operations."""
+    XML_MEMORY_THRESHOLD_MB = 200
+    JSON_STREAM_THRESHOLD_MB = 100
+    CIRCUIT_BREAKER_FAILURE_RATE = 0.20
+    CIRCUIT_BREAKER_MIN_FAILURES = 5
+    MAX_CACHE_SIZE = 10000
+    MICRO_BATCH_SAVE_SIZE = 10000 # Save entities to DB in micro-batches of this size
+
+class DefaultSizes:
+    """Default chunk and batch sizes for processing."""
+    BATCH_SIZE = 200
+    CSV_CHUNK_SIZE = 1000
+    JSON_CHUNK_SIZE = 1000
+    NER_CHUNK_SIZE = 1500
+    NLP_BATCH_SIZE = 500
 
 # --- Model Configuration ---
 TRANSFORMER_MODEL = "Davlan/xlm-roberta-base-ner-hrl"

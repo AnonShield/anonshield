@@ -32,7 +32,7 @@ class TestSecretKeyValidation(unittest.TestCase):
         result = subprocess.run(command, capture_output=True, text=True)
         
         self.assertNotEqual(result.returncode, 0, "anon.py should fail without SECRET_KEY")
-        self.assertIn("ANON_SECRET_KEY environment variable not set for anonymization", result.stderr)
+        self.assertIn("ANON_SECRET_KEY or ANON_SECRET_KEY_FILE not set", result.stderr)
         
         # Clean up dummy file
         os.remove(dummy_file)
@@ -49,7 +49,7 @@ class TestSecretKeyValidation(unittest.TestCase):
         result = subprocess.run(command, capture_output=True, text=True)
         
         # We assert that the specific error message for missing SECRET_KEY is NOT present.
-        self.assertNotIn("ANON_SECRET_KEY environment variable not set for anonymization", result.stderr)
+        self.assertNotIn("ANON_SECRET_KEY or ANON_SECRET_KEY_FILE not set", result.stderr)
         
         # The return code might still be non-zero if other errors occur (e.g., no processor for dummy.txt or model download issues)
         # So we specifically check for the absence of the SECRET_KEY error.
@@ -74,7 +74,7 @@ class TestSecretKeyValidation(unittest.TestCase):
         result = subprocess.run(command, capture_output=True, text=True)
         
         self.assertEqual(result.returncode, 0, f"anon.py failed even with SECRET_KEY set. Stderr: {result.stderr}")
-        self.assertNotIn("ANON_SECRET_KEY environment variable not set for anonymization", result.stderr)
+        self.assertNotIn("ANON_SECRET_KEY or ANON_SECRET_KEY_FILE not set", result.stderr)
 
         # Verify output file exists and is anonymized
         output_file_path = os.path.join(temp_output_dir, "anon_dummy.txt")

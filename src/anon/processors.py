@@ -13,6 +13,7 @@ import ijson
 import re
 import shutil
 import logging
+import unicodedata # Added for Unicode normalization
 from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from typing import Iterable, List, Generator, Optional, Dict, Tuple, Union
@@ -27,9 +28,8 @@ from PIL import Image  # type: ignore
 from tqdm import tqdm  # type: ignore
 import pymupdf as fitz  # type: ignore
 
-from .config import TECHNICAL_STOPLIST
+from .config import Global, ProcessingLimits, DefaultSizes
 from .engine import AnonymizationOrchestrator
-
 
 def get_output_path(original_path: str, new_ext: str, prefix: str = "anon_", output_dir: str = "output") -> str:
     """Constructs a secure output file path, preventing path traversal."""
@@ -49,9 +49,14 @@ def get_output_path(original_path: str, new_ext: str, prefix: str = "anon_", out
     
     # 2. Sanitize filename from original_path to prevent it from being used for traversal
     base_name = os.path.basename(original_path)
-    if not base_name or base_name in ('.', '..'):
-        logging.error(f"Invalid original path provided: '{original_path}'")
-        raise ValueError(f"Invalid original path provided: '{original_path}'")
+    
+    # Normalize Unicode (NFD) and remove dangerous characters for robust sanitization
+    base_name = unicodedata.normalize('NFKD', base_name).encode('ascii', 'ignore').decode('utf-8')
+    base_name = re.sub(r'[^\w\s\-.]', '_', base_name).strip() # Whitelist approach, allowing only alphanumeric, whitespace, hyphen, dot
+    
+    if not base_name or base_name in ('.', '..') or base_name.startswith('.'):
+        logging.error(f"Invalid or sanitized-away filename from original path: '{original_path}' resulted in '{base_name}'")
+        raise ValueError(f"Invalid filename derived from original path: '{original_path}'")
 
     safe_filename = f"{prefix}{os.path.splitext(base_name)[0]}{new_ext}"
     
@@ -96,7 +101,8 @@ class FileProcessor(ABC):
                  batch_size: int = 200,
                  csv_chunk_size: int = 1000,
                  json_chunk_size: int = 1000,
-                 ner_chunk_size: int = 1500):
+                 ner_chunk_size: int = 1500,
+                 force_large_xml: bool = False): # Added force_large_xml
         self.file_path = file_path
         self.orchestrator = orchestrator
         self.ner_data_generation = ner_data_generation
@@ -112,9 +118,10 @@ class FileProcessor(ABC):
         self.csv_chunk_size = csv_chunk_size
         self.json_chunk_size = json_chunk_size
         self.ner_chunk_size = ner_chunk_size
+        self.force_large_xml = force_large_xml # Store the new parameter
         self.ner_output_file: Optional[str] = None
         self.ner_file_handle = None # Initialize to None
-        logging.debug(f"FileProcessor initialized for '{file_path}' with: ner_data_generation={ner_data_generation}, min_word_length={min_word_length}, skip_numeric={skip_numeric}, output_dir='{output_dir}', overwrite={overwrite}, disable_gc={disable_gc}.")
+        logging.debug(f"FileProcessor initialized for '{file_path}' with: ner_data_generation={ner_data_generation}, min_word_length={min_word_length}, skip_numeric={skip_numeric}, output_dir='{output_dir}', overwrite={overwrite}, disable_gc={disable_gc}, force_large_xml={force_large_xml}.")
 
     def _get_ner_output_path(self) -> str:
         return get_output_path(self.file_path, ".jsonl", prefix="ner_data_anon_", output_dir=self.output_dir)
@@ -246,7 +253,7 @@ class FileProcessor(ABC):
             logging.debug("Skipping numeric-only string. Not anonymizing.")
             return False, None
         
-        if stripped_text.lower() in TECHNICAL_STOPLIST:
+        if stripped_text.lower() in Global.TECHNICAL_STOPLIST:
             logging.debug("Skipping due to technical stoplist. Not anonymizing.")
             return False, None
 
@@ -290,7 +297,7 @@ class FileProcessor(ABC):
     def _run_ner_pipeline(self, text_list: List[str]):
         if not text_list: return
 
-        MAX_CHUNK_SIZE = self.ner_chunk_size
+        MAX_CHUNK_SIZE = DefaultSizes.NER_CHUNK_SIZE
         DELIMITER = " . ||| . "
         
         text_chunks: List[str] = []
@@ -436,91 +443,94 @@ class CsvFileProcessor(FileProcessor):
     
     def _process_anonymization(self, output_path: str):
         chunk_size = self.csv_chunk_size
+        temp_output_path = output_path + ".tmp"
         header_written = False
         
-        # The logic is now inverted: by default we use deduplication (faster).
-        # Full context processing is enabled only when the flag is explicitly set.
         use_deduplication = not self.preserve_row_context
         
         try:
-            # Efficiently get total_rows for tqdm
             with open(self.file_path, "rb") as f:
-                total_rows = sum(1 for _ in f) -1 # Subtract 1 for header
+                total_rows = sum(1 for _ in f) -1
         except (IOError, FileNotFoundError):
             total_rows = 0
         
         if total_rows <= 0:
-            if not header_written: # Ensure empty file still gets a header if input had one
+            if not header_written:
                 try:
                     df_header = pd.read_csv(self.file_path, nrows=0)
                     df_header.to_csv(output_path, mode='a', index=False, header=True)
                 except Exception:
-                    pass # Ignore if file doesn't exist or is truly empty
+                    pass
             return
 
-        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
-            progress_bar = tqdm(total=total_rows, desc=f"Processing CSV {os.path.basename(self.file_path)}", unit="rows", leave=False)
-            for chunk_idx, chunk in enumerate(reader):
-                logging.debug(f"Processing CSV chunk {chunk_idx + 1} with {len(chunk)} rows.")
-                anonymized_chunk = chunk.copy()
-                
-                if use_deduplication:
-                    logging.debug("CSV processing with value deduplication (faster, context-unaware).")
-                    # Original fast path: process unique values only
-                    texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
-                    for col in chunk.columns:
-                        for val in chunk[col].dropna().unique():
-                            val_str = str(val)
-                            should_anon, forced_type = self._should_anonymize(val_str, col)
-                            if should_anon:
-                                group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
-                                texts_to_anonymize_map[group_key][col].append(val_str)
-
-                    translation_map: Dict[str, str] = {}
-                    for group_key, cols_data in texts_to_anonymize_map.items():
-                        current_forced_type = group_key if group_key != "auto" else None
-                        if isinstance(current_forced_type, tuple): current_forced_type = list(current_forced_type)
-                        
-                        unique_texts_for_group = list(set(val for sublist in cols_data.values() for val in sublist))
-                        if unique_texts_for_group:
-                            logging.debug(f"Anonymizing {len(unique_texts_for_group)} unique texts for group '{group_key}'.")
-                            anonymized_texts = self._process_batch_smart(unique_texts_for_group, forced_entity_type=current_forced_type)
-                            translation_map.update(dict(zip(unique_texts_for_group, anonymized_texts)))
-
-                    if translation_map:
+        try:
+            with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
+                progress_bar = tqdm(total=total_rows, desc=f"Processing CSV {os.path.basename(self.file_path)}", unit="rows", leave=False)
+                for chunk_idx, chunk in enumerate(reader):
+                    logging.debug(f"Processing CSV chunk {chunk_idx + 1} with {len(chunk)} rows.")
+                    anonymized_chunk = chunk.copy()
+                    
+                    if use_deduplication:
+                        logging.debug("CSV processing with value deduplication (faster, context-unaware).")
+                        texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
                         for col in chunk.columns:
-                            logging.debug(f"Applying anonymization map to column '{col}'.")
-                            anonymized_chunk[col] = anonymized_chunk[col].map(lambda x: translation_map.get(str(x), x))
-                else:
-                    logging.debug("CSV processing with row context preservation (slower, context-aware).")
-                    # New context-aware path: process all values
-                    for col in chunk.columns:
-                        series = chunk[col].dropna()
-                        if series.empty: 
-                            logging.debug(f"Column '{col}' is empty, skipping.")
-                            continue
-                        
-                        # Check if any value in the series should be anonymized
-                        # This is an optimization to avoid processing columns with no PII
-                        if not any(self._should_anonymize(str(val), col)[0] for val in series):
-                            logging.debug(f"Column '{col}' contains no PII to anonymize based on current rules.")
-                            continue
+                            for val in chunk[col].dropna().unique():
+                                val_str = str(val)
+                                should_anon, forced_type = self._should_anonymize(val_str, col)
+                                if should_anon:
+                                    group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
+                                    texts_to_anonymize_map[group_key][col].append(val_str)
 
-                        values_to_process = series.tolist()
-                        # We assume all values in a column share the same forced_type for simplicity in batching
-                        _, forced_type = self._should_anonymize(values_to_process[0], col)
-                        
-                        logging.debug(f"Processing {len(values_to_process)} values in column '{col}' for anonymization.")
-                        anonymized_values = self._process_batch_smart(values_to_process, forced_entity_type=forced_type)
-                        
-                        # Use a series to map anonymized values back using original indexes
-                        anonymized_series = pd.Series(anonymized_values, index=series.index)
-                        anonymized_chunk[col].update(anonymized_series)
+                        translation_map: Dict[str, str] = {}
+                        for group_key, cols_data in texts_to_anonymize_map.items():
+                            current_forced_type = group_key if group_key != "auto" else None
+                            if isinstance(current_forced_type, tuple): current_forced_type = list(current_forced_type)
+                            
+                            unique_texts_for_group = list(set(val for sublist in cols_data.values() for val in sublist))
+                            if unique_texts_for_group:
+                                logging.debug(f"Anonymizing {len(unique_texts_for_group)} unique texts for group '{group_key}'.")
+                                anonymized_texts = self._process_batch_smart(unique_texts_for_group, forced_entity_type=current_forced_type)
+                                translation_map.update(dict(zip(unique_texts_for_group, anonymized_texts)))
 
-                anonymized_chunk.to_csv(output_path, mode='a', index=False, header=not header_written, encoding='utf-8')
-                header_written = True
-                progress_bar.update(len(chunk))
-            progress_bar.close()
+                        if translation_map:
+                            for col in chunk.columns:
+                                logging.debug(f"Applying anonymization map to column '{col}'.")
+                                anonymized_chunk[col] = anonymized_chunk[col].map(lambda x: translation_map.get(str(x), x))
+                    else:
+                        logging.debug("CSV processing with row context preservation (slower, context-aware).")
+                        for col in chunk.columns:
+                            series = chunk[col].dropna()
+                            if series.empty: 
+                                logging.debug(f"Column '{col}' is empty, skipping.")
+                                continue
+                            
+                            if not any(self._should_anonymize(str(val), col)[0] for val in series):
+                                logging.debug(f"Column '{col}' contains no PII to anonymize based on current rules.")
+                                continue
+
+                            values_to_process = series.tolist()
+                            _, forced_type = self._should_anonymize(values_to_process[0], col)
+                            
+                            logging.debug(f"Processing {len(values_to_process)} values in column '{col}' for anonymization.")
+                            anonymized_values = self._process_batch_smart(values_to_process, forced_entity_type=forced_type)
+                            
+                            anonymized_series = pd.Series(anonymized_values, index=series.index)
+                            anonymized_chunk[col].update(anonymized_series)
+
+                    anonymized_chunk.to_csv(temp_output_path, mode='a', index=False, header=not header_written, encoding='utf-8')
+                    header_written = True
+                    progress_bar.update(len(chunk))
+                progress_bar.close()
+            
+            shutil.move(temp_output_path, output_path)
+            logging.info(f"Successfully anonymized CSV file saved to: {output_path}")
+
+        except Exception as e:
+            logging.error(f"Error processing CSV file '{self.file_path}': {e}", exc_info=True)
+            if os.path.exists(temp_output_path):
+                os.remove(temp_output_path)
+                logging.info(f"Removed corrupt temporary file: {temp_output_path}")
+            raise # Re-raise the exception after cleanup
 
     def _extract_texts(self) -> Iterable[str]:
         chunk_size = self.csv_chunk_size
@@ -674,15 +684,24 @@ class XmlFileProcessor(FileProcessor):
             element.clear()
 
     def _process_anonymization(self, output_path: str):
+        xml_memory_threshold_bytes = ProcessingLimits.XML_MEMORY_THRESHOLD_MB * 1024 * 1024
         file_size = os.path.getsize(self.file_path)
-        if file_size > self.XML_MEMORY_THRESHOLD_BYTES:
-            logging.warning(
+        if file_size > xml_memory_threshold_bytes and not self.force_large_xml:
+            logging.error(
                 f"XML file '{os.path.basename(self.file_path)}' ({file_size / 1024**2:.1f} MB) "
-                f"exceeds the memory safety threshold of {self.XML_MEMORY_THRESHOLD_BYTES / 1024**2:.1f} MB. "
-                "Skipping anonymization to prevent potential Out-of-Memory errors. The original file will be copied."
+                f"exceeds the memory safety threshold of {ProcessingLimits.XML_MEMORY_THRESHOLD_MB} MB. "
+                "Processing skipped to prevent potential Out-of-Memory errors and PII leakage. "
+                "Use --force-large-xml to override and attempt processing, but be aware of memory implications and potential for data leakage if processing fails."
             )
-            shutil.copy(self.file_path, output_path)
-            return
+            raise ValueError(
+                f"XML file too large for safe processing without --force-large-xml. "
+                f"Threshold: {ProcessingLimits.XML_MEMORY_THRESHOLD_MB} MB."
+            )
+        elif file_size > xml_memory_threshold_bytes and self.force_large_xml:
+            logging.warning(
+                f"Processing large XML file '{os.path.basename(self.file_path)}' ({file_size / 1024**2:.1f} MB) "
+                "due to --force-large-xml flag. This may lead to high memory usage or Out-of-Memory errors, and PII leakage if processing fails."
+            )
 
         parser = etree.XMLParser(recover=True, strip_cdata=False)
         try:
@@ -826,11 +845,13 @@ class JsonFileProcessor(FileProcessor):
     def _process_json_array_streaming(self, output_path: str, chunk_size: int):
         """Processes a file containing a root-level JSON array in streamed chunks."""
         logging.info(f"Starting JSON array streaming for '{self.file_path}' with chunk size {chunk_size}.")
-        with open(self.file_path, 'rb') as in_f, open(output_path, 'wb') as out_f:
-            out_f.write(b'[\n')
-            is_first_chunk = True
-            
-            try:
+        temp_output_path = output_path + ".tmp"
+        
+        try:
+            with open(self.file_path, 'rb') as in_f, open(temp_output_path, 'wb') as out_f:
+                out_f.write(b'[\n')
+                is_first_chunk = True
+                
                 objects_iterator = ijson.items(in_f, 'item', use_float=True)
                 
                 for chunk_idx, obj_batch in enumerate(self._batch_iterator(objects_iterator, chunk_size)):
@@ -852,39 +873,57 @@ class JsonFileProcessor(FileProcessor):
                         out_f.write(orjson.dumps(reconstructed_obj, option=orjson.OPT_INDENT_2))
                         is_first_chunk = False
             
-            except (ijson.JSONError, MemoryError) as e:
-                logging.error(f"Error streaming JSON file {self.file_path}: {e}", exc_info=True)
-                out_f.truncate()
-                out_f.write(b'{"error": "Failed to parse source JSON file"}')
-            finally:
-                logging.info(f"Finished JSON array streaming for '{self.file_path}'.")
+                out_f.write(b'\n]') # Close the JSON array
+            
+            shutil.move(temp_output_path, output_path)
+            logging.info(f"Finished JSON array streaming for '{self.file_path}'. Anonymized file saved to: {output_path}")
 
-            out_f.write(b'\n]')
+        except (ijson.JSONError, MemoryError) as e:
+            logging.error(f"Error streaming JSON file {self.file_path}: {e}", exc_info=True)
+            if os.path.exists(temp_output_path):
+                os.remove(temp_output_path)
+                logging.info(f"Removed corrupt temporary file: {temp_output_path}")
+            raise # Re-raise the exception after cleanup
+
 
     def _process_anonymization_in_memory(self, output_path: str):
         """Fast in-memory processing for files smaller than the threshold."""
         logging.info(f"Starting in-memory JSON processing for '{self.file_path}'.")
-        with open(self.file_path, "rb") as f:
-            try:
-                data = orjson.loads(f.read())
-            except orjson.JSONDecodeError:
-                logging.error(f"Invalid JSON in {self.file_path}. Aborting.")
-                with open(output_path, "wb") as out_f:
-                    out_f.write(b"{}")
+        temp_output_path = output_path + ".tmp"
+        try:
+            with open(self.file_path, "rb") as f:
+                try:
+                    data = orjson.loads(f.read())
+                except orjson.JSONDecodeError:
+                    logging.error(f"Invalid JSON in {self.file_path}. Aborting.")
+                    with open(temp_output_path, "wb") as out_f:
+                        out_f.write(b"{}")
+                    shutil.move(temp_output_path, output_path)
+                    return
+
+            text_groups = self._collect_strings_from_object(data)
+            path_aware_map = self._build_path_aware_translation_map(text_groups)
+            
+            if not path_aware_map:
+                logging.info("No PII found for anonymization in JSON. Copying original file.")
+                shutil.copyfile(self.file_path, output_path)
+                if os.path.exists(temp_output_path):
+                    os.remove(temp_output_path) # Ensure temp file is removed if it was created
                 return
 
-        text_groups = self._collect_strings_from_object(data)
-        path_aware_map = self._build_path_aware_translation_map(text_groups)
-        
-        if not path_aware_map:
-            logging.info("No PII found for anonymization in JSON. Copying original file.")
-            shutil.copyfile(self.file_path, output_path)
-            return
+            reconstructed_data = self._reconstruct_object(data, path_aware_map)
+            with open(temp_output_path, "wb") as f:
+                f.write(orjson.dumps(reconstructed_data, option=orjson.OPT_INDENT_2))
+            
+            shutil.move(temp_output_path, output_path)
+            logging.info(f"In-memory JSON processing complete. Anonymized file saved to: {output_path}")
 
-        reconstructed_data = self._reconstruct_object(data, path_aware_map)
-        with open(output_path, "wb") as f:
-            f.write(orjson.dumps(reconstructed_data, option=orjson.OPT_INDENT_2))
-        logging.info(f"In-memory JSON processing complete. Anonymized file saved to: {output_path}")
+        except Exception as e:
+            logging.error(f"Error processing JSON file '{self.file_path}': {e}", exc_info=True)
+            if os.path.exists(temp_output_path):
+                os.remove(temp_output_path)
+                logging.info(f"Removed corrupt temporary file: {temp_output_path}")
+            raise # Re-raise the exception after cleanup
     
     def _collect_strings_from_object(self, obj, path_prefix: str = "") -> Dict[str, List[str]]:
         text_groups = defaultdict(list)
@@ -980,19 +1019,31 @@ class JsonFileProcessor(FileProcessor):
 
     def _process_anonymization_jsonl(self, output_path: str):
         """Processes .jsonl files line by line for maximum memory efficiency."""
-        with open(output_path, "wb") as out_f:
-            with open(self.file_path, "rb") as in_f:
-                for line in in_f:
-                    if not line.strip(): continue
-                    try:
-                        data = orjson.loads(line)
-                        text_groups = self._collect_strings_from_object(data)
-                        path_aware_map = self._build_path_aware_translation_map(text_groups)
-                        processed_data = self._reconstruct_object(data, path_aware_map)
-                        out_f.write(orjson.dumps(processed_data) + b'\n')
-                    except orjson.JSONDecodeError:
-                        logging.warning(f"Skipping invalid JSON line in {self.file_path}")
-                        out_f.write(line)
+        temp_output_path = output_path + ".tmp"
+        try:
+            with open(temp_output_path, "wb") as out_f:
+                with open(self.file_path, "rb") as in_f:
+                    for line in in_f:
+                        if not line.strip(): continue
+                        try:
+                            data = orjson.loads(line)
+                            text_groups = self._collect_strings_from_object(data)
+                            path_aware_map = self._build_path_aware_translation_map(text_groups)
+                            processed_data = self._reconstruct_object(data, path_aware_map)
+                            out_f.write(orjson.dumps(processed_data) + b'\n')
+                        except orjson.JSONDecodeError:
+                            logging.warning(f"Skipping invalid JSON line in {self.file_path}. Original line written.")
+                            out_f.write(line) # Write original line if parsing fails
+            
+            shutil.move(temp_output_path, output_path)
+            logging.info(f"Successfully anonymized JSONL file saved to: {output_path}")
+
+        except Exception as e:
+            logging.error(f"Error processing JSONL file '{self.file_path}': {e}", exc_info=True)
+            if os.path.exists(temp_output_path):
+                os.remove(temp_output_path)
+                logging.info(f"Removed corrupt temporary file: {temp_output_path}")
+            raise # Re-raise the exception after cleanup
     
     def _extract_texts(self) -> Iterable[str]:
         if self.file_path.endswith(".jsonl"):
@@ -1030,27 +1081,63 @@ class JsonFileProcessor(FileProcessor):
 
 
 
-def get_processor(file_path: str, orchestrator: AnonymizationOrchestrator, **kwargs) -> Optional[FileProcessor]:
-    ext = os.path.splitext(file_path)[1].lower()
-    
-    processor_map = {
-        ".txt": TextFileProcessor, ".log": TextFileProcessor,
-        ".pdf": PdfFileProcessor,
-        ".docx": DocxFileProcessor,
-        ".csv": CsvFileProcessor,
-        ".xlsx": XlsxFileProcessor,
-        ".xml": XmlFileProcessor,
-        ".json": JsonFileProcessor, ".jsonl": JsonFileProcessor,
-        ".jpeg": ImageFileProcessor, ".jpg": ImageFileProcessor, ".png": ImageFileProcessor,
-        ".gif": ImageFileProcessor, ".bmp": ImageFileProcessor, ".tiff": ImageFileProcessor,
-        ".tif": ImageFileProcessor, ".webp": ImageFileProcessor, ".jp2": ImageFileProcessor,
-        ".pnm": ImageFileProcessor,
-    }
-    
-    processor_class = processor_map.get(ext)
-    if not processor_class:
-        logging.debug(f"No suitable processor found for file extension '{ext}'.")
-        return None
-    
-    logging.debug(f"Found processor '{processor_class.__name__}' for file extension '{ext}'.")
-    return processor_class(file_path, orchestrator, **kwargs)  # type: ignore
+from .config import Global, ProcessingLimits, DefaultSizes
+from .engine import AnonymizationOrchestrator
+from .security import FileTypeValidator # Import FileTypeValidator
+
+
+class ProcessorRegistry:
+    """A registry for mapping file extensions to their corresponding processors."""
+    _processors: Dict[str, type[FileProcessor]] = {}
+    _file_type_validator = FileTypeValidator()
+
+    @classmethod
+    def register(cls, extensions: List[str], processor_class: type[FileProcessor]):
+        """Register a processor class for a list of file extensions."""
+        for ext in extensions:
+            cls._processors[ext.lower()] = processor_class
+
+    @classmethod
+    def get_processor(cls, file_path: str, orchestrator: AnonymizationOrchestrator, **kwargs) -> Optional[FileProcessor]:
+        """
+        Determines the correct processor for a file based on its true file type,
+        falling back to the file extension if necessary.
+        """
+        initial_ext = os.path.splitext(file_path)[1].lower()
+        true_ext_from_magic = cls._file_type_validator.get_file_extension_from_magic(file_path)
+
+        ext_to_use = initial_ext
+        if true_ext_from_magic:
+            ext_to_use = true_ext_from_magic
+            if initial_ext and initial_ext != true_ext_from_magic:
+                logging.warning(
+                    f"File extension mismatch for '{os.path.basename(file_path)}': "
+                    f"declared '{initial_ext}', detected '{true_ext_from_magic}'. Using detected type."
+                )
+        else:
+            logging.warning(
+                f"Could not determine file type for '{os.path.basename(file_path)}' using magic bytes. "
+                "Falling back to file extension. Processing may be inaccurate."
+            )
+
+        processor_class = cls._processors.get(ext_to_use)
+        if not processor_class:
+            logging.debug(f"No suitable processor found for file type '{ext_to_use}' for file: '{file_path}'. Skipping.")
+            return None
+
+        logging.debug(f"Found processor '{processor_class.__name__}' for file type '{ext_to_use}'.")
+        return processor_class(file_path, orchestrator, **kwargs)
+
+
+# Initialize FileTypeValidator once
+file_type_validator = FileTypeValidator()
+
+# Register all the processors
+ProcessorRegistry.register([".txt", ".log"], TextFileProcessor)
+ProcessorRegistry.register([".pdf"], PdfFileProcessor)
+ProcessorRegistry.register([".docx"], DocxFileProcessor)
+ProcessorRegistry.register([".csv"], CsvFileProcessor)
+ProcessorRegistry.register([".xlsx"], XlsxFileProcessor)
+ProcessorRegistry.register([".xml"], XmlFileProcessor)
+ProcessorRegistry.register([".json", ".jsonl"], JsonFileProcessor)
+ProcessorRegistry.register([".jpeg", ".jpg", ".png", ".gif", ".bmp", ".tiff", ".tif", ".webp", ".jp2", ".pnm"], ImageFileProcessor)

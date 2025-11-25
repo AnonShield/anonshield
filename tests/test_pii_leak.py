@@ -29,22 +29,25 @@ class TestPiiLeak(unittest.TestCase):
         if "ANON_SECRET_KEY" in os.environ:
             del os.environ["ANON_SECRET_KEY"]
 
-    @patch('src.anon.engine.AnonymizationOrchestrator._anonymize_texts_presidio')
-    def test_fallback_strategy_prevents_pii_leak_error(self, mock_anonymize_presidio):
+    @patch('src.anon.strategies.PresidioStrategy.anonymize')
+    def test_fallback_strategy_prevents_pii_leak_error(self, mock_anonymize_strategy):
         """
         Tests that the fallback strategy prevents the PII leak RuntimeError
         by gracefully handling batch mismatches.
         """
-        # Configure the mock for the internal Presidio method to return a list of the wrong size.
+        # Configure the mock for the strategy's anonymize method to return a list of the wrong size.
         # This simulates a failure inside the batch processor.
-        mock_anonymize_presidio.return_value = ["mocked_anonymized_line"]
+        mock_anonymize_strategy.return_value = ["mocked_anonymized_line"]
 
         # Instantiate a REAL orchestrator. The fallback logic we want to test is inside it.
+        # The orchestrator will use the default 'presidio' strategy, which we have mocked.
         orchestrator = AnonymizationOrchestrator(
             lang="en",
-            db_context=None, # Pass None for db_context as this test doesn't require actual DB interaction
+            db_context=None,
             allow_list=[],
             entities_to_preserve=[]
+            # Other dependencies will be created with defaults inside the orchestrator,
+            # which is fine because our mock intercepts the call before they are used.
         )
 
         processor = TextFileProcessor(
@@ -61,16 +64,16 @@ class TestPiiLeak(unittest.TestCase):
         except RuntimeError:
             self.fail("RuntimeError was raised, but the fallback strategy should have prevented it.")
 
-        # Verify the output. The fallback should return the original text for failed items.
-        # In this mocked scenario, the fallback itself calls the mock, so we expect 'mocked' lines.
+        # Verify the output. The fallback re-processes item by item. Inside the loop, it calls
+        # the strategy again. Our mock will be called for each item.
         with open(output_path, "r") as f:
             output_lines = f.read().splitlines()
         
         # The key check: Did we get the same number of lines back?
         self.assertEqual(len(output_lines), len(self.input_lines))
         
-        # Check content. Since the mock returns "mocked_anonymized_line" for every call,
-        # the fallback will produce a list of these.
+        # Check content. The fallback calls the strategy for each of the 3 lines.
+        # The mock returns ["mocked_anonymized_line"] each time. The fallback takes the first element.
         self.assertEqual(output_lines[0], "mocked_anonymized_line")
         self.assertEqual(output_lines[1], "mocked_anonymized_line")
         self.assertEqual(output_lines[2], "mocked_anonymized_line")

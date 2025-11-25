@@ -3,7 +3,8 @@ import os
 import queue
 import threading
 import sqlite3
-import json
+import orjson # Added orjson
+import time # Added time for sleep in flush
 from typing import Optional, List, Tuple
 
 from tenacity import (
@@ -29,6 +30,7 @@ class DatabaseContext:
         self.write_queue = queue.Queue()
         self.writer_thread: Optional[threading.Thread] = None
         self.is_initialized = False
+        self._shutdown_flag = threading.Event() # Event to signal thread to stop
 
     def initialize(self, synchronous: Optional[str] = None):
         """Initializes the repository, schema, and starts the background writer thread."""
@@ -50,6 +52,7 @@ class DatabaseContext:
         self.repository.initialize_schema(synchronous=sync_mode)
 
         if not self.writer_thread or not self.writer_thread.is_alive():
+            self._shutdown_flag.clear() # Ensure flag is clear on re-initialization
             self.writer_thread = threading.Thread(target=self._writer_thread_target, daemon=True)
             self.writer_thread.start()
             logging.info("DB writer thread started.")
@@ -58,33 +61,43 @@ class DatabaseContext:
         logging.info("DatabaseContext initialized.")
 
     def shutdown(self):
-        """Signals the writer thread to shut down and cleans up resources."""
+        """Signals the writer thread to shut down, ensures all items are processed/logged, and cleans up resources."""
         if not self.is_initialized:
+            logging.info("DatabaseContext not initialized, skipping shutdown.")
             return
-            
-        logging.info("Shutting down DatabaseContext.")
-        self.write_queue.put(None)  # Sentinel to stop the writer thread
-        
-        if self.writer_thread:
-            self.writer_thread.join(timeout=10)
-            if self.writer_thread.is_alive():
-                logging.warning("DB writer thread did not shut down in time.")
-            self.writer_thread = None
-        
-        if not self.write_queue.empty():
-            logging.info("Waiting for %d final items in DB queue to be processed...", self.write_queue.qsize())
-            self.write_queue.join()
 
+        logging.info("Shutting down DatabaseContext. Signaling writer thread to stop...")
+        # 1. Send sentinel to the queue to signal the writer thread to stop processing new items.
+        self.write_queue.put(None)
+
+        # 2. Wait for the writer thread to finish its current work.
+        if self.writer_thread:
+            self.writer_thread.join(timeout=30)  # Give the thread 30 seconds to finish.
+            if self.writer_thread.is_alive():
+                logging.critical("DB writer thread did not shut down gracefully in 30s. There might be unprocessed items.")
+            self.writer_thread = None
+
+        # 3. After the thread has terminated, handle any items that might be left in the queue.
+        # This can happen if the thread died unexpectedly or timed out.
+        if not self.write_queue.empty():
+            logging.warning("Queue is not empty after writer thread shutdown. Flushing remaining items to dead-letter log.")
+            self._flush_queue_to_dead_letter()
+
+        # 4. Close the repository connection.
         if self.repository:
             self.repository.close_thread_connection()
             self.repository = None
-            
+
         self.is_initialized = False
-        logging.info("DatabaseContext shut down.")
+        logging.info("DatabaseContext shutdown complete.")
 
     def save_entities(self, entity_list: List[Tuple]):
         """Puts a list of entities into the thread-safe queue to be saved."""
         if not entity_list:
+            return
+        if not self.is_initialized or (self.writer_thread and not self.writer_thread.is_alive()):
+            logging.warning("Database context is shutting down or writer thread is dead. Skipping save for %d entities.", len(entity_list))
+            self._log_to_dead_letter(entity_list)
             return
         logging.debug(f"Adding {len(entity_list)} entities to DB write queue.")
         self.write_queue.put(entity_list)
@@ -106,16 +119,13 @@ class DatabaseContext:
 
         while True:
             try:
-                # Wait for items to appear in the queue
-                entity_list = self.write_queue.get(timeout=0.5)
-            except queue.Empty:
-                continue
+                entity_list = self.write_queue.get()
 
-            try:
-                if entity_list is None:  # The shutdown sentinel
-                    logging.info("DB writer thread received shutdown signal.")
+                # The sentinel value (None) signals the thread to exit.
+                if entity_list is None:
+                    logging.info("DB writer thread received shutdown sentinel. Exiting gracefully.")
                     break
-                
+
                 _attempt_save_batch(entity_list)
 
             except sqlite3.OperationalError as e:
@@ -126,21 +136,46 @@ class DatabaseContext:
                 logging.error(f"DB Writer thread encountered an unhandled error: {e}", exc_info=True)
             finally:
                 self.write_queue.task_done()
-        
-        if self.repository:
-            self.repository.close_thread_connection()
+
         logging.info("DB writer thread finished.")
 
+    def _flush_queue_to_dead_letter(self):
+        """
+        Flushes all remaining items in the write queue to the dead-letter log.
+        Called when the writer thread fails to shut down gracefully or on final shutdown.
+        """
+        logging.warning("Flushing remaining queue items to dead-letter log.")
+        while not self.write_queue.empty():
+            try:
+                entity_list = self.write_queue.get_nowait()
+                if entity_list is None:  # Skip any lingering sentinels
+                    self.write_queue.task_done()
+                    continue
+                self._log_to_dead_letter(entity_list)
+            except queue.Empty:
+                break  # The queue is empty
+            except Exception as e:
+                logging.error(f"Error during dead-letter flush: {e}", exc_info=True)
+            finally:
+                if 'entity_list' in locals(): # Ensure task_done is called even on error
+                    self.write_queue.task_done()
+        logging.info("Finished flushing queue to dead-letter log.")
+
     def _log_to_dead_letter(self, entity_list: List[Tuple]):
-        """Logs a failed batch of entities to a dead-letter file."""
+        """Logs a failed batch of entities to a dead-letter file, using orjson."""
+        if not entity_list:
+            return
         dead_letter_path = os.path.join("logs", "dead_letter.log")
         os.makedirs("logs", exist_ok=True)
-        with open(dead_letter_path, "a", encoding="utf-8") as f:
-            for entity in entity_list:
-                try:
-                    f.write(json.dumps(entity) + "\n")
-                except TypeError:
-                    # Fallback for entities that are not JSON serializable (e.g. tuples)
-                    f.write(str(entity) + "\n")
-        logging.info(f"{len(entity_list)} entities logged to dead-letter file: {dead_letter_path}")
+        logging.info(f"Logging {len(entity_list)} entities to dead-letter file: {dead_letter_path}")
+        try:
+            # Use 'ab' mode to append bytes to the log file.
+            with open(dead_letter_path, "ab") as f:
+                for entity in entity_list:
+                    # orjson.dumps returns bytes, so we write directly.
+                    # Add OPT_APPEND_NEWLINE to ensure each JSON object is on a new line.
+                    f.write(orjson.dumps(entity, option=orjson.OPT_APPEND_NEWLINE))
+        except Exception as e:
+            logging.error(f"Could not write to dead-letter log '{dead_letter_path}': {e}", exc_info=True)
+
 
