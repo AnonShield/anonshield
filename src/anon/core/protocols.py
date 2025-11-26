@@ -61,10 +61,3 @@ class SecretManager(Protocol):
     """
     def get_secret_key(self) -> Optional[str]:
         ...
-
-class FileValidator(Protocol):
-    """
-    Protocol for validating file types.
-    """
-    def get_file_processor(self, file_path: str, orchestrator: "AnonymizationOrchestrator", **kwargs) -> Optional[Any]:
-        ...
