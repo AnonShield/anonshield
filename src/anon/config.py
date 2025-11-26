@@ -1,7 +1,5 @@
 import os
-import logging
-from .security import SecretManagerImpl # Import the manager
-
+from .security import SecretManagerImpl 
 # --- Global Configuration ---
 _secret_manager = SecretManagerImpl()
 SECRET_KEY = _secret_manager.get_secret_key()
