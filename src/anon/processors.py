@@ -130,7 +130,7 @@ class FileProcessor(ABC):
         self.ner_chunk_size = ner_chunk_size
         self.force_large_xml = force_large_xml # Store the new parameter
         self.ner_output_file: Optional[str] = None
-        self.ner_file_handle = None # Initialize to None
+        self.ner_file_handle: Optional[io.TextIOWrapper] = None # Initialize to None with proper type hint
         logging.debug(f"FileProcessor initialized for '{file_path}' with: ner_data_generation={ner_data_generation}, min_word_length={min_word_length}, skip_numeric={skip_numeric}, output_dir='{output_dir}', overwrite={overwrite}, disable_gc={disable_gc}, force_large_xml={force_large_xml}.")
 
     def _get_ner_output_path(self) -> str:
@@ -336,8 +336,9 @@ class FileProcessor(ABC):
         for chunk in tqdm(text_chunks, desc=desc, leave=False):
             ner_records = self.orchestrator.detect_entities([chunk])
             for record in ner_records:
-                self.ner_file_handle.write(orjson.dumps(record).decode('utf-8') + "\n")
-                self.ner_file_handle.flush()
+                if self.ner_file_handle is not None:
+                    self.ner_file_handle.write(orjson.dumps(record).decode('utf-8') + "\n")
+                    self.ner_file_handle.flush()
 
 
 class TextFileProcessor(FileProcessor):
@@ -420,10 +421,12 @@ class PdfFileProcessor(FileProcessor):
 
     def _extract_texts(self) -> Iterable[str]:
         with fitz.open(self.file_path) as doc:
-            for page_num, page in enumerate(doc):
+            for page_num in range(doc.page_count):
+                page = doc[page_num]
                 logging.debug(f"Extracting text from page {page_num + 1}/{doc.page_count} of '{self.file_path}'.")
                 content_items = []
-                text_blocks = page.get_text("dict").get("blocks", [])
+                page_dict = page.get_text("dict")
+                text_blocks = page_dict.get("blocks", []) if isinstance(page_dict, dict) else []
                 for block in text_blocks:
                     if block["type"] == 0:
                         block_text = "".join(span["text"] for line in block.get("lines", []) for span in line.get("spans", []) if "text" in span)
@@ -568,7 +571,7 @@ class XlsxFileProcessor(FileProcessor):
             for row in sheet.iter_rows():
                 for cell in row:
                     if cell.value and isinstance(cell.value, str):
-                        path = f"{sheet.title}.{cell.column_letter}"
+                        path = f"{sheet.title}.{cell.column_letter}" # type: ignore
                         should_anon, _ = self._should_anonymize(cell.value, path)
                         if should_anon:
                             yield cell.value
@@ -597,7 +600,7 @@ class XlsxFileProcessor(FileProcessor):
                 for row in sheet.iter_rows():
                     for cell in row:
                         if cell.value and isinstance(cell.value, str):
-                            path = f"{sheet.title}.{cell.column_letter}"
+                            path = f"{sheet.title}.{cell.column_letter}" # type: ignore
                             should_anon, forced_type = self._should_anonymize(cell.value, path)
                             if should_anon:
                                 group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type or "auto")
@@ -1094,14 +1097,11 @@ class JsonFileProcessor(FileProcessor):
 
 from .config import Global, ProcessingLimits, DefaultSizes
 from .engine import AnonymizationOrchestrator
-from .security import FileTypeValidator # Import FileTypeValidator
-
 
 class ProcessorRegistry:
     """A registry for mapping file extensions to their corresponding processors."""
     _processors: Dict[str, type[FileProcessor]] = {}
-    _file_type_validator = FileTypeValidator()
-
+    
     @classmethod
     def register(cls, extensions: List[str], processor_class: type[FileProcessor]):
         """Register a processor class for a list of file extensions."""
@@ -1124,8 +1124,6 @@ class ProcessorRegistry:
         return processor_class(file_path, orchestrator, **kwargs)
 
 
-# Initialize FileTypeValidator once
-file_type_validator = FileTypeValidator()
 
 # Register all the processors
 ProcessorRegistry.register([".txt", ".log"], TextFileProcessor)
