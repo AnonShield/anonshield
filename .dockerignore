@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Virtual environment
+.venv
+ignore/.venv
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# IDE / Editor specific
+.vscode/
+.idea/
+
+# Build and distribution
+dist/
+build/
+*.egg-info/
+
+# Test and coverage artifacts
+.pytest_cache/
+.mypy_cache/
+coverage.xml
+.coverage
+
+# Temporary files
+*.swp
+*.swo
+
+# Local data and output
+db/
+db_pytest/
+logs/
+output/
+models/
+ignore/
+*.log
+
+# Docker specific
+Dockerfile
+.dockerignore
+
+# OS specific
+.DS_Store
+Thumbs.db

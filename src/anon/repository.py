@@ -2,34 +2,47 @@
 import sqlite3
 import os
 import logging
+import threading
 from typing import List, Optional, Tuple
 
 class EntityRepository:
     """
     Handles all database operations for anonymized entities, encapsulating SQL queries.
+    This implementation is thread-safe by using thread-local storage for database connections.
     """
 
     def __init__(self, db_path: str):
         """
-        Initializes the repository and establishes a database connection.
+        Initializes the repository. A database connection will be created on-demand for each thread.
         
         Args:
             db_path: The path to the SQLite database file (e.g., 'db/entities.db' or ':memory:').
         """
         self.db_path = db_path
-        self.connection = sqlite3.connect(db_path, check_same_thread=False)
-        logging.info(f"Repository initialized for database at: {db_path}")
+        self._local = threading.local()
+        logging.info(f"Repository initialized for database at: {self.db_path}")
+
+    def _get_connection(self) -> sqlite3.Connection:
+        """
+        Retrieves or creates a database connection for the current thread.
+        """
+        if not hasattr(self._local, "connection"):
+            logging.debug(f"Thread {threading.get_ident()}: Creating new SQLite connection to {self.db_path}")
+            # Add a timeout to handle locked databases gracefully
+            self._local.connection = sqlite3.connect(self.db_path, timeout=10)
+        return self._local.connection
 
     def initialize_schema(self, synchronous: str = "NORMAL", journal_mode: str = "WAL"):
         """
         Creates the necessary tables and indexes if they don't exist.
-        Sets the PRAGMA settings for the connection.
+        Sets the PRAGMA settings for the new connection.
         """
-        logging.info(f"Setting PRAGMA synchronous={synchronous}, journal_mode={journal_mode}")
-        self.connection.execute(f"PRAGMA synchronous={synchronous};")
-        self.connection.execute(f"PRAGMA journal_mode={journal_mode};")
-        self.connection.execute("PRAGMA cache_size=-10000;")
-        self.connection.execute("PRAGMA temp_store=MEMORY;")
+        conn = self._get_connection()
+        logging.info(f"Setting PRAGMA synchronous={synchronous}, journal_mode={journal_mode} for new connection.")
+        conn.execute(f"PRAGMA synchronous={synchronous};")
+        conn.execute(f"PRAGMA journal_mode={journal_mode};")
+        conn.execute("PRAGMA cache_size=-10000;")
+        conn.execute("PRAGMA temp_store=MEMORY;")
         
         create_table_sql = """
         CREATE TABLE IF NOT EXISTS entities (
@@ -44,10 +57,10 @@ class EntityRepository:
         """
         create_index_sql = "CREATE INDEX IF NOT EXISTS idx_full_hash ON entities(full_hash);"
         
-        with self.connection:
-            self.connection.execute(create_table_sql)
-            self.connection.execute(create_index_sql)
-        logging.info("Database schema initialized successfully.")
+        with conn:
+            conn.execute(create_table_sql)
+            conn.execute(create_index_sql)
+        logging.info("Database schema initialized successfully for thread.")
 
     def save_batch(self, entity_list: List[Tuple]):
         """
@@ -64,13 +77,13 @@ class EntityRepository:
         (entity_type, original_name, slug_name, full_hash, first_seen, last_seen)
         VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
         """
+        conn = self._get_connection()
         try:
-            with self.connection:
-                self.connection.executemany(insert_sql, entity_list)
+            with conn:
+                conn.executemany(insert_sql, entity_list)
             logging.info("%d entities written to database.", len(entity_list))
         except sqlite3.Error as e:
             logging.error(f"Repository failed to save batch: {e}", exc_info=True)
-            # Re-raise the exception to allow the caller to handle it (e.g., for deadlock retry logic)
             raise
 
     def find_by_slug(self, display_hash: str) -> Optional[Tuple]:
@@ -84,17 +97,18 @@ class EntityRepository:
             A tuple containing the entity data if found, otherwise None.
         """
         query_sql = "SELECT original_name, entity_type, first_seen, last_seen FROM entities WHERE slug_name = ?"
+        conn = self._get_connection()
         try:
-            with self.connection:
-                cursor = self.connection.execute(query_sql, (display_hash,))
-                return cursor.fetchone()
+            cursor = conn.execute(query_sql, (display_hash,))
+            return cursor.fetchone()
         except sqlite3.Error as e:
             logging.error(f"Repository failed to find by slug '{display_hash}': {e}", exc_info=True)
             return None
 
-    def close(self):
-        """Closes the database connection."""
-        if self.connection:
-            self.connection.close()
-            logging.info(f"Repository connection to {self.db_path} closed.")
+    def close_thread_connection(self):
+        """Closes the database connection for the current thread, if it exists."""
+        if hasattr(self._local, "connection"):
+            self._local.connection.close()
+            del self._local.connection
+            logging.info(f"Repository connection for thread {threading.get_ident()} closed.")
 

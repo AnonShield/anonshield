@@ -329,6 +329,8 @@ uv run anon.py --list-languages
 
 - `--optimize`: A shorthand to enable all performance optimizations (`--anonymization-strategy fast`, `--db-mode in-memory`, `--use-cache`, and `--min-word-length 3`).
 - `--use-cache`: Enables in-memory caching for the run to speed up repeated anonymizations. Disabled by default.
+- `--preserve-row-context`: For CSV/XLSX files, process every value to preserve row context, which is more accurate but slower. The default behavior is to only process unique values, which is faster.
+- `--json-stream-threshold-mb <NUM>`: Sets the threshold (in MB) for streaming JSON files. Files larger than this will be streamed from disk to conserve memory. Default: `100`.
 - `--max-cache-size <NUM>`: Maximum number of items to store in the in-memory cache. Default: `10000`.
 - `--min-word-length <NUM>`: Minimum character length for a word to be processed. Default: `0` (no limit).
 - `--technical-stoplist <TERMS>`: A comma-separated list of custom words to add to the technical stoplist.
@@ -338,6 +340,14 @@ uv run anon.py --list-languages
 - `--db-mode <MODE>`: Sets the database mode. Options: `persistent` (saves to disk), `in-memory` (temporary database). Default: `persistent`.
 - `--db-synchronous-mode <MODE>`: Sets the SQLite `synchronous` PRAGMA for the database connection. Options: `OFF`, `NORMAL`, `FULL`, `EXTRA`. Overrides config file setting.
 - `--disable-gc`: Disables automatic garbage collection during processing. May boost speed for large single files but increases memory usage.
+
+#### Chunking & Batching Options
+
+- `--batch-size <NUM>`: Default batch size for processing text chunks. Default: `200`.
+- `--csv-chunk-size <NUM>`: Chunk size for reading CSV files with pandas. Default: `1000`.
+- `--json-chunk-size <NUM>`: Chunk size for streaming large JSON arrays. Default: `1000`.
+- `--ner-chunk-size <NUM>`: Max character size for text chunks in NER data generation. Default: `1500`.
+- `--nlp-batch-size <NUM>`: Batch size for spaCy's nlp.pipe() processing. Default: `500`.
 
 #### Example Commands
 
@@ -478,108 +488,85 @@ uv run anon.py dataset/ --db-synchronous-mode OFF
 
 ## Architecture Deep Dive
 
+The architecture is designed for modularity, testability, and extensibility, following SOLID principles.
+
 ### Core Components
 
 #### 1. CLI Layer (`anon.py`)
 
-The command-line interface orchestrates the entire process:
-- Parses arguments and validates configuration
-- Checks and downloads required NLP models
-- Initializes the database and writer thread
-- Creates the `AnonymizationOrchestrator`
-- Dispatches files to appropriate processors
-- Generates performance reports
+The command-line interface is the application's **composition root**. It is responsible for:
+- Parsing arguments and validating configuration.
+- Instantiating and "wiring up" all core components (e.g., `CacheManager`, `HashGenerator`, `EntityDetector`, `DatabaseContext`).
+- Injecting these dependencies into the `AnonymizationOrchestrator`.
+- Dispatching files to the appropriate `FileProcessor`.
+- Generating performance reports.
 
 #### 2. Anonymization Orchestrator (`engine.py`)
 
-The `AnonymizationOrchestrator` is the core engine:
+The `AnonymizationOrchestrator` is the central coordinator of the anonymization process. Its responsibilities have been refined to focus on high-level orchestration rather than low-level implementation:
 
 **Responsibilities:**
-- Manages Presidio analyzers and anonymizers
-- Loads custom regex recognizers for cybersecurity entities
-- Provides multiple anonymization strategies (`presidio`, `fast`)
-- Implements caching with LRU eviction
-- Handles entity detection for NER data generation
-- Maintains entity statistics
+- Initializes and holds the Presidio `AnalyzerEngine` and `AnonymizerEngine`.
+- Selects the appropriate anonymization strategy (`presidio`, `fast`, `balanced`) based on user input.
+- Injects the required dependencies (engines, detectors, etc.) into the chosen strategy.
+- Manages the overall workflow, including the fallback mechanism for batch processing failures.
+- Collects and maintains entity statistics for reporting.
+- Dispatches special-case anonymization (e.g., `forced_entity_type`).
 
-**Key Methods:**
-- `anonymize_text()`: Single text anonymization
-- `anonymize_texts()`: Batch text anonymization with strategy dispatch
-- `detect_entities()`: Entity detection for NER data generation
-- `_anonymize_texts_presidio()`: Full Presidio pipeline
-- `_anonymize_texts_fast_path()`: Optimized spaCy-only pipeline
-- `_anonymize_texts_forced_type()`: Force a specific entity type
-- `_anonymize_texts_pick_one()`: Choose best entity from multiple options
+**Anonymization Strategies (`strategies.py`):**
 
-**Anonymization Strategies:**
+The core anonymization logic is encapsulated within a set of interchangeable strategy classes, adhering to the **Strategy Design Pattern**. This design allows for different performance and accuracy trade-offs without altering the main orchestration flow.
 
-1.  **Presidio Strategy (Comprehensive):**
-    -   **How it works:** Uses the full Presidio `AnalyzerEngine` pipeline. This involves a comprehensive analysis by **all** available recognizers: the **Transformer model + spaCy** pipeline, the **custom regex patterns**, and **dozens of Presidio's built-in recognizers** (for specific national IDs, credit cards, etc.). Results from all these sources are then aggregated by a sophisticated logic to resolve conflicts and determine the best entity.
-    -   **Pros:** Highest accuracy and broadest detection capability.
-    -   **Cons:** Slower due to the extensive analysis and complex aggregation.
-
-2.  **Fast Strategy (Optimized for Speed):**
-    -   **How it works:** This strategy is designed for maximum speed by completely bypassing the full `AnalyzerEngine`. It runs a direct, manual pipeline:
-        1.  Passes the text through the **spaCy + Transformer** pipeline (as configured by Presidio's `TransformersNlpEngine`).
-        2.  In parallel, passes the text through the **custom regex patterns**.
-        3.  Uses a simpler, custom merge logic (`_merge_overlapping_entities`) to combine the results from these two sources.
-        4.  Reconstructs the text manually without the `AnonymizerEngine`'s full pipeline.
-    -   **Pros:** Significantly faster by eliminating the `AnalyzerEngine`'s overhead and its numerous internal recognizers.
-    -   **Cons:** Less robust in resolving entity conflicts and does not benefit from the full range of Presidio's additional recognizers.
-
-3.  **Balanced Strategy (Optimal Balance):**
-    -   **How it works:** This strategy offers a smart middle ground. It *uses* the Presidio `AnalyzerEngine` (thus benefiting from its more robust result aggregation logic than `fast` mode), but it invokes it selectively. Instead of using all recognizers, it instructs the engine to use **only** the main **spaCy + Transformer** pipeline and the **custom regex patterns**, effectively disabling Presidio's other built-in recognizers.
-    -   **Pros:** Offers an ideal balance, being faster than `presidio` (by ignoring many internal recognizers) and more robust than `fast` (by using Presidio's superior aggregation logic).
-    -   **Cons:** May not detect very specific entities that only the full `presidio` strategy would cover.
+- **Decoupled Logic**: Each strategy is now self-contained. It receives its required dependencies (like `analyzer_engine`, `entity_detector`, `cache_manager`) upon creation and no longer holds a reference to the orchestrator.
+- **Key Strategies**:
+    1.  **`PresidioStrategy` (Comprehensive):** Contains the logic for the full Presidio pipeline, using all available recognizers for the highest accuracy.
+    2.  **`FastStrategy` (Optimized):** Contains the logic for the optimized pipeline that uses a manual combination of the NLP model and custom regexes, bypassing the main Presidio engine for speed.
+    3.  **`BalancedStrategy` (Optimal Balance):** Uses the Presidio engine but with a limited, curated set of recognizers, offering a balance between the `presidio` and `fast` strategies.
 
 #### 3. File Processors (`processors.py`)
 
-Uses the Template Method Pattern with a base `FileProcessor` class and specialized subclasses:
+Uses the **Template Method Pattern** with a base `FileProcessor` class and specialized subclasses.
 
 **Base Class (`FileProcessor`):**
-- Defines the main workflow: extract → process → output
-- Implements batch processing logic
-- Handles optimization setup/cleanup
-- Manages NER data generation pipeline
+- Defines the main workflow: extract → process → output.
+- Implements batch processing and error handling logic.
+- Manages NER data generation pipeline.
 
 **Specialized Processors:**
-
-- **`TextFileProcessor`:** Line-by-line processing for `.txt`, `.log` files
-- **`ImageFileProcessor`:** OCR extraction for image files
-- **`DocxFileProcessor`:** Paragraph and embedded image extraction
-- **`PdfFileProcessor`:** Text block and image extraction with spatial sorting
-- **`CsvFileProcessor`:** Efficient column-wise processing with translation maps
-- **`XlsxFileProcessor`:** Excel workbook processing with in-memory translation
-- **`XmlFileProcessor`:** Structure-preserving XML processing with XPath tracking
-- **`JsonFileProcessor`:** Hybrid JSON/JSONL processor with streaming support
+- **`TextFileProcessor`:** Line-by-line processing for `.txt`, `.log` files.
+- **`ImageFileProcessor`:** OCR extraction for image files.
+- **`DocxFileProcessor`:** Paragraph and embedded image extraction.
+- **`PdfFileProcessor`:** Text block and image extraction with spatial sorting.
+- **`CsvFileProcessor`:** Efficient column-wise processing with translation maps.
+- **`XlsxFileProcessor`:** Excel workbook processing with in-memory translation.
+- **`XmlFileProcessor`:** Structure-preserving XML processing with XPath tracking.
+- **`JsonFileProcessor`:** Hybrid JSON/JSONL processor with streaming support.
 
 **JSON Processing Modes:**
 
 The `JsonFileProcessor` uses a sophisticated hybrid approach:
 
-1. **JSONL Mode:** Line-by-line streaming for `.jsonl` files
-2. **Small JSON Mode:** In-memory processing for files < 100 MB
-3. **Large JSON Array Mode:** Streaming with `ijson` for large array files
-4. **Error Handling:** Falls back to in-memory if streaming fails
+1. **JSONL Mode:** Line-by-line streaming for `.jsonl` files.
+2. **Small JSON Mode:** In-memory processing for files < 100 MB.
+3. **Large JSON Array Mode:** Streaming with `ijson` for large array files.
+4. **Error Handling:** Falls back to in-memory processing if streaming fails, with clear warnings.
 
 #### 4. Database Layer
 
 **Repository Pattern (`repository.py`):**
 
-The `EntityRepository` encapsulates all database operations:
-- Connection management
-- Schema initialization with PRAGMA settings
-- Batch insertion with `INSERT OR IGNORE`
-- Lookup by slug
-- Connection cleanup
+The `EntityRepository` encapsulates all database operations, ensuring a clean separation between business logic and data access. It is responsible for:
+- Connection management (using thread-local storage for safety).
+- Schema initialization with PRAGMA settings for performance.
+- Batch insertion with `INSERT OR IGNORE`.
+- Entity lookup by slug.
 
-**Thread-Safe Queue (`config.py`):**
+**Thread-Safe Queue (`database.py`):**
 
-Database writes are handled by a dedicated writer thread:
-- Main threads put entities in a queue
-- Writer thread processes queue asynchronously
-- Prevents database locking issues
-- Graceful shutdown with sentinel value
+To prevent database write locks from blocking the main processing threads, all database writes are handled asynchronously:
+- The main `AnonymizationOrchestrator` places entities into a `queue.Queue`.
+- A dedicated background writer thread, managed by the `DatabaseContext`, consumes items from this queue and performs the batch database operations.
+- This ensures a graceful shutdown by processing all remaining items in the queue before the application exits.
 
 ### Processing Pipeline
 

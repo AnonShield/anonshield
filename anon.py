@@ -1,31 +1,32 @@
-"""
-Anonymization Command-Line Interface
-
-This script provides a command-line interface to anonymize sensitive information in various file formats.
-It orchestrates the process by parsing arguments, setting up the anonymization engine, 
-and delegating the file processing to the appropriate processor.
-"""
 import argparse
-import os
-import subprocess
-import sys
-import time
 import warnings
-import spacy
-import torch
-import json
+import re
 import logging
+import os
+import sys
+import subprocess
+import json
+import torch
+import spacy
+import time
+import time
+
 
 from src.anon.config import (
     ENTITY_MAPPING,
     SECRET_KEY,
     TRANSFORMER_MODEL,
     TRF_MODEL_PATH,
-    initialize_db,
-    shutdown_db_writer,
+    ProcessingLimits,
+    DefaultSizes,
+    Global
 )
+from src.anon.database import DatabaseContext
 from src.anon.engine import AnonymizationOrchestrator, load_custom_recognizers, SUPPORTED_LANGUAGES
-from src.anon.processors import get_processor
+from src.anon.processors import ProcessorRegistry
+from src.anon.cache_manager import CacheManager
+from src.anon.hash_generator import HashGenerator
+from src.anon.entity_detector import EntityDetector
 
 warnings.filterwarnings("ignore")
 
@@ -52,7 +53,7 @@ def models_check(lang: str):
                 sys.exit(1)
 
     if not os.path.exists(TRF_MODEL_PATH):
-        logging.info(f"Downloading Transformer model '{TRANSFORMER_MODEL}'...")
+        logging.info(f"Transformer model '{TRANSFORMER_MODEL}' not found. Downloading...")
         snapshot_download(repo_id=TRANSFORMER_MODEL, cache_dir=TRF_MODEL_PATH, max_workers=10)
 
 
@@ -109,18 +110,30 @@ def _parse_arguments():
     parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a JSON file with advanced anonymization rules for structured files.")
     
     # Performance & Filtering options
+    parser.add_argument("--preserve-row-context", action="store_true", help="For CSV/XLSX, process all values to preserve context instead of only unique values. Slower but more accurate.")
+    parser.add_argument("--json-stream-threshold-mb", type=int, default=ProcessingLimits.JSON_STREAM_THRESHOLD_MB, help=f"JSON streaming threshold in MB. Files larger than this will be streamed from disk. Default: {ProcessingLimits.JSON_STREAM_THRESHOLD_MB}")
     parser.add_argument("--optimize", action="store_true", help="Enable all optimizations (fast strategy, cache, min-word-length=3, in-memory DB).")
     parser.add_argument("--use-cache", action="store_true", default=False, help="Enable in-memory caching for the run. Disabled by default.")
-    parser.add_argument("--max-cache-size", type=int, default=10000, help="Maximum number of items to store in the in-memory cache. Default is 10000.")
+    parser.add_argument("--max-cache-size", type=int, default=ProcessingLimits.MAX_CACHE_SIZE, help=f"Maximum number of items to store in the in-memory cache. Default: {ProcessingLimits.MAX_CACHE_SIZE}")
     parser.add_argument("--min-word-length", type=int, default=0, help="Minimum character length for a word to be processed. Default is 0 (no limit).")
     parser.add_argument("--technical-stoplist", type=str, default="", help="Comma-separated list of custom words to add to the technical stoplist.")
     parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized. Default is to anonymize them if other rules permit.")
     parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast", "balanced"], help="Anonymization strategy ('presidio' for full analysis, 'fast' for an optimized path, 'balanced' for a mix of speed and accuracy).")
     parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
     parser.add_argument("--db-mode", type=str, default="persistent", choices=["persistent", "in-memory"], help="Database mode ('persistent' to save to disk, 'in-memory' for a temporary DB).")
+    parser.add_argument("--db-dir", type=str, default="db", help="Directory for the database file.")
     parser.add_argument("--disable-gc", action="store_true", help="Disable automatic garbage collection during processing. May boost speed for single large files but increases memory usage.")
     parser.add_argument("--db-synchronous-mode", type=str, default=None, choices=["OFF", "NORMAL", "FULL", "EXTRA"], help="SQLite 'synchronous' PRAGMA mode. Overrides config file setting.")
     parser.add_argument("--log-level", type=str, default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level (default: WARNING).")
+    parser.add_argument("--force-large-xml", action="store_true", help="Force processing of XML files exceeding memory safety thresholds. Use with caution as it may lead to Out-of-Memory errors.")
+
+    # Chunking & Batching Options
+    chunk_group = parser.add_argument_group('Chunking and Batching')
+    chunk_group.add_argument("--batch-size", type=int, default=DefaultSizes.BATCH_SIZE, help=f"Default batch size for processing text chunks. Default: {DefaultSizes.BATCH_SIZE}.")
+    chunk_group.add_argument("--csv-chunk-size", type=int, default=DefaultSizes.CSV_CHUNK_SIZE, help=f"Chunk size for reading CSV files with pandas. Default: {DefaultSizes.CSV_CHUNK_SIZE}.")
+    chunk_group.add_argument("--json-chunk-size", type=int, default=DefaultSizes.JSON_CHUNK_SIZE, help=f"Chunk size for streaming large JSON arrays. Default: {DefaultSizes.JSON_CHUNK_SIZE}.")
+    chunk_group.add_argument("--ner-chunk-size", type=int, default=DefaultSizes.NER_CHUNK_SIZE, help=f"Max character size for text chunks in NER data generation. Default: {DefaultSizes.NER_CHUNK_SIZE}.")
+    chunk_group.add_argument("--nlp-batch-size", type=int, default=DefaultSizes.NLP_BATCH_SIZE, help=f"Batch size for spaCy's nlp.pipe() processing. Default: {DefaultSizes.NLP_BATCH_SIZE}.")
 
     args = parser.parse_args()
     logging.debug(f"Parsed arguments: {args}")
@@ -206,7 +219,7 @@ def main():
     logging.info("Verifying hardware...")
     if torch.cuda.is_available():
         try:
-            spacy.require_gpu()
+            spacy.require_gpu() # type: ignore
             logging.info(f"GPU activated successfully! (Device: {torch.cuda.get_device_name(0)})")
         except Exception as e:
             logging.warning(f"GPU detected, but failed to activate in Spacy: {e}")
@@ -215,20 +228,22 @@ def main():
 
     # --- SECRET_KEY Validation (Early Exit) ---
     if not args.generate_ner_data and not SECRET_KEY:
-        logging.error("ANON_SECRET_KEY environment variable not set for anonymization.")
+        logging.error("ANON_SECRET_KEY or ANON_SECRET_KEY_FILE not set for anonymization.")
         sys.exit(1)
 
     start_time = time.time()
-    if not args.generate_ner_data:
-        initialize_db(mode=args.db_mode, synchronous=args.db_synchronous_mode)
-        logging.info(f"Database initialized in '{args.db_mode}' mode with synchronous PRAGMA set to '{args.db_synchronous_mode or 'NORMAL'}'.")
     
+    db_context = None
+    if not args.generate_ner_data:
+        db_context = DatabaseContext(mode=args.db_mode, db_dir=args.db_dir)
+        db_context.initialize(synchronous=args.db_synchronous_mode)
+        logging.info(f"Database initialized in '{args.db_mode}' mode with synchronous PRAGMA set to '{args.db_synchronous_mode or 'NORMAL'}'.")
+
     # Update stoplist from CLI
     if args.technical_stoplist:
-        from src.anon.config import TECHNICAL_STOPLIST
         new_stopwords = {term.strip().lower() for term in args.technical_stoplist.split(',') if term.strip()}
         if new_stopwords:
-            TECHNICAL_STOPLIST.update(new_stopwords)
+            Global.TECHNICAL_STOPLIST.update(new_stopwords)
             logging.info(f"Updated TECHNICAL_STOPLIST with {len(new_stopwords)} custom words.")
 
     models_check(args.lang)
@@ -250,15 +265,50 @@ def main():
         engine_message = "NER detection engine" if args.generate_ner_data else "anonymization engine"
         logging.info(f"Initializing {engine_message} for language '{args.lang}'...")
         
+        # Instantiate dependencies for injection
+        cache_manager = CacheManager(
+            use_cache=args.use_cache,
+            max_cache_size=args.max_cache_size
+        )
+        hash_generator = HashGenerator()
+        
+        compiled_patterns = []
+        custom_recognizers = load_custom_recognizers([args.lang], regex_priority=args.regex_priority)
+        
+        for recognizer in custom_recognizers:
+            entity_type = recognizer.supported_entities[0]
+            if entity_type in entities_to_preserve:
+                continue
+            for pattern in recognizer.patterns:
+                try:
+                    compiled_patterns.append({
+                        "label": entity_type,
+                        "regex": re.compile(pattern.regex, flags=re.DOTALL | re.IGNORECASE),
+                        "score": pattern.score
+                    })
+                except re.error:
+                    logging.warning(f"Invalid regex pattern skipped: {pattern.regex}")
+        
+        entity_detector = EntityDetector(
+            compiled_patterns=compiled_patterns,
+            entities_to_preserve=set(entities_to_preserve),
+            allow_list=set(allow_list)
+        )
+        
+        
         orchestrator = AnonymizationOrchestrator(
-            lang=args.lang, 
+            lang=args.lang,
+            db_context=db_context,
             allow_list=allow_list, 
             entities_to_preserve=entities_to_preserve,
             slug_length=args.slug_length,
-            strategy=args.anonymization_strategy,
-            use_cache=args.use_cache,
+            strategy_name=args.anonymization_strategy,
             regex_priority=args.regex_priority,
-            max_cache_size=args.max_cache_size
+            nlp_batch_size=args.nlp_batch_size,
+            cache_manager=cache_manager,
+            hash_generator=hash_generator,
+            entity_detector=entity_detector,
+            ner_data_generation=args.generate_ner_data
         )
         
         # --- Processing ---
@@ -270,6 +320,13 @@ def main():
             "output_dir": args.output_dir,
             "overwrite": args.overwrite,
             "disable_gc": args.disable_gc,
+            "json_stream_threshold_mb": args.json_stream_threshold_mb,
+            "preserve_row_context": args.preserve_row_context,
+            "batch_size": args.batch_size,
+            "csv_chunk_size": args.csv_chunk_size,
+            "json_chunk_size": args.json_chunk_size,
+            "ner_chunk_size": args.ner_chunk_size,
+            "force_large_xml": args.force_large_xml, # Pass the new argument
         }
         logging.debug(f"Processor factory arguments: {processor_factory_args}")
 
@@ -283,7 +340,7 @@ def main():
                     file_full_path = os.path.join(root, file_name)
                     logging.debug(f"Attempting to get processor for file: {file_full_path}")
                     try:
-                        processor = get_processor(file_full_path, orchestrator, **processor_factory_args)
+                        processor = ProcessorRegistry.get_processor(file_full_path, orchestrator, **processor_factory_args)
                         if not processor: 
                             logging.debug(f"No suitable processor found for file: {file_full_path}. Skipping.")
                             continue
@@ -307,7 +364,7 @@ def main():
         else:
             mode_str = "Generating NER data for" if args.generate_ner_data else "Processing"
             logging.info(f"{mode_str} file: {args.file_path}...")
-            processor = get_processor(args.file_path, orchestrator, **processor_factory_args)
+            processor = ProcessorRegistry.get_processor(args.file_path, orchestrator, **processor_factory_args)
             if processor:
                 output_file = processor.process()
                 if args.generate_ner_data:
@@ -336,10 +393,9 @@ def main():
         logging.error(f"An error occurred during processing: {e}", exc_info=True)
         sys.exit(1)
     finally:
-        if not args.generate_ner_data:
-            logging.info("Shutting down database writer...")
-            shutdown_db_writer()
-            logging.info("Database writer shut down.")
+        if db_context:
+            db_context.shutdown()
+
 
 
 if __name__ == "__main__":
