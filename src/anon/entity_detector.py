@@ -59,8 +59,6 @@ class EntityDetector:
             extracted = self.extract_entities(doc, original_doc_text)
             merged = self.merge_overlapping_entities(extracted)
 
-            # In the original code, this was filtering entities again. Let's ensure that logic is preserved
-            # if it was intended. The original `detect_entities` in orchestrator did a final filter.
             final_merged = []
             for ent in merged:
                 if ent["label"] in self.entities_to_preserve: continue
