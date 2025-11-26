@@ -63,7 +63,7 @@ class CustomSlugAnonymizer(Operator):
         entity_type = params.get("entity_type", "UNKNOWN")
         logging.debug(f"Anonymizing text '{clean_text}' with entity type '{entity_type}'.")
 
-        hash_generator: HashingStrategy = params.get("hash_generator")
+        hash_generator = params.get("hash_generator")
         if not hash_generator:
             raise ValueError("HashGenerator instance not provided in operator params.")
 
@@ -507,8 +507,11 @@ class AnonymizationOrchestrator:
         results = []
         
         # Get all supported entities, but filter out those the user wants to preserve.
-        all_entities = self.analyzer_engine.analyzer_engine.get_supported_entities()
-        entities_to_analyze = [e for e in all_entities if e not in self.entities_to_preserve]
+        if self.analyzer_engine and self.analyzer_engine.analyzer_engine:
+            all_entities = self.analyzer_engine.analyzer_engine.get_supported_entities()
+            entities_to_analyze = [e for e in all_entities if e not in self.entities_to_preserve]
+        else:
+            entities_to_analyze = []
 
         analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
             texts,
