@@ -219,7 +219,7 @@ def main():
     logging.info("Verifying hardware...")
     if torch.cuda.is_available():
         try:
-            spacy.require_gpu()
+            spacy.require_gpu() # type: ignore
             logging.info(f"GPU activated successfully! (Device: {torch.cuda.get_device_name(0)})")
         except Exception as e:
             logging.warning(f"GPU detected, but failed to activate in Spacy: {e}")
