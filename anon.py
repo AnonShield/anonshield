@@ -106,7 +106,7 @@ def _parse_arguments():
     # Anonymization options
     parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve.")
     parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to allow.")
-    parser.add_argument("--slug-length", type=int, default=None, help="Specify the length of the anonymized slug (1-64).")
+    parser.add_argument("--slug-length", type=int, default=None, help="Specify the length of the anonymized slug (0-64). If 0, only the entity type is used.")
     parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a JSON file with advanced anonymization rules for structured files.")
     
     # Performance & Filtering options
@@ -144,8 +144,8 @@ def _parse_arguments():
     if args.list_languages:
         _handle_list_languages()
 
-    if args.slug_length is not None and not (1 <= args.slug_length <= 64):
-        parser.error("--slug-length must be between 1 and 64.")
+    if args.slug_length is not None and not (0 <= args.slug_length <= 64):
+        parser.error("--slug-length must be between 0 and 64.")
 
     if not args.file_path and not (args.list_entities or args.list_languages):
         parser.error("A file path must be provided.")

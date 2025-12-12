@@ -76,6 +76,8 @@ class CustomSlugAnonymizer(Operator):
         if "entity_collector" in params:
             params["entity_collector"].append((entity_type, clean_text, display_hash, full_hash))
 
+        if slug_length == 0:
+            return f"[{entity_type}]"
         return f"[{entity_type}_{display_hash}]"
 
     def validate(self, params: dict | None = None) -> None: pass
@@ -492,8 +494,12 @@ class AnonymizationOrchestrator:
             display_hash, full_hash = self.hash_generator.generate_slug(clean_text, self.slug_length)
 
             collected_entities_from_forced.append((entity_type, clean_text, display_hash, full_hash))
-            
-            anonymized_text = f"[{entity_type}_{display_hash}]"
+
+            if self.slug_length == 0:
+                anonymized_text = f"[{entity_type}]"
+            else:
+                anonymized_text = f"[{entity_type}_{display_hash}]"
+
             self.cache_manager.add(cache_key, anonymized_text) # Use CacheManager
             anonymized_list.append(anonymized_text)
         return anonymized_list, collected_entities_from_forced
