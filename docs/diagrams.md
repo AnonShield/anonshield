@@ -71,11 +71,7 @@ graph TB
     
     HashGen --> SecMgr
     HashGen --> HMAC
-    
-    style CLI fill:#e1f5ff
-    style Orch fill:#fff4e1
-    style DBCtx fill:#e8f5e9
-    style SecMgr fill:#ffebee
+
 ```
 
 ## 2. **Fluxo de Decisão: Estratégia de Processamento**
@@ -114,11 +110,6 @@ graph TD
     Strategy -->|Balanced| CoreRecognizers[Recognizers Principais]
     
     FullPipeline & OptimizedPath & CoreRecognizers --> Output[Arquivo Anonimizado]
-    
-    style Start fill:#e1f5ff
-    style Error fill:#ffcdd2
-    style XMLError fill:#ffcdd2
-    style Output fill:#c8e6c9
 ```
 
 ## 3. **Pipeline de Detecção de Entidades (Entity Detection Pipeline)**
@@ -162,11 +153,7 @@ graph LR
     end
     
     Skip1 & Skip2 & Skip3 & Skip4 --> NoAction[Sem Ação]
-    
-    style Text fill:#e1f5ff
-    style Final fill:#fff4e1
-    style Replace fill:#c8e6c9
-    style NoAction fill:#ffecb3
+
 ```
 
 ## 4. **Arquitetura de Cache e Performance**
@@ -210,9 +197,6 @@ graph TD
     Skip --> Return
     CacheHit --> Return
     
-    style CacheHit fill:#c8e6c9
-    style Process fill:#fff4e1
-    style Evict fill:#ffecb3
 ```
 
 ## 5. **Fallback e Circuit Breaker Pattern**
@@ -304,11 +288,7 @@ graph TB
         RequireKey -->|Sim| RetrieveOriginal[Recuperar Original]
     end
     
-    style Error fill:#ffcdd2
-    style HMAC fill:#fff4e1
-    style DB fill:#e8f5e9
-    style DenyAccess fill:#ffcdd2
-    style RetrieveOriginal fill:#c8e6c9
+
 ```
 
 ## 7. **Processamento de Estruturas (JSON/XML Preservation)**
@@ -363,10 +343,7 @@ graph TD
         Validate --> Output[Arquivo Anonimizado]
     end
     
-    style Input fill:#e1f5ff
-    style Config fill:#fff4e1
-    style TransMap fill:#ffecb3
-    style Output fill:#c8e6c9
+
 ```
 
 ## 8. **Diagrama de Componentes (Component Diagram - C4 Model)**
@@ -448,10 +425,6 @@ graph TB
     
     Proc2 --> FileSystem
     
-    style CLI fill:#e1f5ff
-    style Orchestrator fill:#fff4e1
-    style DatabaseContext fill:#e8f5e9
-    style SecretManager fill:#ffebee
 ```
 
 ## 9. **Diagrama de Sequência: Fluxo de Anonimização Completo**
@@ -555,13 +528,6 @@ graph TD
     ForceAnon & AutoAnon --> AnonymizePipeline[Pipeline de Anonimização]
     AnonymizePipeline --> End2([Anonymized Text])
     
-    style Exclude fill:#ffcdd2
-    style ForceAnon fill:#c8e6c9
-    style AutoAnon fill:#c8e6c9
-    style Reject1 fill:#ffecb3
-    style Reject2 fill:#ffecb3
-    style Reject3 fill:#ffecb3
-    style ImplicitSkip fill:#ffecb3
 ```
 
 ---
@@ -913,10 +879,6 @@ graph TB
     Regex --> Hash
     Hash --> DB
     
-    style CLI fill:#e1f5ff
-    style Engine fill:#fff4e1
-    style Hash fill:#ffebee
-    style DB fill:#e8f5e9
 ```
 
 ### 5. **Diagrama Simplificado: Fluxo de Anonimização (Para Artigo)**
@@ -929,11 +891,6 @@ graph LR
     D --> E[💾 Armazenamento<br/>Mapping]
     E --> F[📝 Documento<br/>Anonimizado]
     
-    style A fill:#e1f5ff
-    style C fill:#fff4e1
-    style D fill:#ffebee
-    style E fill:#e8f5e9
-    style F fill:#c8e6c9
 ```
 
 ### 6. **Diagrama Simplificado: Tipos de Entidades Detectadas (Para Artigo)**
@@ -977,10 +934,7 @@ graph TD
     Presidio --> Result[Documento<br/>Anonimizado]
     Balanced --> Result
     Fast --> Result
-    
-    style Presidio fill:#e3f2fd
-    style Balanced fill:#fff9c4
-    style Fast fill:#c8e6c9
+
 ```
 
 ### 8. **Diagrama Simplificado: Garantias de Segurança (Para Artigo)**
@@ -1006,9 +960,6 @@ graph TD
     C --> D
     F --> G
     
-    style B fill:#fff4e1
-    style E fill:#ffebee
-    style I fill:#e8f5e9
 ```
 
 ### 9. **Diagrama Simplificado: Suporte Multi-formato (Para Artigo)**
@@ -1031,8 +982,7 @@ graph LR
     end
     
     T & P & D & I & J & C & X & M --> Output[📦 Arquivo<br/>Anonimizado]
-    
-    style Output fill:#c8e6c9
+
 ```
 
 ### 10. **Diagrama Simplificado: Arquitetura de 3 Camadas (Para Artigo)**
@@ -1063,11 +1013,7 @@ graph TB
     Det --> Hash
     Hash --> DB
     Strat --> Cache
-    
-    style CLI fill:#e1f5ff
-    style Orch fill:#fff4e1
-    style DB fill:#e8f5e9
-    style Hash fill:#ffebee
+
 ```
 
 ### 11. **Diagrama de Estado: Ciclo de Vida de uma Entidade (Para Artigo)**
@@ -1110,10 +1056,7 @@ graph LR
     F --> G
     G --> H[🔍 Detecção<br/>de PII]
     H --> I[📝 Documento<br/>Anonimizado]
-    
-    style E fill:#fff4e1
-    style H fill:#ffebee
-    style I fill:#c8e6c9
+
 ```
 
 ### 13. **Diagrama de Classes Simplificado: Padrões de Design (Para Artigo)**
@@ -1174,8 +1117,6 @@ graph TB
     end
     
     O1 & O2 & O3 & O4 --> R
-    
-    style R fill:#c8e6c9
 ```
 
 ---
