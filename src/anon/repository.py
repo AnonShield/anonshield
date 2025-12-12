@@ -105,6 +105,36 @@ class EntityRepository:
             logging.error(f"Repository failed to find by slug '{display_hash}': {e}", exc_info=True)
             return None
 
+    def get_all_entities(self) -> List[Tuple]:
+        """
+        Retrieves all entities from the database.
+
+        Returns:
+            A list of tuples, where each tuple is a record.
+        """
+        query_sql = "SELECT id, entity_type, original_name, slug_name, full_hash, first_seen, last_seen FROM entities"
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(query_sql)
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            logging.error(f"Repository failed to get all entities: {e}", exc_info=True)
+            return []
+
+    def clear_all_entities(self):
+        """
+        Deletes all records from the entities table.
+        """
+        delete_sql = "DELETE FROM entities"
+        conn = self._get_connection()
+        try:
+            with conn:
+                conn.execute(delete_sql)
+            logging.info("All entities have been deleted from the database.")
+        except sqlite3.Error as e:
+            logging.error(f"Repository failed to clear all entities: {e}", exc_info=True)
+            raise
+
     def close_thread_connection(self):
         """Closes the database connection for the current thread, if it exists."""
         if hasattr(self._local, "connection"):

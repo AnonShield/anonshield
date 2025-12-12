@@ -26,7 +26,7 @@ import pytesseract  # type: ignore
 from docx import Document  # type: ignore
 from lxml import etree  # type: ignore
 from PIL import Image  # type: ignore
-from tqdm import tqdm  # type: ignore
+from tqdm.auto import tqdm  # type: ignore
 import pymupdf as fitz  # type: ignore
 
 from .config import Global, ProcessingLimits, DefaultSizes
@@ -397,7 +397,8 @@ class DocxFileProcessor(FileProcessor):
 
     def _extract_texts(self) -> Iterable[str]:
         doc = Document(self.file_path)
-        for para in doc.paragraphs:
+        desc = f"Extracting DOCX {os.path.basename(self.file_path)}"
+        for para in tqdm(doc.paragraphs, desc=desc, unit="para", leave=False):
             para_content_parts = []
             for run in para.runs:
                 if run._r.xpath(".//w:drawing"):
@@ -421,7 +422,8 @@ class PdfFileProcessor(FileProcessor):
 
     def _extract_texts(self) -> Iterable[str]:
         with fitz.open(self.file_path) as doc:
-            for page_num in range(doc.page_count):
+            desc = f"Extracting PDF {os.path.basename(self.file_path)}"
+            for page_num in tqdm(range(doc.page_count), desc=desc, unit="page", leave=False):
                 page = doc[page_num]
                 logging.debug(f"Extracting text from page {page_num + 1}/{doc.page_count} of '{self.file_path}'.")
                 content_items = []
@@ -589,6 +591,8 @@ class XlsxFileProcessor(FileProcessor):
             shutil.copy(self.file_path, output_path) # Copy original on failure to open
             return
 
+        total_rows = sum(sheet.max_row for sheet in read_only_wb.worksheets)
+        
         # The logic is now inverted: by default we use deduplication (faster).
         # Full context processing is enabled only when the flag is explicitly set.
         use_deduplication = not self.preserve_row_context
@@ -596,15 +600,17 @@ class XlsxFileProcessor(FileProcessor):
         
         all_texts_map: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
         try:
-            for sheet in read_only_wb.worksheets:
-                for row in sheet.iter_rows():
-                    for cell in row:
-                        if cell.value and isinstance(cell.value, str):
-                            path = f"{sheet.title}.{cell.column_letter}" # type: ignore
-                            should_anon, forced_type = self._should_anonymize(cell.value, path)
-                            if should_anon:
-                                group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type or "auto")
-                                all_texts_map[group_key].append(cell.value)
+            with tqdm(total=total_rows, desc=f"Pass 1/2: Reading {os.path.basename(self.file_path)}", unit="row", leave=False) as pbar:
+                for sheet in read_only_wb.worksheets:
+                    for row in sheet.iter_rows():
+                        pbar.update(1)
+                        for cell in row:
+                            if cell.value and isinstance(cell.value, str):
+                                path = f"{sheet.title}.{cell.column_letter}" # type: ignore
+                                should_anon, forced_type = self._should_anonymize(cell.value, path)
+                                if should_anon:
+                                    group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type or "auto")
+                                    all_texts_map[group_key].append(cell.value)
         finally:
             read_only_wb.close() # Ensure read-only workbook is closed
 
@@ -644,24 +650,26 @@ class XlsxFileProcessor(FileProcessor):
 
         logging.debug("XLSX processing pass 2 (writing anonymized file).")
         try:
-            for read_sheet in read_only_wb.worksheets:
-                write_sheet = write_wb.create_sheet(title=read_sheet.title)
-                for row_idx, row in enumerate(read_sheet.iter_rows(), 1):
-                    for col_idx, cell in enumerate(row, 1):
-                        new_cell = write_sheet.cell(row=row_idx, column=col_idx)
-                        
-                        original_value = cell.value
-                        if isinstance(original_value, str) and original_value in translation_map:
-                            try:
-                                if use_deduplication:
-                                    new_cell.value = translation_map[original_value][0]
-                                else:
-                                    new_cell.value = translation_map[original_value].popleft()
-                            except IndexError:
-                                logging.error(f"Mismatch in anonymized XLSX cell counts for '{original_value}'. Using original value as fallback.")
+            with tqdm(total=total_rows, desc=f"Pass 2/2: Writing {os.path.basename(self.file_path)}", unit="row", leave=False) as pbar:
+                for read_sheet in read_only_wb.worksheets:
+                    write_sheet = write_wb.create_sheet(title=read_sheet.title)
+                    for row_idx, row in enumerate(read_sheet.iter_rows(), 1):
+                        pbar.update(1)
+                        for col_idx, cell in enumerate(row, 1):
+                            new_cell = write_sheet.cell(row=row_idx, column=col_idx)
+                            
+                            original_value = cell.value
+                            if isinstance(original_value, str) and original_value in translation_map:
+                                try:
+                                    if use_deduplication:
+                                        new_cell.value = translation_map[original_value][0]
+                                    else:
+                                        new_cell.value = translation_map[original_value].popleft()
+                                except IndexError:
+                                    logging.error(f"Mismatch in anonymized XLSX cell counts for '{original_value}'. Using original value as fallback.")
+                                    new_cell.value = original_value
+                            else:
                                 new_cell.value = original_value
-                        else:
-                            new_cell.value = original_value
         finally:
             read_only_wb.close()
         
@@ -733,7 +741,12 @@ class XmlFileProcessor(FileProcessor):
         text_groups: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
         logging.debug(f"XML processing with deduplication: {use_deduplication}.")
 
-        for element in tree.iter():
+        # Wrap the iterator with tqdm for progress visualization
+        nodes_iterator = tree.iter()
+        total_nodes = len(list(tree.iter())) # This can be memory intensive for large files
+        
+        desc_collect = f"Pass 1/2: Collecting texts from {os.path.basename(self.file_path)}"
+        for element in tqdm(tree.iter(), total=total_nodes, desc=desc_collect, unit="node", leave=False):
             path = self._get_xpath(element)
             if element.text and element.text.strip():
                 should_anon, forced_type = self._should_anonymize(element.text, path)
@@ -775,8 +788,9 @@ class XmlFileProcessor(FileProcessor):
             logging.info("No PII found for anonymization in XML. Saving original file.")
             tree.write(output_path, encoding="utf-8", xml_declaration=True)
             return
-
-        for element in tree.iter():
+            
+        desc_anon = f"Pass 2/2: Anonymizing {os.path.basename(self.file_path)}"
+        for element in tqdm(tree.iter(), total=total_nodes, desc=desc_anon, unit="node", leave=False):
             if element.text in translation_map:
                 try:
                     if use_deduplication:
@@ -860,15 +874,24 @@ class JsonFileProcessor(FileProcessor):
         """Processes a file containing a root-level JSON array in streamed chunks."""
         logging.info(f"Starting JSON array streaming for '{self.file_path}' with chunk size {chunk_size}.")
         temp_output_path = output_path + ".tmp"
+        file_size = os.path.getsize(self.file_path)
         
         try:
-            with open(self.file_path, 'rb') as in_f, open(temp_output_path, 'wb') as out_f:
+            with open(self.file_path, 'rb') as in_f, \
+                 open(temp_output_path, 'wb') as out_f, \
+                 tqdm(total=file_size, unit='B', unit_scale=True, desc=f"Streaming {os.path.basename(self.file_path)}", leave=False) as pbar:
+                
                 out_f.write(b'[\n')
                 is_first_chunk = True
                 
                 objects_iterator = ijson.items(in_f, 'item', use_float=True)
                 
+                last_pos = 0
                 for chunk_idx, obj_batch in enumerate(self._batch_iterator(objects_iterator, chunk_size)):
+                    current_pos = in_f.tell()
+                    pbar.update(current_pos - last_pos)
+                    last_pos = current_pos
+
                     logging.debug(f"Processing JSON array chunk {chunk_idx + 1} with {len(obj_batch)} objects.")
                     batch_text_groups = defaultdict(list)
                     
@@ -880,12 +903,14 @@ class JsonFileProcessor(FileProcessor):
                     path_aware_map = self._build_path_aware_translation_map(batch_text_groups)
                     
                     for obj_idx, obj in enumerate(obj_batch):
-                        if not is_first_chunk:
+                        # Use obj_idx to check if it's not the very first object in the very first chunk
+                        if not (is_first_chunk and obj_idx == 0):
                             out_f.write(b',\n')
                         
                         reconstructed_obj = self._reconstruct_object(obj, path_aware_map)
                         out_f.write(orjson.dumps(reconstructed_obj, option=orjson.OPT_INDENT_2))
-                        is_first_chunk = False
+                    
+                    is_first_chunk = False # After the first chunk, this is always false
             
                 out_f.write(b'\n]') # Close the JSON array
             
@@ -1035,19 +1060,22 @@ class JsonFileProcessor(FileProcessor):
         """Processes .jsonl files line by line for maximum memory efficiency."""
         temp_output_path = output_path + ".tmp"
         try:
-            with open(temp_output_path, "wb") as out_f:
-                with open(self.file_path, "rb") as in_f:
-                    for line in in_f:
-                        if not line.strip(): continue
-                        try:
-                            data = orjson.loads(line)
-                            text_groups = self._collect_strings_from_object(data)
-                            path_aware_map = self._build_path_aware_translation_map(text_groups)
-                            processed_data = self._reconstruct_object(data, path_aware_map)
-                            out_f.write(orjson.dumps(processed_data) + b'\n')
-                        except orjson.JSONDecodeError:
-                            logging.warning(f"Skipping invalid JSON line in {self.file_path}. Original line written.")
-                            out_f.write(line) # Write original line if parsing fails
+            with open(self.file_path, "rb") as f:
+                total_lines = sum(1 for _ in f)
+
+            with open(temp_output_path, "wb") as out_f, open(self.file_path, "rb") as in_f:
+                desc = f"Processing {os.path.basename(self.file_path)}"
+                for line in tqdm(in_f, total=total_lines, desc=desc, unit="line", leave=False):
+                    if not line.strip(): continue
+                    try:
+                        data = orjson.loads(line)
+                        text_groups = self._collect_strings_from_object(data)
+                        path_aware_map = self._build_path_aware_translation_map(text_groups)
+                        processed_data = self._reconstruct_object(data, path_aware_map)
+                        out_f.write(orjson.dumps(processed_data) + b'\n')
+                    except orjson.JSONDecodeError:
+                        logging.warning(f"Skipping invalid JSON line in {self.file_path}. Original line written.")
+                        out_f.write(line) # Write original line if parsing fails
             
             shutil.move(temp_output_path, output_path)
             logging.info(f"Successfully anonymized JSONL file saved to: {output_path}")
