@@ -126,7 +126,10 @@ class FastStrategy(AnonymizationStrategy):
             display_hash, full_hash = self.hash_generator.generate_slug(clean_text, slug_length)
 
             collected_entities_for_text.append((ent["label"], clean_text, display_hash, full_hash))
-            new_text_parts.append(f"[{ent['label']}_{display_hash}]")
+            if slug_length == 0:
+                new_text_parts.append(f"[{ent['label']}]")
+            else:
+                new_text_parts.append(f"[{ent['label']}_{display_hash}]")
             current_idx = ent["end"]
         
         new_text_parts.append(original_doc_text[current_idx:])
