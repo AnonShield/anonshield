@@ -1,0 +1,228 @@
+"""
+SLM Client Module - Abstract interface for interacting with local LLMs via Ollama
+
+This module provides a protocol-based abstraction for SLM operations, ensuring
+dependency inversion and easy testability.
+"""
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import Protocol, List, Dict, Any, Optional
+import logging
+import requests
+import json
+from dataclasses import dataclass
+
+
+@dataclass
+class SLMResponse:
+    """Structured response from an SLM query."""
+    content: str
+    model: str
+    tokens_used: int = 0
+    success: bool = True
+    error: Optional[str] = None
+
+
+class SLMClient(Protocol):
+    """Protocol defining the interface for SLM clients."""
+    
+    def query(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> SLMResponse:
+        """Send a query to the SLM and return structured response."""
+        ...
+    
+    def query_json(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+        """Query SLM and parse JSON response."""
+        ...
+
+
+class OllamaClient:
+    """
+    Concrete implementation of SLM client using Ollama REST API.
+    
+    This client follows the Dependency Inversion Principle by depending on
+    configuration rather than hard-coded values.
+    
+    Example:
+        client = OllamaClient(model="llama3", base_url="http://localhost:11434")
+        response = client.query("Extract entities from: John works at Google")
+    """
+    
+    def __init__(
+        self, 
+        model: str = "llama3",
+        base_url: str = "http://localhost:11434",
+        timeout: int = 120,
+        temperature: float = 0.1,  # Low temperature for deterministic outputs
+        max_retries: int = 3
+    ):
+        self.model = model
+        self.base_url = base_url.rstrip('/')
+        self.timeout = timeout
+        self.temperature = temperature
+        self.max_retries = max_retries
+        self.logger = logging.getLogger(__class__.__name__)
+        
+        # Validate connectivity on init
+        self._validate_connection()
+    
+    def _validate_connection(self) -> None:
+        """Validates that Ollama is running and the model is available."""
+        try:
+            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
+            response.raise_for_status()
+            
+            available_models = [m["name"] for m in response.json().get("models", [])]
+            
+            if self.model not in available_models:
+                self.logger.warning(
+                    f"Model '{self.model}' not found in Ollama. "
+                    f"Available models: {', '.join(available_models)}. "
+                    "The model will be pulled on first use."
+                )
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Failed to connect to Ollama at {self.base_url}: {e}")
+            raise ConnectionError(
+                f"Cannot connect to Ollama at {self.base_url}. "
+                "Ensure Ollama is running with: ollama serve"
+            ) from e
+    
+    def query(
+        self, 
+        prompt: str, 
+        system_prompt: Optional[str] = None,
+        **kwargs
+    ) -> SLMResponse:
+        """
+        Send a query to the SLM with automatic retry logic.
+        
+        Args:
+            prompt: The user prompt to send
+            system_prompt: Optional system context
+            **kwargs: Additional parameters to pass to Ollama
+        
+        Returns:
+            SLMResponse with content and metadata
+        """
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": kwargs.get("temperature", self.temperature),
+                "num_predict": kwargs.get("max_tokens", 2048),
+            }
+        }
+        
+        for attempt in range(self.max_retries):
+            try:
+                self.logger.debug(f"Querying Ollama (attempt {attempt + 1}/{self.max_retries})")
+                
+                response = requests.post(
+                    f"{self.base_url}/api/chat",
+                    json=payload,
+                    timeout=self.timeout
+                )
+                response.raise_for_status()
+                
+                data = response.json()
+                content = data.get("message", {}).get("content", "")
+                
+                return SLMResponse(
+                    content=content,
+                    model=self.model,
+                    tokens_used=data.get("eval_count", 0),
+                    success=True
+                )
+                
+            except requests.exceptions.Timeout:
+                self.logger.warning(f"Request timed out (attempt {attempt + 1})")
+                if attempt == self.max_retries - 1:
+                    return SLMResponse(
+                        content="",
+                        model=self.model,
+                        success=False,
+                        error="Request timed out after maximum retries"
+                    )
+                    
+            except requests.exceptions.RequestException as e:
+                self.logger.error(f"Request failed: {e}")
+                if attempt == self.max_retries - 1:
+                    return SLMResponse(
+                        content="",
+                        model=self.model,
+                        success=False,
+                        error=str(e)
+                    )
+        
+        # Should never reach here, but for type safety
+        return SLMResponse(content="", model=self.model, success=False, error="Unknown error")
+    
+    def query_json(
+        self, 
+        prompt: str, 
+        system_prompt: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Query the SLM and parse JSON response with robust error handling.
+        
+        This method enforces JSON output format and validates the response.
+        
+        Returns:
+            Parsed JSON dictionary, or {"error": "..."} on failure
+        """
+        # Enforce JSON output in the prompt
+        json_instruction = "\n\nRespond ONLY with valid JSON. No explanations or markdown."
+        modified_prompt = prompt + json_instruction
+        
+        response = self.query(modified_prompt, system_prompt, **kwargs)
+        
+        if not response.success:
+            return {"error": response.error}
+        
+        # Try to extract JSON from response (handles cases where model adds text)
+        content = response.content.strip()
+        
+        # Remove markdown code fences if present
+        if content.startswith("```"):
+            lines = content.split("\n")
+            content = "\n".join(lines[1:-1]) if len(lines) > 2 else content
+        
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse JSON from SLM response: {e}")
+            self.logger.debug(f"Raw response: {content[:500]}")
+            return {"error": f"Invalid JSON response: {str(e)}", "raw_content": content}
+
+
+class MockSLMClient:
+    """Mock client for testing without requiring Ollama."""
+    
+    def __init__(self, mock_responses: Optional[List[str]] = None):
+        self.mock_responses = mock_responses or []
+        self.call_count = 0
+        self.logger = logging.getLogger(__class__.__name__)
+    
+    def query(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> SLMResponse:
+        response_content = self.mock_responses[self.call_count % len(self.mock_responses)] if self.mock_responses else ""
+        self.call_count += 1
+        
+        return SLMResponse(
+            content=response_content,
+            model="mock",
+            tokens_used=len(response_content.split()),
+            success=True
+        )
+    
+    def query_json(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+        response = self.query(prompt, system_prompt, **kwargs)
+        try:
+            return json.loads(response.content)
+        except json.JSONDecodeError:
+            return {"error": "Mock response is not valid JSON"}
