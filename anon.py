@@ -9,7 +9,9 @@ import json
 import torch
 import spacy
 import time
-import time
+import csv
+from pathlib import Path
+from tqdm import tqdm
 
 
 from src.anon.config import (
@@ -19,7 +21,8 @@ from src.anon.config import (
     TRF_MODEL_PATH,
     ProcessingLimits,
     DefaultSizes,
-    Global
+    Global,
+    LLM_CONFIG
 )
 from src.anon.database import DatabaseContext
 from src.anon.engine import AnonymizationOrchestrator, load_custom_recognizers, SUPPORTED_LANGUAGES
@@ -27,8 +30,158 @@ from src.anon.processors import ProcessorRegistry
 from src.anon.cache_manager import CacheManager
 from src.anon.hash_generator import HashGenerator
 from src.anon.entity_detector import EntityDetector
+from src.anon.slm.client import OllamaClient
+from src.anon.slm.prompts import PromptManager
+from src.anon.slm.mappers.entity_mapper import SLMEntityMapper, EntityMapperExporter
+from src.anon.slm.detectors.slm_detector import SLMEntityDetector
+from src.anon.slm.anonymizers.slm_anonymizer import SLMAnonymizationStrategy, SLMFullAnonymizer
 
 warnings.filterwarnings("ignore")
+
+
+def _handle_slm_entity_mapping(args):
+    """Orchestrates the SLM entity mapping process (Task 1), processing large files in chunks."""
+    logging.info("Starting SLM Entity Mapping process...")
+
+    if not args.file_path or not os.path.exists(args.file_path):
+        logging.error(f"File not found at specified path: {args.file_path}")
+        sys.exit(1)
+
+    # Prepare output paths and directories
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    base_name = Path(args.file_path).stem
+    json_output_path = output_dir / f"{base_name}_entity_map.json"
+    csv_output_path = output_dir / f"{base_name}_entity_map.csv"
+
+    json_file_handle = None
+    csv_file_handle = None
+    csv_writer = None
+    is_first_json_entity = True  # Flag to handle comma for JSON array
+
+    try:
+        # Open JSON output file and write initial structure
+        json_file_handle = open(json_output_path, 'w', encoding='utf-8')
+        json_file_handle.write('{\n  "entities": [\n')
+
+        # Open CSV output file and write header
+        csv_file_handle = open(csv_output_path, 'w', newline='', encoding='utf-8')
+        csv_writer = csv.writer(csv_file_handle)
+        csv_writer.writerow(["Text", "Entity Type", "Start", "End", "Confidence", "Reason", "Context"])
+
+        # 1. Instantiate components with a longer timeout for this task
+        ollama_config = LLM_CONFIG["ollama"]
+        client = OllamaClient(
+            model=ollama_config["model"],
+            base_url=ollama_config["base_url"],
+            timeout=300,  # Increased timeout for mapping task
+            temperature=ollama_config["temperature"],
+            max_retries=5  # Increased max retries for robustness
+        )
+        prompt_manager = PromptManager(base_path="prompts")
+        mapper = SLMEntityMapper(client, prompt_manager)
+
+        # 2. Process file in chunks to handle large files
+        file_extension = Path(args.file_path).suffix.lower()
+        
+        logging.info(f"Processing file '{args.file_path}' in chunks...")
+
+        if file_extension == '.csv':
+            try:
+                import pandas as pd
+                
+                # Estimate total number of lines for tqdm
+                total_lines = 0
+                try:
+                    with open(args.file_path, "r", encoding="utf-8") as f:
+                        total_lines = sum(1 for _ in f) - 1  # Subtract 1 for header
+                except Exception as e:
+                    logging.warning(f"Could not estimate total lines for tqdm: {e}")
+                
+                chunk_size = args.csv_chunk_size
+                chunk_iterator = pd.read_csv(args.file_path, chunksize=chunk_size, on_bad_lines='skip', engine='python')
+                
+                total_chunks = (total_lines // chunk_size) + (1 if total_lines % chunk_size > 0 else 0) if total_lines > 0 else None
+
+                desc = f"Processing CSV {os.path.basename(args.file_path)} chunks"
+                with tqdm(total=total_chunks, desc=desc, unit="chunk", leave=False) as pbar:
+                    for i, chunk_df in enumerate(chunk_iterator):
+                        logging.info(f"Processing CSV chunk {i+1}...")
+                        
+                        texts_to_map = []
+                        for col in chunk_df.columns:
+                            for val in chunk_df[col].dropna():  # Only consider non-NaN values
+                                if isinstance(val, str):
+                                    # Only add non-empty strings after stripping whitespace
+                                    if val.strip():
+                                        texts_to_map.append(val)
+                        
+                        if texts_to_map:
+                            results_batch = mapper.batch_map(
+                                texts_to_map, 
+                                language=args.lang,
+                                prompt_version=args.slm_prompt_version
+                            )
+                            # Write entities from this batch to files progressively
+                            for result in results_batch:
+                                for entity in result.entities:
+                                    if not is_first_json_entity:
+                                        json_file_handle.write(',\n')
+                                    # Use json.dumps for proper JSON string representation
+                                    json_file_handle.write('    ' + json.dumps(entity.to_dict(), indent=2, ensure_ascii=False).replace('\n', '\n    '))
+                                    csv_writer.writerow([
+                                        entity.text, entity.entity_type, entity.start, 
+                                        entity.end, entity.confidence, entity.reason, entity.context
+                                    ])
+                                    is_first_json_entity = False
+                        else:
+                            logging.info(f"CSV chunk {i+1} contained no mappable string text. Skipping.")
+                        pbar.update(1)  # Update progress bar for each chunk
+            except Exception as e:
+                logging.error(f"Failed to process CSV file in chunks: {e}. Falling back to reading the whole file as a single string (less granular).")
+                # Fallback for non-standard CSVs or other pandas errors
+                with open(args.file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # In fallback, map the entire content as a single text
+                result = mapper.map_entities(content, language=args.lang, prompt_version=args.slm_prompt_version)
+                for entity in result.entities:
+                    if not is_first_json_entity:
+                        json_file_handle.write(',\n')
+                    json_file_handle.write('    ' + json.dumps(entity.to_dict(), indent=2, ensure_ascii=False).replace('\n', '\n    '))
+                    csv_writer.writerow([
+                        entity.text, entity.entity_type, entity.start, 
+                        entity.end, entity.confidence, entity.reason, entity.context
+                    ])
+                    is_first_json_entity = False
+        else:
+            # For non-CSV files, read the whole content (original behavior)
+            with open(args.file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            result = mapper.map_entities(content, language=args.lang, prompt_version=args.slm_prompt_version)
+            for entity in result.entities:
+                if not is_first_json_entity:
+                    json_file_handle.write(',\n')
+                json_file_handle.write('    ' + json.dumps(entity.to_dict(), indent=2, ensure_ascii=False).replace('\n', '\n    '))
+                csv_writer.writerow([
+                    entity.text, entity.entity_type, entity.start, 
+                    entity.end, entity.confidence, entity.reason, entity.context
+                ])
+                is_first_json_entity = False
+
+        logging.info(f"Progressive entity map (JSON) saved to: {json_output_path}")
+        logging.info(f"Progressive entity map (CSV) saved to: {csv_output_path}")
+
+    except Exception as e:
+        logging.error(f"An error occurred during SLM entity mapping: {e}", exc_info=True)
+        sys.exit(1)
+    finally:
+        if json_file_handle:
+            json_file_handle.write('\n  ]\n}')  # Close JSON array and object
+            json_file_handle.close()
+        if csv_file_handle:
+            csv_file_handle.close()
+
 
 def models_check(lang: str):
     """Downloads and verifies necessary spaCy and Transformer models."""
@@ -118,7 +271,7 @@ def _parse_arguments():
     parser.add_argument("--min-word-length", type=int, default=0, help="Minimum character length for a word to be processed. Default is 0 (no limit).")
     parser.add_argument("--technical-stoplist", type=str, default="", help="Comma-separated list of custom words to add to the technical stoplist.")
     parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized. Default is to anonymize them if other rules permit.")
-    parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast", "balanced"], help="Anonymization strategy ('presidio' for full analysis, 'fast' for an optimized path, 'balanced' for a mix of speed and accuracy).")
+    parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast", "balanced", "slm"], help="Anonymization strategy ('presidio' for full analysis, 'fast' for an optimized path, 'balanced' for a mix of speed and accuracy, or 'slm' for end-to-end SLM anonymization).")
     parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
     parser.add_argument("--db-mode", type=str, default="persistent", choices=["persistent", "in-memory"], help="Database mode ('persistent' to save to disk, 'in-memory' for a temporary DB).")
     parser.add_argument("--db-dir", type=str, default="db", help="Directory for the database file.")
@@ -126,6 +279,12 @@ def _parse_arguments():
     parser.add_argument("--db-synchronous-mode", type=str, default=None, choices=["OFF", "NORMAL", "FULL", "EXTRA"], help="SQLite 'synchronous' PRAGMA mode. Overrides config file setting.")
     parser.add_argument("--log-level", type=str, default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level (default: WARNING).")
     parser.add_argument("--force-large-xml", action="store_true", help="Force processing of XML files exceeding memory safety thresholds. Use with caution as it may lead to Out-of-Memory errors.")
+
+    # SLM Options
+    slm_group = parser.add_argument_group('SLM Options')
+    slm_group.add_argument("--slm-map-entities", action="store_true", help="Use SLM to map potential entities for analysis (Task 1). Does not anonymize.")
+    slm_group.add_argument("--slm-detector", action="store_true", help="Use SLM as a hybrid entity detector alongside traditional methods (Task 2).")
+    slm_group.add_argument("--slm-prompt-version", type=str, default="v1", help="Specify the prompt version to use for SLM tasks.")
 
     # Chunking & Batching Options
     chunk_group = parser.add_argument_group('Chunking and Batching')
@@ -147,7 +306,7 @@ def _parse_arguments():
     if args.slug_length is not None and not (0 <= args.slug_length <= 64):
         parser.error("--slug-length must be between 0 and 64.")
 
-    if not args.file_path and not (args.list_entities or args.list_languages):
+    if not args.file_path and not (args.list_entities or args.list_languages or args.slm_map_entities):
         parser.error("A file path must be provided.")
 
     # Handle the --optimize flag
@@ -177,9 +336,15 @@ def main():
         raise ValueError(f"Invalid log level: {args.log_level}")
     logging.basicConfig(level=numeric_level, format='%(asctime)s - %(levelname)s - %(message)s')
     logging.debug(f"Resolved log level to: {numeric_level}")
+    
+    # --- Task 1: SLM Entity Mapping ---
+    if args.slm_map_entities:
+        _handle_slm_entity_mapping(args)
+        sys.exit(0)
+
     logging.info("Starting anonymization process...")
 
-    if not os.path.exists(args.file_path):
+    if not args.file_path or not os.path.exists(args.file_path):
         logging.critical(f"Input path not found: {args.file_path}")
         sys.exit(1)
 
@@ -272,9 +437,9 @@ def main():
         )
         hash_generator = HashGenerator()
         
-        compiled_patterns = []
+        # --- Entity Detector Setup ---
         custom_recognizers = load_custom_recognizers([args.lang], regex_priority=args.regex_priority)
-        
+        compiled_patterns = []
         for recognizer in custom_recognizers:
             entity_type = recognizer.supported_entities[0]
             if entity_type in entities_to_preserve:
@@ -294,20 +459,59 @@ def main():
             entities_to_preserve=set(entities_to_preserve),
             allow_list=set(allow_list)
         )
+
+        slm_detector_instance = None
+        if args.slm_detector:
+            logging.info("SLM detector enabled for hybrid mode (Task 2).")
+            try:
+                ollama_config = LLM_CONFIG["ollama"]
+                client = OllamaClient(model=ollama_config["model"], base_url=ollama_config["base_url"])
+                prompt_manager = PromptManager(base_path="prompts")
+                slm_detector_instance = SLMEntityDetector(
+                    slm_client=client,
+                    prompt_manager=prompt_manager,
+                    entities_to_preserve=set(entities_to_preserve),
+                    allow_list=set(allow_list),
+                    prompt_version="v1_cyber"
+                )
+            except Exception as e:
+                logging.error(f"Failed to initialize SLM detector, proceeding without it. Error: {e}")
+
+        # --- Strategy Setup (SLM or Traditional) ---
+        strategy_instance = None
+        if args.anonymization_strategy == "slm":
+            logging.info("Using 'slm' end-to-end anonymization strategy (Task 3).")
+            try:
+                ollama_config = LLM_CONFIG["ollama"]
+                client = OllamaClient(model=ollama_config["model"], base_url=ollama_config["base_url"])
+                prompt_manager = PromptManager(base_path="prompts")
+                slm_anonymizer = SLMFullAnonymizer(
+                    slm_client=client,
+                    prompt_manager=prompt_manager
+                )
+                strategy_instance = SLMAnonymizationStrategy(
+                    slm_anonymizer=slm_anonymizer,
+                    lang=args.lang
+                )
+            except Exception as e:
+                logging.critical(f"Failed to initialize SLM strategy. Error: {e}. Aborting.")
+                sys.exit(1)
         
-        
+        # --- Orchestrator ---
         orchestrator = AnonymizationOrchestrator(
             lang=args.lang,
             db_context=db_context,
             allow_list=allow_list, 
             entities_to_preserve=entities_to_preserve,
             slug_length=args.slug_length,
+            strategy=strategy_instance,
             strategy_name=args.anonymization_strategy,
             regex_priority=args.regex_priority,
             nlp_batch_size=args.nlp_batch_size,
             cache_manager=cache_manager,
             hash_generator=hash_generator,
             entity_detector=entity_detector,
+            slm_detector=slm_detector_instance,
             ner_data_generation=args.generate_ner_data
         )
         
@@ -326,7 +530,7 @@ def main():
             "csv_chunk_size": args.csv_chunk_size,
             "json_chunk_size": args.json_chunk_size,
             "ner_chunk_size": args.ner_chunk_size,
-            "force_large_xml": args.force_large_xml, # Pass the new argument
+            "force_large_xml": args.force_large_xml,
         }
         logging.debug(f"Processor factory arguments: {processor_factory_args}")
 
@@ -376,8 +580,6 @@ def main():
 
         logging.info("Processing complete.")
 
-
-
         # --- Final Output ---
         if not args.generate_ner_data and not args.no_report:
             logging.info("\n--- Anonymization Stats ---")
@@ -400,4 +602,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
