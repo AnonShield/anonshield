@@ -226,7 +226,8 @@ class AnonymizationOrchestrator:
                  allow_list: List[str],
                  entities_to_preserve: List[str],
                  slug_length: Optional[int] = None,
-                 strategy_name: str = "presidio",
+                 strategy: Optional[AnonymizationStrategy] = None,
+                 strategy_name: Optional[str] = "presidio",
                  regex_priority: bool = False,
                  analyzer_engine: Optional[BatchAnalyzerEngine] = None,
                  anonymizer_engine: Optional[AnonymizerEngine] = None,
@@ -234,6 +235,7 @@ class AnonymizationOrchestrator:
                  cache_manager: Optional[CacheStrategy] = None,
                  hash_generator: Optional[HashingStrategy] = None,
                  entity_detector: Optional[EntityDetector] = None,
+                 slm_detector: Optional[AnonymizationStrategy] = None,
                  ner_data_generation: bool = False):
 
         self.lang = lang
@@ -283,21 +285,25 @@ class AnonymizationOrchestrator:
                 allow_list=self.allow_list
             )
 
-        # --- Strategy Factory ---
-        # The factory is now called from the orchestrator, which injects dependencies into the strategy.
-        self.anonymization_strategy = strategy_factory(
-            strategy_name=strategy_name,
-            analyzer_engine=self.analyzer_engine,
-            anonymizer_engine=self.anonymizer_engine,
-            entity_detector=self.entity_detector,
-            hash_generator=self.hash_generator,
-            cache_manager=self.cache_manager,
-            lang=self.lang,
-            entities_to_preserve=self.entities_to_preserve,
-            allow_list=self.allow_list,
-            nlp_batch_size=self.nlp_batch_size
-        )
-        logging.info(f"Anonymization strategy '{strategy_name}' initialized.")
+        # --- Strategy Initialization: Prefer injected strategy, fallback to factory ---
+        if strategy:
+            self.anonymization_strategy = strategy
+            logging.info(f"Using injected anonymization strategy: '{strategy.__class__.__name__}'.")
+        else:
+            self.anonymization_strategy = strategy_factory(
+                strategy_name=strategy_name,
+                analyzer_engine=self.analyzer_engine,
+                anonymizer_engine=self.anonymizer_engine,
+                entity_detector=self.entity_detector,
+                slm_detector=slm_detector,
+                hash_generator=self.hash_generator,
+                cache_manager=self.cache_manager,
+                lang=self.lang,
+                entities_to_preserve=self.entities_to_preserve,
+                allow_list=self.allow_list,
+                nlp_batch_size=self.nlp_batch_size
+            )
+            logging.info(f"Anonymization strategy '{strategy_name}' initialized via factory.")
 
 
     def _setup_engines(self) -> tuple[BatchAnalyzerEngine, AnonymizerEngine]:
