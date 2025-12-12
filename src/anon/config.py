@@ -47,3 +47,14 @@ ENTITY_MAPPING = dict(
     GPE="LOCATION",
     ORGANIZATION="ORGANIZATION",
 )
+
+# --- LLM Configuration ---
+LLM_CONFIG = {
+    "provider": os.getenv("LLM_PROVIDER", "ollama"), # Prepares for future providers
+    "ollama": {
+        "base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+        "model": os.getenv("OLLAMA_MODEL", "llama3"),
+        "timeout": 120,
+        "temperature": 0.05, # Lower temp for more deterministic output
+    }
+}
