@@ -741,12 +741,9 @@ class XmlFileProcessor(FileProcessor):
         text_groups: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
         logging.debug(f"XML processing with deduplication: {use_deduplication}.")
 
-        # Wrap the iterator with tqdm for progress visualization
-        nodes_iterator = tree.iter()
-        total_nodes = len(list(tree.iter())) # This can be memory intensive for large files
-        
+        # Otimização: Evita iterar a árvore duas vezes. O tqdm funciona sem um total.
         desc_collect = f"Pass 1/2: Collecting texts from {os.path.basename(self.file_path)}"
-        for element in tqdm(tree.iter(), total=total_nodes, desc=desc_collect, unit="node", leave=False):
+        for element in tqdm(tree.iter(), desc=desc_collect, unit="node", leave=False):
             path = self._get_xpath(element)
             if element.text and element.text.strip():
                 should_anon, forced_type = self._should_anonymize(element.text, path)
@@ -790,7 +787,7 @@ class XmlFileProcessor(FileProcessor):
             return
             
         desc_anon = f"Pass 2/2: Anonymizing {os.path.basename(self.file_path)}"
-        for element in tqdm(tree.iter(), total=total_nodes, desc=desc_anon, unit="node", leave=False):
+        for element in tqdm(tree.iter(), desc=desc_anon, unit="node", leave=False):
             if element.text in translation_map:
                 try:
                     if use_deduplication:
@@ -1060,12 +1057,9 @@ class JsonFileProcessor(FileProcessor):
         """Processes .jsonl files line by line for maximum memory efficiency."""
         temp_output_path = output_path + ".tmp"
         try:
-            with open(self.file_path, "rb") as f:
-                total_lines = sum(1 for _ in f)
-
             with open(temp_output_path, "wb") as out_f, open(self.file_path, "rb") as in_f:
                 desc = f"Processing {os.path.basename(self.file_path)}"
-                for line in tqdm(in_f, total=total_lines, desc=desc, unit="line", leave=False):
+                for line in tqdm(in_f, desc=desc, unit="line", leave=False):
                     if not line.strip(): continue
                     try:
                         data = orjson.loads(line)

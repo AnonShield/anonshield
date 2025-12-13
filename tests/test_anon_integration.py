@@ -233,6 +233,44 @@ class TestAnonIntegration(unittest.TestCase):
         self.assertIsNotNone(db_slug, "Slug not found in database.")
         self.assertEqual(len(db_slug[0]), slug_len)
 
+    def test_slug_length_zero(self):
+        """
+        Tests the behavior of --slug-length 0.
+        Ensures entities are anonymized without a slug in the text and are NOT saved to the database.
+        This test uses a specific file and the 'fast' strategy to ensure the logic is tested
+        on an entity type that this strategy can detect.
+        """
+        # This specific file only contains an email, which the 'fast' strategy can detect.
+        test_file = os.path.join(self.test_data_dir, "test_slug_zero.txt")
+        if not os.path.exists(test_file):
+            with open(test_file, "w") as f:
+                f.write("My email is test@example.com.")
+
+        # Use fast strategy as it's the one we modified for this behavior.
+        self._run_anon_py(test_file, slug_length=0, anonymization_strategy="fast", extra_args=["--overwrite"])
+        output_file = self._get_output_file_path(test_file)
+
+        self.assertTrue(os.path.exists(output_file))
+        with open(output_file, "r") as f:
+            content = f.read()
+
+        # 1. Check that the placeholder is [ENTITY_TYPE] without a hash.
+        self.assertIn("[EMAIL_ADDRESS]", content)
+        self.assertNotIn("test@example.com", content)
+
+        # 2. Check that no hash is present in the placeholder.
+        self.assertNotIn("[EMAIL_ADDRESS_", content)
+        
+        # 3. Verify that NO entities were saved to the database.
+        self.assertTrue(os.path.exists(self.db_path), "Database file should exist.")
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM entities")
+        count = cursor.fetchone()[0]
+        conn.close()
+
+        self.assertEqual(count, 0, "Database should be empty when slug_length is 0.")
+
     def test_preserve_and_allow_list(self):
         test_file = os.path.join(self.test_data_dir, "test.txt")
         # The input is "My name is John Doe and my email is test@example.com."

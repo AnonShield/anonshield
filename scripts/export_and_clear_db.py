@@ -2,90 +2,89 @@
 import os
 import csv
 import logging
-import sqlite3
-import argparse # Added argparse
+import argparse
+from typing import List, Tuple
 
 # --- Configuration ---
-# The script is in "scripts/", so the project root is one level up.
+# Adiciona o diretório raiz do projeto ao sys.path para permitir importações de módulos locais
+import sys
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(PROJECT_ROOT, "db", "entities.db")
-OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
-CSV_FILENAME = "entities_export.csv"
+sys.path.insert(0, PROJECT_ROOT)
+
+from src.anon.repository import EntityRepository
+from src.anon.config import DB_CONFIG
+
 # ---
+
+def export_entities_to_csv(entities: List[Tuple], output_path: str):
+    """Escreve uma lista de entidades para um arquivo CSV."""
+    if not entities:
+        logging.info("Nenhuma entidade encontrada no banco de dados. Nada para exportar.")
+        return
+
+    logging.info(f"Exportando {len(entities)} entidades para '{output_path}'...")
+    header = ["id", "entity_type", "original_name", "slug_name", "full_hash", "first_seen", "last_seen"]
+    
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(header)
+        writer.writerows(entities)
+    logging.info(f"Exportação concluída com sucesso. Dados salvos em {output_path}")
 
 def main():
     """
-    Exports all entities from the database to a CSV file and then
-    optionally clears the entities table.
+    Exporta todas as entidades do banco de dados para um arquivo CSV e, opcionalmente,
+    limpa a tabela de entidades.
     """
-    parser = argparse.ArgumentParser(description="Export entities to CSV and optionally clear the database.")
+    parser = argparse.ArgumentParser(description="Exportar entidades para CSV e, opcionalmente, limpar o banco de dados.")
     parser.add_argument(
         "--clear",
         action="store_true",
-        help="Clear all entities from the database after exporting to CSV."
+        help="Limpar todas as entidades do banco de dados após a exportação para CSV."
     )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    output_path = os.path.join(OUTPUT_DIR, CSV_FILENAME)
+    output_dir = os.path.join(PROJECT_ROOT, "output")
+    csv_filename = "entities_export.csv"
+    output_path = os.path.join(output_dir, csv_filename)
 
-    if not os.path.exists(DB_PATH):
-        logging.error(f"Database file not found at '{DB_PATH}'. Make sure the database exists.")
+    if not os.path.exists(DB_CONFIG['db_path']):
+        logging.error(f"Arquivo de banco de dados não encontrado em '{DB_CONFIG['db_path']}'. Certifique-se de que o banco de dados existe.")
         return
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    
-    conn = None
+    repository = None
     try:
-        # Connect to the database
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        logging.info(f"Successfully connected to database at '{DB_PATH}'.")
+        # Inicializa o repositório que gerencia as conexões de banco de dados
+        repository = EntityRepository(db_path=DB_CONFIG['db_path'])
+        repository.initialize_schema() # Garante que o esquema está pronto
+        
+        logging.info(f"Conectado com sucesso ao banco de dados em '{DB_CONFIG['db_path']}'.")
 
-        # 1. Fetch all entities
-        logging.info("Fetching all entities from the database...")
-        cursor.execute("SELECT id, entity_type, original_name, slug_name, full_hash, first_seen, last_seen FROM entities")
-        entities = cursor.fetchall()
+        # 1. Busca todas as entidades usando o repositório
+        logging.info("Buscando todas as entidades do banco de dados...")
+        entities = repository.get_all_entities()
 
-        if not entities:
-            logging.info("No entities found in the database. Nothing to export.")
-        else:
-            # 2. Write to CSV
-            logging.info(f"Exporting {len(entities)} entities to '{output_path}'...")
-            header = ["id", "entity_type", "original_name", "slug_name", "full_hash", "first_seen", "last_seen"]
-            with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerow(header)
-                writer.writerows(entities)
-            logging.info(f"Export completed successfully. Data saved to {output_path}")
+        # 2. Escreve para CSV
+        export_entities_to_csv(entities, output_path)
 
-        # 3. Conditionally clear the database
+        # 3. Limpa o banco de dados condicionalmente
         if args.clear:
-            logging.info("Clearing all entities from the database as --clear flag was provided...")
-            cursor.execute("DELETE FROM entities")
-            conn.commit()
-            # To reset the autoincrement counter, we can also delete from sqlite_sequence
-            try:
-                cursor.execute("DELETE FROM sqlite_sequence WHERE name='entities'")
-                conn.commit()
-                logging.info("Auto-increment counter for 'entities' table has been reset.")
-            except sqlite3.OperationalError:
-                # This will happen if the table has never had any data deleted before
-                logging.info("No sequence to reset for 'entities' table (this is normal).")
-                
-            logging.info(f"Database cleared successfully. {cursor.rowcount} rows deleted.")
+            logging.info("Limpando todas as entidades do banco de dados, pois a flag --clear foi fornecida...")
+            deleted_rows_count = repository.clear_all_entities()
+            logging.info(f"Banco de dados limpo com sucesso. {deleted_rows_count} linhas foram deletadas.")
         else:
-            logging.info("Database clear skipped. To clear the database, run the script with the --clear flag.")
+            logging.info("A limpeza do banco de dados foi ignorada. Para limpar o banco de dados, execute o script com a flag --clear.")
 
-    except sqlite3.Error as e:
-        logging.error(f"A database error occurred: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+        logging.error(f"Ocorreu um erro inesperado: {e}", exc_info=True)
     finally:
-        if conn:
-            conn.close()
-            logging.info("Database connection closed.")
+        if repository:
+            repository.close_thread_connection()
+            logging.info("Conexão com o banco de dados fechada.")
 
 
 if __name__ == "__main__":

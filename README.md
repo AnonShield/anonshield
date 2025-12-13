@@ -16,6 +16,7 @@ AnonLFI 2.0 is a modular pseudonymization framework for CSIRTs that resolves the
 - [Installation and Execution](#installation-and-execution)
 - [Usage](#usage)
   - [Basic Commands](#basic-commands)
+  - [SLM Integration (Experimental)](#slm-integration-experimental)
   - [Command-Line Options](#command-line-options)
   - [Advanced Configuration for Structured Files](#advanced-configuration-for-structured-files)
   - [NER Data Generation Mode](#ner-data-generation-mode)
@@ -32,49 +33,50 @@ AnonLFI 2.0 is a modular pseudonymization framework for CSIRTs that resolves the
 
 ## System Architecture
 
-The tool is designed with a modular, layered architecture to separate responsibilities and allow for extensibility. The following diagram illustrates the main components and workflows.
+The tool is designed with a modular, layered architecture to separate responsibilities and allow for extensibility. The following diagram illustrates the main components and workflows, including the choice between traditional and SLM-based anonymization engines.
 
 ```mermaid
-%% Anonymization Architecture Flow (AnonLFI 2.0)
+%% Anonymization Architecture Flow (AnonLFI 2.0 with SLM)
 graph TD
     A[User] -- "uv run anon.py <file> [args]" --> B(anon.py CLI);
 
-    subgraph "1. Orchestration and Selection"
-        B -- "Reads arguments (--lang, --preserve...)" --> B;
-        B -- "Instantiates" --> Eng(AnonymizationOrchestrator);
-        B -- "get_processor(file, engine)" --> F["Processor Factory (processors.py)"];
+    subgraph "1. Orchestration & File Processing"
+        B -- "Instantiates" --> Orch(AnonymizationOrchestrator);
+        B -- "Gets Processor" --> F(ProcessorFactory);
+        F -- "e.g., .pdf" --> P_PDF(PdfFileProcessor);
+        P_PDF -- "Extracts" --> RawText(Raw Text Content);
     end
 
-    subgraph "2. Processing by Type (processors.py)"
-        F -- ".pdf" --> P_PDF(PdfFileProcessor);
-        F -- ".json" --> P_JSON(JsonFileProcessor);
-        F -- ".txt" --> P_TXT(TextFileProcessor);
-        F -- ".docx" --> P_DOCX(DocxFileProcessor);
-        F -- ".png" --> P_IMG(ImageFileProcessor);
-        F -- "..." --> P_ETC(...);
+    subgraph "2. Anonymization Core"
+        RawText -- "orchestrator.anonymize()" --> Orch;
+        Orch -- "Selects Strategy (--strategy)" --> STR_CHOICE{Strategy};
+        
+        STR_CHOICE -- "'presidio', 'fast', 'balanced'" --> PRESIDIO_STR(Traditional Strategy);
+        STR_CHOICE -- "'slm' or '--slm-detector'" --> SLM_STR(SLM Strategy);
     end
 
-    subgraph "3. Extraction and OCR (Ex: PDF / DOCX)"
-        P_PDF -- "Reads file (PyMuPDF)" --> T1[Plain Text];
-        P_PDF -- "Extracts Embedded Images" --> IMG[Images];
-        IMG -- "Processes w/" --> OCR(Tesseract OCR);
-        OCR -- "OCR Text" --> T2[Image Text];
-        T1 & T2 -- "Concatenates Content" --> TXT_BRUTO(Raw Text);
+    subgraph "3a. Traditional Engine (Presidio/Regex)"
+        PRESIDIO_STR -- "Uses" --> Presidio(Presidio Engine);
+        Presidio -- "Loads Models" --> Models(NLP Models);
+        Presidio -- "Uses Recognizers" --> Regex(Custom Recognizers);
+        Presidio -- "Generates Slug" --> Anonymizer(CustomSlugAnonymizer);
+        Anonymizer -- "HMAC + DB" --> DB[(entities.db)];
+        Anonymizer -- "Replaces PII" --> AnonymizedText1[Anonymized Text];
     end
 
-    subgraph "4. Anonymization Engine (engine.py)"
-        TXT_BRUTO -- "orchestrator.anonymize_text()" --> ENG_A(Presidio Analyzer);
-        ENG_A -- "Loads Models (spaCy, Transformer)" --> MOD(models/);
-        ENG_A -- "Identifies Entities (PII, technical...)" --> ENG_B(CustomSlugAnonymizer);
-        ENG_B -- "HMAC-SHA256(text, SECRET_KEY)" --> HASH[Secure Hash];
-        HASH -- "Saves Mapping (original, hash)" --> DB[(db/entities.db)];
-        HASH -- "Generates Slug [TYPE_hash...]" --> SLUG[Anonymized Slug];
-        SLUG -- "Replaces PII in Text" --> TXT_ANON(Anonymized Text);
+    subgraph "3b. SLM Engine (Ollama)"
+        SLM_STR -- "Uses" --> SLM_MOD(src/anon/slm/);
+        SLM_MOD -- "Sends Prompt" --> Client(OllamaClient);
+        Client -- "Queries" --> SLM_LLM(Local LLM e.g., Llama3);
+        SLM_LLM -- "Returns Response" --> Client;
+        Client -- "Result to" --> SLM_MOD;
+        SLM_MOD -- "Generates Output" --> AnonymizedText2[Anonymized Text or Entity Map];
     end
 
-    subgraph "5. Output Generation"
-        TXT_ANON -- "Returns to" --> P_PDF;
-        P_PDF -- "Writes .txt file (or preserves .json, .csv)" --> OUT(output/anon_file...);
+    subgraph "4. Output Generation"
+        AnonymizedText1 --> P_PDF;
+        AnonymizedText2 --> P_PDF;
+        P_PDF -- "Writes File" --> OUT(output/anon_file...);
         B -- "Writes Report" --> LOG(logs/report.txt);
     end
 ```
@@ -84,6 +86,7 @@ graph TD
 - **Structure-Preserving Processing:** Natively processes `.json` and `.xml` files to preserve their original hierarchy, while also supporting `.txt`, `.csv`, `.pdf`, `.docx`, and `.xlsx`.
 - **OCR for Images:** Automatically extracts and anonymizes text embedded in images within PDF and DOCX files. Also supports direct anonymization of image files like `.png`, `.jpeg`, `.gif`, `.bmp`, `.tiff`, `.webp`, and more.
 - **Advanced Entity Recognition:** Uses Presidio and a Transformer model (`Davlan/xlm-roberta-base-ner-hrl`) for high-accuracy entity detection.
+- **SLM-Powered Anonymization (Experimental):** Integrates Small Language Models (SLMs) via Ollama for three advanced tasks: generating entity maps for analysis, acting as a powerful entity detector, or performing end-to-end contextual anonymization.
 - **Cybersecurity-Focused Recognizers:** Includes custom logic to detect specific patterns like IP addresses, URLs, hostnames, hashes, UUIDs, CVE IDs, CPE strings, certificate serials, MAC addresses, file paths, PGP blocks, and more.
 - **Consistent & Secure Anonymization:** Generates stable HMAC-SHA256-based slugs for each unique entity.
 - **Controlled De-anonymization:** A separate script allows for retrieving original data from a slug, protected by the same secret key.
@@ -99,6 +102,7 @@ This tool is built on top of a powerful stack of open-source libraries:
 
 - **[Presidio](https://microsoft.github.io/presidio/):** Core engine for PII identification and anonymization.
 - **[spaCy](https://spacy.io/) & [Hugging Face Transformers](https://huggingface.co/docs/transformers/index):** For state-of-the-art NLP and Named Entity Recognition (NER).
+- **[Ollama](https://ollama.com/):** For running local Small Language Models (SLMs) used in advanced anonymization tasks.
 - **[Pandas](https://pandas.pydata.org/):** For efficient processing of structured data formats like CSV and XLSX.
 - **[PyMuPDF](https://pymupdf.readthedocs.io/en/latest/) & [python-docx](https://python-docx.readthedocs.io/en/latest/):** For parsing PDF and DOCX files.
 - **[Pytesseract](https://github.com/madmaze/pytesseract):** For OCR capabilities to extract text from images.
@@ -117,6 +121,8 @@ The integrity of the anonymization process is guaranteed by a secure and consist
 4. A "slug" (a prefix of the full hash, with a customizable length via `--slug-length`) is used for substitution in the text, making the output more readable.
 
 This process ensures that the same entity (e.g., "John Doe") will always be replaced by the same slug (e.g., `[PERSON_a1b2c3d4]`), maintaining referential consistency in the anonymized data, which is crucial for training AI models.
+
+**Note:** The SLM-based anonymization strategy (`--anonymization-strategy slm`) uses a different, context-aware mechanism and does not rely on HMAC hashing or the database.
 
 ## Database Schema
 
@@ -224,12 +230,19 @@ The tool is pre-configured for **24 languages**:
 │   ├── config.py          # Configuration, constants, and database functions
 │   ├── engine.py          # Core anonymization logic and Presidio orchestration
 │   ├── processors.py      # File-specific processing classes (PDF, DOCX, etc.)
-│   └── repository.py      # Database operations layer
+│   ├── repository.py      # Database operations layer
+│   └── slm/               # SLM integration module
+│       ├── anonymizers/   # Task 3: End-to-end anonymization
+│       ├── detectors/     # Task 2: SLM as an entity detector
+│       ├── mappers/       # Task 1: SLM for entity mapping
+│       ├── client.py      # Ollama client
+│       └── prompts.py     # Prompt management
 ├── tests/                 # Integration and unit tests
 ├── db/                    # (Generated) SQLite database for entity storage
 ├── logs/                  # (Generated) Execution reports
 ├── models/                # (Generated) Downloaded NLP models
 ├── output/                # (Generated) Anonymized output files
+├── prompts/               # Directory for SLM prompt templates
 ├── pyproject.toml         # Project dependencies for `uv`
 ├── uv.lock                # Locked dependency versions
 └── README.md              # This file
@@ -237,15 +250,23 @@ The tool is pre-configured for **24 languages**:
 
 ## Prerequisites
 
-1. **`uv` Tool**:
-   - **Windows:** `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
-   - **Linux/macOS:** `curl -LsSf https://astral.sh/uv/install.sh | sh`
+1.  **`uv` Tool**:
+    - **Windows:** `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+    - **Linux/macOS:** `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
-2. **Tesseract OCR**:
-   - Required to extract text from images in PDF and DOCX files.
-   - **Ubuntu/Debian:** `sudo apt update && sudo apt install tesseract-ocr`
-   - **macOS (Homebrew):** `brew install tesseract`
-   - **Windows:** Download the installer from the [Tesseract documentation](https://github.com/tesseract-ocr/tesseract#installing-tesseract) and add the installation path to the `PATH` environment variable.
+2.  **Tesseract OCR**:
+    - Required to extract text from images in PDF and DOCX files.
+    - **Ubuntu/Debian:** `sudo apt update && sudo apt install tesseract-ocr`
+    - **macOS (Homebrew):** `brew install tesseract`
+    - **Windows:** Download the installer from the [Tesseract documentation](https://github.com/tesseract-ocr/tesseract#installing-tesseract) and add the installation path to the `PATH` environment variable.
+
+3.  **Ollama (for SLM features)**:
+    - To use the experimental SLM features (`--slm-*` flags), you must have a running Ollama instance.
+    - Follow the [Ollama installation guide](https://ollama.com/download).
+    - After installation, pull a model:
+      ```bash
+      ollama run llama3
+      ```
 
 ## Installation and Execution
 
@@ -300,6 +321,33 @@ uv run anon.py --list-entities
 uv run anon.py --list-languages
 ```
 
+### SLM Integration (Experimental)
+
+The SLM integration allows you to leverage a local language model for more advanced, context-aware PII detection. It offers three distinct operational modes. For a detailed technical overview, see the [SLM Integration Guide](./SLM_INTEGRATION_GUIDE.md).
+
+**Task 1: Map Potential Entities (for Analysis)**
+This mode scans a document and generates a detailed report (`.jsonl` and `.csv`) of potential PII, along with confidence scores and reasoning from the SLM. It does not anonymize the file. It's an analytical tool to help you understand a document's PII surface or develop new recognizers.
+
+```bash
+uv run anon.py /path/to/document.txt --slm-map-entities
+```
+> Output: `output/document_entity_map.jsonl` and `output/document_entity_map.csv`
+
+**Task 2: Use SLM as an Advanced Detector**
+This mode incorporates the SLM as a powerful recognizer within the existing anonymization workflow. It can work in `hybrid` mode (combining its results with traditional recognizers) or `exclusive` mode (using only SLM results).
+
+```bash
+# Use SLM in hybrid mode to enhance detection
+uv run anon.py report.pdf --slm-detector --slm-detector-mode hybrid
+```
+
+**Task 3: Perform End-to-End Anonymization with SLM**
+This mode delegates the entire anonymization process to the SLM, which identifies and replaces PII based on contextual understanding. This can result in more readable output but does not use the HMAC-hashing mechanism.
+
+```bash
+uv run anon.py chat_logs.txt --anonymization-strategy slm
+```
+
 ### Command-Line Options
 
 #### Required Arguments
@@ -325,6 +373,17 @@ uv run anon.py --list-languages
 - `--slug-length <NUM>`: Sets the character length of the hash in the slug (1-64). Defaults to the full 64-character hash.
 - `--anonymization-config <PATH>`: Path to a JSON file with advanced rules for structured files (see Advanced Configuration section).
 
+#### SLM Options
+
+- `--slm-map-entities`: Use SLM to map potential entities for analysis. Does not anonymize.
+- `--slm-detector`: Use SLM as an entity detector alongside traditional methods.
+- `--slm-detector-mode <MODE>`: Mode for the SLM detector. Options: `hybrid` (merges with traditional NER), `exclusive` (uses only SLM results). Default: `hybrid`.
+- `--slm-prompt-version <VERSION>`: Specify the prompt version to use for SLM tasks (e.g., `v1`, `v2`). Default: `v1`.
+- `--slm-chunk-size <NUM>`: Max character size for chunks sent to the SLM mapper.
+- `--slm-confidence-threshold <FLOAT>`: Minimum confidence score for entities from the SLM mapper (0.0 to 1.0). Default: `0.7`.
+- `--slm-context-window <NUM>`: Character window size for context extraction in the SLM mapper.
+- `--slm-temperature <FLOAT>`: Temperature for the SLM model, controlling randomness.
+
 #### Performance & Filtering Options
 
 - `--optimize`: A shorthand to enable all performance optimizations (`--anonymization-strategy fast`, `--db-mode in-memory`, `--use-cache`, and `--min-word-length 3`).
@@ -335,7 +394,7 @@ uv run anon.py --list-languages
 - `--min-word-length <NUM>`: Minimum character length for a word to be processed. Default: `0` (no limit).
 - `--technical-stoplist <TERMS>`: A comma-separated list of custom words to add to the technical stoplist.
 - `--skip-numeric`: If set, numeric-only strings will not be anonymized.
-- `--anonymization-strategy <strategy>`: Anonymization strategy. Options: `presidio` (full analysis with Presidio), `fast` (optimized path using spaCy directly). Default: `presidio`.
+- `--anonymization-strategy <strategy>`: Anonymization strategy. Options: `presidio` (full analysis), `fast` (optimized), `balanced` (mix of speed/accuracy), `slm` (end-to-end SLM). Default: `presidio`.
 - `--regex-priority`: Give priority to custom regex recognizers over model-based ones (adds 0.15 to regex pattern scores).
 - `--db-mode <MODE>`: Sets the database mode. Options: `persistent` (saves to disk), `in-memory` (temporary database). Default: `persistent`.
 - `--db-synchronous-mode <MODE>`: Sets the SQLite `synchronous` PRAGMA for the database connection. Options: `OFF`, `NORMAL`, `FULL`, `EXTRA`. Overrides config file setting.
@@ -507,21 +566,22 @@ The `AnonymizationOrchestrator` is the central coordinator of the anonymization 
 
 **Responsibilities:**
 - Initializes and holds the Presidio `AnalyzerEngine` and `AnonymizerEngine`.
-- Selects the appropriate anonymization strategy (`presidio`, `fast`, `balanced`) based on user input.
+- Selects the appropriate anonymization strategy (`presidio`, `fast`, `balanced`, `slm`) based on user input.
 - Injects the required dependencies (engines, detectors, etc.) into the chosen strategy.
 - Manages the overall workflow, including the fallback mechanism for batch processing failures.
 - Collects and maintains entity statistics for reporting.
 - Dispatches special-case anonymization (e.g., `forced_entity_type`).
 
-**Anonymization Strategies (`strategies.py`):**
+**Anonymization Strategies (`strategies.py`, `slm/anonymizers/slm_anonymizer.py`):**
 
 The core anonymization logic is encapsulated within a set of interchangeable strategy classes, adhering to the **Strategy Design Pattern**. This design allows for different performance and accuracy trade-offs without altering the main orchestration flow.
 
-- **Decoupled Logic**: Each strategy is now self-contained. It receives its required dependencies (like `analyzer_engine`, `entity_detector`, `cache_manager`) upon creation and no longer holds a reference to the orchestrator.
+- **Decoupled Logic**: Each strategy is self-contained. It receives its required dependencies (like `analyzer_engine`, `entity_detector`, `cache_manager`) upon creation.
 - **Key Strategies**:
     1.  **`PresidioStrategy` (Comprehensive):** Contains the logic for the full Presidio pipeline, using all available recognizers for the highest accuracy.
     2.  **`FastStrategy` (Optimized):** Contains the logic for the optimized pipeline that uses a manual combination of the NLP model and custom regexes, bypassing the main Presidio engine for speed.
     3.  **`BalancedStrategy` (Optimal Balance):** Uses the Presidio engine but with a limited, curated set of recognizers, offering a balance between the `presidio` and `fast` strategies.
+    4.  **`SLMAnonymizationStrategy` (Experimental):** Uses a local SLM to perform end-to-end contextual anonymization.
 
 #### 3. File Processors (`processors.py`)
 
@@ -589,23 +649,23 @@ To prevent database write locks from blocking the main processing threads, all d
    - Mode-based logic (explicit vs. implicit)
 
 2. **Entity Detection:**
-   - spaCy NER model
-   - Transformer model (XLM-RoBERTa)
-   - Custom regex patterns
-   - Entity merging and deduplication
+   - **Traditional:** spaCy NER model, Transformer model (XLM-RoBERTa), Custom regex patterns.
+   - **SLM-Enhanced:** `SLMEntityDetector` can be used in hybrid or exclusive mode.
+   - Entity merging and deduplication.
 
-3. **Hash Generation:**
+3. **Hash Generation (Traditional Strategy):**
    - Text normalization
    - HMAC-SHA256 with secret key
    - Slug creation (configurable length)
 
-4. **Database Storage:**
+4. **Database Storage (Traditional Strategy):**
    - Queue entity for async write
    - Track entity statistics
 
 5. **Text Replacement:**
-   - Replace entity with `[TYPE_hash]` format
-   - Maintain text structure
+   - **Traditional:** Replace entity with `[TYPE_hash]` format.
+   - **SLM Strategy:** The model returns the full text with replacements already made.
+   - Maintain text structure.
 
 #### Structure Preservation
 

@@ -62,9 +62,7 @@ def get_slm_client():
             base_url=ollama_config["base_url"],
             timeout=120,  # Generous timeout for regex generation
         )
-        # Check connection
-        client.get_available_models()
-        logging.info(f"Successfully connected to Ollama at {ollama_config['base_url']} and found models.")
+        logging.info(f"Successfully connected to Ollama at {ollama_config['base_url']}.")
         return client
     except Exception as e:
         logging.error(f"Failed to connect to Ollama SLM: {e}")

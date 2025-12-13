@@ -60,15 +60,62 @@ This document outlines the command-line arguments for `anon.py`, providing a hig
 *   **Default**: `""` (no terms allowed by default)
 
 #### `--slug-length`
-*   **Description**: Defines the desired length of the anonymized "slug" or replacement string generated for each redacted entity. The slug is a consistent, non-identifying substitute for sensitive information. A longer slug might offer more robust anonymization by making reverse engineering harder, while a shorter one might be preferred for brevity. The length must be an integer between 1 and 64 characters.
+*   **Description**: Defines the desired length of the anonymized "slug" or replacement string generated for each redacted entity. The slug is a consistent, non-identifying substitute for sensitive information. A longer slug might offer more robust anonymization by making reverse engineering harder, while a shorter one might be preferred for brevity. The length must be an integer between 0 and 64 characters.
 *   **Type**: Integer
-*   **Range**: 1-64
+*   **Range**: 0-64
 *   **Default**: `None` (the system determines an appropriate default length)
 
 #### `--anonymization-config`
 *   **Description**: Specifies the file path to a JSON configuration file that defines advanced, fine-grained anonymization rules, especially for structured data formats like JSON, CSV, or XML. This configuration can dictate which specific fields to include/exclude, specify custom anonymization strategies for certain data types, or define complex redaction patterns beyond standard entity detection.
 *   **Type**: String (path to JSON file)
 *   **Default**: `None`
+
+### SLM (Small Language Model) Options
+
+This group of options controls the experimental features that leverage a local Small Language Model (via Ollama) for advanced analysis and anonymization.
+
+#### `--slm-map-entities`
+*   **Description**: Activates the SLM entity mapping mode. Instead of anonymizing, the script will use the SLM to analyze the input file and generate a structured report (`.jsonl` and `.csv`) of potential PII, including the entity text, type, confidence, and the SLM's reasoning. This is an analytical tool for discovering entities and aiding in the development of new recognizers. This mode does not perform anonymization.
+*   **Type**: Boolean flag
+*   **Default**: `False`
+
+#### `--slm-detector`
+*   **Description**: Incorporates the SLM as an additional entity detector within the main anonymization pipeline. This allows the system to combine the strengths of traditional regex/model-based recognizers with the contextual understanding of an SLM.
+*   **Type**: Boolean flag
+*   **Default**: `False`
+
+#### `--slm-detector-mode`
+*   **Description**: Defines how the SLM detector's results are used when `--slm-detector` is enabled.
+    *   `hybrid`: Merges the SLM's findings with those from traditional recognizers. In cases of overlap, the highest-scoring detection is typically chosen.
+    *   `exclusive`: Uses only the entities detected by the SLM, ignoring results from other recognizers.
+*   **Type**: String (choice)
+*   **Choices**: `hybrid`, `exclusive`
+*   **Default**: `hybrid`
+
+#### `--slm-prompt-version`
+*   **Description**: Specifies the version of the prompt template to use for the SLM task (e.g., `v1`, `v2`). Prompts are stored in the `prompts/` directory, and this allows for A/B testing or selecting different instructions for the SLM without changing the code.
+*   **Type**: String
+*   **Default**: `v1`
+
+#### `--slm-chunk-size`
+*   **Description**: Sets the maximum character size for text chunks sent to the SLM. Larger texts are broken down into chunks of this size to fit within the model's context window.
+*   **Type**: Integer
+*   **Default**: `DefaultSizes.SLM_MAPPER_CHUNK_SIZE` (e.g., 4096)
+
+#### `--slm-confidence-threshold`
+*   **Description**: When using the SLM entity mapper, this sets the minimum confidence score (from 0.0 to 1.0) an entity must have to be included in the final output.
+*   **Type**: Float
+*   **Default**: `0.7`
+
+#### `--slm-context-window`
+*   **Description**: Defines the number of characters of surrounding text to extract as "context" for each entity in the SLM mapper's output. This helps human analysts validate the entity in its original context.
+*   **Type**: Integer
+*   **Default**: `50`
+
+#### `--slm-temperature`
+*   **Description**: Sets the "temperature" for the SLM, controlling the randomness of its output. A lower value (e.g., 0.1) makes the output more deterministic and focused, while a higher value increases creativity and variability. For detection tasks, a low temperature is recommended.
+*   **Type**: Float
+*   **Default**: `LLM_CONFIG['ollama']['temperature']` (e.g., 0.1)
 
 ### Performance & Filtering Options
 
@@ -117,8 +164,9 @@ This document outlines the command-line arguments for `anon.py`, providing a hig
     *   `presidio`: Utilizes a comprehensive, model-based approach, leveraging the full power of the Presidio library for highly accurate and contextual entity detection. This is generally the most accurate but can be slower.
     *   `fast`: Employs an optimized, potentially rule-based or simplified model approach, prioritizing speed over exhaustive accuracy. This is suitable for large volumes of data where a balance between performance and reasonable anonymization is desired.
     *   `balanced`: Aims for a middle ground, combining elements of both `presidio` and `fast` strategies to offer a good blend of accuracy and performance.
+    *   `slm`: A fully experimental strategy that delegates end-to-end anonymization to a local Small Language Model.
 *   **Type**: String (choice)
-*   **Choices**: `presidio`, `fast`, `balanced`
+*   **Choices**: `presidio`, `fast`, `balanced`, `slm`
 *   **Default**: `presidio`
 
 #### `--regex-priority`

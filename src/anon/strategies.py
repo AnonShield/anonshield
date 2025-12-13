@@ -129,7 +129,11 @@ class FastStrategy(AnonymizationStrategy):
             
             display_hash, full_hash = self.hash_generator.generate_slug(clean_text, slug_length)
 
-            collected_entities_for_text.append((ent["label"], clean_text, display_hash, full_hash))
+            # Apenas coleta a entidade para persistência se um slug foi gerado (slug_length > 0).
+            # Se slug_length é 0, a anonimização é somente no texto e não é reversível pelo banco de dados.
+            if slug_length > 0:
+                collected_entities_for_text.append((ent["label"], clean_text, display_hash, full_hash))
+
             if slug_length == 0:
                 new_text_parts.append(f"[{ent['label']}]")
             else:

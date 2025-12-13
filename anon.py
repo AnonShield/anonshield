@@ -12,7 +12,8 @@ import time
 import csv
 import signal
 from pathlib import Path
-from tqdm import tqdm
+import threading
+import queue
 
 
 from src.anon.config import (
@@ -41,8 +42,13 @@ from src.anon.tqdm_handler import TqdmLoggingHandler
 warnings.filterwarnings("ignore")
 
 
+import threading
+import queue
+
+# ... (other imports)
+
 def _handle_slm_entity_mapping(args):
-    """Orchestrates the SLM entity mapping process, writing results progressively."""
+    """Orchestrates the SLM entity mapping process with threaded, progressive writing."""
     logging.info("Starting SLM Entity Mapping process...")
 
     if not args.file_path or not os.path.exists(args.file_path):
@@ -55,30 +61,57 @@ def _handle_slm_entity_mapping(args):
     jsonl_output_path = output_dir / f"{base_name}_entity_map.jsonl"
     csv_output_path = output_dir / f"{base_name}_entity_map.csv"
 
-    jsonl_file_handle = None
-    csv_file_handle = None
+    # 1. Setup Producer-Consumer Queue
+    write_queue = queue.Queue()
 
+    # 2. Define the Consumer (Writer) Thread
+    def writer_worker(q, jsonl_path, csv_path):
+        try:
+            with open(jsonl_path, 'w', encoding='utf-8') as jf, \
+                 open(csv_path, 'w', newline='', encoding='utf-8') as cf:
+                
+                csv_writer = csv.writer(cf)
+                csv_writer.writerow(["Text", "Entity Type", "Start", "End", "Confidence", "Reason", "Context"])
+
+                while True:
+                    item = q.get()
+                    if item is None:  # Sentinel value to stop the thread
+                        break
+                    
+                    # Write to both files
+                    jf.write(json.dumps(item.to_dict()) + '\n')
+                    csv_writer.writerow([
+                        item.text, item.entity_type, item.start, 
+                        item.end, item.confidence, item.reason, item.context
+                    ])
+                    q.task_done()
+        except Exception as e:
+            logging.error(f"Error in writer thread: {e}", exc_info=True)
+
+    # 3. Start the writer thread
+    writer_thread = threading.Thread(target=writer_worker, args=(write_queue, jsonl_output_path, csv_output_path))
+    writer_thread.daemon = True # Allows main thread to exit even if writer is blocked
+    writer_thread.start()
+
+    # 4. Graceful shutdown handler
     def graceful_shutdown(signum, frame):
-        logging.warning(f"Interrupt signal ({signum}) received. Closing files and exiting.")
-        if jsonl_file_handle and not jsonl_file_handle.closed:
-            jsonl_file_handle.close()
-        if csv_file_handle and not csv_file_handle.closed:
-            csv_file_handle.close()
+        logging.warning(f"Interrupt signal ({signum}) received. Draining queue and exiting.")
+        write_queue.put(None)  # Signal writer to stop
+        writer_thread.join()   # Wait for writer to finish
         sys.exit(0)
 
     signal.signal(signal.SIGINT, graceful_shutdown)
     signal.signal(signal.SIGTERM, graceful_shutdown)
 
+    # 5. Main (Producer) Logic
     try:
-        jsonl_file_handle = open(jsonl_output_path, 'w', encoding='utf-8')
-        csv_file_handle = open(csv_output_path, 'w', newline='', encoding='utf-8')
-        csv_writer = csv.writer(csv_file_handle)
-        csv_writer.writerow(["Text", "Entity Type", "Start", "End", "Confidence", "Reason", "Context"])
-
         ollama_config = LLM_CONFIG["ollama"]
         client = OllamaClient(
-            model=ollama_config["model"], base_url=ollama_config["base_url"],
-            timeout=300, temperature=ollama_config["temperature"], max_retries=5
+            model=ollama_config["model"],
+            base_url=ollama_config["base_url"],
+            timeout=300,
+            temperature=args.slm_temperature, # Use new CLI arg
+            max_retries=5
         )
         prompt_manager = PromptManager(base_path="prompts")
         mapper = SLMEntityMapper(
@@ -89,75 +122,27 @@ def _handle_slm_entity_mapping(args):
             context_window=args.slm_context_window
         )
 
-        file_extension = Path(args.file_path).suffix.lower()
         logging.info(f"Processing file '{args.file_path}'...")
+        with open(args.file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # The stream is now the producer
+        entity_stream = mapper.map_entities_stream(content, language=args.lang, prompt_version=args.slm_prompt_version)
+        
+        for entity in entity_stream:
+            write_queue.put(entity)
 
-        if file_extension == '.csv':
-            try:
-                import pandas as pd
-                total_lines = sum(1 for _ in open(args.file_path, 'r', encoding='utf-8')) - 1
-                chunk_iterator = pd.read_csv(args.file_path, chunksize=args.csv_chunk_size, on_bad_lines='skip', engine='python')
-                
-                with tqdm(total=total_lines, desc=f"Processing CSV {os.path.basename(args.file_path)}", unit="line") as pbar:
-                    for chunk_df in chunk_iterator:
-                        texts_to_map = [val for col in chunk_df.columns for val in chunk_df[col].dropna() if isinstance(val, str) and val.strip()]
-                        if not texts_to_map:
-                            pbar.update(len(chunk_df))
-                            continue
-                        
-                        results_batch = mapper.batch_map(texts_to_map, language=args.lang, prompt_version=args.slm_prompt_version)
-                        
-                        for result in results_batch:
-                            for entity in result.entities:
-                                jsonl_file_handle.write(json.dumps(entity.to_dict()) + '\n')
-                                csv_writer.writerow([
-                                    entity.text, entity.entity_type, entity.start, 
-                                    entity.end, entity.confidence, entity.reason, entity.context
-                                ])
-                        
-                        jsonl_file_handle.flush()
-                        csv_file_handle.flush()
-                        pbar.update(len(chunk_df))
-
-            except Exception as e:
-                logging.error(f"Failed to process CSV file in chunks: {e}. All data will be loaded into memory.", exc_info=True)
-                with open(args.file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                entity_stream = mapper.map_entities_stream(content, language=args.lang, prompt_version=args.slm_prompt_version)
-                for entity in entity_stream:
-                    jsonl_file_handle.write(json.dumps(entity.to_dict()) + '\n')
-                    csv_writer.writerow([
-                        entity.text, entity.entity_type, entity.start, 
-                        entity.end, entity.confidence, entity.reason, entity.context
-                    ])
-                    jsonl_file_handle.flush()
-                    csv_file_handle.flush()
-        else:
-            with open(args.file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            entity_stream = mapper.map_entities_stream(content, language=args.lang, prompt_version=args.slm_prompt_version)
-            
-            for entity in entity_stream:
-                jsonl_file_handle.write(json.dumps(entity.to_dict()) + '\n')
-                csv_writer.writerow([
-                    entity.text, entity.entity_type, entity.start, 
-                    entity.end, entity.confidence, entity.reason, entity.context
-                ])
-                jsonl_file_handle.flush()
-                csv_file_handle.flush()
-
-        logging.info(f"Progressive entity map (JSONL) saved to: {jsonl_output_path}")
-        logging.info(f"Progressive entity map (CSV) saved to: {csv_output_path}")
+        logging.info("Finished processing file. Waiting for writer to complete...")
 
     except Exception as e:
         logging.error(f"An error occurred during SLM entity mapping: {e}", exc_info=True)
-        sys.exit(1)
     finally:
-        if jsonl_file_handle and not jsonl_file_handle.closed:
-            jsonl_file_handle.close()
-        if csv_file_handle and not csv_file_handle.closed:
-            csv_file_handle.close()
+        # 6. Signal writer to finish and wait
+        write_queue.put(None)
+        writer_thread.join()
+        logging.info(f"Progressive entity map (JSONL) saved to: {jsonl_output_path}")
+        logging.info(f"Progressive entity map (CSV) saved to: {csv_output_path}")
+
 
 
 def models_check(lang: str):
@@ -266,6 +251,7 @@ def _parse_arguments():
     slm_group.add_argument("--slm-chunk-size", type=int, default=DefaultSizes.SLM_MAPPER_CHUNK_SIZE, help=f"Max character size for chunks sent to the SLM mapper. Default: {DefaultSizes.SLM_MAPPER_CHUNK_SIZE}.")
     slm_group.add_argument("--slm-confidence-threshold", type=float, default=0.7, help="Minimum confidence score for entities from the SLM mapper. Default: 0.7.")
     slm_group.add_argument("--slm-context-window", type=int, default=50, help="Character window size for context extraction in SLM mapper. Default: 50.")
+    slm_group.add_argument("--slm-temperature", type=float, default=LLM_CONFIG['ollama']['temperature'], help=f"Temperature for the SLM model. Default: {LLM_CONFIG['ollama']['temperature']}.")
 
     # Chunking & Batching Options
     chunk_group = parser.add_argument_group('Chunking and Batching')
