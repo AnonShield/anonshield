@@ -134,6 +134,10 @@ def _handle_slm_entity_mapping(args):
                                         entity.end, entity.confidence, entity.reason, entity.context
                                     ])
                                     is_first_json_entity = False
+                            
+                            # Flush file handles to ensure data is written to disk immediately
+                            json_file_handle.flush()
+                            csv_file_handle.flush()
                         else:
                             logging.info(f"CSV chunk {i+1} contained no mappable string text. Skipping.")
                         pbar.update(1)  # Update progress bar for each chunk
@@ -154,6 +158,10 @@ def _handle_slm_entity_mapping(args):
                         entity.end, entity.confidence, entity.reason, entity.context
                     ])
                     is_first_json_entity = False
+                
+                # Flush file handles in fallback case
+                json_file_handle.flush()
+                csv_file_handle.flush()
         else:
             # For non-CSV files, read the whole content (original behavior)
             with open(args.file_path, 'r', encoding='utf-8') as f:
@@ -168,6 +176,10 @@ def _handle_slm_entity_mapping(args):
                     entity.end, entity.confidence, entity.reason, entity.context
                 ])
                 is_first_json_entity = False
+            
+            # Flush file handles for non-CSV files
+            json_file_handle.flush()
+            csv_file_handle.flush()
 
         logging.info(f"Progressive entity map (JSON) saved to: {json_output_path}")
         logging.info(f"Progressive entity map (CSV) saved to: {csv_output_path}")
@@ -334,7 +346,7 @@ def main():
     numeric_level = getattr(logging, args.log_level.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError(f"Invalid log level: {args.log_level}")
-    logging.basicConfig(level=numeric_level, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=numeric_level, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
     logging.debug(f"Resolved log level to: {numeric_level}")
     
     # --- Task 1: SLM Entity Mapping ---

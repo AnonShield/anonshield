@@ -187,6 +187,7 @@ class OllamaClient:
         
         # Try to extract JSON from response (handles cases where model adds text)
         content = response.content.strip()
+        self.logger.debug(f"SLM raw response content: {content}")
         
         # Remove markdown code fences if present
         if content.startswith("```"):

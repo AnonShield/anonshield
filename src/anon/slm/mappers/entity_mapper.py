@@ -187,9 +187,8 @@ class SLMEntityMapper(EntityMapper):
     
     def _parse_slm_response(self, response_json: Dict, original_text: str) -> List[MappedEntity]:
         """
-        Parse the SLM's JSON response into MappedEntity objects.
-        
-        Handles various response formats and validates data.
+        Parse the SLM's JSON response and deterministically find positions in python.
+        This fixes hallucination (text not in source) and index errors (LLM bad math).
         """
         if "error" in response_json:
             self.logger.error(f"SLM returned error: {response_json['error']}")
@@ -198,38 +197,59 @@ class SLMEntityMapper(EntityMapper):
         entities_data = response_json.get("entities", [])
         mapped_entities = []
         
+        # Normaliza o texto original para busca (opcional, se quiser case-insensitive)
+        # original_lower = original_text.lower() 
+
         for entity_data in entities_data:
             try:
-                # Validate required fields
-                required = ["text", "type", "start", "end"]
-                if not all(k in entity_data for k in required):
-                    self.logger.warning(f"Skipping entity with missing fields: {entity_data}")
+                # 1. Validação básica de campos
+                if "text" not in entity_data or "type" not in entity_data:
                     continue
                 
-                # Validate confidence
-                confidence = float(entity_data.get("confidence", 1.0))
-                if confidence < self.confidence_threshold:
-                    self.logger.debug(f"Skipping low-confidence entity: {entity_data['text']} ({confidence})")
+                text_to_find = entity_data["text"]
+                entity_type = entity_data["type"]
+                confidence = entity_data.get("confidence", 1.0)
+
+                # 2. CHECK ANTI-ALUCINAÇÃO & ANTI-GENÉRICO
+                # Se a string extraída for muito curta (ex: "a") ou não estiver no texto, ignorar.
+                if len(text_to_find) < 2 or text_to_find not in original_text:
+                    self.logger.debug(f"Hallucination or formatting mismatch dropped: '{text_to_find}'")
                     continue
-                
-                # Extract context
-                start = int(entity_data["start"])
-                end = int(entity_data["end"])
-                context = self._extract_context(original_text, start, end)
-                
-                entity = MappedEntity(
-                    text=entity_data["text"],
-                    entity_type=entity_data["type"],
-                    start=start,
-                    end=end,
-                    confidence=confidence,
-                    reason=entity_data.get("reason", ""),
-                    context=context
-                )
-                mapped_entities.append(entity)
-                
-            except (ValueError, KeyError) as e:
-                self.logger.warning(f"Failed to parse entity: {e}")
+
+                # 2.5. CHECK CONFIDENCE THRESHOLD
+                if confidence < 0.1:
+                    self.logger.debug(f"Entity '{text_to_find}' dropped due to low confidence: {confidence}")
+                    continue
+
+                # 3. BUSCA DETERMINÍSTICA (Find All Occurrences)
+                # A LLM achou o padrão. Nós achamos TODAS as ocorrências dele no chunk.
+                start_search = 0
+                while True:
+                    start_index = original_text.find(text_to_find, start_search)
+                    if start_index == -1:
+                        break
+                    
+                    end_index = start_index + len(text_to_find)
+                    
+                    # Extrai contexto real do Python
+                    context = self._extract_context(original_text, start_index, end_index)
+
+                    entity = MappedEntity(
+                        text=text_to_find,
+                        entity_type=entity_type,
+                        start=start_index,
+                        end=end_index,
+                        confidence=confidence,
+                        reason=entity_data.get("reason", "Detected by SLM"),
+                        context=context
+                    )
+                    mapped_entities.append(entity)
+                    
+                    # Avança a busca para não pegar o mesmo índice
+                    start_search = end_index
+
+            except Exception as e:
+                self.logger.warning(f"Failed to process entity '{entity_data.get('text', 'unknown')}': {e}")
                 continue
         
         return mapped_entities
@@ -278,14 +298,20 @@ class SLMEntityMapper(EntityMapper):
                 language=language
             )
             
+            self.logger.debug(f"SLM query for chunk {i+1}/{len(chunks)}. System prompt: {system_prompt}")
+            self.logger.debug(f"User prompt: {user_prompt}")
+            
             # Query SLM
             response = self.client.query_json(
                 prompt=user_prompt,
                 system_prompt=system_prompt
             )
             
+            self.logger.debug(f"SLM raw response for chunk {i+1}/{len(chunks)}: {response}")
+
             # Parse response
             chunk_entities = self._parse_slm_response(response, chunk)
+            self.logger.debug(f"Parsed {len(chunk_entities)} entities from chunk {i+1}/{len(chunks)}.")
             
             # Adjust entity positions for multi-chunk processing
             for entity in chunk_entities:
@@ -295,8 +321,9 @@ class SLMEntityMapper(EntityMapper):
             
             offset += len(chunk)
         
-        self.logger.info(f"Mapped {len(all_entities)} entities")
-        
+        self.logger.info(f"Mapped {len(all_entities)} total entities")
+        self.logger.debug(f"Final mapped entities: {[e.to_dict() for e in all_entities]}")
+
         return EntityMappingResult(
             original_text=text,
             entities=all_entities,
