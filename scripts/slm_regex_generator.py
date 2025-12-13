@@ -15,6 +15,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 try:
     from src.anon.slm.client import OllamaClient
     from src.anon.config import LLM_CONFIG
+    from src.anon.tqdm_handler import TqdmLoggingHandler
     ollama_client_available = True
 except ImportError as e:
     print(f"Could not import project dependencies: {e}")
@@ -153,6 +154,15 @@ def main():
     parser.add_argument("--max-samples", type=int, default=50, help="Maximum number of unique entity samples to send to the SLM for each type.")
     
     args = parser.parse_args()
+
+    # Configure logging to be tqdm-friendly
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    tqdm_handler = TqdmLoggingHandler()
+    tqdm_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    root_logger.addHandler(tqdm_handler)
 
     if not args.file_path.exists():
         logging.error(f"Input file not found: {args.file_path}")

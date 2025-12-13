@@ -67,8 +67,8 @@ class PromptTemplate:
         self.user_template = user_template
 
     def format(self, **kwargs) -> Tuple[str, str]:
-        """Formats both system and user prompts with the given data."""
+        """Formats only the user prompt with the given data."""
         return (
-            self.system_template.format(**kwargs),
+            self.system_template, # System template usually does not need formatting
             self.user_template.format(**kwargs)
         )

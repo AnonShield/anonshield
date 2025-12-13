@@ -167,7 +167,7 @@ def analyze_entity_map(json_file: Path, output_dir: Path, min_regex_samples: int
 def main():
     parser = argparse.ArgumentParser(description="Analyze SLM entity map JSON or JSONL file and generate reports.")
     parser.add_argument("file_path", type=Path, help="Path to the entity map JSON or JSONL file.")
-    parser.add_argument("--output-dir", type=Path, default="entity_analysis_report", help="Directory to save analysis reports and charts.")
+    parser.add_argument("--output-dir", type=Path, default=None, help="Directory to save reports. If not provided, a unique directory will be created based on the input file name.")
     parser.add_argument("--min-regex-samples", type=int, default=5, help="Minimum number of unique entity samples required to attempt grex regex generation.")
     parser.add_argument("--top-n-examples", type=int, default=10, help="Number of unique examples to list for each entity type.")
     
@@ -181,13 +181,20 @@ def main():
     if file_suffix not in ['.json', '.jsonl']:
         logging.error(f"Input file must be a JSON or JSONL file. Got: {file_suffix}")
         sys.exit(1)
+    
+    # Determine output directory
+    output_dir = args.output_dir
+    if output_dir is None:
+        base_name = args.file_path.stem.replace("_entity_map", "")
+        output_dir = Path(f"entity_analysis_report_{base_name}")
+        logging.info(f"--output-dir not specified. Using generated directory: {output_dir}")
 
     if not grex_available:
         logging.warning("Python library 'grex' not found. Regex generation will be skipped. Install it with 'uv pip install grex'")
     if not wordcloud_available:
         logging.warning("Python library 'wordcloud' not found. Word cloud generation will be skipped. Install it with 'uv pip install wordcloud'")
 
-    analyze_entity_map(args.file_path, args.output_dir, args.min_regex_samples, args.top_n_examples)
+    analyze_entity_map(args.file_path, output_dir, args.min_regex_samples, args.top_n_examples)
 
 if __name__ == "__main__":
     main()

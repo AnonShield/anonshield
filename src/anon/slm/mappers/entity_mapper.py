@@ -17,6 +17,7 @@ from typing import List, Dict, Optional, Protocol
 import logging
 import json
 from pathlib import Path
+from tqdm import tqdm
 
 
 @dataclass
@@ -300,7 +301,7 @@ class SLMEntityMapper(EntityMapper):
         prompt_version: Optional[str] = None
     ) -> EntityMappingResult:
         """
-        Map all entities in the text using the SLM.
+        Map all entities in the text using the SLM by collecting results from the stream.
         
         Args:
             text: Input text to analyze
@@ -310,64 +311,13 @@ class SLMEntityMapper(EntityMapper):
         Returns:
             EntityMappingResult with all identified entities
         """
-        self.logger.info(f"Mapping entities in text of length {len(text)}")
+        all_entities = list(self.map_entities_stream(text, language, prompt_version, show_progress=False))
         
-        # Get the appropriate prompt
-        try:
-            template = self.prompt_manager.get(
-                "entity_mapper",
-                version=prompt_version,
-                language=language
-            )
-        except KeyError as e:
-            self.logger.error(f"Prompt not found: {e}")
-            return EntityMappingResult(original_text=text)
-        
-        # Process text in chunks if necessary
-        chunks = self._chunk_text(text)
-        all_entities = []
-        offset = 0
-        
-        for i, chunk in enumerate(chunks):
-            self.logger.debug(f"Processing chunk {i+1}/{len(chunks)}")
-            
-            # Format prompt
-            system_prompt, user_prompt = template.format(
-                text=chunk,
-                language=language
-            )
-            
-            self.logger.debug(f"SLM query for chunk {i+1}/{len(chunks)}. System prompt: {system_prompt}")
-            self.logger.debug(f"User prompt: {user_prompt}")
-            
-            # Query SLM
-            response = self.client.query_json(
-                prompt=user_prompt,
-                system_prompt=system_prompt
-            )
-            
-            self.logger.debug(f"SLM raw response for chunk {i+1}/{len(chunks)}: {response}")
-
-            # Parse response
-            chunk_entities = self._parse_slm_response(response, chunk)
-            self.logger.debug(f"Parsed {len(chunk_entities)} entities from chunk {i+1}/{len(chunks)}.")
-            
-            # Adjust entity positions for multi-chunk processing
-            for entity in chunk_entities:
-                entity.start += offset
-                entity.end += offset
-                all_entities.append(entity)
-            
-            offset += len(chunk)
-        
-        self.logger.info(f"Mapped {len(all_entities)} total entities")
-        self.logger.debug(f"Final mapped entities: {[e.to_dict() for e in all_entities]}")
-
         return EntityMappingResult(
             original_text=text,
             entities=all_entities,
             metadata={
-                "chunks_processed": len(chunks),
+                "chunks_processed": len(self._chunk_text(text)),
                 "model": getattr(self.client, 'model', 'unknown'),
                 "confidence_threshold": self.confidence_threshold
             }
@@ -386,9 +336,9 @@ class SLMEntityMapper(EntityMapper):
         as it can reuse prompts and potentially batch API calls.
         """
         results = []
-        
         for i, text in enumerate(texts):
             self.logger.debug(f"Batch mapping {i+1}/{len(texts)}")
+            # When batching, we don't want a progress bar for each small text.
             result = self.map_entities(text, language, prompt_version=prompt_version)
             results.append(result)
         
@@ -398,11 +348,12 @@ class SLMEntityMapper(EntityMapper):
         self,
         text: str,
         language: str = "en",
-        prompt_version: Optional[str] = None
-    ):
+        prompt_version: Optional[str] = None,
+        show_progress: bool = True
+    ) -> Iterator[MappedEntity]:
         """
         Map all entities in the text using the SLM and yields them as a stream.
-        This is suitable for progressive writing of results.
+        This version includes an internal tqdm progress bar.
         """
         self.logger.info(f"Streaming mapping for text of length {len(text)}")
         
@@ -420,8 +371,12 @@ class SLMEntityMapper(EntityMapper):
         offset = 0
         total_entities_found = 0
         
-        for i, chunk in enumerate(chunks):
-            self.logger.debug(f"Processing chunk {i+1}/{len(chunks)}")
+        # Determine whether to show the progress bar
+        chunk_iterator = tqdm(chunks, desc="Mapping file chunks", unit="chunk") if show_progress else chunks
+        
+        for chunk in chunk_iterator:
+            if show_progress:
+                self.logger.debug(f"Processing chunk {chunk_iterator.n + 1}/{len(chunks)}")
             
             system_prompt, user_prompt = template.format(text=chunk, language=language)
             
@@ -431,7 +386,8 @@ class SLMEntityMapper(EntityMapper):
             )
             
             chunk_entities = self._parse_slm_response(response, chunk)
-            self.logger.debug(f"Parsed {len(chunk_entities)} entities from chunk {i+1}/{len(chunks)}.")
+            
+            self.logger.debug(f"Parsed {len(chunk_entities)} entities from current chunk.")
             
             for entity in chunk_entities:
                 entity.start += offset

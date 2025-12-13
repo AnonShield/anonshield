@@ -166,40 +166,59 @@ class OllamaClient:
         self, 
         prompt: str, 
         system_prompt: Optional[str] = None,
+        json_retries: int = 2,
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Query the SLM and parse JSON response with robust error handling.
+        Query the SLM and parse JSON response with robust error handling and retries.
         
-        This method enforces JSON output format and validates the response.
+        This method enforces JSON output and includes a retry mechanism to ask the
+        SLM to fix its own malformed JSON.
         
         Returns:
-            Parsed JSON dictionary, or {"error": "..."} on failure
+            Parsed JSON dictionary, or {"error": "..."} on failure.
         """
-        # Enforce JSON output in the prompt
         json_instruction = "\n\nRespond ONLY with valid JSON. No explanations or markdown."
-        modified_prompt = prompt + json_instruction
-        
-        response = self.query(modified_prompt, system_prompt, **kwargs)
-        
-        if not response.success:
-            return {"error": response.error}
-        
-        # Try to extract JSON from response (handles cases where model adds text)
-        content = response.content.strip()
-        self.logger.debug(f"SLM raw response content: {content}")
-        
-        # Remove markdown code fences if present
-        if content.startswith("```"):
-            lines = content.split("\n")
-            content = "\n".join(lines[1:-1]) if len(lines) > 2 else content
-        
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to parse JSON from SLM response: {e}")
-            self.logger.debug(f"Raw response: {content[:500]}")
-            return {"error": f"Invalid JSON response: {str(e)}", "raw_content": content}
+        current_prompt = prompt + json_instruction
+        current_system_prompt = system_prompt
+
+        for attempt in range(json_retries + 1):
+            response = self.query(current_prompt, current_system_prompt, **kwargs)
+            
+            if not response.success:
+                return {"error": response.error}
+            
+            content = response.content.strip()
+            
+            # Improved cleanup: remove markdown fences and surrounding text
+            if '```json' in content:
+                content = content.split('```json')[1].split('```')[0].strip()
+            elif '```' in content:
+                content = content.split('```')[1].split('```')[0].strip()
+
+            try:
+                # Attempt to parse the cleaned content
+                return json.loads(content)
+            except json.JSONDecodeError as e:
+                self.logger.warning(f"JSON parse failed on attempt {attempt + 1}: {e}")
+                self.logger.debug(f"Invalid raw content: {content[:500]}")
+                
+                if attempt < json_retries:
+                    # If it's not the last attempt, create a "fixer" prompt
+                    self.logger.info("Attempting to fix JSON with another SLM call...")
+                    current_system_prompt = None  # The fixer prompt is self-contained
+                    current_prompt = (
+                        "The following text is not valid JSON. Please fix it and return ONLY the corrected JSON object. "
+                        "Do not add any explanations, apologies, or markdown formatting.\n\n"
+                        f"Invalid JSON:\n---\n{content}\n---\nCorrected JSON:"
+                    )
+                else:
+                    # On the last attempt, return the error
+                    self.logger.error(f"Final attempt to parse JSON failed. Raw content: {content[:500]}")
+                    return {"error": f"Invalid JSON response after retries: {e}", "raw_content": content}
+
+        # This part should not be reached
+        return {"error": "JSON generation failed after multiple retries."}
 
 
 class MockSLMClient:

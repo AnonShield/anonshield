@@ -36,6 +36,7 @@ from src.anon.slm.prompts import PromptManager
 from src.anon.slm.mappers.entity_mapper import SLMEntityMapper, EntityMapperExporter
 from src.anon.slm.detectors.slm_detector import SLMEntityDetector
 from src.anon.slm.anonymizers.slm_anonymizer import SLMAnonymizationStrategy, SLMFullAnonymizer
+from src.anon.tqdm_handler import TqdmLoggingHandler
 
 warnings.filterwarnings("ignore")
 
@@ -117,7 +118,7 @@ def _handle_slm_entity_mapping(args):
                 with open(args.file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 entity_stream = mapper.map_entities_stream(content, language=args.lang, prompt_version=args.slm_prompt_version)
-                for entity in tqdm(entity_stream, desc="Processing file content"):
+                for entity in entity_stream:
                     jsonl_file_handle.write(json.dumps(entity.to_dict()) + '\n')
                     csv_writer.writerow([
                         entity.text, entity.entity_type, entity.start, 
@@ -131,7 +132,7 @@ def _handle_slm_entity_mapping(args):
             
             entity_stream = mapper.map_entities_stream(content, language=args.lang, prompt_version=args.slm_prompt_version)
             
-            for entity in tqdm(entity_stream, desc="Mapping entities in file"):
+            for entity in entity_stream:
                 jsonl_file_handle.write(json.dumps(entity.to_dict()) + '\n')
                 csv_writer.writerow([
                     entity.text, entity.entity_type, entity.start, 
@@ -302,12 +303,27 @@ def _handle_list_languages():
 def main():
     """Main function to orchestrate the anonymization or NER data generation process."""
     args = _parse_arguments()
+    
+    # Configure logging to be tqdm-friendly
     numeric_level = getattr(logging, args.log_level.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError(f"Invalid log level: {args.log_level}")
-    logging.basicConfig(level=numeric_level, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
-    logging.debug(f"Resolved log level to: {numeric_level}")
     
+    # Get the root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(numeric_level)
+    
+    # Remove any existing handlers
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+        
+    # Add our Tqdm-friendly handler
+    tqdm_handler = TqdmLoggingHandler()
+    tqdm_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    root_logger.addHandler(tqdm_handler)
+    
+    logging.debug(f"Resolved log level to: {numeric_level} and configured TqdmLoggingHandler.")
+
     # --- Task 1: SLM Entity Mapping ---
     if args.slm_map_entities:
         _handle_slm_entity_mapping(args)
