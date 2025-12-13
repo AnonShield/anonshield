@@ -136,9 +136,14 @@ class SLMFullAnonymizer:
         - Structure is preserved (if enabled)
         - No obvious leakage of sensitive data
         """
-        # Length check (allow up to 50% variation)
+        # Length check (allow more variation for short strings)
+        if len(original_text) == 0:
+             return len(anonymized_text) == 0 # If input is empty, output should be too
+
+        min_ratio, max_ratio = (0.2, 10.0) if len(original_text) < 50 else (0.5, 1.5)
+        
         length_ratio = len(anonymized_text) / len(original_text)
-        if not (0.5 <= length_ratio <= 1.5):
+        if not (min_ratio <= length_ratio <= max_ratio):
             self.logger.warning(f"Suspicious length change: {length_ratio:.2f}x")
             return False
         

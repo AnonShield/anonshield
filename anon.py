@@ -10,6 +10,7 @@ import torch
 import spacy
 import time
 import csv
+import signal
 from pathlib import Path
 from tqdm import tqdm
 
@@ -40,158 +41,115 @@ warnings.filterwarnings("ignore")
 
 
 def _handle_slm_entity_mapping(args):
-    """Orchestrates the SLM entity mapping process (Task 1), processing large files in chunks."""
+    """Orchestrates the SLM entity mapping process, writing results progressively."""
     logging.info("Starting SLM Entity Mapping process...")
 
     if not args.file_path or not os.path.exists(args.file_path):
-        logging.error(f"File not found at specified path: {args.file_path}")
+        logging.error(f"File not found: {args.file_path}")
         sys.exit(1)
 
-    # Prepare output paths and directories
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     base_name = Path(args.file_path).stem
-    json_output_path = output_dir / f"{base_name}_entity_map.json"
+    jsonl_output_path = output_dir / f"{base_name}_entity_map.jsonl"
     csv_output_path = output_dir / f"{base_name}_entity_map.csv"
 
-    json_file_handle = None
+    jsonl_file_handle = None
     csv_file_handle = None
-    csv_writer = None
-    is_first_json_entity = True  # Flag to handle comma for JSON array
+
+    def graceful_shutdown(signum, frame):
+        logging.warning(f"Interrupt signal ({signum}) received. Closing files and exiting.")
+        if jsonl_file_handle and not jsonl_file_handle.closed:
+            jsonl_file_handle.close()
+        if csv_file_handle and not csv_file_handle.closed:
+            csv_file_handle.close()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, graceful_shutdown)
+    signal.signal(signal.SIGTERM, graceful_shutdown)
 
     try:
-        # Open JSON output file and write initial structure
-        json_file_handle = open(json_output_path, 'w', encoding='utf-8')
-        json_file_handle.write('{\n  "entities": [\n')
-
-        # Open CSV output file and write header
+        jsonl_file_handle = open(jsonl_output_path, 'w', encoding='utf-8')
         csv_file_handle = open(csv_output_path, 'w', newline='', encoding='utf-8')
         csv_writer = csv.writer(csv_file_handle)
         csv_writer.writerow(["Text", "Entity Type", "Start", "End", "Confidence", "Reason", "Context"])
 
-        # 1. Instantiate components with a longer timeout for this task
         ollama_config = LLM_CONFIG["ollama"]
         client = OllamaClient(
-            model=ollama_config["model"],
-            base_url=ollama_config["base_url"],
-            timeout=300,  # Increased timeout for mapping task
-            temperature=ollama_config["temperature"],
-            max_retries=5  # Increased max retries for robustness
+            model=ollama_config["model"], base_url=ollama_config["base_url"],
+            timeout=300, temperature=ollama_config["temperature"], max_retries=5
         )
         prompt_manager = PromptManager(base_path="prompts")
         mapper = SLMEntityMapper(client, prompt_manager)
 
-        # 2. Process file in chunks to handle large files
         file_extension = Path(args.file_path).suffix.lower()
-        
-        logging.info(f"Processing file '{args.file_path}' in chunks...")
+        logging.info(f"Processing file '{args.file_path}'...")
 
         if file_extension == '.csv':
             try:
                 import pandas as pd
+                total_lines = sum(1 for _ in open(args.file_path, 'r', encoding='utf-8')) - 1
+                chunk_iterator = pd.read_csv(args.file_path, chunksize=args.csv_chunk_size, on_bad_lines='skip', engine='python')
                 
-                # Estimate total number of lines for tqdm
-                total_lines = 0
-                try:
-                    with open(args.file_path, "r", encoding="utf-8") as f:
-                        total_lines = sum(1 for _ in f) - 1  # Subtract 1 for header
-                except Exception as e:
-                    logging.warning(f"Could not estimate total lines for tqdm: {e}")
-                
-                chunk_size = args.csv_chunk_size
-                chunk_iterator = pd.read_csv(args.file_path, chunksize=chunk_size, on_bad_lines='skip', engine='python')
-                
-                total_chunks = (total_lines // chunk_size) + (1 if total_lines % chunk_size > 0 else 0) if total_lines > 0 else None
+                with tqdm(total=total_lines, desc=f"Processing CSV {os.path.basename(args.file_path)}", unit="line") as pbar:
+                    for chunk_df in chunk_iterator:
+                        texts_to_map = [val for col in chunk_df.columns for val in chunk_df[col].dropna() if isinstance(val, str) and val.strip()]
+                        if not texts_to_map:
+                            pbar.update(len(chunk_df))
+                            continue
+                        
+                        results_batch = mapper.batch_map(texts_to_map, language=args.lang, prompt_version=args.slm_prompt_version)
+                        
+                        for result in results_batch:
+                            for entity in result.entities:
+                                jsonl_file_handle.write(json.dumps(entity.to_dict()) + '\n')
+                                csv_writer.writerow([
+                                    entity.text, entity.entity_type, entity.start, 
+                                    entity.end, entity.confidence, entity.reason, entity.context
+                                ])
+                        
+                        jsonl_file_handle.flush()
+                        csv_file_handle.flush()
+                        pbar.update(len(chunk_df))
 
-                desc = f"Processing CSV {os.path.basename(args.file_path)} chunks"
-                with tqdm(total=total_chunks, desc=desc, unit="chunk", leave=False) as pbar:
-                    for i, chunk_df in enumerate(chunk_iterator):
-                        logging.info(f"Processing CSV chunk {i+1}...")
-                        
-                        texts_to_map = []
-                        for col in chunk_df.columns:
-                            for val in chunk_df[col].dropna():  # Only consider non-NaN values
-                                if isinstance(val, str):
-                                    # Only add non-empty strings after stripping whitespace
-                                    if val.strip():
-                                        texts_to_map.append(val)
-                        
-                        if texts_to_map:
-                            results_batch = mapper.batch_map(
-                                texts_to_map, 
-                                language=args.lang,
-                                prompt_version=args.slm_prompt_version
-                            )
-                            # Write entities from this batch to files progressively
-                            for result in results_batch:
-                                for entity in result.entities:
-                                    if not is_first_json_entity:
-                                        json_file_handle.write(',\n')
-                                    # Use json.dumps for proper JSON string representation
-                                    json_file_handle.write('    ' + json.dumps(entity.to_dict(), indent=2, ensure_ascii=False).replace('\n', '\n    '))
-                                    csv_writer.writerow([
-                                        entity.text, entity.entity_type, entity.start, 
-                                        entity.end, entity.confidence, entity.reason, entity.context
-                                    ])
-                                    is_first_json_entity = False
-                            
-                            # Flush file handles to ensure data is written to disk immediately
-                            json_file_handle.flush()
-                            csv_file_handle.flush()
-                        else:
-                            logging.info(f"CSV chunk {i+1} contained no mappable string text. Skipping.")
-                        pbar.update(1)  # Update progress bar for each chunk
             except Exception as e:
-                logging.error(f"Failed to process CSV file in chunks: {e}. Falling back to reading the whole file as a single string (less granular).")
-                # Fallback for non-standard CSVs or other pandas errors
+                logging.error(f"Failed to process CSV file in chunks: {e}. All data will be loaded into memory.", exc_info=True)
                 with open(args.file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                
-                # In fallback, map the entire content as a single text
-                result = mapper.map_entities(content, language=args.lang, prompt_version=args.slm_prompt_version)
-                for entity in result.entities:
-                    if not is_first_json_entity:
-                        json_file_handle.write(',\n')
-                    json_file_handle.write('    ' + json.dumps(entity.to_dict(), indent=2, ensure_ascii=False).replace('\n', '\n    '))
+                entity_stream = mapper.map_entities_stream(content, language=args.lang, prompt_version=args.slm_prompt_version)
+                for entity in tqdm(entity_stream, desc="Processing file content"):
+                    jsonl_file_handle.write(json.dumps(entity.to_dict()) + '\n')
                     csv_writer.writerow([
                         entity.text, entity.entity_type, entity.start, 
                         entity.end, entity.confidence, entity.reason, entity.context
                     ])
-                    is_first_json_entity = False
-                
-                # Flush file handles in fallback case
-                json_file_handle.flush()
-                csv_file_handle.flush()
+                    jsonl_file_handle.flush()
+                    csv_file_handle.flush()
         else:
-            # For non-CSV files, read the whole content (original behavior)
             with open(args.file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            result = mapper.map_entities(content, language=args.lang, prompt_version=args.slm_prompt_version)
-            for entity in result.entities:
-                if not is_first_json_entity:
-                    json_file_handle.write(',\n')
-                json_file_handle.write('    ' + json.dumps(entity.to_dict(), indent=2, ensure_ascii=False).replace('\n', '\n    '))
+            
+            entity_stream = mapper.map_entities_stream(content, language=args.lang, prompt_version=args.slm_prompt_version)
+            
+            for entity in tqdm(entity_stream, desc="Mapping entities in file"):
+                jsonl_file_handle.write(json.dumps(entity.to_dict()) + '\n')
                 csv_writer.writerow([
                     entity.text, entity.entity_type, entity.start, 
                     entity.end, entity.confidence, entity.reason, entity.context
                 ])
-                is_first_json_entity = False
-            
-            # Flush file handles for non-CSV files
-            json_file_handle.flush()
-            csv_file_handle.flush()
+                jsonl_file_handle.flush()
+                csv_file_handle.flush()
 
-        logging.info(f"Progressive entity map (JSON) saved to: {json_output_path}")
+        logging.info(f"Progressive entity map (JSONL) saved to: {jsonl_output_path}")
         logging.info(f"Progressive entity map (CSV) saved to: {csv_output_path}")
 
     except Exception as e:
         logging.error(f"An error occurred during SLM entity mapping: {e}", exc_info=True)
         sys.exit(1)
     finally:
-        if json_file_handle:
-            json_file_handle.write('\n  ]\n}')  # Close JSON array and object
-            json_file_handle.close()
-        if csv_file_handle:
+        if jsonl_file_handle and not jsonl_file_handle.closed:
+            jsonl_file_handle.close()
+        if csv_file_handle and not csv_file_handle.closed:
             csv_file_handle.close()
 
 
@@ -295,7 +253,8 @@ def _parse_arguments():
     # SLM Options
     slm_group = parser.add_argument_group('SLM Options')
     slm_group.add_argument("--slm-map-entities", action="store_true", help="Use SLM to map potential entities for analysis (Task 1). Does not anonymize.")
-    slm_group.add_argument("--slm-detector", action="store_true", help="Use SLM as a hybrid entity detector alongside traditional methods (Task 2).")
+    slm_group.add_argument("--slm-detector", action="store_true", help="Use SLM as an entity detector alongside traditional methods (Task 2).")
+    slm_group.add_argument("--slm-detector-mode", type=str, default="hybrid", choices=["hybrid", "exclusive"], help="Mode for the SLM detector: 'hybrid' (default) merges with traditional NER, 'exclusive' uses only SLM results.")
     slm_group.add_argument("--slm-prompt-version", type=str, default="v1", help="Specify the prompt version to use for SLM tasks.")
 
     # Chunking & Batching Options
@@ -484,7 +443,7 @@ def main():
                     prompt_manager=prompt_manager,
                     entities_to_preserve=set(entities_to_preserve),
                     allow_list=set(allow_list),
-                    prompt_version="v1_cyber"
+                    prompt_version=args.slm_prompt_version
                 )
             except Exception as e:
                 logging.error(f"Failed to initialize SLM detector, proceeding without it. Error: {e}")
@@ -524,6 +483,7 @@ def main():
             hash_generator=hash_generator,
             entity_detector=entity_detector,
             slm_detector=slm_detector_instance,
+            slm_detector_mode=args.slm_detector_mode,
             ner_data_generation=args.generate_ner_data
         )
         

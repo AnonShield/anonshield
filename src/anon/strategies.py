@@ -104,7 +104,8 @@ class FastStrategy(AnonymizationStrategy):
                  cache_manager: CacheStrategy,
                  lang: str,
                  nlp_batch_size: int,
-                 slm_detector: Optional['SLMEntityDetector'] = None):
+                 slm_detector: Optional['SLMEntityDetector'] = None,
+                 slm_detector_mode: str = "hybrid"):
         super().__init__()
         self.nlp_engine = nlp_engine
         self.entity_detector = entity_detector
@@ -113,6 +114,7 @@ class FastStrategy(AnonymizationStrategy):
         self.lang = lang
         self.nlp_batch_size = nlp_batch_size
         self.slm_detector = slm_detector
+        self.slm_detector_mode = slm_detector_mode
     
     def _generate_anonymized_text_and_collect_entities(self, original_doc_text: str, merged_entities: List[Dict], operator_params: Dict) -> Tuple[str, List[Tuple]]:
         """Generates the anonymized text and collects entities based on merged entities."""
@@ -138,7 +140,7 @@ class FastStrategy(AnonymizationStrategy):
         return "".join(new_text_parts), collected_entities_for_text
 
     def anonymize(self, texts: List[str], operator_params: Dict) -> Tuple[List[str], List[Tuple]]:
-        self.logger.debug("Executing FastStrategy")
+        self.logger.debug(f"Executing FastStrategy with SLM mode: {self.slm_detector_mode if self.slm_detector else 'off'}")
         if not texts: return [], []
 
         original_texts = [str(text) if pd.notna(text) else "" for text in texts]
@@ -170,13 +172,17 @@ class FastStrategy(AnonymizationStrategy):
         for i, doc in enumerate(docs):
             original_doc_text = doc.text
             
-            # --- Hybrid Detection Logic ---
-            # 1. Get entities from the traditional detector
-            detected_entities = self.entity_detector.extract_entities(doc, original_doc_text)
+            # --- Hybrid/Exclusive Detection Logic ---
+            detected_entities = []
+            
+            # Run traditional detector if not in exclusive SLM mode
+            if not (self.slm_detector and self.slm_detector_mode == 'exclusive'):
+                self.logger.debug("Running traditional entity detector.")
+                detected_entities.extend(self.entity_detector.extract_entities(doc, original_doc_text))
 
-            # 2. If an SLM detector is provided, get entities from it and merge
+            # Run SLM detector if enabled
             if self.slm_detector:
-                self.logger.debug("SLM detector present, performing hybrid detection.")
+                self.logger.debug(f"SLM detector enabled in '{self.slm_detector_mode}' mode.")
                 slm_results = self.slm_detector.detect_entities([original_doc_text], language=self.lang)
                 
                 # Convert SLM results to the same format as traditional results
@@ -190,7 +196,7 @@ class FastStrategy(AnonymizationStrategy):
                             "score": 0.85 # Assign a confident score for SLM entities
                         })
             
-            # 3. Merge all collected entities (from traditional and SLM)
+            # Merge all collected entities
             merged_entities = self.entity_detector.merge_overlapping_entities(detected_entities)
             
             anonymized_text, collected_entities_for_text = self._generate_anonymized_text_and_collect_entities(original_doc_text, merged_entities, operator_params)
@@ -251,7 +257,8 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
         return FastStrategy(
             nlp_engine=kwargs["analyzer_engine"].analyzer_engine.nlp_engine,
             entity_detector=kwargs["entity_detector"],
-            slm_detector=kwargs.get("slm_detector"), # Use .get() for safety
+            slm_detector=kwargs.get("slm_detector"),
+            slm_detector_mode=kwargs.get("slm_detector_mode", "hybrid"),
             hash_generator=kwargs["hash_generator"],
             cache_manager=kwargs["cache_manager"],
             lang=kwargs["lang"],

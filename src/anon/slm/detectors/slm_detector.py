@@ -130,52 +130,64 @@ class SLMEntityDetector:
         self._cache[text] = entities
     
     def _parse_slm_response(self, response_json: Dict, original_text: str) -> List[DetectedEntity]:
-        """Parse SLM JSON response into DetectedEntity objects."""
+        """
+        Parse the SLM's JSON response and deterministically find positions in python.
+        This fixes hallucination (text not in source) and index errors from the SLM.
+        """
         if "error" in response_json:
             self.logger.error(f"SLM error: {response_json['error']}")
             return []
         
         entities_data = response_json.get("entities", [])
-        detected = []
+        detected_entities = []
         
         for entity_data in entities_data:
             try:
-                entity_type = entity_data.get("type", "UNKNOWN")
+                if "text" not in entity_data or "type" not in entity_data:
+                    continue
                 
-                # Skip preserved entities
+                text_to_find = entity_data["text"]
+                entity_type = entity_data["type"]
+                score = float(entity_data.get("confidence", entity_data.get("score", 1.0)))
+
                 if entity_type in self.entities_to_preserve:
                     continue
-                
-                # Validate required fields
-                if not all(k in entity_data for k in ["text", "type", "start", "end"]):
-                    self.logger.warning(f"Skipping malformed entity: {entity_data}")
+
+                if text_to_find.lower() in self.allow_list:
                     continue
-                
-                text = entity_data["text"]
-                
-                # Skip allow-listed items
-                if text.lower() in self.allow_list:
-                    continue
-                
-                score = float(entity_data.get("confidence", entity_data.get("score", 0.9)))
-                
-                # Apply confidence threshold
+
                 if score < self.confidence_threshold:
+                    self.logger.debug(f"Entity '{text_to_find}' dropped due to low confidence: {score}")
                     continue
-                
-                detected.append(DetectedEntity(
-                    text=text,
-                    entity_type=entity_type,
-                    start=int(entity_data["start"]),
-                    end=int(entity_data["end"]),
-                    score=score
-                ))
-                
+
+                if len(text_to_find) < 2 or text_to_find not in original_text:
+                    self.logger.debug(f"Hallucination or formatting mismatch dropped: '{text_to_find}'")
+                    continue
+
+                start_search = 0
+                while True:
+                    start_index = original_text.find(text_to_find, start_search)
+                    if start_index == -1:
+                        break
+                    
+                    end_index = start_index + len(text_to_find)
+                    
+                    entity = DetectedEntity(
+                        text=text_to_find,
+                        entity_type=entity_type,
+                        start=start_index,
+                        end=end_index,
+                        score=score
+                    )
+                    detected_entities.append(entity)
+                    
+                    start_search = end_index
+
             except (ValueError, KeyError) as e:
-                self.logger.warning(f"Failed to parse entity: {e}")
+                self.logger.warning(f"Failed to process entity '{entity_data.get('text', 'unknown')}': {e}")
                 continue
         
-        return detected
+        return detected_entities
     
     def _fallback_regex_detection(self, text: str) -> List[DetectedEntity]:
         """

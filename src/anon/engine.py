@@ -236,6 +236,7 @@ class AnonymizationOrchestrator:
                  hash_generator: Optional[HashingStrategy] = None,
                  entity_detector: Optional[EntityDetector] = None,
                  slm_detector: Optional[AnonymizationStrategy] = None,
+                 slm_detector_mode: str = "hybrid",
                  ner_data_generation: bool = False):
 
         self.lang = lang
@@ -296,6 +297,7 @@ class AnonymizationOrchestrator:
                 anonymizer_engine=self.anonymizer_engine,
                 entity_detector=self.entity_detector,
                 slm_detector=slm_detector,
+                slm_detector_mode=slm_detector_mode,
                 hash_generator=self.hash_generator,
                 cache_manager=self.cache_manager,
                 lang=self.lang,

@@ -135,7 +135,7 @@ class SLMEntityMapper(EntityMapper):
         slm_client,  # SLMClient protocol
         prompt_manager,  # PromptManager
         confidence_threshold: float = 0.7,
-        max_chunk_size: int = 2000,
+        max_chunk_size: int = 500,
         include_context: bool = True,
         context_window: int = 50
     ):
@@ -152,6 +152,7 @@ class SLMEntityMapper(EntityMapper):
         Split text into processable chunks while preserving sentence boundaries.
         
         Uses a simple sentence-aware chunking to avoid breaking mid-sentence.
+        If a sentence is longer than max_chunk_size, it is split.
         """
         if len(text) <= self.max_chunk_size:
             return [text]
@@ -162,18 +163,56 @@ class SLMEntityMapper(EntityMapper):
         # Simple sentence splitting (can be improved with NLTK/spaCy)
         sentences = text.replace('\n', ' ').split('. ')
         
-        for sentence in sentences:
-            if len(current_chunk) + len(sentence) > self.max_chunk_size:
+        for i, sentence in enumerate(sentences):
+            if not sentence:
+                continue
+
+            # Re-add the separator, except for the last part of the split
+            sentence_to_add = sentence
+            if i < len(sentences) -1:
+                sentence_to_add += ". "
+
+            # If a sentence itself is larger than the chunk size, it must be split.
+            if len(sentence_to_add) > self.max_chunk_size:
+                # First, process any pending text in current_chunk.
                 if current_chunk:
                     chunks.append(current_chunk.strip())
-                current_chunk = sentence
+                
+                # Split the oversized sentence while trying to respect word boundaries.
+                remaining_sentence = sentence_to_add
+                while len(remaining_sentence) > self.max_chunk_size:
+                    split_pos = remaining_sentence.rfind(' ', 0, self.max_chunk_size)
+                    
+                    if split_pos != -1:
+                        # Found a space, split there.
+                        chunks.append(remaining_sentence[:split_pos])
+                        remaining_sentence = remaining_sentence[split_pos+1:]
+                    else:
+                        # No space found, hard split at max_chunk_size.
+                        chunks.append(remaining_sentence[:self.max_chunk_size])
+                        remaining_sentence = remaining_sentence[self.max_chunk_size:]
+                
+                # Add the last part of the sentence.
+                if remaining_sentence:
+                    chunks.append(remaining_sentence)
+                
+                current_chunk = ""
+                continue
+
+            # If adding the new sentence would make the chunk too big,
+            # add the current chunk to the list and start a new one.
+            if len(current_chunk) + len(sentence_to_add) > self.max_chunk_size:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = sentence_to_add
             else:
-                current_chunk += sentence + ". "
+                current_chunk += sentence_to_add
         
+        # Add any remaining text in current_chunk.
         if current_chunk:
             chunks.append(current_chunk.strip())
-        
-        return chunks
+            
+        return [chunk for chunk in chunks if chunk]
     
     def _extract_context(self, text: str, start: int, end: int) -> str:
         """Extract surrounding context for an entity."""
@@ -354,6 +393,55 @@ class SLMEntityMapper(EntityMapper):
             results.append(result)
         
         return results
+
+    def map_entities_stream(
+        self,
+        text: str,
+        language: str = "en",
+        prompt_version: Optional[str] = None
+    ):
+        """
+        Map all entities in the text using the SLM and yields them as a stream.
+        This is suitable for progressive writing of results.
+        """
+        self.logger.info(f"Streaming mapping for text of length {len(text)}")
+        
+        try:
+            template = self.prompt_manager.get(
+                "entity_mapper",
+                version=prompt_version,
+                language=language
+            )
+        except KeyError as e:
+            self.logger.error(f"Prompt not found: {e}")
+            return
+
+        chunks = self._chunk_text(text)
+        offset = 0
+        total_entities_found = 0
+        
+        for i, chunk in enumerate(chunks):
+            self.logger.debug(f"Processing chunk {i+1}/{len(chunks)}")
+            
+            system_prompt, user_prompt = template.format(text=chunk, language=language)
+            
+            response = self.client.query_json(
+                prompt=user_prompt,
+                system_prompt=system_prompt
+            )
+            
+            chunk_entities = self._parse_slm_response(response, chunk)
+            self.logger.debug(f"Parsed {len(chunk_entities)} entities from chunk {i+1}/{len(chunks)}.")
+            
+            for entity in chunk_entities:
+                entity.start += offset
+                entity.end += offset
+                total_entities_found += 1
+                yield entity
+            
+            offset += len(chunk)
+            
+        self.logger.info(f"Mapped {total_entities_found} total entities in stream.")
 
 
 class EntityMapperExporter:
