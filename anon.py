@@ -81,7 +81,13 @@ def _handle_slm_entity_mapping(args):
             timeout=300, temperature=ollama_config["temperature"], max_retries=5
         )
         prompt_manager = PromptManager(base_path="prompts")
-        mapper = SLMEntityMapper(client, prompt_manager)
+        mapper = SLMEntityMapper(
+            client, 
+            prompt_manager,
+            max_chunk_size=args.slm_chunk_size,
+            confidence_threshold=args.slm_confidence_threshold,
+            context_window=args.slm_context_window
+        )
 
         file_extension = Path(args.file_path).suffix.lower()
         logging.info(f"Processing file '{args.file_path}'...")
@@ -257,6 +263,9 @@ def _parse_arguments():
     slm_group.add_argument("--slm-detector", action="store_true", help="Use SLM as an entity detector alongside traditional methods (Task 2).")
     slm_group.add_argument("--slm-detector-mode", type=str, default="hybrid", choices=["hybrid", "exclusive"], help="Mode for the SLM detector: 'hybrid' (default) merges with traditional NER, 'exclusive' uses only SLM results.")
     slm_group.add_argument("--slm-prompt-version", type=str, default="v1", help="Specify the prompt version to use for SLM tasks.")
+    slm_group.add_argument("--slm-chunk-size", type=int, default=DefaultSizes.SLM_MAPPER_CHUNK_SIZE, help=f"Max character size for chunks sent to the SLM mapper. Default: {DefaultSizes.SLM_MAPPER_CHUNK_SIZE}.")
+    slm_group.add_argument("--slm-confidence-threshold", type=float, default=0.7, help="Minimum confidence score for entities from the SLM mapper. Default: 0.7.")
+    slm_group.add_argument("--slm-context-window", type=int, default=50, help="Character window size for context extraction in SLM mapper. Default: 50.")
 
     # Chunking & Batching Options
     chunk_group = parser.add_argument_group('Chunking and Batching')

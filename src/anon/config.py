@@ -29,6 +29,7 @@ class DefaultSizes:
     JSON_CHUNK_SIZE = 1000
     NER_CHUNK_SIZE = 1500
     NLP_BATCH_SIZE = 500
+    SLM_MAPPER_CHUNK_SIZE = 1500
 
 # --- Model Configuration ---
 TRANSFORMER_MODEL = "Davlan/xlm-roberta-base-ner-hrl"

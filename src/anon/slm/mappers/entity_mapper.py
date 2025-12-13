@@ -19,6 +19,8 @@ import json
 from pathlib import Path
 from tqdm import tqdm
 
+from ...config import DefaultSizes
+
 
 @dataclass
 class MappedEntity:
@@ -115,7 +117,7 @@ class SLMEntityMapper(EntityMapper):
     This mapper uses few-shot learning with carefully crafted prompts to
     identify entities that should be anonymized.
     
-    Example:
+    Example:  
         from slm.client import OllamaClient
         from slm.prompts import PromptManager
         
@@ -136,7 +138,7 @@ class SLMEntityMapper(EntityMapper):
         slm_client,  # SLMClient protocol
         prompt_manager,  # PromptManager
         confidence_threshold: float = 0.7,
-        max_chunk_size: int = 500,
+        max_chunk_size: int = DefaultSizes.SLM_MAPPER_CHUNK_SIZE,
         include_context: bool = True,
         context_window: int = 50
     ):
