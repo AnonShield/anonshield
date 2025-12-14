@@ -292,8 +292,12 @@ class GroundTruth:
         self.document_mappings[document_id] = hash_mapping
     
     def get_expected_hashes(self) -> Set[str]:
-        """Get all expected hashes."""
+        """Get all expected full hashes."""
         return set(self.hash_to_entity.keys())
+
+    def get_expected_display_hashes(self) -> Set[str]:
+        """Get all expected display hashes."""
+        return {entity.display_hash for entity in self.entities}
     
     def get_total_entities(self) -> int:
         """Get total number of entities in ground truth."""

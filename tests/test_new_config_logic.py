@@ -6,7 +6,7 @@ import shutil
 
 class TestNewConfigLogic(unittest.TestCase):
     CONFIG_FILE = "anonymization_config.json"
-    OUTPUT_DIR = "output"
+    OUTPUT_DIR = "test_output_new_config"
     TEST_ARRAY_FILE = "tests/test_data_pytest/test_array.json"
     TEST_SHORT_WORD_FILE = "tests/test_data_pytest/test_short_words.json"
     TEST_AUTODETECT_FILE = "tests/test_data_pytest/test_autodetect.json"
@@ -27,6 +27,7 @@ class TestNewConfigLogic(unittest.TestCase):
         command = [
             "uv", "run", "python", "anon.py", file_path,
             "--db-mode", "in-memory",
+            "--output-dir", self.OUTPUT_DIR,
             *extra_args
         ]
         result = subprocess.run(command, capture_output=True, text=True, check=False)

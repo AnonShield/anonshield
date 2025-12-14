@@ -129,8 +129,8 @@ class MetricsCalculator:
         tracker = HashTracker()
         actual_counts = tracker.count_hashes(anonymized_text)
         
-        # Get expected hashes
-        expected_hashes = ground_truth.get_expected_hashes()
+        # Get expected display hashes to match what the tracker finds
+        expected_hashes = ground_truth.get_expected_display_hashes()
         
         # Get anonymized entities from database
         db_entities = self._get_anonymized_entities()

@@ -6,7 +6,7 @@ import subprocess
 
 class TestJsonAnonymization(unittest.TestCase):
     def setUp(self):
-        self.output_dir = "output"
+        self.output_dir = "test_output_json_anon"
         self.test_data_dir = "tests/test_data_pytest"
         self.test_array_file = os.path.join(self.test_data_dir, "test_array.json")
         self.test_jsonl_file = os.path.join(self.test_data_dir, "test.jsonl")
@@ -46,7 +46,8 @@ class TestJsonAnonymization(unittest.TestCase):
         command = [
             "uv", "run", "python", "anon.py", file_path,
             "--anonymization-config", self.config_file,
-            "--db-mode", "in-memory"
+            "--db-mode", "in-memory",
+            "--output-dir", self.output_dir,
         ]
         result = subprocess.run(command, capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, f"Anonymizer script failed for '{file_path}'.\nStderr: {result.stderr}\nStdout: {result.stdout}")

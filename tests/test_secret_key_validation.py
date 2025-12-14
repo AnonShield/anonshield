@@ -32,7 +32,8 @@ class TestSecretKeyValidation(unittest.TestCase):
         result = subprocess.run(command, capture_output=True, text=True)
         
         self.assertNotEqual(result.returncode, 0, "anon.py should fail without SECRET_KEY")
-        self.assertIn("ANON_SECRET_KEY or ANON_SECRET_KEY_FILE not set", result.stderr)
+        # The TqdmLoggingHandler redirects all logs to stdout, so we check there.
+        self.assertIn("ANON_SECRET_KEY or ANON_SECRET_KEY_FILE not set", result.stdout)
         
         # Clean up dummy file
         os.remove(dummy_file)
