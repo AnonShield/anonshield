@@ -148,7 +148,7 @@ def process_entities(json_file: Path, output_file: Path, max_samples: int):
 def main():
     parser = argparse.ArgumentParser(description="Use an SLM to generate regular expressions from an entity map file.")
     parser.add_argument("file_path", type=Path, help="Path to the entity map JSON or JSONL file.")
-    parser.add_argument("--output-file", type=Path, default="slm_regex_report.json", help="Path to save the output JSON report.")
+    parser.add_argument("--output-file", type=Path, default=None, help="Path to save the output JSON report. If not provided, a default one will be created inside the 'output' directory.")
     parser.add_argument("--max-samples", type=int, default=50, help="Maximum number of unique entity samples to send to the SLM for each type.")
     
     args = parser.parse_args()
@@ -166,7 +166,13 @@ def main():
         logging.error(f"Input file not found: {args.file_path}")
         sys.exit(1)
 
-    process_entities(args.file_path, args.output_file, args.max_samples)
+    output_file = args.output_file
+    if output_file is None:
+        script_name = Path(__file__).stem
+        output_file = Path("output") / script_name / "slm_regex_report.json"
+        logging.info(f"--output-file not specified. Using generated path: {output_file}")
+
+    process_entities(args.file_path, output_file, args.max_samples)
 
 if __name__ == "__main__":
     if not ollama_client_available:

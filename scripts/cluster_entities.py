@@ -143,7 +143,7 @@ def cluster_and_report(json_file: Path, output_dir: Path, min_cluster_size: int,
 def main():
     parser = argparse.ArgumentParser(description="Cluster entity texts from an entity map file to find similar items.")
     parser.add_argument("file_path", type=Path, help="Path to the entity map JSON or JSONL file.")
-    parser.add_argument("--output-dir", type=Path, default=None, help="Directory to save the clustering report. If not provided, a unique directory is created.")
+    parser.add_argument("--output-dir", type=Path, default=None, help="Directory to save the clustering report. If not provided, a default directory will be created inside 'output/'.")
     parser.add_argument("--min-cluster-size", type=int, default=2, help="The minimum number of samples in a group for it to be considered a cluster (for HDBSCAN).")
     parser.add_argument("--entity-types", nargs='+', help="Optional: A space-separated list of specific entity types to filter by before clustering (e.g., HOSTNAME URL).")
     parser.add_argument("--min-text-length", type=int, default=3, help="Minimum character length of entity text to be included in clustering.")
@@ -160,8 +160,9 @@ def main():
         
     output_dir = args.output_dir
     if output_dir is None:
+        script_name = Path(__file__).stem
         base_name = args.file_path.stem.replace("_entity_map", "")
-        output_dir = Path(f"entity_cluster_report_{base_name}")
+        output_dir = Path("output") / script_name / f"entity_cluster_report_{base_name}"
         logging.info(f"--output-dir not specified. Using generated directory: {output_dir}")
 
     cluster_and_report(args.file_path, output_dir, args.min_cluster_size, args.entity_types, args.min_text_length, args.embedding_model)

@@ -1,4 +1,3 @@
-
 import os
 import csv
 import logging
@@ -12,7 +11,6 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 from src.anon.repository import EntityRepository
-from src.anon.config import DB_CONFIG
 
 # ---
 
@@ -44,25 +42,29 @@ def main():
         action="store_true",
         help="Limpar todas as entidades do banco de dados após a exportação para CSV."
     )
+    parser.add_argument("--db-dir", default="db", help="Directory where the database file is located. Defaults to 'db'.")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    output_dir = os.path.join(PROJECT_ROOT, "output")
+    script_name = os.path.splitext(os.path.basename(__file__))[0]
+    output_dir = os.path.join(PROJECT_ROOT, "output", script_name)
     csv_filename = "entities_export.csv"
     output_path = os.path.join(output_dir, csv_filename)
 
-    if not os.path.exists(DB_CONFIG['db_path']):
-        logging.error(f"Arquivo de banco de dados não encontrado em '{DB_CONFIG['db_path']}'. Certifique-se de que o banco de dados existe.")
+    db_path = os.path.join(args.db_dir, "entities.db")
+
+    if not os.path.exists(db_path):
+        logging.error(f"Arquivo de banco de dados não encontrado em '{db_path}'. Certifique-se de que o banco de dados existe.")
         return
 
     repository = None
     try:
         # Inicializa o repositório que gerencia as conexões de banco de dados
-        repository = EntityRepository(db_path=DB_CONFIG['db_path'])
+        repository = EntityRepository(db_path=db_path)
         repository.initialize_schema() # Garante que o esquema está pronto
         
-        logging.info(f"Conectado com sucesso ao banco de dados em '{DB_CONFIG['db_path']}'.")
+        logging.info(f"Conectado com sucesso ao banco de dados em '{db_path}'.")
 
         # 1. Busca todas as entidades usando o repositório
         logging.info("Buscando todas as entidades do banco de dados...")

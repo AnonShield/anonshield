@@ -14,7 +14,7 @@ import os
 import re
 import subprocess
 import time
-from sys import argv
+import sys
 
 # Quantidade de runs
 NUM_RUNS = 10
@@ -23,27 +23,11 @@ NUM_RUNS = 10
 REPORT_DIR = "logs"
 
 # CSV de saída
-CSV_OUT = "metrics_runs.csv"
-
-# Um caminho foi passado?
-if len(argv) < 2:
-    print("Use: python get_runs_metrics.py <tests_path>")
-    exit(1)
-
-# O caminho passado é um diretório válido?
-test_dir = argv[1].rstrip(os.sep)
-if not os.path.isdir(test_dir):
-    print(f"Error: '{test_dir}' is not a valid directory.")
-    exit(1)
-
-# Arquivos de teste (sem a barra no final)
-TEST_FILES = glob.glob(f"{test_dir}/*")
-
-# Comando base para rodar o anon
-CMD_BASE = ["uv", "run", "../anon.py"]
+script_name = os.path.splitext(os.path.basename(__file__))[0]
+CSV_OUT = os.path.join("output", script_name, "metrics_runs.csv")
 
 
-def collect_run_metrics(run_id):
+def collect_run_metrics(run_id, test_files, cmd_base):
     """
     Executa uma run completa (conjunto de teste), aguarda os relatórios,
     extrai tempo e tickets de cada relatório e retorna um dict com:
@@ -58,11 +42,11 @@ def collect_run_metrics(run_id):
     per_file_times = []
     total_tickets = 0
 
-    for idx, file in enumerate(TEST_FILES, start=1):
-        print(f"[Run {run_id}] Processing file {idx}/{len(TEST_FILES)}: {file}")
+    for idx, file in enumerate(test_files, start=1):
+        print(f"[Run {run_id}] Processing file {idx}/{len(test_files)}: {file}")
         # dispara o anon.py e deixa stdout/stderr no console
         try:
-            subprocess.run(CMD_BASE + [file], check=True)
+            subprocess.run(cmd_base + [file], check=True)
         except subprocess.CalledProcessError as e:
             print(f"[Run {run_id}] ⚠️ Error in {file}: {e}")
 
@@ -83,7 +67,8 @@ def collect_run_metrics(run_id):
             continue
 
         # lê e extrai métricas
-        content = open(report_file, encoding="utf-8").read()
+        with open(report_file, encoding="utf-8") as f:
+            content = f.read()
         m_lines = re.search(r"Number of processed rows:\s*(\d+)", content)
         m_time = re.search(r"Total elapsed time:\s*([\d.]+)", content)
 
@@ -117,7 +102,18 @@ def collect_run_metrics(run_id):
     }
 
 
-def main():
+def main_logic(test_dir):
+    """The main logic of the script."""
+    # Arquivos de teste (sem a barra no final)
+    test_files = glob.glob(f"{test_dir}/*")
+
+    # Comando base para rodar o anon
+    # Assumes CWD is project root
+    cmd_base = ["uv", "run", "python", "anon.py"]
+
+    # Garante que o diretório de saída exista
+    os.makedirs(os.path.dirname(CSV_OUT), exist_ok=True)
+
     # Verifica se o CSV já existe
     first_time = not os.path.exists(CSV_OUT)
 
@@ -139,7 +135,7 @@ def main():
 
         # Executa as runs sequencialmente
         for run_id in range(1, NUM_RUNS + 1):
-            metrics = collect_run_metrics(run_id)
+            metrics = collect_run_metrics(run_id, test_files, cmd_base)
             writer.writerow(
                 {
                     "Run": metrics["run"],
@@ -153,6 +149,19 @@ def main():
             print(f"[Main] Run {run_id} row added to CSV.")
 
     print(f"\n✅ All {NUM_RUNS} runs completed. Metrics in: {CSV_OUT}")
+
+def main():
+    """Parses arguments and runs the main logic."""
+    if len(sys.argv) < 2:
+        print("Use: python get_runs_metrics.py <tests_path>")
+        sys.exit(1)
+
+    test_dir = sys.argv[1].rstrip(os.sep)
+    if not os.path.isdir(test_dir):
+        print(f"Error: '{test_dir}' is not a valid directory.")
+        sys.exit(1)
+    
+    main_logic(test_dir)
 
 
 if __name__ == "__main__":

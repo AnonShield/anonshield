@@ -167,7 +167,7 @@ def analyze_entity_map(json_file: Path, output_dir: Path, min_regex_samples: int
 def main():
     parser = argparse.ArgumentParser(description="Analyze SLM entity map JSON or JSONL file and generate reports.")
     parser.add_argument("file_path", type=Path, help="Path to the entity map JSON or JSONL file.")
-    parser.add_argument("--output-dir", type=Path, default=None, help="Directory to save reports. If not provided, a unique directory will be created based on the input file name.")
+    parser.add_argument("--output-dir", type=Path, default=None, help="Directory to save reports. If not provided, a default directory will be created inside 'output/'.")
     parser.add_argument("--min-regex-samples", type=int, default=5, help="Minimum number of unique entity samples required to attempt grex regex generation.")
     parser.add_argument("--top-n-examples", type=int, default=10, help="Number of unique examples to list for each entity type.")
     
@@ -185,8 +185,9 @@ def main():
     # Determine output directory
     output_dir = args.output_dir
     if output_dir is None:
+        script_name = Path(__file__).stem
         base_name = args.file_path.stem.replace("_entity_map", "")
-        output_dir = Path(f"entity_analysis_report_{base_name}")
+        output_dir = Path("output") / script_name / f"entity_analysis_report_{base_name}"
         logging.info(f"--output-dir not specified. Using generated directory: {output_dir}")
 
     if not grex_available:
