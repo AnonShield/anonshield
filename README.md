@@ -1,6 +1,6 @@
-# AnonLFI 2.0: Extensible Architecture for PII Pseudonymization in CSIRTs with OCR and Technical Recognizers
+# AnonLFI 3.0: Extensible Architecture for PII Pseudonymization in CSIRTs with OCR and Technical Recognizers
 
-AnonLFI 2.0 is a modular pseudonymization framework for CSIRTs that resolves the conflict between data confidentiality (GDPR/LGPD) and analytical utility. It uses HMAC-SHA256 to generate strong, reversible pseudonyms, natively preserves XML and JSON structures, and integrates an OCR pipeline and specialized technical recognizers to handle PII in complex security artifacts. This allows sensitive incident data to be used safely for threat analysis, detection engineering, and training AI (LLM) models.
+AnonLFI 3.0 is a modular pseudonymization framework for CSIRTs that resolves the conflict between data confidentiality (GDPR/LGPD) and analytical utility. It uses HMAC-SHA256 to generate strong, reversible pseudonyms, natively preserves XML and JSON structures, and integrates an OCR pipeline and specialized technical recognizers to handle PII in complex security artifacts. This allows sensitive incident data to be used safely for threat analysis, detection engineering, and training AI (LLM) models.
 
 ## Table of Contents
 
@@ -36,7 +36,7 @@ AnonLFI 2.0 is a modular pseudonymization framework for CSIRTs that resolves the
 The tool is designed with a modular, layered architecture to separate responsibilities and allow for extensibility. The following diagram illustrates the main components and workflows, including the choice between traditional and SLM-based anonymization engines.
 
 ```mermaid
-%% Anonymization Architecture Flow (AnonLFI 2.0 with SLM)
+%% Anonymization Architecture Flow (AnonLFI 3.0 with SLM)
 graph TD
     A[User] -- "uv run anon.py <file> [args]" --> B(anon.py CLI);
 
@@ -272,8 +272,8 @@ The tool is pre-configured for **24 languages**:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/AnonShield/AnonLFI2.0.git
-   cd AnonLFI2.0
+   git clone https://github.com/AnonShield/AnonLFI3.0.git
+   cd AnonLFI3.0
    ```
 
 2. **Set the Secret Key (Mandatory for Anonymization):**
@@ -780,4 +780,4 @@ This command will discover and run all test cases located in the `tests/` direct
 
 
 
-This project is licensed under the Apache 2.0 License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache 3.0 License. See the [LICENSE](LICENSE) file for details.
