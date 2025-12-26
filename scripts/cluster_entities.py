@@ -25,7 +25,7 @@ except ImportError:
     logging.error("`hdbscan` library not found. Please install it with: uv pip install hdbscan")
     hdbscan_available = False
 
-def cluster_and_report(json_file: Path, output_dir: Path, min_cluster_size: int, entity_types: list[str] | None, min_text_length: int, model_name: str):
+def cluster_and_report(json_file: Path, output_dir: Path, min_cluster_size: int, entity_types: list[str] | None, min_text_length: int, model_name: str, cluster_selection_epsilon: float):
     """
     Loads entity data, clusters all entity texts globally to find semantic similarities
     across types, and generates a detailed markdown report.
@@ -73,6 +73,7 @@ def cluster_and_report(json_file: Path, output_dir: Path, min_cluster_size: int,
     report_content += f"* **Clustering Algorithm:** HDBSCAN\n"
     report_content += f"* **Embedding Model:** `{model_name}`\n"
     report_content += f"* **Minimum Cluster Size:** `{min_cluster_size}`\n"
+    report_content += f"* **Cluster Selection Epsilon:** `{cluster_selection_epsilon}`\n"
     report_content += f"* **Minimum Text Length:** `{min_text_length}`\n\n"
     
     # --- Filter for specific entity types if requested ---
@@ -106,7 +107,11 @@ def cluster_and_report(json_file: Path, output_dir: Path, min_cluster_size: int,
 
     # --- Perform Clustering ---
     logging.info("Running HDBSCAN clustering...")
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, gen_min_span_tree=True)
+    clusterer = hdbscan.HDBSCAN(
+        min_cluster_size=min_cluster_size,
+        cluster_selection_epsilon=cluster_selection_epsilon,
+        gen_min_span_tree=True
+    )
     clusterer.fit(embeddings)
     
     # --- Map clusters back to all original entities ---
@@ -145,6 +150,7 @@ def main():
     parser.add_argument("file_path", type=Path, help="Path to the entity map JSON or JSONL file.")
     parser.add_argument("--output-dir", type=Path, default=None, help="Directory to save the clustering report. If not provided, a default directory will be created inside 'output/'.")
     parser.add_argument("--min-cluster-size", type=int, default=2, help="The minimum number of samples in a group for it to be considered a cluster (for HDBSCAN).")
+    parser.add_argument("--cluster-selection-epsilon", type=float, default=0.0, help="A distance threshold. Clusters below this distance will be merged. A smaller value leads to more, smaller clusters.")
     parser.add_argument("--entity-types", nargs='+', help="Optional: A space-separated list of specific entity types to filter by before clustering (e.g., HOSTNAME URL).")
     parser.add_argument("--min-text-length", type=int, default=3, help="Minimum character length of entity text to be included in clustering.")
     parser.add_argument("--embedding-model", type=str, default="multi-qa-MiniLM-L6-cos-v1", help="The sentence-transformer model to use for embeddings.")
@@ -165,7 +171,15 @@ def main():
         output_dir = Path("output") / script_name / f"entity_cluster_report_{base_name}"
         logging.info(f"--output-dir not specified. Using generated directory: {output_dir}")
 
-    cluster_and_report(args.file_path, output_dir, args.min_cluster_size, args.entity_types, args.min_text_length, args.embedding_model)
+    cluster_and_report(
+        args.file_path,
+        output_dir,
+        args.min_cluster_size,
+        args.entity_types,
+        args.min_text_length,
+        args.embedding_model,
+        args.cluster_selection_epsilon
+    )
 
 if __name__ == "__main__":
     main()
