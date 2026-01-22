@@ -180,4 +180,4 @@ cython_debug/
 .pypirc
 output/*example*
 Vulnerabilidades-CAIS/
-*meu_modelo_*
+*meu_modelo_*cve_dataset_anonimizados_stratified.json
