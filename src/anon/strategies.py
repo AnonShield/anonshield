@@ -121,7 +121,7 @@ class FastStrategy(AnonymizationStrategy):
         new_text_parts = []
         current_idx = 0
         collected_entities_for_text: List[Tuple] = []
-        slug_length = operator_params.get("custom_slug_length")
+        slug_length = operator_params.get("custom_slug_length", 64)
 
         for ent in merged_entities:
             new_text_parts.append(original_doc_text[current_idx:ent["start"]])

@@ -1,6 +1,6 @@
 # SLM (Small Language Model) Integration Guide
 
-This document provides a deep dive into the architecture and design of the SLM integration module (`src/anon/slm/`). It is intended for developers who want to understand, maintain, or extend the SLM-powered capabilities of AnonLFI 2.0.
+This document provides a deep dive into the architecture and design of the SLM integration module (`src/anon/slm/`). It is intended for developers who want to understand, maintain, or extend the SLM-powered capabilities of AnonLFI 3.0.
 
 ## 1. Overview and Design Philosophy
 

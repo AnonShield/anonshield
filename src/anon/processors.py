@@ -28,9 +28,26 @@ from lxml import etree  # type: ignore
 from PIL import Image  # type: ignore
 from tqdm.auto import tqdm  # type: ignore
 import pymupdf as fitz  # type: ignore
+from dataclasses import dataclass
 
 from .config import Global, ProcessingLimits, DefaultSizes
 from .engine import AnonymizationOrchestrator
+
+
+@dataclass
+class NERTextItem:
+    """
+    Represents a text item with metadata for NER data generation.
+
+    Attributes:
+        text: The text content to process
+        path: The field path (e.g., "user.name" for JSON, "A1" for Excel)
+        forced_entity_type: Entity type forced by anonymization_config, if any
+    """
+    text: str
+    path: str = ""
+    forced_entity_type: Optional[Union[str, List[str]]] = None
+
 
 def get_output_path(original_path: str, new_ext: str, prefix: str = "anon_", output_dir: str = "output") -> str:
     """Constructs a secure output file path, preventing path traversal."""
@@ -98,13 +115,15 @@ def extract_text_from_image(image_bytes: bytes) -> str:
 class FileProcessor(ABC):
     DEFAULT_BATCH_SIZE = 200
 
-    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator, 
-                 ner_data_generation: bool = False, 
-                 anonymization_config: Optional[Dict] = None, 
-                 min_word_length: int = 3, 
-                 skip_numeric: bool = False, 
-                 output_dir: str = "output", 
-                 overwrite: bool = False, 
+    def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator,
+                 ner_data_generation: bool = False,
+                 ner_include_all: bool = False,
+                 ner_aggregate_record: bool = False,
+                 anonymization_config: Optional[Dict] = None,
+                 min_word_length: int = 3,
+                 skip_numeric: bool = False,
+                 output_dir: str = "output",
+                 overwrite: bool = False,
                  disable_gc: bool = False,
                  json_stream_threshold_mb: int = 100,
                  preserve_row_context: bool = False,
@@ -112,10 +131,12 @@ class FileProcessor(ABC):
                  csv_chunk_size: int = 1000,
                  json_chunk_size: int = 1000,
                  ner_chunk_size: int = 1500,
-                 force_large_xml: bool = False): # Added force_large_xml
+                 force_large_xml: bool = False):
         self.file_path = file_path
         self.orchestrator = orchestrator
         self.ner_data_generation = ner_data_generation
+        self.ner_include_all = ner_include_all
+        self.ner_aggregate_record = ner_aggregate_record
         self.anonymization_config = copy.deepcopy(anonymization_config) if anonymization_config is not None else {}
         self.min_word_length = min_word_length
         self.skip_numeric = skip_numeric
@@ -128,10 +149,10 @@ class FileProcessor(ABC):
         self.csv_chunk_size = csv_chunk_size
         self.json_chunk_size = json_chunk_size
         self.ner_chunk_size = ner_chunk_size
-        self.force_large_xml = force_large_xml # Store the new parameter
+        self.force_large_xml = force_large_xml
         self.ner_output_file: Optional[str] = None
-        self.ner_file_handle: Optional[io.TextIOWrapper] = None # Initialize to None with proper type hint
-        logging.debug(f"FileProcessor initialized for '{file_path}' with: ner_data_generation={ner_data_generation}, min_word_length={min_word_length}, skip_numeric={skip_numeric}, output_dir='{output_dir}', overwrite={overwrite}, disable_gc={disable_gc}, force_large_xml={force_large_xml}.")
+        self.ner_file_handle: Optional[io.TextIOWrapper] = None
+        logging.debug(f"FileProcessor initialized for '{file_path}' with: ner_data_generation={ner_data_generation}, ner_aggregate_record={ner_aggregate_record}, min_word_length={min_word_length}, skip_numeric={skip_numeric}, output_dir='{output_dir}', overwrite={overwrite}, disable_gc={disable_gc}, force_large_xml={force_large_xml}.")
 
     def _get_ner_output_path(self) -> str:
         return get_output_path(self.file_path, ".jsonl", prefix="ner_data_anon_", output_dir=self.output_dir)
@@ -173,9 +194,9 @@ class FileProcessor(ABC):
                 # Open the file handle here, within the try block
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
                 self.ner_file_handle = open(output_path, "w", encoding="utf-8")
-                
-                all_texts = self._extract_all_texts()
-                self._run_ner_pipeline(all_texts)
+
+                ner_items = list(self._extract_texts_for_ner())
+                self._run_ner_pipeline(ner_items)
                 logging.info(f"Successfully generated NER data to: {output_path}")
             else:
                 logging.info("Mode: Anonymization.")
@@ -215,6 +236,17 @@ class FileProcessor(ABC):
 
     def _extract_all_texts(self) -> List[str]:
         return list(self._extract_texts())
+
+    def _extract_texts_for_ner(self) -> Iterable[NERTextItem]:
+        """
+        Extracts texts with metadata for NER data generation.
+
+        Subclasses can override this to provide path and forced_entity_type
+        information from anonymization_config. Default implementation
+        wraps _extract_texts without metadata.
+        """
+        for text in self._extract_texts():
+            yield NERTextItem(text=text)
 
     @abstractmethod
     def _get_output_extension(self) -> str:
@@ -304,39 +336,82 @@ class FileProcessor(ABC):
         logging.debug(f"Smart batch processed successfully. Anonymized {len(text_list)} items.")
         return anonymized_values
 
-    def _run_ner_pipeline(self, text_list: List[str]):
-        if not text_list: return
+    def _run_ner_pipeline(self, ner_items: List[NERTextItem]):
+        """
+        Generates NER training data in Doccano-compatible JSONL format.
 
-        MAX_CHUNK_SIZE = DefaultSizes.NER_CHUNK_SIZE
-        DELIMITER = " . ||| . "
-        
-        text_chunks: List[str] = []
-        current_chunk: List[str] = []
-        current_len = 0
-        
-        for s in text_list:
-            should, _ = self._should_anonymize(s)
-            if not should: continue
-            s = s.strip()
-            if not s: continue
+        Each text is processed individually to ensure correct entity offsets.
+        Supports forced_entity_type from anonymization_config.
 
-            if current_len + len(s) + len(DELIMITER) > MAX_CHUNK_SIZE and current_chunk:
-                text_chunks.append(DELIMITER.join(current_chunk))
-                current_chunk, current_len = [], 0
-            
-            current_chunk.append(s)
-            current_len += len(s) + len(DELIMITER)
-        
-        if current_chunk:
-            text_chunks.append(DELIMITER.join(current_chunk))
+        Output format: {"id": int, "text": str, "label": [[start, end, type], ...]}
+        """
+        if not ner_items:
+            return
 
-        if not text_chunks: return
-        
+        # Filter items that should be processed, respecting path-based config
+        filtered_items: List[NERTextItem] = []
+        for item in ner_items:
+            text = item.text.strip()
+            if not text:
+                continue
+
+            # In aggregate mode (path="<record>"), skip path-based filtering
+            # since the entire record is serialized and path rules don't apply
+            if item.path == "<record>":
+                filtered_items.append(NERTextItem(text=text, path=item.path, forced_entity_type=None))
+                continue
+
+            should, forced_type = self._should_anonymize(text, item.path)
+            if not should:
+                continue
+            # Update forced_entity_type if config specifies one
+            if forced_type and not item.forced_entity_type:
+                item = NERTextItem(text=text, path=item.path, forced_entity_type=forced_type)
+            else:
+                item = NERTextItem(text=text, path=item.path, forced_entity_type=item.forced_entity_type)
+            filtered_items.append(item)
+
+        if not filtered_items:
+            return
+
         desc = f"Detecting Entities for {os.path.basename(self.file_path)}"
-        for chunk in tqdm(text_chunks, desc=desc, leave=False):
-            ner_records = self.orchestrator.detect_entities([chunk])
-            for record in ner_records:
-                if self.ner_file_handle is not None:
+        document_id = 0
+
+        # Process in batches for efficiency, but each text gets its own record
+        for batch in tqdm(
+            list(self._batch_iterator(filtered_items, self.batch_size)),
+            desc=desc,
+            leave=False
+        ):
+            # Extract just the texts for the orchestrator
+            texts = [item.text for item in batch]
+            ner_records = self.orchestrator.detect_entities(texts)
+
+            # Create mappings for merging detected entities with forced labels
+            text_to_item = {item.text: item for item in batch}
+            text_to_record = {record["text"]: record for record in ner_records}
+
+            # Process all items, not just those with detected entities
+            for item in batch:
+                if self.ner_file_handle is None:
+                    continue
+
+                text = item.text
+                record = text_to_record.get(text, {"text": text, "label": []})
+
+                # If forced_entity_type is set, add it as a label for the entire text
+                if item.forced_entity_type:
+                    forced_types = item.forced_entity_type if isinstance(item.forced_entity_type, list) else [item.forced_entity_type]
+                    for entity_type in forced_types:
+                        forced_label = [0, len(text), entity_type]
+                        # Add forced label if not already present
+                        if forced_label not in record.get("label", []):
+                            record.setdefault("label", []).insert(0, forced_label)
+
+                # Write if there are labels, or if ner_include_all is enabled
+                if record.get("label") or self.ner_include_all:
+                    record["id"] = document_id
+                    document_id += 1
                     self.ner_file_handle.write(orjson.dumps(record).decode('utf-8') + "\n")
                     self.ner_file_handle.flush()
 
@@ -562,6 +637,18 @@ class CsvFileProcessor(FileProcessor):
                 if batch_values:
                     yield "\n".join(batch_values) + "\n" # Yield batch of values separated by newline
 
+    def _extract_texts_for_ner(self) -> Iterable[NERTextItem]:
+        """Extracts texts with metadata for NER data generation from CSV files."""
+        chunk_size = self.csv_chunk_size
+        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
+            for chunk in reader:
+                for col in chunk.columns:
+                    for val in chunk[col].dropna():
+                        val_str = str(val)
+                        should_anon, forced_type = self._should_anonymize(val_str, col)
+                        if should_anon:
+                            yield NERTextItem(text=val_str, path=col, forced_entity_type=forced_type)
+
 
 class XlsxFileProcessor(FileProcessor):
     def _get_output_extension(self) -> str:
@@ -577,7 +664,19 @@ class XlsxFileProcessor(FileProcessor):
                         should_anon, _ = self._should_anonymize(cell.value, path)
                         if should_anon:
                             yield cell.value
-    
+
+    def _extract_texts_for_ner(self) -> Iterable[NERTextItem]:
+        """Extracts texts with metadata for NER data generation from XLSX files."""
+        wb = openpyxl.load_workbook(self.file_path, read_only=True)
+        for sheet in wb.worksheets:
+            for row in sheet.iter_rows():
+                for cell in row:
+                    if cell.value and isinstance(cell.value, str):
+                        path = f"{sheet.title}.{cell.column_letter}"  # type: ignore
+                        should_anon, forced_type = self._should_anonymize(cell.value, path)
+                        if should_anon:
+                            yield NERTextItem(text=cell.value, path=path, forced_entity_type=forced_type)
+
     def _process_anonymization(self, output_path: str):
         """
         Process an XLSX file in a memory-efficient way.
@@ -1111,10 +1210,106 @@ class JsonFileProcessor(FileProcessor):
         elif isinstance(obj, list):
             for item in obj:
                 yield from self._yield_strings_from_obj(item, path)
-        elif isinstance(obj, str):
-             should, _ = self._should_anonymize(obj, path)
-             if should: yield obj
+        elif isinstance(obj, (str, int, float)):
+            # Convert numbers to string - skip_numeric flag is handled by _should_anonymize
+            text = str(obj) if not isinstance(obj, str) else obj
+            should, _ = self._should_anonymize(text, path)
+            if should:
+                yield text
 
+    def _yield_ner_items_from_obj(self, obj, path="") -> Iterable[NERTextItem]:
+        """Yields NERTextItem with path and forced_entity_type for NER generation."""
+        path = path.lstrip(".")
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                yield from self._yield_ner_items_from_obj(v, f"{path}.{k}")
+        elif isinstance(obj, list):
+            for i, item in enumerate(obj):
+                yield from self._yield_ner_items_from_obj(item, f"{path}[{i}]")
+        elif isinstance(obj, (str, int, float)):
+            # Convert numbers to string - skip_numeric flag is handled by _should_anonymize
+            text = str(obj) if not isinstance(obj, str) else obj
+            should, forced_type = self._should_anonymize(text, path)
+            if should:
+                yield NERTextItem(text=text, path=path, forced_entity_type=forced_type)
+
+    def _serialize_record_for_ner(self, obj, path="") -> str:
+        """
+        Serializes a JSON object into a human-readable text format for NER.
+
+        Example: {"name": "John", "email": "john@example.com"}
+        Becomes: "name: John | email: john@example.com"
+        """
+        parts = []
+
+        def _flatten(o, p=""):
+            if isinstance(o, dict):
+                for k, v in o.items():
+                    new_path = f"{p}.{k}" if p else k
+                    _flatten(v, new_path)
+            elif isinstance(o, list):
+                for i, item in enumerate(o):
+                    _flatten(item, f"{p}[{i}]")
+            elif o is not None and not isinstance(o, bool):
+                # Convert to string and add to parts
+                text = str(o)
+                if text.strip():
+                    parts.append(f"{p}: {text}")
+
+        _flatten(obj, path)
+        return " | ".join(parts)
+
+    def _extract_texts_for_ner(self) -> Iterable[NERTextItem]:
+        """Extracts texts with metadata for NER data generation from JSON/JSONL files."""
+        if self.ner_aggregate_record:
+            # Aggregate mode: serialize each record as a single text
+            yield from self._extract_aggregated_records_for_ner()
+        elif self.file_path.endswith(".jsonl"):
+            with open(self.file_path, "rb") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        data = orjson.loads(line)
+                        yield from self._yield_ner_items_from_obj(data)
+                    except orjson.JSONDecodeError:
+                        continue
+        else:
+            # For regular JSON files, use in-memory loading to handle both arrays and objects
+            with open(self.file_path, "rb") as f:
+                data = orjson.loads(f.read())
+                if isinstance(data, list):
+                    for obj in data:
+                        yield from self._yield_ner_items_from_obj(obj)
+                else:
+                    yield from self._yield_ner_items_from_obj(data)
+
+    def _extract_aggregated_records_for_ner(self) -> Iterable[NERTextItem]:
+        """Extracts aggregated records where each JSON record becomes a single NER text."""
+        if self.file_path.endswith(".jsonl"):
+            with open(self.file_path, "rb") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        data = orjson.loads(line)
+                        text = self._serialize_record_for_ner(data)
+                        if text.strip():
+                            yield NERTextItem(text=text, path="<record>", forced_entity_type=None)
+                    except orjson.JSONDecodeError:
+                        continue
+        else:
+            with open(self.file_path, "rb") as f:
+                data = orjson.loads(f.read())
+                if isinstance(data, list):
+                    for obj in data:
+                        text = self._serialize_record_for_ner(obj)
+                        if text.strip():
+                            yield NERTextItem(text=text, path="<record>", forced_entity_type=None)
+                else:
+                    text = self._serialize_record_for_ner(data)
+                    if text.strip():
+                        yield NERTextItem(text=text, path="<record>", forced_entity_type=None)
 
 
 from .config import Global, ProcessingLimits, DefaultSizes
