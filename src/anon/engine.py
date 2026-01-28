@@ -257,7 +257,9 @@ class AnonymizationOrchestrator:
                  entity_detector: Optional[EntityDetector] = None,
                  slm_detector: Optional[AnonymizationStrategy] = None,
                  slm_detector_mode: str = "hybrid",
-                 ner_data_generation: bool = False):
+                 ner_data_generation: bool = False,
+                 transformer_model: str = "Davlan/xlm-roberta-base-ner-hrl",
+                 parallel_workers: int = 1):
 
         self.lang = lang
         self.db_context = db_context
@@ -267,6 +269,8 @@ class AnonymizationOrchestrator:
         self.nlp_batch_size = nlp_batch_size
         self.regex_priority = regex_priority
         self.ner_data_generation = ner_data_generation
+        self.transformer_model = transformer_model
+        self.parallel_workers = parallel_workers
 
         self.total_entities_processed = 0
         self.entity_counts: Dict[str, int] = {}
@@ -352,10 +356,18 @@ class AnonymizationOrchestrator:
         else:
             logging.info(f"Anonymization mode: Initializing TransformersNlpEngine for '{effective_lang}'.")
             trf_model_config = [
-                {"lang_code": effective_lang, "model_name": {"spacy": spacy_model_name, "transformers": TRANSFORMER_MODEL}}
+                {"lang_code": effective_lang, "model_name": {"spacy": spacy_model_name, "transformers": self.transformer_model}}
             ]
+            
+            # Choose entity mapping based on transformer model
+            if "SecureModernBERT-NER" in self.transformer_model:
+                from .config import SECURE_MODERNBERT_ENTITY_MAPPING
+                entity_mapping = SECURE_MODERNBERT_ENTITY_MAPPING
+            else:
+                entity_mapping = ENTITY_MAPPING
+                
             ner_config = NerModelConfiguration(
-                model_to_presidio_entity_mapping=ENTITY_MAPPING, 
+                model_to_presidio_entity_mapping=entity_mapping, 
                 aggregation_strategy="max", 
                 labels_to_ignore=["O"]
             )
@@ -385,6 +397,11 @@ class AnonymizationOrchestrator:
         This method dispatches to the appropriate internal method, collects all generated
         entities, and handles micro-batching persistence and entity counting.
         """
+        # Use parallel processing if enabled
+        if self.parallel_workers > 1 and len(texts) > self.parallel_workers:
+            return self._anonymize_texts_parallel(texts, forced_entity_type)
+        
+        # Single-threaded processing (original implementation)
         all_collected_entities: List[Tuple] = [] # Orchestrator's master collector for micro-batching
         operator_params = {
             "hash_generator": self.hash_generator,

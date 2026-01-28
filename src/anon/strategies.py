@@ -240,9 +240,10 @@ class BalancedStrategy(PresidioStrategy):
     def _get_core_entities(self) -> List[str]:
         """Returns a curated list of entities supported by our core recognizers (NLP + Custom Regex)."""
         from .engine import load_custom_recognizers
-        from .config import ENTITY_MAPPING
+        from .config import ENTITY_MAPPING, SECURE_MODERNBERT_ENTITY_MAPPING
         
-        core_entities = set(ENTITY_MAPPING.values())
+        # Use both entity mappings to support all models
+        core_entities = set(ENTITY_MAPPING.values()) | set(SECURE_MODERNBERT_ENTITY_MAPPING.values())
         for recognizer in load_custom_recognizers(langs=[self.lang]):
             core_entities.update(recognizer.supported_entities)
         return list(core_entities)

@@ -60,7 +60,7 @@ TRF_MODEL_PATH = os.path.join(MODELS_DIR, TRANSFORMER_MODEL)
 # Entity mappings between the transformer model's labels and Presidio's entities
 ENTITY_MAPPING = dict(
     LOC="LOCATION",
-    ORG="ORGANIZATION",
+    ORG="ORGANIZATION", 
     PER="PERSON",
     EMAIL="EMAIL_ADDRESS",
     PHONE="PHONE_NUMBER",
@@ -69,6 +69,37 @@ ENTITY_MAPPING = dict(
     GPE="LOCATION",
     ORGANIZATION="ORGANIZATION",
 )
+
+# Entity mappings for SecureModernBERT-NER (cybersecurity-focused entities)
+SECURE_MODERNBERT_ENTITY_MAPPING = {
+    # People and Organizations
+    "ORG": "ORGANIZATION",
+    "LOC": "LOCATION", 
+    "EMAIL": "EMAIL_ADDRESS",
+    
+    # Technical Indicators
+    "URL": "URL",
+    "IPV4": "IP_ADDRESS",
+    "IPV6": "IP_ADDRESS", 
+    "DOMAIN": "HOSTNAME",
+    "MD5": "HASH",
+    "SHA1": "HASH",
+    "SHA256": "HASH",
+    "FILEPATH": "FILE_PATH",
+    # Handle both variants from model
+    "REGISTRY-KEYS": "REGISTRY_KEY",
+    "THREAT-ACTOR": "THREAT_ACTOR",
+    # Cybersecurity Entities (keep as-is)
+    "MALWARE": "MALWARE",
+    "CVE": "CVE_ID",
+    "PLATFORM": "PLATFORM",
+    "PRODUCT": "PRODUCT",
+    "SECTOR": "SECTOR", 
+    "TOOL": "TOOL",
+    "CAMPAIGN": "CAMPAIGN",
+    "MITRE_TACTIC": "MITRE_TACTIC",
+    "SERVICE": "SERVICE",
+}
 
 # --- LLM Configuration ---
 LLM_CONFIG = {

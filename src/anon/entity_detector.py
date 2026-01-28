@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Optional
 
 from .config import ENTITY_MAPPING
 
@@ -7,10 +7,11 @@ class EntityDetector:
     """
     A class dedicated to detecting and merging entities from text using NLP models and regex.
     """
-    def __init__(self, compiled_patterns: List[Dict], entities_to_preserve: Set[str], allow_list: Set[str]):
+    def __init__(self, compiled_patterns: List[Dict], entities_to_preserve: Set[str], allow_list: Set[str], entity_mapping: Optional[Dict[str, str]] = None):
         self.compiled_patterns = compiled_patterns
         self.entities_to_preserve = entities_to_preserve
         self.allow_list = allow_list
+        self.entity_mapping = entity_mapping or ENTITY_MAPPING
         self.logger = logging.getLogger(__class__.__name__)
 
     def extract_entities(self, doc, original_doc_text: str) -> List[Dict]:
@@ -19,7 +20,7 @@ class EntityDetector:
 
         # Extract entities from spaCy Doc
         for ent in doc.ents:
-            normalized_label = ENTITY_MAPPING.get(ent.label_, ent.label_)
+            normalized_label = self.entity_mapping.get(ent.label_, ent.label_)
             if normalized_label not in self.entities_to_preserve:
                 detected_entities.append({
                     "start": ent.start_char, "end": ent.end_char, "label": normalized_label,

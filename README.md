@@ -214,6 +214,160 @@ The tool is pre-configured for **24 languages**:
 
 *For a full list of supported languages, run `uv run anon.py --list-languages`.*
 
+## Anonymization Strategies & Entity Detection
+
+The tool offers multiple anonymization strategies with different transformer models and entity detection approaches. Each strategy provides different trade-offs between speed, accuracy, and entity type coverage.
+
+### Transformer Models
+
+The tool supports multiple transformer models for Named Entity Recognition (NER), each optimized for different use cases:
+
+#### 1. `Davlan/xlm-roberta-base-ner-hrl` (Default)
+- **Type:** Multilingual general-purpose NER model
+- **Languages:** 24+ languages (multilingual)
+- **Size:** ~1.1 GB VRAM
+- **Use Case:** General PII detection across multiple languages
+
+**Detected Entity Types:**
+- `PERSON` - Person names
+- `ORGANIZATION` - Organization names  
+- `LOCATION` - Geographic locations
+
+#### 2. `attack-vector/SecureModernBERT-NER`
+- **Type:** Cybersecurity-focused NER model
+- **Languages:** English only
+- **Size:** ~1.1 GB VRAM  
+- **Use Case:** Cybersecurity threat intelligence and incident reports
+
+**Detected Entity Types (22 specific types):**
+- **Threat Intelligence:** `MALWARE`, `THREAT-ACTOR`, `CAMPAIGN`, `MITRE-TACTIC`
+- **Vulnerabilities:** `CVE_ID`, `TOOL`, `PLATFORM`, `PRODUCT`
+- **Network Indicators:** `URL`, `IPV4`, `IPV6`, `DOMAIN` → `HOSTNAME`
+- **Cryptographic:** `MD5` → `HASH`, `SHA1` → `HASH`, `SHA256` → `HASH`, `FILEPATH` → `FILE_PATH`, `REGISTRY-KEYS` → `REGISTRY_KEY`
+- **Organizations:** `ORG` → `ORGANIZATION`, `SECTOR`, `SERVICE`
+- **Geographic:** `LOC` → `LOCATION`
+- **Personal:** `EMAIL` → `EMAIL_ADDRESS`
+
+### Anonymization Strategies
+
+#### 1. `presidio` (Comprehensive)
+```bash
+python anon.py file.txt --anonymization-strategy presidio
+```
+- **Entity Detection:** Transformer model + spaCy NLP + Custom regex patterns
+- **Accuracy:** Highest (all available recognizers)
+
+**Complete Entity List:**
+- **From Transformer Model:** Depends on `--transformer-model` choice (see above)
+- **From spaCy NLP:** `DATE`, `TIME`, `MONEY`, `PERCENT`, `CARDINAL`, `ORDINAL`, `QUANTITY`, `GPE`, `NORP`, `FAC`, `EVENT`, `WORK_OF_ART`, `LAW`, `LANGUAGE`, `PRODUCT`
+- **From Custom Regex:** All 25+ patterns listed below
+- **From Presidio Built-in:** `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `PERSON`, `US_SSN`, `US_DRIVER_LICENSE`, etc.
+
+#### 2. `fast` (Optimized)  
+```bash
+python anon.py file.txt --anonymization-strategy fast
+```
+- **Entity Detection:** Transformer model + Custom regex patterns only
+- **Accuracy:** High (no spaCy built-in entities)
+
+**Complete Entity List:**
+- **From Transformer Model:** Depends on `--transformer-model` choice (see above)
+- **From Custom Regex:** All 25+ patterns listed below
+- **Excluded:** spaCy built-in entities, Presidio built-in recognizers
+
+#### 3. `balanced` (Mixed Approach)
+```bash
+python anon.py file.txt --anonymization-strategy balanced
+```
+- **Entity Detection:** Selected Presidio recognizers + Custom patterns
+- **Accuracy:** Good (curated subset for performance)
+
+**Complete Entity List:**
+- **From Transformer Model:** Depends on `--transformer-model` choice
+- **From Presidio Built-in:** `EMAIL_ADDRESS`, `PHONE_NUMBER`, `PERSON`, `ORGANIZATION`, `LOCATION`
+- **From Custom Regex:** High-confidence patterns only (IP_ADDRESS, HASH, CVE_ID, URL, UUID)
+- **Excluded:** spaCy built-in entities, low-confidence regex patterns
+
+#### 4. `slm` (Context-Aware)
+```bash
+python anon.py file.txt --anonymization-strategy slm
+```
+- **Entity Detection:** Local LLM (via Ollama) with contextual understanding
+- **Accuracy:** Context-dependent (dynamic entity recognition)
+
+**Complete Entity List:**
+- **Dynamic Detection:** Entities identified based on context and LLM understanding
+- **Custom Entities:** Can create new entity types based on document content
+- **No Fixed List:** Entity types vary per document and LLM model capabilities
+- **Note:** Does not use HMAC hashing or database storage
+
+### Custom Regex Entities (Available in All Strategies)
+
+The following entities are detected using custom regex patterns and are available across all anonymization strategies:
+
+**Network & Infrastructure:**
+- `URL` - Web addresses and obfuscated links
+- `IP_ADDRESS` - IPv4 and IPv6 addresses  
+- `HOSTNAME` - Domain names and FQDNs
+- `MAC_ADDRESS` - MAC addresses
+- `PORT` - Port/protocol combinations
+
+**Cryptographic & Security:**
+- `HASH` - MD5, SHA1, SHA256, SHA512 hashes
+- `CERTIFICATE` - PEM certificates and private keys
+- `CRYPTOGRAPHIC_KEY` - RSA keys, JWT tokens, Base64 keys
+- `CERT_SERIAL` - Certificate serial numbers
+- `PGP_BLOCK` - PGP signature and key blocks
+
+**Cybersecurity Identifiers:**
+- `CVE_ID` - Common Vulnerabilities and Exposures
+- `CPE_STRING` - Common Platform Enumeration
+- `UUID` - Universally Unique Identifiers
+- `OID` - Object Identifiers
+
+**Authentication & Credentials:**
+- `AUTH_TOKEN` - Session tokens and API keys
+- `PASSWORD` - Contextual passwords from key=value pairs
+- `USERNAME` - Contextual usernames from key=value pairs
+
+**Personal Information:**
+- `EMAIL_ADDRESS` - Email addresses
+- `PHONE_NUMBER` - Phone numbers (including Brazilian CPF)
+- `CREDIT_CARD` - Credit card numbers
+- `FILE_PATH` - User home directory paths
+
+### Choosing the Right Configuration
+
+**For General PII Detection:**
+```bash
+python anon.py file.txt --anonymization-strategy fast
+```
+
+**For Cybersecurity Documents:**
+```bash
+python anon.py threat_report.pdf --transformer-model attack-vector/SecureModernBERT-NER --anonymization-strategy fast
+```
+
+**For Maximum Accuracy:**
+```bash
+python anon.py sensitive_doc.txt --anonymization-strategy presidio --transformer-model attack-vector/SecureModernBERT-NER
+```
+
+**For Complex Context Understanding:**
+```bash
+python anon.py complex_report.txt --anonymization-strategy slm
+```
+
+### Memory Requirements
+
+| Configuration | VRAM Usage | Notes |
+|---------------|------------|--------|
+| Any transformer model | ~2 GB | Base transformer + spaCy models |
+| + Presidio strategy | +200 MB | Additional Presidio recognizers |
+| + SLM strategy | 8-26 GB | Depends on Ollama model size (7B-70B params) |
+
+*Processing time varies significantly based on file size, content complexity, and hardware.*
+
 ## Repository Structure
 
 ```
@@ -395,6 +549,7 @@ uv run anon.py chat_logs.txt --anonymization-strategy slm
 - `--technical-stoplist <TERMS>`: A comma-separated list of custom words to add to the technical stoplist.
 - `--skip-numeric`: If set, numeric-only strings will not be anonymized.
 - `--anonymization-strategy <strategy>`: Anonymization strategy. Options: `presidio` (full analysis), `fast` (optimized), `balanced` (mix of speed/accuracy), `slm` (end-to-end SLM). Default: `presidio`.
+- `--transformer-model <model>`: Transformer model for NER detection. Options: `Davlan/xlm-roberta-base-ner-hrl` (default, multilingual), `attack-vector/SecureModernBERT-NER` (cybersecurity-focused), `dslim/bert-base-NER` (English-only, fast). Default: `Davlan/xlm-roberta-base-ner-hrl`.
 - `--regex-priority`: Give priority to custom regex recognizers over model-based ones (adds 0.15 to regex pattern scores).
 - `--db-mode <MODE>`: Sets the database mode. Options: `persistent` (saves to disk), `in-memory` (temporary database). Default: `persistent`.
 - `--db-synchronous-mode <MODE>`: Sets the SQLite `synchronous` PRAGMA for the database connection. Options: `OFF`, `NORMAL`, `FULL`, `EXTRA`. Overrides config file setting.

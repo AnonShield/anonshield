@@ -22,6 +22,7 @@ from src.anon.config import (
     SECRET_KEY,
     TRANSFORMER_MODEL,
     TRF_MODEL_PATH,
+    MODELS_DIR,
     ProcessingLimits,
     DefaultSizes,
     Global,
@@ -568,7 +569,7 @@ def _handle_slm_entity_mapping(args):
 
 
 
-def models_check(lang: str):
+def models_check(lang: str, transformer_model: str = TRANSFORMER_MODEL):
     """Downloads and verifies necessary spaCy and Transformer models."""
     import spacy.util
     from huggingface_hub import snapshot_download
@@ -590,9 +591,11 @@ def models_check(lang: str):
                 logging.error(f"Failed to download spaCy model '{model}': {e}")
                 sys.exit(1)
 
-    if not os.path.exists(TRF_MODEL_PATH):
-        logging.info(f"Transformer model '{TRANSFORMER_MODEL}' not found. Downloading...")
-        snapshot_download(repo_id=TRANSFORMER_MODEL, cache_dir=TRF_MODEL_PATH, max_workers=10)
+    # Download transformer model dynamically based on user selection
+    trf_model_path = os.path.join(MODELS_DIR, transformer_model)
+    if not os.path.exists(trf_model_path):
+        logging.info(f"Transformer model '{transformer_model}' not found. Downloading...")
+        snapshot_download(repo_id=transformer_model, cache_dir=trf_model_path, max_workers=10)
 
 
 def write_report(file_path, start_time):
@@ -608,7 +611,10 @@ def write_report(file_path, start_time):
 
 def get_supported_entities() -> list[str]:
     """Return a sorted list of supported entity names."""
-    supported = set(ENTITY_MAPPING.values())
+    from src.anon.config import SECURE_MODERNBERT_ENTITY_MAPPING
+    
+    # Include entities from both default and SecureModernBERT mappings
+    supported = set(ENTITY_MAPPING.values()) | set(SECURE_MODERNBERT_ENTITY_MAPPING.values())
     try:
         for r in load_custom_recognizers(langs=['en']):
             supported.update(r.supported_entities)
@@ -678,6 +684,8 @@ def _parse_arguments():
     parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized. Default is to anonymize them if other rules permit.")
     parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast", "balanced", "slm"], help="Anonymization strategy ('presidio' for full analysis, 'fast' for an optimized path, 'balanced' for a mix of speed and accuracy, or 'slm' for end-to-end SLM anonymization).")
     parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
+    parser.add_argument("--transformer-model", type=str, default=TRANSFORMER_MODEL, help=f"Transformer model for NER detection. Options: 'Davlan/xlm-roberta-base-ner-hrl' (default, multilingual), 'attack-vector/SecureModernBERT-NER' (cybersecurity-focused), 'dslim/bert-base-NER' (English-only, fast). Default: {TRANSFORMER_MODEL}.")
+    parser.add_argument("--parallel-workers", type=int, default=1, help="Number of parallel workers for processing. Default: 1 (sequential processing).")
     parser.add_argument("--db-mode", type=str, default="persistent", choices=["persistent", "in-memory"], help="Database mode ('persistent' to save to disk, 'in-memory' for a temporary DB).")
     parser.add_argument("--db-dir", type=str, default="db", help="Directory for the database file.")
     parser.add_argument("--disable-gc", action="store_true", help="Disable automatic garbage collection during processing. May boost speed for single large files but increases memory usage.")
@@ -865,7 +873,7 @@ def main():
             Global.TECHNICAL_STOPLIST.update(new_stopwords)
             logging.info(f"Updated TECHNICAL_STOPLIST with {len(new_stopwords)} custom words.")
 
-    models_check(args.lang)
+    models_check(args.lang, args.transformer_model)
 
     allow_list = [term.strip() for term in args.allow_list.split(',') if term]
     logging.debug(f"Allow list: {allow_list}")
@@ -884,7 +892,7 @@ def main():
 
     try:
         engine_message = "NER detection engine" if args.generate_ner_data else "anonymization engine"
-        logging.info(f"Initializing {engine_message} for language '{args.lang}'...")
+        logging.info(f"Initializing {engine_message} for language '{args.lang}' with transformer model '{args.transformer_model}'...")
         
         # Instantiate dependencies for injection
         cache_manager = CacheManager(
@@ -892,6 +900,11 @@ def main():
             max_cache_size=args.max_cache_size
         )
         hash_generator = HashGenerator()
+        
+        # --- Determine entity mapping based on transformer model ---
+        from src.anon.config import SECURE_MODERNBERT_ENTITY_MAPPING
+        entity_mapping = SECURE_MODERNBERT_ENTITY_MAPPING if "SecureModernBERT-NER" in args.transformer_model else ENTITY_MAPPING
+        logging.info(f"Using entity mapping for model: {args.transformer_model}")
         
         # --- Entity Detector Setup ---
         custom_recognizers = load_custom_recognizers([args.lang], regex_priority=args.regex_priority)
@@ -913,7 +926,8 @@ def main():
         entity_detector = EntityDetector(
             compiled_patterns=compiled_patterns,
             entities_to_preserve=set(entities_to_preserve),
-            allow_list=set(allow_list)
+            allow_list=set(allow_list),
+            entity_mapping=entity_mapping
         )
 
         slm_detector_instance = None
@@ -983,7 +997,9 @@ def main():
             entity_detector=entity_detector,
             slm_detector=slm_detector_instance,
             slm_detector_mode=args.slm_detector_mode,
-            ner_data_generation=args.generate_ner_data
+            ner_data_generation=args.generate_ner_data,
+            transformer_model=args.transformer_model,
+            parallel_workers=args.parallel_workers
         )
         
         # --- Processing ---
