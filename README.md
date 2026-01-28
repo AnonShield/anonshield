@@ -387,7 +387,7 @@ uv run anon.py chat_logs.txt --anonymization-strategy slm
 #### Performance & Filtering Options
 
 - `--optimize`: A shorthand to enable all performance optimizations (`--anonymization-strategy fast`, `--db-mode in-memory`, `--use-cache`, and `--min-word-length 3`).
-- `--use-cache`: Enables in-memory caching for the run to speed up repeated anonymizations. Disabled by default.
+- `--use-cache`: Enables in-memory caching for the run to speed up repeated anonymizations. **Enabled by default**. Use `--no-use-cache` to disable.
 - `--preserve-row-context`: For CSV/XLSX files, process every value to preserve row context, which is more accurate but slower. The default behavior is to only process unique values, which is faster.
 - `--json-stream-threshold-mb <NUM>`: Sets the threshold (in MB) for streaming JSON files. Files larger than this will be streamed from disk to conserve memory. Default: `100`.
 - `--max-cache-size <NUM>`: Maximum number of items to store in the in-memory cache. Default: `10000`.
@@ -402,7 +402,7 @@ uv run anon.py chat_logs.txt --anonymization-strategy slm
 
 #### Chunking & Batching Options
 
-- `--batch-size <NUM>`: Default batch size for processing text chunks. Default: `200`.
+- `--batch-size <NUM>`: Default batch size for processing text chunks. Default: `1000`.
 - `--csv-chunk-size <NUM>`: Chunk size for reading CSV files with pandas. Default: `1000`.
 - `--json-chunk-size <NUM>`: Chunk size for streaming large JSON arrays. Default: `1000`.
 - `--ner-chunk-size <NUM>`: Max character size for text chunks in NER data generation. Default: `1500`.
@@ -511,7 +511,7 @@ uv run anon.py large_dataset/ --optimize
 ```
 
 This enables:
-- Fast anonymization strategy (bypasses Presidio, uses spaCy directly)
+- Fast anonymization strategy (bypasses Presidio completely, loads spaCy directly)
 - In-memory database (no disk I/O)
 - Caching enabled
 - Minimum word length of 3 characters
@@ -579,7 +579,7 @@ The core anonymization logic is encapsulated within a set of interchangeable str
 - **Decoupled Logic**: Each strategy is self-contained. It receives its required dependencies (like `analyzer_engine`, `entity_detector`, `cache_manager`) upon creation.
 - **Key Strategies**:
     1.  **`PresidioStrategy` (Comprehensive):** Contains the logic for the full Presidio pipeline, using all available recognizers for the highest accuracy.
-    2.  **`FastStrategy` (Optimized):** Contains the logic for the optimized pipeline that uses a manual combination of the NLP model and custom regexes, bypassing the main Presidio engine for speed.
+    2.  **`FastStrategy` (Optimized):** Contains the logic for the optimized pipeline that loads spaCy directly and uses custom regex recognizers, completely bypassing the Presidio engine initialization for maximum speed.
     3.  **`BalancedStrategy` (Optimal Balance):** Uses the Presidio engine but with a limited, curated set of recognizers, offering a balance between the `presidio` and `fast` strategies.
     4.  **`SLMAnonymizationStrategy` (Experimental):** Uses a local SLM to perform end-to-end contextual anonymization.
 

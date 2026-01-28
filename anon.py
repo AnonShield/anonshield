@@ -877,7 +877,9 @@ def main():
     if unknown_entities:
         logging.warning(f"Unsupported entities will be ignored: {', '.join(unknown_entities)}")
 
-    entities_to_preserve = [e for e in requested_preserve if e in supported_entities_upper]
+    # Add non-PII entities to preservation list automatically
+    entities_to_preserve = list(Global.NON_PII_ENTITIES) + [e for e in requested_preserve if e in supported_entities_upper]
+    logging.info(f"Auto-preserving non-PII entities: {', '.join(sorted(Global.NON_PII_ENTITIES))}")
     logging.debug(f"Effective entities to preserve: {entities_to_preserve}")
 
     try:
@@ -1053,13 +1055,43 @@ def main():
 
         # --- Final Output ---
         if not args.generate_ner_data and not args.no_report:
-            logging.info("\n--- Anonymization Stats ---")
-            logging.info(f"Total entities processed: {orchestrator.total_entities_processed}")
+            elapsed_time = time.time() - start_time
+            
+            # Calculate file size and throughput
+            try:
+                if os.path.isfile(args.file_path):
+                    file_size_bytes = os.path.getsize(args.file_path)
+                elif os.path.isdir(args.file_path):
+                    # Sum all files in directory
+                    file_size_bytes = sum(
+                        os.path.getsize(os.path.join(root, f))
+                        for root, _, files in os.walk(args.file_path)
+                        for f in files
+                    )
+                else:
+                    file_size_bytes = 0
+                
+                file_size_kb = file_size_bytes / 1024
+                file_size_mb = file_size_kb / 1024
+                throughput_kbps = file_size_kb / elapsed_time if elapsed_time > 0 else 0
+            except Exception:
+                file_size_mb = 0
+                throughput_kbps = 0
+            
+            print("\n" + "="*50)
+            print("ANONYMIZATION STATISTICS")
+            print("="*50)
+            print(f"Total entities processed: {orchestrator.total_entities_processed}")
             if hasattr(orchestrator, 'entity_counts') and orchestrator.entity_counts:
-                logging.info("Entities by type:")
-                for entity_type, count in sorted(orchestrator.entity_counts.items()):
-                    logging.info(f"  - {entity_type}: {count}")
-            logging.info("---------------------------\n")
+                print("\nEntities by type:")
+                for entity_type, count in sorted(orchestrator.entity_counts.items(), key=lambda x: x[1], reverse=True):
+                    print(f"  {entity_type:30s}: {count:6,d}")
+            
+            print(f"\nPerformance:")
+            print(f"  File size                     : {file_size_mb:8.2f} MB")
+            print(f"  Processing time               : {elapsed_time:8.2f} seconds")
+            print(f"  Average throughput            : {throughput_kbps:8.2f} KB/s")
+            print("="*50 + "\n")
             write_report(args.file_path, start_time)
 
     except Exception as e:

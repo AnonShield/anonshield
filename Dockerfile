@@ -1,63 +1,149 @@
-# Use a slim and modern Python base image
-FROM python:3.12-slim
+# =============================================================================
+# AnonLFI - Multi-stage Dockerfile with Lazy Loading
+# =============================================================================
+#
+# Design Principles:
+# - Lazy Loading: Models are NOT downloaded at build time
+# - Modularity: Tesseract is optional, installed but not loaded unless needed
+# - Persistence: Models are stored in volumes for reuse across containers
+# - GPU Support: Works with or without NVIDIA GPU
+#
+# Build targets:
+#   docker build -t anon:latest .                    # CPU version
+#   docker build -t anon:gpu --target gpu .          # GPU version
+#
+# Usage:
+#   docker run -v anon-models:/app/models anon:latest input.txt
+#   docker-compose up  # Recommended - includes Ollama
+# =============================================================================
 
-# Set environment variables
-# Prevents Python from writing .pyc files
-ENV PYTHONDONTWRITEBYTECODE 1
-# Ensures Python output is sent straight to the terminal without buffering
-ENV PYTHONUNBUFFERED 1
-# Set the path for uv
-ENV UV_HOME="/opt/uv"
-ENV PATH="/opt/uv/bin:$PATH"
-# Set a default secret key (should be overridden in production)
-ENV ANON_SECRET_KEY="a-secure-default-secret-key-for-development"
+# -----------------------------------------------------------------------------
+# Stage 1: Base image with system dependencies
+# -----------------------------------------------------------------------------
+FROM python:3.12-slim AS base
 
-# Install system dependencies required by the application
-# - tesseract-ocr: For OCR capabilities
-# - git: For version control and potentially fetching dependencies
-# - curl: To download the uv installer
-# - build-essential: For compiling dependencies if needed from source
-RUN apt-get update && apt-get install -y \
+# Prevent Python from writing .pyc files and buffering stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    # Application configuration
+    ANON_LAZY_LOADING=1 \
+    # Ollama configuration (for docker-compose networking)
+    OLLAMA_BASE_URL="http://ollama:11434"
+
+# Install system dependencies
+# - tesseract-ocr: OCR capabilities (lazy - only loaded when processing images)
+# - libmagic1: File type detection
+# - build-essential: Required for compiling native extensions (hdbscan, etc.)
+# - curl: Health checks and downloads
+RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
-    git \
-    curl \
+    tesseract-ocr-por \
+    libmagic1 \
     build-essential \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Install uv, the Python package manager used by this project
+# Install uv package manager
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Set the working directory inside the container
+# Add uv to PATH (must be after install)
+ENV PATH="/root/.local/bin:$PATH"
+
 WORKDIR /app
 
-# Copy dependency definition files
+# -----------------------------------------------------------------------------
+# Stage 2: Dependencies installation
+# -----------------------------------------------------------------------------
+FROM base AS dependencies
+
+# Copy only dependency files first (better layer caching)
 COPY pyproject.toml uv.lock ./
 
-# Install Python dependencies using uv for a fast and reproducible install
-RUN uv sync --no-cache
+# Install Python dependencies (without dev dependencies)
+# Using --no-cache to reduce image size
+RUN uv sync --no-cache --no-dev
 
-# Download NLP models during the build process to avoid runtime downloads
-# This makes the image self-contained and avoids failures in environments without internet access.
-RUN uv run python -m spacy download en_core_web_lg && \
-    uv run python -m spacy download pt_core_news_lg
+# -----------------------------------------------------------------------------
+# Stage 3: Production image (CPU)
+# -----------------------------------------------------------------------------
+FROM dependencies AS production
 
-# Pre-download the transformer model to the expected directory
-# The application looks for it in `models/Davlan/xlm-roberta-base-ner-hrl`
-RUN uv run python -c "from transformers import AutoModel, AutoTokenizer; \
-    model_name='Davlan/xlm-roberta-base-ner-hrl'; \
-    model_dir='models/' + model_name; \
-    AutoModel.from_pretrained(model_name, cache_dir=model_dir); \
-    AutoTokenizer.from_pretrained(model_name, cache_dir=model_dir);"
+# Copy application source
+COPY src/ ./src/
+COPY prompts/ ./prompts/
+COPY anon.py ./
+COPY anonymization_config.json ./
 
-# Copy the rest of the application source code into the container
-COPY . .
+# Create directories for runtime data
+RUN mkdir -p /app/models /app/output /app/logs /app/db
 
-# Set the entrypoint for the container.
-# This will execute the anon.py script when the container starts.
-# Arguments can be passed to `docker run`. For example:
-# docker run anon-lfi path/to/your/file.txt
-ENTRYPOINT ["uv", "run", "anon.py"]
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Set a default command (can be overridden).
-# For example, to show the help message.
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+# Volumes for persistent data
+VOLUME ["/app/models", "/app/output", "/app/db"]
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["--help"]
+
+# -----------------------------------------------------------------------------
+# Stage 4: GPU-enabled image
+# -----------------------------------------------------------------------------
+FROM nvidia/cuda:12.1-runtime-ubuntu22.04 AS gpu-base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    ANON_LAZY_LOADING=1 \
+    OLLAMA_BASE_URL="http://ollama:11434" \
+    # CUDA configuration
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# Install Python and system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    tesseract-ocr \
+    tesseract-ocr-por \
+    libmagic1 \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.12 /usr/bin/python \
+    && ln -sf /usr/bin/python3.12 /usr/bin/python3
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Add uv to PATH
+ENV PATH="/root/.local/bin:$PATH"
+
+WORKDIR /app
+
+FROM gpu-base AS gpu
+
+# Copy from production stage
+COPY --from=dependencies /app/.venv /app/.venv
+COPY --from=production /app/src /app/src
+COPY --from=production /app/prompts /app/prompts
+COPY --from=production /app/anon.py /app/
+COPY --from=production /app/anonymization_config.json /app/
+COPY --from=production /usr/local/bin/docker-entrypoint.sh /usr/local/bin/
+
+RUN mkdir -p /app/models /app/output /app/logs /app/db
+
+VOLUME ["/app/models", "/app/output", "/app/db"]
+
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["--help"]
