@@ -75,7 +75,9 @@ class CustomSlugAnonymizer(Operator):
         display_hash, full_hash = hash_generator.generate_slug(clean_text, slug_length)
 
         if "entity_collector" in params:
-            params["entity_collector"].append((entity_type, clean_text, display_hash, full_hash))
+            # Sempre adiciona para contagem, mas marca se deve persistir
+            should_persist = slug_length > 0
+            params["entity_collector"].append((entity_type, clean_text, display_hash, full_hash, should_persist))
 
         if slug_length == 0:
             return f"[{entity_type}]"
@@ -256,10 +258,17 @@ class AnonymizationOrchestrator:
         self.cache_manager = cache_manager or CacheManager(use_cache=False, max_cache_size=0)
         self.hash_generator = hash_generator or HashGenerator()
 
+        # Initialize Presidio engines for all strategies (xlm-roberta used by fast as well)
         if analyzer_engine and anonymizer_engine:
             self.analyzer_engine = analyzer_engine
             self.anonymizer_engine = anonymizer_engine
+        elif strategy_name == "slm":
+            # SLM strategy doesn't need Presidio engines
+            self.analyzer_engine = None
+            self.anonymizer_engine = None
+            logging.info(f"Skipping Presidio initialization for '{strategy_name}' strategy.")
         else:
+            # Initialize Presidio for presidio, fast, and balanced strategies
             self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
 
         # If entity_detector was not provided, create a default one.
@@ -550,11 +559,28 @@ class AnonymizationOrchestrator:
         return results
 
     def _save_and_clear_entities(self, entities: List[Tuple]):
-        """Saves a batch of entities to the database and clears the list."""
-        if self.db_context and entities:
-            self.db_context.save_entities(entities)
-            self._increment_entity_counters_for_batch(entities)
-            entities.clear() # Clear the list to free memory
+        """Counts entities for statistics and saves only those marked for persistence to the database."""
+        if not entities:
+            return
+            
+        # Sempre conta para estatísticas
+        self._increment_entity_counters_for_batch(entities)
+        
+        # Filtra apenas as que devem ser persistidas (5º elemento da tupla)
+        entities_to_persist = []
+        for entity in entities:
+            # Tuplas podem ter 4 elementos (antigas) ou 5 elementos (novas com should_persist)
+            if len(entity) >= 5 and entity[4]:  # should_persist = True
+                # Remove o flag antes de salvar (banco espera 4 elementos)
+                entities_to_persist.append(entity[:4])
+            elif len(entity) == 4:
+                # Formato antigo sem flag, assume que deve persistir
+                entities_to_persist.append(entity)
+        
+        if self.db_context and entities_to_persist:
+            self.db_context.save_entities(entities_to_persist)
+        
+        entities.clear()  # Clear the list to free memory
 
     def _increment_entity_counters_for_batch(self, entities: List[Tuple]):
         """Increments internal counters for a batch of entities."""

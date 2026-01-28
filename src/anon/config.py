@@ -12,6 +12,23 @@ class Global:
         "id", "type", "true", "false", "null", "none", "n/a", "json", "xml",
         "string", "integer", "boolean", "date", "datetime", "timestamp"
     }
+    
+    # Non-PII entities that should be preserved by default
+    # These are spaCy entity types that don't contain personally identifiable information
+    NON_PII_ENTITIES = {
+        "CARDINAL",  # Numerals that don't fall under other types
+        "ORDINAL",   # First, second, etc.
+        "QUANTITY",  # Measurements (weight, distance, etc.)
+        "MONEY",     # Monetary values
+        "PERCENT",   # Percentages
+        "TIME",      # Times (smaller than a day)
+        "LANGUAGE",  # Named languages
+        "LAW",       # Named laws, documents, etc.
+        "EVENT",     # Named events (wars, sports events, etc.)
+        "WORK_OF_ART", # Titles of books, songs, etc.
+        "PRODUCT",   # Objects, vehicles, foods, etc. (not services)
+        "FAC",       # Buildings, airports, highways, etc.
+    }
 
 class ProcessingLimits:
     """Memory and throughput limits for file processing and other operations."""

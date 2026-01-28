@@ -380,7 +380,9 @@ class FileProcessor(ABC):
         for batch in tqdm(
             list(self._batch_iterator(filtered_items, self.batch_size)),
             desc=desc,
-            leave=False
+            leave=False,
+            unit="batch",
+            bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]'
         ):
             # Extract just the texts for the orchestrator
             texts = [item.text for item in batch]
@@ -472,7 +474,8 @@ class DocxFileProcessor(FileProcessor):
     def _extract_texts(self) -> Iterable[str]:
         doc = Document(self.file_path)
         desc = f"Extracting DOCX {os.path.basename(self.file_path)}"
-        for para in tqdm(doc.paragraphs, desc=desc, unit="para", leave=False):
+        for para in tqdm(doc.paragraphs, desc=desc, unit="para", leave=False,
+                        bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]'):
             para_content_parts = []
             for run in para.runs:
                 if run._r.xpath(".//w:drawing"):
@@ -497,7 +500,8 @@ class PdfFileProcessor(FileProcessor):
     def _extract_texts(self) -> Iterable[str]:
         with fitz.open(self.file_path) as doc:
             desc = f"Extracting PDF {os.path.basename(self.file_path)}"
-            for page_num in tqdm(range(doc.page_count), desc=desc, unit="page", leave=False):
+            for page_num in tqdm(range(doc.page_count), desc=desc, unit="page", leave=False,
+                                bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]'):
                 page = doc[page_num]
                 logging.debug(f"Extracting text from page {page_num + 1}/{doc.page_count} of '{self.file_path}'.")
                 content_items = []
@@ -852,7 +856,8 @@ class XmlFileProcessor(FileProcessor):
 
         # Otimização: Evita iterar a árvore duas vezes. O tqdm funciona sem um total.
         desc_collect = f"Pass 1/2: Collecting texts from {os.path.basename(self.file_path)}"
-        for element in tqdm(tree.iter(), desc=desc_collect, unit="node", leave=False):
+        for element in tqdm(tree.iter(), desc=desc_collect, unit="node", leave=False,
+                           bar_format='{desc}: {n_fmt} nodes [{elapsed}, {rate_fmt}]'):
             path = self._get_xpath(element)
             if element.text and element.text.strip():
                 should_anon, forced_type = self._should_anonymize(element.text, path)
@@ -896,7 +901,8 @@ class XmlFileProcessor(FileProcessor):
             return
             
         desc_anon = f"Pass 2/2: Anonymizing {os.path.basename(self.file_path)}"
-        for element in tqdm(tree.iter(), desc=desc_anon, unit="node", leave=False):
+        for element in tqdm(tree.iter(), desc=desc_anon, unit="node", leave=False,
+                           bar_format='{desc}: {n_fmt} nodes [{elapsed}, {rate_fmt}]'):
             if element.text in translation_map:
                 try:
                     if use_deduplication:
@@ -1140,7 +1146,8 @@ class JsonFileProcessor(FileProcessor):
             
         progress_desc = "Anonymizing (cached)" if use_deduplication else "Anonymizing (full context)"
         logging.debug(f"Building path-aware translation map ({progress_desc}). Total strings to process: {total_strings}.")
-        progress = tqdm(total=total_strings, desc=progress_desc, unit="str", leave=False)
+        progress = tqdm(total=total_strings, desc=progress_desc, unit="str", leave=False,
+                       bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
 
         for group_key, string_list in text_groups.items():
             strings_to_process = sorted(list(set(string_list))) if use_deduplication else string_list

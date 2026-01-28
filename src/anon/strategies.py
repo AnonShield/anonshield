@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, TYPE_CHECKING, Optional, Set, Tuple
 import logging
 import pandas as pd
+import spacy
 from presidio_anonymizer import OperatorConfig
 
 if TYPE_CHECKING:
@@ -96,9 +97,9 @@ class PresidioStrategy(AnonymizationStrategy):
         return final_anonymized_list, collected_entities
 
 class FastStrategy(AnonymizationStrategy):
-    """Optimized path that bypasses the full Presidio AnalyzerEngine."""
+    """Optimized path using xlm-roberta for detection with fast anonymization."""
     def __init__(self, 
-                 nlp_engine: NlpEngine, 
+                 nlp_engine,  # TransformersNlpEngine with xlm-roberta + spaCy
                  entity_detector: EntityDetector,
                  hash_generator: HashingStrategy,
                  cache_manager: CacheStrategy,
@@ -129,10 +130,10 @@ class FastStrategy(AnonymizationStrategy):
             
             display_hash, full_hash = self.hash_generator.generate_slug(clean_text, slug_length)
 
-            # Apenas coleta a entidade para persistência se um slug foi gerado (slug_length > 0).
-            # Se slug_length é 0, a anonimização é somente no texto e não é reversível pelo banco de dados.
-            if slug_length > 0:
-                collected_entities_for_text.append((ent["label"], clean_text, display_hash, full_hash))
+            # Sempre coleta a entidade para estatísticas (com slug_length como flag)
+            # Tupla: (entity_type, text, display_hash, full_hash, should_persist)
+            should_persist = slug_length > 0
+            collected_entities_for_text.append((ent["label"], clean_text, display_hash, full_hash, should_persist))
 
             if slug_length == 0:
                 new_text_parts.append(f"[{ent['label']}]")
@@ -170,19 +171,32 @@ class FastStrategy(AnonymizationStrategy):
 
         self.logger.debug(f"Processing batch of {len(texts_to_process_in_batch)} texts in fast path.")
 
-        nlp_model = self.nlp_engine.nlp[self.lang] 
-        docs = nlp_model.pipe(texts_to_process_in_batch, batch_size=self.nlp_batch_size)
+        # Detect entities using xlm-roberta transformer via Presidio's batch analyzer
+        analyzer_results_iterator = self.nlp_engine.analyze_iterator(
+            texts_to_process_in_batch, language=self.lang,
+            score_threshold=0.6
+        )
+        
+        analyzer_results_list = list(analyzer_results_iterator)
 
-        for i, doc in enumerate(docs):
-            original_doc_text = doc.text
+        for idx, (original_doc_text, analyzer_results) in enumerate(zip(texts_to_process_in_batch, analyzer_results_list)):
             
             # --- Hybrid/Exclusive Detection Logic ---
             detected_entities = []
             
-            # Run traditional detector if not in exclusive SLM mode
+            # Add transformer-detected entities (xlm-roberta)
             if not (self.slm_detector and self.slm_detector_mode == 'exclusive'):
-                self.logger.debug("Running traditional entity detector.")
-                detected_entities.extend(self.entity_detector.extract_entities(doc, original_doc_text))
+                self.logger.debug("Running xlm-roberta entity detector.")
+                
+                # Convert Presidio results to entity format
+                for result in analyzer_results:
+                    detected_entities.append({
+                        "start": result.start,
+                        "end": result.end,
+                        "label": result.entity_type,
+                        "text": original_doc_text[result.start:result.end],
+                        "score": result.score
+                    })
 
             # Run SLM detector if enabled
             if self.slm_detector:
@@ -208,7 +222,7 @@ class FastStrategy(AnonymizationStrategy):
 
             self.cache_manager.add(original_doc_text, anonymized_text)
             
-            original_index = indices_map[i]
+            original_index = indices_map[idx]
             anonymized_results[original_index] = anonymized_text
         
         return anonymized_results, collected_entities_total
@@ -258,8 +272,9 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             allow_list=kwargs["allow_list"]
         )
     elif strategy_name == "fast":
+        # Fast strategy uses xlm-roberta for detection with optimized anonymization
         return FastStrategy(
-            nlp_engine=kwargs["analyzer_engine"].analyzer_engine.nlp_engine,
+            nlp_engine=kwargs["analyzer_engine"],  # Use Presidio engine with xlm-roberta
             entity_detector=kwargs["entity_detector"],
             slm_detector=kwargs.get("slm_detector"),
             slm_detector_mode=kwargs.get("slm_detector_mode", "hybrid"),
