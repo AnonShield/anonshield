@@ -12,6 +12,8 @@ import requests
 import json
 from dataclasses import dataclass
 
+from .ollama_manager import OllamaManager
+
 
 @dataclass
 class SLMResponse:
@@ -25,11 +27,11 @@ class SLMResponse:
 
 class SLMClient(Protocol):
     """Protocol defining the interface for SLM clients."""
-    
+
     def query(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> SLMResponse:
         """Send a query to the SLM and return structured response."""
         ...
-    
+
     def query_json(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """Query SLM and parse JSON response."""
         ...
@@ -38,41 +40,75 @@ class SLMClient(Protocol):
 class OllamaClient:
     """
     Concrete implementation of SLM client using Ollama REST API.
-    
+
     This client follows the Dependency Inversion Principle by depending on
     configuration rather than hard-coded values.
-    
+
+    When auto_manage=True (default), the client will automatically:
+    - Start the Ollama Docker container if not running
+    - Pull the required model if not available
+
     Example:
         client = OllamaClient(model="llama3", base_url="http://localhost:11434")
         response = client.query("Extract entities from: John works at Google")
     """
-    
+
     def __init__(
-        self, 
+        self,
         model: str = "llama3",
         base_url: str = "http://localhost:11434",
         timeout: int = 120,
-        temperature: float = 0.1,  # Low temperature for deterministic outputs
-        max_retries: int = 3
+        temperature: float = None,  # Will use LLM_CONFIG default if None
+        max_retries: int = 3,
+        auto_manage: bool = True,  # Auto-manage Ollama service
+        docker_image: str = None,
+        container_name: str = None,
+        gpu_enabled: bool = True
     ):
         self.model = model
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
-        self.temperature = temperature
+        # Import here to avoid circular dependency
+        from ..config import LLM_CONFIG
+        self.temperature = temperature if temperature is not None else LLM_CONFIG['ollama']['temperature']
         self.max_retries = max_retries
+        self.auto_manage = auto_manage
         self.logger = logging.getLogger(__class__.__name__)
-        
-        # Validate connectivity on init
+
+        # Initialize Ollama manager for service lifecycle
+        self.manager = OllamaManager(
+            base_url=base_url,
+            docker_image=docker_image,
+            container_name=container_name,
+            gpu_enabled=gpu_enabled
+        )
+
+        # Validate connectivity on init (with auto-management if enabled)
         self._validate_connection()
     
     def _validate_connection(self) -> None:
-        """Validates that Ollama is running and the model is available."""
+        """
+        Validates that Ollama is running and the model is available.
+
+        If auto_manage is enabled, will attempt to:
+        1. Start the Ollama Docker container if not running
+        2. Pull the required model if not available
+        """
+        if self.auto_manage:
+            # Use the manager to ensure service and model are ready
+            success, error = self.manager.ensure_service_ready(model=self.model)
+            if not success:
+                self.logger.error(f"Failed to initialize Ollama: {error}")
+                raise ConnectionError(error)
+            return
+
+        # Manual validation (original behavior when auto_manage=False)
         try:
             response = requests.get(f"{self.base_url}/api/tags", timeout=5)
             response.raise_for_status()
-            
+
             available_models = [m["name"] for m in response.json().get("models", [])]
-            
+
             if self.model not in available_models:
                 self.logger.warning(
                     f"Model '{self.model}' not found in Ollama. "

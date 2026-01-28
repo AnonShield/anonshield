@@ -33,7 +33,6 @@ from dataclasses import dataclass
 from .config import Global, ProcessingLimits, DefaultSizes
 from .engine import AnonymizationOrchestrator
 
-
 @dataclass
 class NERTextItem:
     """
@@ -113,24 +112,24 @@ def extract_text_from_image(image_bytes: bytes) -> str:
 
 
 class FileProcessor(ABC):
-    DEFAULT_BATCH_SIZE = 200
+    DEFAULT_BATCH_SIZE = DefaultSizes.BATCH_SIZE
 
     def __init__(self, file_path: str, orchestrator: AnonymizationOrchestrator,
                  ner_data_generation: bool = False,
                  ner_include_all: bool = False,
                  ner_aggregate_record: bool = False,
                  anonymization_config: Optional[Dict] = None,
-                 min_word_length: int = 3,
+                 min_word_length: int = DefaultSizes.DEFAULT_MIN_WORD_LENGTH,
                  skip_numeric: bool = False,
                  output_dir: str = "output",
                  overwrite: bool = False,
                  disable_gc: bool = False,
-                 json_stream_threshold_mb: int = 100,
+                 json_stream_threshold_mb: int = ProcessingLimits.JSON_STREAM_THRESHOLD_MB,
                  preserve_row_context: bool = False,
-                 batch_size: int = 200,
-                 csv_chunk_size: int = 1000,
-                 json_chunk_size: int = 1000,
-                 ner_chunk_size: int = 1500,
+                 batch_size: int = DefaultSizes.BATCH_SIZE,
+                 csv_chunk_size: int = DefaultSizes.CSV_CHUNK_SIZE,
+                 json_chunk_size: int = DefaultSizes.JSON_CHUNK_SIZE,
+                 ner_chunk_size: int = DefaultSizes.NER_CHUNK_SIZE,
                  force_large_xml: bool = False):
         self.file_path = file_path
         self.orchestrator = orchestrator
@@ -433,7 +432,7 @@ class TextFileProcessor(FileProcessor):
             # The base iterator yields lines with newlines attached.
             text_iterator = self._extract_texts()
 
-            for text_batch in self._batch_iterator(text_iterator, self.DEFAULT_BATCH_SIZE):
+            for text_batch in self._batch_iterator(text_iterator, self.batch_size):
                 if not text_batch:
                     continue
 
@@ -540,11 +539,13 @@ class CsvFileProcessor(FileProcessor):
         use_deduplication = not self.preserve_row_context
         
         try:
+            file_size = os.path.getsize(self.file_path)
             with open(self.file_path, "rb") as f:
-                total_rows = sum(1 for _ in f) -1
+                total_rows = sum(1 for _ in f) - 1
         except (IOError, FileNotFoundError):
             total_rows = 0
-        
+            file_size = 0
+
         if total_rows <= 0:
             if not header_written:
                 try:
@@ -555,8 +556,11 @@ class CsvFileProcessor(FileProcessor):
             return
 
         try:
+            bytes_per_row = file_size / total_rows if total_rows > 0 else 0
             with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
-                progress_bar = tqdm(total=total_rows, desc=f"Processing CSV {os.path.basename(self.file_path)}", unit="rows", leave=False)
+                progress_bar = tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024,
+                                    desc=f"Processing CSV {os.path.basename(self.file_path)}", leave=False,
+                                    bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
                 for chunk_idx, chunk in enumerate(reader):
                     logging.debug(f"Processing CSV chunk {chunk_idx + 1} with {len(chunk)} rows.")
                     anonymized_chunk = chunk.copy()
@@ -610,7 +614,7 @@ class CsvFileProcessor(FileProcessor):
 
                     anonymized_chunk.to_csv(temp_output_path, mode='a', index=False, header=not header_written, encoding='utf-8')
                     header_written = True
-                    progress_bar.update(len(chunk))
+                    progress_bar.update(int(len(chunk) * bytes_per_row))
                 progress_bar.close()
             
             shutil.move(temp_output_path, output_path)
@@ -691,18 +695,22 @@ class XlsxFileProcessor(FileProcessor):
             return
 
         total_rows = sum(sheet.max_row for sheet in read_only_wb.worksheets)
-        
+        file_size = os.path.getsize(self.file_path)
+        bytes_per_row = file_size / total_rows if total_rows > 0 else 0
+
         # The logic is now inverted: by default we use deduplication (faster).
         # Full context processing is enabled only when the flag is explicitly set.
         use_deduplication = not self.preserve_row_context
         logging.debug(f"XLSX processing pass 1 (collecting texts) with deduplication: {use_deduplication}.")
-        
+
         all_texts_map: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
         try:
-            with tqdm(total=total_rows, desc=f"Pass 1/2: Reading {os.path.basename(self.file_path)}", unit="row", leave=False) as pbar:
+            with tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024,
+                      desc=f"Pass 1/2: Reading {os.path.basename(self.file_path)}", leave=False,
+                      bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]') as pbar:
                 for sheet in read_only_wb.worksheets:
                     for row in sheet.iter_rows():
-                        pbar.update(1)
+                        pbar.update(int(bytes_per_row))
                         for cell in row:
                             if cell.value and isinstance(cell.value, str):
                                 path = f"{sheet.title}.{cell.column_letter}" # type: ignore
@@ -749,11 +757,13 @@ class XlsxFileProcessor(FileProcessor):
 
         logging.debug("XLSX processing pass 2 (writing anonymized file).")
         try:
-            with tqdm(total=total_rows, desc=f"Pass 2/2: Writing {os.path.basename(self.file_path)}", unit="row", leave=False) as pbar:
+            with tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024,
+                      desc=f"Pass 2/2: Writing {os.path.basename(self.file_path)}", leave=False,
+                      bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]') as pbar:
                 for read_sheet in read_only_wb.worksheets:
                     write_sheet = write_wb.create_sheet(title=read_sheet.title)
                     for row_idx, row in enumerate(read_sheet.iter_rows(), 1):
-                        pbar.update(1)
+                        pbar.update(int(bytes_per_row))
                         for col_idx, cell in enumerate(row, 1):
                             new_cell = write_sheet.cell(row=row_idx, column=col_idx)
                             
@@ -975,7 +985,9 @@ class JsonFileProcessor(FileProcessor):
         try:
             with open(self.file_path, 'rb') as in_f, \
                  open(temp_output_path, 'wb') as out_f, \
-                 tqdm(total=file_size, unit='B', unit_scale=True, desc=f"Streaming {os.path.basename(self.file_path)}", leave=False) as pbar:
+                 tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024,
+                      desc=f"Streaming {os.path.basename(self.file_path)}", leave=False,
+                      bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]') as pbar:
                 
                 out_f.write(b'[\n')
                 is_first_chunk = True
@@ -1140,7 +1152,7 @@ class JsonFileProcessor(FileProcessor):
                 forced_type = list(forced_type)
 
             anonymized_strings = []
-            for chunk in self._batch_iterator(strings_to_process, self.DEFAULT_BATCH_SIZE):
+            for chunk in self._batch_iterator(strings_to_process, self.batch_size):
                 anonymized_chunk = self._process_batch_smart(chunk, forced_entity_type=forced_type)
                 anonymized_strings.extend(anonymized_chunk)
                 progress.update(len(chunk))
@@ -1155,10 +1167,15 @@ class JsonFileProcessor(FileProcessor):
     def _process_anonymization_jsonl(self, output_path: str):
         """Processes .jsonl files line by line for maximum memory efficiency."""
         temp_output_path = output_path + ".tmp"
+        file_size = os.path.getsize(self.file_path)
         try:
             with open(temp_output_path, "wb") as out_f, open(self.file_path, "rb") as in_f:
                 desc = f"Processing {os.path.basename(self.file_path)}"
-                for line in tqdm(in_f, desc=desc, unit="line", leave=False):
+                pbar = tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024,
+                            desc=desc, leave=False,
+                            bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
+                for line in in_f:
+                    pbar.update(len(line))
                     if not line.strip(): continue
                     try:
                         data = orjson.loads(line)
@@ -1169,7 +1186,8 @@ class JsonFileProcessor(FileProcessor):
                     except orjson.JSONDecodeError:
                         logging.warning(f"Skipping invalid JSON line in {self.file_path}. Original line written.")
                         out_f.write(line) # Write original line if parsing fails
-            
+                pbar.close()
+
             shutil.move(temp_output_path, output_path)
             logging.info(f"Successfully anonymized JSONL file saved to: {output_path}")
 

@@ -529,8 +529,12 @@ def _handle_slm_entity_mapping(args):
             model=ollama_config["model"],
             base_url=ollama_config["base_url"],
             timeout=300,
-            temperature=args.slm_temperature, # Use new CLI arg
-            max_retries=5
+            temperature=args.slm_temperature,
+            max_retries=5,
+            auto_manage=not args.no_auto_ollama,
+            docker_image=args.ollama_docker_image,
+            container_name=args.ollama_container_name,
+            gpu_enabled=not args.ollama_no_gpu
         )
         prompt_manager = PromptManager(base_path="prompts")
         mapper = SLMEntityMapper(
@@ -642,7 +646,7 @@ def _parse_arguments():
     # Anonymization options
     parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve.")
     parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to allow.")
-    parser.add_argument("--slug-length", type=int, default=None, help="Specify the length of the anonymized slug (0-64). If 0, only the entity type is used.")
+    parser.add_argument("--slug-length", type=int, default=DefaultSizes.DEFAULT_SLUG_LENGTH, help=f"Specify the length of the anonymized slug (0-64). If 0, only the entity type is used. Default: {DefaultSizes.DEFAULT_SLUG_LENGTH}.")
     parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a JSON file with advanced anonymization rules for structured files.")
     
     # Sampling Options
@@ -666,9 +670,10 @@ def _parse_arguments():
     parser.add_argument("--preserve-row-context", action="store_true", help="For CSV/XLSX, process all values to preserve context instead of only unique values. Slower but more accurate.")
     parser.add_argument("--json-stream-threshold-mb", type=int, default=ProcessingLimits.JSON_STREAM_THRESHOLD_MB, help=f"JSON streaming threshold in MB. Files larger than this will be streamed from disk. Default: {ProcessingLimits.JSON_STREAM_THRESHOLD_MB}")
     parser.add_argument("--optimize", action="store_true", help="Enable all optimizations (fast strategy, cache, min-word-length=3, in-memory DB).")
-    parser.add_argument("--use-cache", action="store_true", default=False, help="Enable in-memory caching for the run. Disabled by default.")
+    parser.add_argument("--use-cache", action="store_true", default=True, help="Enable in-memory caching for the run. Enabled by default. Use --no-use-cache to disable.")
+    parser.add_argument("--no-use-cache", action="store_false", dest="use_cache", help="Disable in-memory caching for the run.")
     parser.add_argument("--max-cache-size", type=int, default=ProcessingLimits.MAX_CACHE_SIZE, help=f"Maximum number of items to store in the in-memory cache. Default: {ProcessingLimits.MAX_CACHE_SIZE}")
-    parser.add_argument("--min-word-length", type=int, default=0, help="Minimum character length for a word to be processed. Default is 0 (no limit).")
+    parser.add_argument("--min-word-length", type=int, default=DefaultSizes.DEFAULT_MIN_WORD_LENGTH, help=f"Minimum character length for a word to be processed. Default: {DefaultSizes.DEFAULT_MIN_WORD_LENGTH} (no limit).")
     parser.add_argument("--technical-stoplist", type=str, default="", help="Comma-separated list of custom words to add to the technical stoplist.")
     parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized. Default is to anonymize them if other rules permit.")
     parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast", "balanced", "slm"], help="Anonymization strategy ('presidio' for full analysis, 'fast' for an optimized path, 'balanced' for a mix of speed and accuracy, or 'slm' for end-to-end SLM anonymization).")
@@ -687,9 +692,16 @@ def _parse_arguments():
     slm_group.add_argument("--slm-detector-mode", type=str, default="hybrid", choices=["hybrid", "exclusive"], help="Mode for the SLM detector: 'hybrid' (default) merges with traditional NER, 'exclusive' uses only SLM results.")
     slm_group.add_argument("--slm-prompt-version", type=str, default="v1", help="Specify the prompt version to use for SLM tasks.")
     slm_group.add_argument("--slm-chunk-size", type=int, default=DefaultSizes.SLM_MAPPER_CHUNK_SIZE, help=f"Max character size for chunks sent to the SLM mapper. Default: {DefaultSizes.SLM_MAPPER_CHUNK_SIZE}.")
-    slm_group.add_argument("--slm-confidence-threshold", type=float, default=0.7, help="Minimum confidence score for entities from the SLM mapper. Default: 0.7.")
-    slm_group.add_argument("--slm-context-window", type=int, default=50, help="Character window size for context extraction in SLM mapper. Default: 50.")
+    slm_group.add_argument("--slm-confidence-threshold", type=float, default=DefaultSizes.DEFAULT_SLM_CONFIDENCE_THRESHOLD, help=f"Minimum confidence score for entities from the SLM mapper. Default: {DefaultSizes.DEFAULT_SLM_CONFIDENCE_THRESHOLD}.")
+    slm_group.add_argument("--slm-context-window", type=int, default=DefaultSizes.DEFAULT_SLM_CONTEXT_WINDOW, help=f"Character window size for context extraction in SLM mapper. Default: {DefaultSizes.DEFAULT_SLM_CONTEXT_WINDOW}.")
     slm_group.add_argument("--slm-temperature", type=float, default=LLM_CONFIG['ollama']['temperature'], help=f"Temperature for the SLM model. Default: {LLM_CONFIG['ollama']['temperature']}.")
+
+    # Ollama Service Management Options
+    ollama_group = parser.add_argument_group('Ollama Service Options')
+    ollama_group.add_argument("--no-auto-ollama", action="store_true", help="Disable automatic Ollama Docker management. By default, the script will start/manage Ollama automatically.")
+    ollama_group.add_argument("--ollama-docker-image", type=str, default="ollama/ollama:latest", help="Docker image for Ollama. Default: ollama/ollama:latest")
+    ollama_group.add_argument("--ollama-container-name", type=str, default="ollama-anon", help="Docker container name for Ollama. Default: ollama-anon")
+    ollama_group.add_argument("--ollama-no-gpu", action="store_true", help="Disable GPU support when starting Ollama Docker container.")
 
     # Chunking & Batching Options
     chunk_group = parser.add_argument_group('Chunking and Batching')
@@ -801,17 +813,26 @@ def main():
         logging.info("Anonymization config not provided. Proceeding without specific rules for structured files.")
 
     # --- Common Setup ---
-    # Dynamically set LD_LIBRARY_PATH for CUDA libraries
+    # Dynamically set LD_LIBRARY_PATH for all NVIDIA CUDA libraries
     venv_python_path = os.path.dirname(sys.executable)
     venv_lib_path = os.path.join(os.path.dirname(venv_python_path), "lib")
     venv_python_version_path = next((d for d in os.listdir(venv_lib_path) if d.startswith("python") and os.path.isdir(os.path.join(venv_lib_path, d))), "python3.11")
-    cuda_lib_path = os.path.join(venv_lib_path, venv_python_version_path, "site-packages", "nvidia", "cuda_runtime", "lib")
-    
-    if os.path.exists(cuda_lib_path):
-        os.environ["LD_LIBRARY_PATH"] = f"{cuda_lib_path}:{os.environ.get('LD_LIBRARY_PATH', '')}"
-        logging.info(f"LD_LIBRARY_PATH set to: {os.environ.get('LD_LIBRARY_PATH')}")
+    nvidia_base_path = os.path.join(venv_lib_path, venv_python_version_path, "site-packages", "nvidia")
+
+    if os.path.exists(nvidia_base_path):
+        # Find all lib directories under nvidia packages
+        cuda_lib_paths = []
+        for package_dir in os.listdir(nvidia_base_path):
+            lib_path = os.path.join(nvidia_base_path, package_dir, "lib")
+            if os.path.isdir(lib_path):
+                cuda_lib_paths.append(lib_path)
+
+        if cuda_lib_paths:
+            cuda_libs_str = ":".join(cuda_lib_paths)
+            os.environ["LD_LIBRARY_PATH"] = f"{cuda_libs_str}:{os.environ.get('LD_LIBRARY_PATH', '')}"
+            logging.info(f"CUDA libraries configured ({len(cuda_lib_paths)} paths added to LD_LIBRARY_PATH)")
     else:
-        logging.warning(f"CUDA library path not found: {cuda_lib_path}.")
+        logging.warning(f"NVIDIA library path not found: {nvidia_base_path}.")
 
     # --- GPU Activation ---
     logging.info("Verifying hardware...")
@@ -898,7 +919,14 @@ def main():
             logging.info("SLM detector enabled for hybrid mode (Task 2).")
             try:
                 ollama_config = LLM_CONFIG["ollama"]
-                client = OllamaClient(model=ollama_config["model"], base_url=ollama_config["base_url"])
+                client = OllamaClient(
+                    model=ollama_config["model"],
+                    base_url=ollama_config["base_url"],
+                    auto_manage=not args.no_auto_ollama,
+                    docker_image=args.ollama_docker_image,
+                    container_name=args.ollama_container_name,
+                    gpu_enabled=not args.ollama_no_gpu
+                )
                 prompt_manager = PromptManager(base_path="prompts")
                 slm_detector_instance = SLMEntityDetector(
                     slm_client=client,
@@ -916,7 +944,14 @@ def main():
             logging.info("Using 'slm' end-to-end anonymization strategy (Task 3).")
             try:
                 ollama_config = LLM_CONFIG["ollama"]
-                client = OllamaClient(model=ollama_config["model"], base_url=ollama_config["base_url"])
+                client = OllamaClient(
+                    model=ollama_config["model"],
+                    base_url=ollama_config["base_url"],
+                    auto_manage=not args.no_auto_ollama,
+                    docker_image=args.ollama_docker_image,
+                    container_name=args.ollama_container_name,
+                    gpu_enabled=not args.ollama_no_gpu
+                )
                 prompt_manager = PromptManager(base_path="prompts")
                 slm_anonymizer = SLMFullAnonymizer(
                     slm_client=client,

@@ -24,12 +24,16 @@ class ProcessingLimits:
 
 class DefaultSizes:
     """Default chunk and batch sizes for processing."""
-    BATCH_SIZE = 200
+    BATCH_SIZE = 1000
     CSV_CHUNK_SIZE = 1000
     JSON_CHUNK_SIZE = 1000
     NER_CHUNK_SIZE = 1500
     NLP_BATCH_SIZE = 500
     SLM_MAPPER_CHUNK_SIZE = 1500
+    DEFAULT_SLUG_LENGTH = 8
+    DEFAULT_MIN_WORD_LENGTH = 0
+    DEFAULT_SLM_CONFIDENCE_THRESHOLD = 0.7
+    DEFAULT_SLM_CONTEXT_WINDOW = 50
 
 # --- Model Configuration ---
 TRANSFORMER_MODEL = "Davlan/xlm-roberta-base-ner-hrl"

@@ -31,6 +31,7 @@ from .config import (
     SECRET_KEY,
     TRANSFORMER_MODEL,
     ProcessingLimits,
+    DefaultSizes,
 )
 from .database import DatabaseContext
 from .cache_manager import CacheManager
@@ -68,7 +69,7 @@ class CustomSlugAnonymizer(Operator):
             raise ValueError("HashGenerator instance not provided in operator params.")
 
         # Try to get the slug length from our custom parameter first.
-        slug_length = params.get("custom_slug_length")
+        slug_length = params.get("custom_slug_length", 8)
         logging.debug(f"CustomSlugAnonymizer.operate, received slug_length = {slug_length}")
         
         display_hash, full_hash = hash_generator.generate_slug(clean_text, slug_length)
@@ -225,13 +226,13 @@ class AnonymizationOrchestrator:
                  db_context: Optional[EntityStorage],
                  allow_list: List[str],
                  entities_to_preserve: List[str],
-                 slug_length: Optional[int] = None,
+                 slug_length: int = 8,
                  strategy: Optional[AnonymizationStrategy] = None,
                  strategy_name: Optional[str] = "presidio",
                  regex_priority: bool = False,
                  analyzer_engine: Optional[BatchAnalyzerEngine] = None,
                  anonymizer_engine: Optional[AnonymizerEngine] = None,
-                 nlp_batch_size: int = 500,
+                 nlp_batch_size: int = DefaultSizes.NLP_BATCH_SIZE,
                  cache_manager: Optional[CacheStrategy] = None,
                  hash_generator: Optional[HashingStrategy] = None,
                  entity_detector: Optional[EntityDetector] = None,
