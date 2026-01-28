@@ -135,8 +135,12 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
     ]
 
     hash_patterns = [
-        Pattern(name="SHA256 Hash", regex=r"\b[0-9a-fA-F]{64}\b", score=0.8 + SCORE_BOOST),
-        Pattern(name="MD5 Colon-Separated Hash", regex=r"\b([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}\b", score=0.85 + SCORE_BOOST)
+        # Hash patterns ordered by specificity (most specific first)
+        Pattern(name="SHA512 Hash", regex=r"\b[0-9a-fA-F]{128}\b", score=0.95 + SCORE_BOOST),
+        Pattern(name="SHA256 Hash", regex=r"\b[0-9a-fA-F]{64}\b(?![0-9a-fA-F])", score=0.92 + SCORE_BOOST),
+        Pattern(name="SHA1 Hash", regex=r"\b[0-9a-fA-F]{40}\b(?![0-9a-fA-F])", score=0.88 + SCORE_BOOST),
+        Pattern(name="MD5 Colon-Separated Hash", regex=r"\b([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}\b", score=0.93 + SCORE_BOOST),
+        Pattern(name="MD5 Hash", regex=r"\b[0-9a-fA-F]{32}\b(?![0-9a-fA-F])", score=0.88 + SCORE_BOOST),
     ]
 
     cve_pattern = Pattern(
@@ -181,7 +185,19 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
     cc_pattern = Pattern(name="Credit Card Pattern", regex=r"\b(?:\d{4}[- ]?){3}\d{4}\b", score=0.7 + SCORE_BOOST)
 
     uuid_pattern = Pattern(name="UUID Pattern", regex=r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", score=0.8 + SCORE_BOOST)
-    cert_body_pattern = Pattern(name="Certificate Body", regex=r"\bMII[a-zA-Z0-9+/=\n]{100,}\b", score=0.8 + SCORE_BOOST)
+    cert_patterns = [
+        Pattern(name="Certificate PEM Block", regex=r"-----BEGIN CERTIFICATE-----[A-Za-z0-9+/=\n\r]+-----END CERTIFICATE-----", score=0.95 + SCORE_BOOST),
+        Pattern(name="Certificate Request PEM Block", regex=r"-----BEGIN CERTIFICATE REQUEST-----[A-Za-z0-9+/=\n\r]+-----END CERTIFICATE REQUEST-----", score=0.95 + SCORE_BOOST),
+        Pattern(name="Private Key PEM Block", regex=r"-----BEGIN (?:RSA |DSA |EC )?PRIVATE KEY-----[A-Za-z0-9+/=\n\r]+-----END (?:RSA |DSA |EC )?PRIVATE KEY-----", score=0.95 + SCORE_BOOST),
+        Pattern(name="Certificate Body DER", regex=r"\bMII[A-Za-z0-9+/=\n]{100,}\b", score=0.8 + SCORE_BOOST),
+        Pattern(name="Certificate Thumbprint", regex=r"(?:thumbprint|sha1|sha256)[:=\s]+[0-9a-fA-F]{40,128}", score=0.85 + SCORE_BOOST),
+    ]
+
+    crypto_patterns = [
+        Pattern(name="RSA Public Key Modulus", regex=r"(?:Modulus|n)[:=\s]+[0-9a-fA-F]{128,512}", score=0.8 + SCORE_BOOST),
+        Pattern(name="JWT Token", regex=r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", score=0.9 + SCORE_BOOST),
+        Pattern(name="Base64 Encoded Key", regex=r"(?:key|secret|password)[:=\s]+([A-Za-z0-9+/]{40,}={0,2})", score=0.7 + SCORE_BOOST),
+    ]
     mac_pattern = Pattern(name="MAC Address", regex=r"\b([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})\b", score=0.8 + SCORE_BOOST)
     path_pattern = Pattern(name="User Home Path", regex=r"(?:/home/|/Users/|C:\\Users\\)([^/\\]+)", score=0.6 + SCORE_BOOST)
     
@@ -203,14 +219,15 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
             PatternRecognizer(supported_entity="CVE_ID", patterns=[cve_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="CPE_STRING", patterns=[cpe_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="CERT_SERIAL", patterns=[serial_pattern], supported_language=lang),
-            PatternRecognizer(supported_entity="CERT_BODY", patterns=[cert_body_pattern], supported_language=lang),
+            PatternRecognizer(supported_entity="CERTIFICATE", patterns=cert_patterns, supported_language=lang),
+            PatternRecognizer(supported_entity="CRYPTOGRAPHIC_KEY", patterns=crypto_patterns, supported_language=lang),
             PatternRecognizer(supported_entity="PASSWORD", patterns=[password_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="USERNAME", patterns=[username_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="EMAIL_ADDRESS", patterns=[email_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="PHONE_NUMBER", patterns=[phone_pattern, cpf_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="CREDIT_CARD", patterns=[cc_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="UUID", patterns=[uuid_pattern], supported_language=lang),
-            PatternRecognizer(supported_entity="PGP_BLOCK", patterns=[pgp_pattern], supported_language=lang), # Added PGP_BLOCK
+            PatternRecognizer(supported_entity="PGP_BLOCK", patterns=[pgp_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="PORT", patterns=[port_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="OID", patterns=[oid_pattern], supported_language=lang),
         ])
