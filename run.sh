@@ -92,9 +92,18 @@ validate() {
 }
 
 check_gpu() {
+    # Try standard --gpus all first
     if docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi &>/dev/null; then
+        echo "standard"
         return 0
     fi
+    
+    # Fallback to explicit --runtime=nvidia for problematic systems
+    if docker run --rm --runtime=nvidia --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi &>/dev/null; then
+        echo "runtime"
+        return 0
+    fi
+    
     log_error "GPU requested but NVIDIA Docker runtime is not available."
     log_error "Install NVIDIA Container Toolkit: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html"
     log_warn "Falling back to CPU."
@@ -150,15 +159,17 @@ main() {
     profile=$(detect_profile "$@")
 
     # GPU validation with fallback
+    local gpu_mode=""
     if [[ "$profile" == gpu* ]]; then
-        if ! check_gpu; then
+        gpu_mode=$(check_gpu) || {
             # Fallback: strip gpu, keep slm if present
             if [[ "$profile" == "gpu-slm" ]]; then
                 profile="slm"
             else
                 profile="cpu"
             fi
-        fi
+            gpu_mode=""
+        }
     fi
 
     log_info "Profile: $profile"
@@ -177,7 +188,33 @@ main() {
     [[ "$profile" == gpu* ]] && service="anon-gpu"
 
     log_info "Running AnonLFI ($service)..."
-    docker compose -f "$COMPOSE_FILE" --profile "$profile" run --rm "$service" "${anon_args[@]}"
+    
+    # For GPU profiles, use appropriate Docker GPU configuration
+    if [[ "$profile" == gpu* ]]; then
+        local docker_args=(
+            "--rm"
+            "--gpus" "all"
+            "-e" "ANON_SECRET_KEY=${ANON_SECRET_KEY:-change-me-in-production}"
+            "-e" "ANON_LAZY_LOADING=1"
+            "-e" "NVIDIA_VISIBLE_DEVICES=all"
+            "-e" "NVIDIA_DRIVER_CAPABILITIES=compute,utility"
+            "-v" "anon-models:/app/models"
+            "-v" "anon-output:/app/output"
+            "-v" "anon-db:/app/db"
+            "-v" "${DATA_DIR:-$(pwd)/../data}:/data:ro"
+        )
+        
+        # Add --runtime=nvidia for problematic systems
+        if [[ "$gpu_mode" == "runtime" ]]; then
+            log_info "Using explicit NVIDIA runtime for GPU acceleration..."
+            docker_args=("--runtime=nvidia" "${docker_args[@]}")
+        fi
+        
+        local image="kapelinsky/anon:gpu"
+        docker run "${docker_args[@]}" "$image" "${anon_args[@]}"
+    else
+        docker compose -f "$COMPOSE_FILE" --profile "$profile" run --rm "$service" "${anon_args[@]}"
+    fi
 }
 
 main "$@"

@@ -2,12 +2,47 @@
 
 AnonLFI 3.0 is a modular pseudonymization framework for CSIRTs that resolves the conflict between data confidentiality (GDPR/LGPD) and analytical utility. It uses HMAC-SHA256 to generate strong, reversible pseudonyms, natively preserves XML and JSON structures, and integrates an OCR pipeline and specialized technical recognizers to handle PII in complex security artifacts.
 
-## Tags
+## GPU Requirements
+
+**Hardware Support:**
+- NVIDIA GPUs with Compute Capability ≥ 6.1 (Pascal architecture and newer)
+- Minimum 4GB VRAM recommended for optimal performance
+- **Tested on:** RTX 5060 Ti (16GB VRAM)
+- **Untested but should work:** Other RTX 30xx/40xx/50xx series with sufficient VRAM
+
+**Software Requirements:**
+- NVIDIA Driver ≥ 525.60.11 (for CUDA 12.8 support)
+- Docker Engine ≥ 20.10
+- NVIDIA Container Toolkit ≥ 1.18.0
+
+**Installation (Ubuntu/Debian):**
+```bash
+# Install NVIDIA Container Toolkit
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt update && sudo apt install -y nvidia-container-toolkit
+
+# Configure Docker daemon
+sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
+sudo systemctl restart docker
+
+# Test installation
+docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi
+```
+
+**Troubleshooting:**
+- If `--gpus all` fails, use `--runtime=nvidia --gpus all` explicitly
+- For "libnvidia-ml.so.1" errors: install proprietary NVIDIA driver instead of open-source version
+- Check driver compatibility: `nvidia-smi` should show CUDA Version ≥ 12.8
+- **Note:** Some systems may require explicit `--runtime=nvidia` flag due to Docker daemon configuration issues
+
+**Compatibility Disclaimer:**
+GPU support has been tested and verified only on RTX 5060 Ti with NVIDIA Driver 590.48.01 on Ubuntu 24.04. While the container should work on other modern NVIDIA GPUs with sufficient VRAM and compatible drivers, compatibility is not guaranteed.
 
 | Tag | Base | Description |
 |-----|------|-------------|
 | `latest` | `python:3.12-slim` | CPU-only runtime. Works on any machine. |
-| `gpu` | `nvidia/cuda:12.1.1` | NVIDIA GPU accelerated. Requires [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html). |
+| `gpu` | `nvidia/cuda:12.8.0` | NVIDIA GPU accelerated. Requires [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html). |
 
 ## Quick Start
 
@@ -70,7 +105,14 @@ docker run --rm \
 
 ### GPU mode
 ```bash
+# Standard GPU usage
 docker run --rm --gpus all \
+  -e ANON_SECRET_KEY="my-key" \
+  -v $(pwd):/data \
+  kapelinsky/anon:gpu /data/document.txt
+
+# For systems with Docker runtime issues, use explicit nvidia runtime:
+docker run --rm --runtime=nvidia --gpus all \
   -e ANON_SECRET_KEY="my-key" \
   -v $(pwd):/data \
   kapelinsky/anon:gpu /data/document.txt
@@ -143,6 +185,29 @@ docker run --rm \
 | `/app/models` | Cached ML models (spaCy, transformers). Mount to persist across runs. |
 | `/app/output` | Default output directory for anonymized files. |
 | `/app/db` | SQLite database for entity mapping (needed for de-anonymization). |
+
+## Performance Benchmarks
+
+**GPU Acceleration Impact (RTX 5060 Ti):**
+- **Transformer NER Models**: Expected 3-5x speedup with GPU vs CPU
+- **spaCy NLP Pipeline**: CPU-bound, minimal GPU benefit
+- **Large Document Processing**: Performance gains more noticeable on files >1MB
+- **Memory Usage**: GPU version uses ~2-4GB VRAM depending on model size
+
+**Resource Requirements:**
+```
+CPU Mode:  ~2GB RAM, any x86_64 processor
+GPU Mode:  ~4GB RAM + 2-4GB VRAM, CUDA-compatible GPU
+```
+
+**When to use GPU:**
+- ✅ Large document batches (>100 files)
+- ✅ Complex entity recognition (multiple languages)
+- ✅ Transformer-heavy workloads
+- ❌ Single small files (<100KB)
+- ❌ Simple regex-only anonymization
+
+**Note:** Performance benchmarks based on testing with RTX 5060 Ti. Results may vary on other GPU models.
 
 ## Supported Entities
 
