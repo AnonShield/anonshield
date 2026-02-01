@@ -1,275 +1,374 @@
-# AnonLFI 3.0: Extensible Architecture for PII Pseudonymization in CSIRTs
+# AnonLFI 3.0: Professional PII Pseudonymization Framework for CSIRTs
 
-AnonLFI 3.0 is a modular pseudonymization framework for CSIRTs that resolves the conflict between data confidentiality (GDPR/LGPD) and analytical utility. It uses HMAC-SHA256 to generate strong, reversible pseudonyms, natively preserves XML and JSON structures, and integrates an OCR pipeline and specialized technical recognizers to handle PII in complex security artifacts.
+**Enterprise-grade pseudonymization framework designed for Cybersecurity Incident Response Teams (CSIRTs).** Resolves the conflict between data confidentiality (GDPR/LGPD compliance) and analytical utility using HMAC-SHA256 reversible pseudonyms. Features OCR pipeline, 24-language support, and Small Language Model (SLM) integration for context-aware anonymization.
 
-## GPU Requirements
+## Container Architecture
 
-**Hardware Support:**
-- NVIDIA GPUs with Compute Capability ≥ 6.1 (Pascal architecture and newer)
-- Minimum 4GB VRAM recommended for optimal performance
-- **Tested on:** RTX 5060 Ti (16GB VRAM)
-- **Untested but should work:** Other RTX 30xx/40xx/50xx series with sufficient VRAM
+| Tag | Base Image | Target Use Case | Size | Features |
+|-----|------------|-----------------|------|----------|
+| `latest` | `python:3.12-slim` | **CPU processing** - Works on any x86_64 machine | ~1.5GB | Full feature set, universal compatibility |
+| `gpu` | `nvidia/cuda:12.8.0` | **GPU acceleration** - NVIDIA hardware only | ~6GB+ | GPU acceleration, CUDA 12.8 support |
 
-**Software Requirements:**
-- NVIDIA Driver ≥ 525.60.11 (for CUDA 12.8 support)
-- Docker Engine ≥ 20.10
-- NVIDIA Container Toolkit ≥ 1.18.0
+## Hardware Requirements
 
-**Installation (Ubuntu/Debian):**
-```bash
-# Install NVIDIA Container Toolkit
-curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-sudo apt update && sudo apt install -y nvidia-container-toolkit
+### CPU Version (`latest` tag)
+- **Any x86_64 processor**
+- **4GB RAM minimum** (8GB+ recommended for large files)
+- No GPU required
 
-# Configure Docker daemon
-sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
-sudo systemctl restart docker
+### GPU Version (`gpu` tag) 
+- **NVIDIA GPU with Compute Capability ≥ 6.1** (Pascal architecture+)
+- **8GB VRAM minimum** (16GB+ recommended for optimal performance)
+- **8GB+ System RAM** (container + models require substantial memory)
+- **NVIDIA Driver ≥ 525.60.11** (for CUDA 12.8 support)
+- **NVIDIA Container Toolkit** (installation guide below)
 
-# Test installation
-docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi
-```
-
-**Troubleshooting:**
-- If `--gpus all` fails, use `--runtime=nvidia --gpus all` explicitly
-- For "libnvidia-ml.so.1" errors: install proprietary NVIDIA driver instead of open-source version
-- Check driver compatibility: `nvidia-smi` should show CUDA Version ≥ 12.8
-- **Note:** Some systems may require explicit `--runtime=nvidia` flag due to Docker daemon configuration issues
-
-**Compatibility Disclaimer:**
-GPU support has been tested and verified only on RTX 5060 Ti with NVIDIA Driver 590.48.01 on Ubuntu 24.04. While the container should work on other modern NVIDIA GPUs with sufficient VRAM and compatible drivers, compatibility is not guaranteed.
-
-| Tag | Base | Description |
-|-----|------|-------------|
-| `latest` | `python:3.12-slim` | CPU-only runtime. Works on any machine. |
-| `gpu` | `nvidia/cuda:12.8.0` | NVIDIA GPU accelerated. Requires [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html). |
+**⚠️ GPU Compatibility:** Tested and verified only on RTX 5060 Ti (16GB VRAM) with Driver 590.48.01 on Ubuntu 24.04. Other modern NVIDIA GPUs should work but compatibility is not guaranteed.
 
 ## Quick Start
 
+### CPU Mode (Universal)
 ```bash
-docker pull kapelinsky/anon
-
+# Basic anonymization
 docker run --rm \
-  -e ANON_SECRET_KEY="your-secret-key" \
-  -v $(pwd):/data \
-  kapelinsky/anon /data/input.txt
-```
-
-Output is written to `/data/output/` by default.
-
-## Key Features
-
-- **Structure-Preserving Processing:** Natively processes `.json`, `.xml`, `.csv`, `.txt`, `.pdf`, `.docx`, and `.xlsx` files preserving their original hierarchy.
-- **OCR for Images:** Extracts and anonymizes text from images in PDF/DOCX files and standalone image files (`.png`, `.jpeg`, `.gif`, `.bmp`, `.tiff`, `.webp`).
-- **Advanced Entity Recognition:** Uses Presidio + Transformer models (`Davlan/xlm-roberta-base-ner-hrl`) for high-accuracy entity detection.
-- **SLM-Powered Anonymization:** Integrates Small Language Models (SLMs) via Ollama for context-aware entity detection and anonymization.
-- **Cybersecurity-Focused Recognizers:** Detects IP addresses, URLs, hostnames, hashes, UUIDs, CVE IDs, CPE strings, certificate serials, MAC addresses, PGP blocks, and more.
-- **Consistent & Secure Anonymization:** HMAC-SHA256-based slugs ensure the same entity always maps to the same pseudonym.
-- **Controlled De-anonymization:** Reverse anonymization protected by the same secret key.
-- **24 Languages Supported:** Including English, Portuguese, Spanish, French, German, Italian, and more.
-
-## Usage Examples
-
-### Anonymize a text file
-```bash
-docker run --rm \
-  -e ANON_SECRET_KEY="my-key" \
+  -e ANON_SECRET_KEY="your-secure-key" \
   -v $(pwd):/data \
   kapelinsky/anon /data/document.txt
-```
 
-### Anonymize a CSV with language selection
-```bash
+# Process entire directory
 docker run --rm \
-  -e ANON_SECRET_KEY="my-key" \
-  -v $(pwd):/data \
-  kapelinsky/anon /data/data.csv --lang pt
-```
-
-### Anonymize a JSON with custom config
-```bash
-docker run --rm \
-  -e ANON_SECRET_KEY="my-key" \
-  -v $(pwd):/data \
-  -v $(pwd)/my_config.json:/app/anonymization_config.json \
-  kapelinsky/anon /data/data.json --anonymization-config /app/anonymization_config.json
-```
-
-### Process an entire directory
-```bash
-docker run --rm \
-  -e ANON_SECRET_KEY="my-key" \
-  -v $(pwd)/docs:/data \
+  -e ANON_SECRET_KEY="your-secure-key" \
+  -v $(pwd)/documents:/data \
   kapelinsky/anon /data/
 ```
 
-### GPU mode
+### GPU Mode (NVIDIA Only)
 ```bash
-# Standard GPU usage
+# GPU acceleration for transformer models
+# ⚠️ CRITICAL: --gpus all flag is MANDATORY
 docker run --rm --gpus all \
-  -e ANON_SECRET_KEY="my-key" \
+  -e ANON_SECRET_KEY="your-secure-key" \
   -v $(pwd):/data \
   kapelinsky/anon:gpu /data/document.txt
 
-# For systems with Docker runtime issues, use explicit nvidia runtime:
+# For systems with Docker runtime issues:
 docker run --rm --runtime=nvidia --gpus all \
-  -e ANON_SECRET_KEY="my-key" \
+  -e ANON_SECRET_KEY="your-secure-key" \
   -v $(pwd):/data \
   kapelinsky/anon:gpu /data/document.txt
-```
 
-### SLM mode (with Ollama)
-```bash
-# Start Ollama first, then:
-docker run --rm \
-  -e ANON_SECRET_KEY="my-key" \
-  -e OLLAMA_BASE_URL="http://host.docker.internal:11434" \
-  -v $(pwd):/data \
-  kapelinsky/anon /data/report.txt --slm-detector --slm-detector-mode hybrid
-```
-
-### Persist models across runs
-```bash
-docker run --rm \
-  -e ANON_SECRET_KEY="my-key" \
+# RECOMMENDED: With model persistence (avoids redownloading 2-4GB every time)
+docker run --rm --gpus all \
+  -e ANON_SECRET_KEY="your-secure-key" \
   -v $(pwd):/data \
   -v anon-models:/app/models \
-  kapelinsky/anon /data/document.txt
+  kapelinsky/anon:gpu /data/document.txt
 ```
 
-### Persist database (for de-anonymization)
+Output files are saved to `/data/output/` by default.
+
+## GPU Setup (NVIDIA Container Toolkit)
+
+**Ubuntu/Debian Installation:**
 ```bash
-docker run --rm \
-  -e ANON_SECRET_KEY="my-key" \
-  -v $(pwd):/data \
-  -v anon-db:/app/db \
-  kapelinsky/anon /data/document.txt --db-mode persistent --db-dir /app/db
+# Add NVIDIA Container Toolkit repository
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+# Install and configure
+sudo apt update && sudo apt install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
+sudo systemctl restart docker
+
+# Test GPU access
+docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi
 ```
 
-### Custom slug length
+**Troubleshooting GPU Issues:**
+- **Error: "libnvidia-ml.so.1 not found"** → Install proprietary NVIDIA drivers (`sudo apt install nvidia-driver-xxx`)
+- **Error: "--gpus all not supported"** → Use `--runtime=nvidia --gpus all` explicitly
+- **Driver compatibility** → Run `nvidia-smi` and verify CUDA Version ≥ 12.8
+
+## SLM Integration (Fully Automatic)
+
+**AnonLFI automatically manages Ollama - no manual setup required!**
+
+### Automatic LLM Management Features
+- ✅ **Zero Configuration**: Just add `--slm-detector` flag
+- ✅ **Auto-Start**: Automatically starts Ollama Docker container if not running
+- ✅ **Auto-Download**: Downloads required models (llama3) on first use
+- ✅ **Docker Integration**: Requires Docker socket access for container management
+- ✅ **Model Persistence**: Downloaded models persist in Docker volumes
+- ✅ **GPU Support**: Automatically uses GPU if available for Ollama
+
+### SLM Usage Examples
 ```bash
+# Auto-managed SLM detection (CPU mode)
 docker run --rm \
-  -e ANON_SECRET_KEY="my-key" \
+  -e ANON_SECRET_KEY="your-key" \
   -v $(pwd):/data \
-  kapelinsky/anon /data/report.pdf --slug-length 12
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  kapelinsky/anon /data/report.txt --slm-detector
+
+# Auto-managed SLM detection (GPU mode - fastest)
+docker run --rm --gpus all \
+  -e ANON_SECRET_KEY="your-key" \
+  -v $(pwd):/data \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  kapelinsky/anon:gpu /data/report.txt --slm-detector
+
+# SLM entity analysis (generates detailed reports)
+docker run --rm \
+  -e ANON_SECRET_KEY="your-key" \
+  -v $(pwd):/data \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  kapelinsky/anon /data/document.txt --slm-map-entities
+
+# Full SLM anonymization (end-to-end AI processing)
+docker run --rm \
+  -e ANON_SECRET_KEY="your-key" \
+  -v $(pwd):/data \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  kapelinsky/anon /data/complex.txt --anonymization-strategy slm
 ```
 
-### Fast mode with optimizations
-```bash
-docker run --rm \
-  -e ANON_SECRET_KEY="my-key" \
-  -v $(pwd):/data \
-  kapelinsky/anon /data/large_dataset/ --optimize
-```
+**How Auto-Management Works:**
+1. **Detection**: System checks if Ollama is running on localhost:11434
+2. **Auto-Start**: If not found, starts `ollama/ollama:latest` container with GPU support
+3. **Model Download**: Downloads `llama3` model automatically (5-10 minutes first time)
+4. **Ready**: SLM features become available immediately
+5. **Persistence**: Models and container persist for subsequent runs
 
-### Generate NER training data (no secret key needed)
-```bash
-docker run --rm \
-  -v $(pwd):/data \
-  kapelinsky/anon /data/corpus/ --generate-ner-data --output-dir /data/ner_output/
-```
+**Docker Socket Requirement:** SLM auto-management requires Docker socket access (`-v /var/run/docker.sock:/var/run/docker.sock`) to manage the Ollama container.
+
+## Core Features
+
+### File Format Support
+**Preserves original structure for:**
+- `.json`, `.jsonl` - JSON structure preserved
+- `.xml` - XML hierarchy maintained
+- `.csv`, `.xlsx` - Tabular data formatting
+- `.pdf`, `.docx` - Document layout preserved
+- `.txt` - Plain text processing
+
+**OCR Image Processing:**
+- Extracts text from images in PDF/DOCX files
+- Supports standalone images: `.png`, `.jpeg`, `.gif`, `.bmp`, `.tiff`, `.webp`
+- Uses Tesseract OCR with multilingual support
+
+### Entity Detection (25+ Types)
+**Personal Information:**
+- `PERSON` - Names, `EMAIL_ADDRESS` - Emails, `PHONE_NUMBER` - Phone numbers
+- `CREDIT_CARD` - Card numbers, `LOCATION` - Geographic locations
+
+**Cybersecurity Indicators:**
+- `IP_ADDRESS` - IPv4/IPv6 addresses, `URL` - Web addresses, `HOSTNAME` - Domain names
+- `HASH` - MD5/SHA1/SHA256/SHA512, `MAC_ADDRESS` - Network MAC addresses
+- `CVE_ID` - Vulnerability identifiers, `CPE_STRING` - Platform enumeration
+- `UUID` - Unique identifiers, `CERT_SERIAL` - Certificate serials
+
+**Technical Patterns:**
+- `AUTH_TOKEN` - API keys/session tokens, `PGP_BLOCK` - PGP signatures
+- `FILE_PATH` - System paths, `PASSWORD`/`USERNAME` - Contextual credentials
+
+### Advanced Processing
+**Anonymization Strategies:**
+- `presidio` (default) - Full analysis with all recognizers
+- `fast` - Optimized transformer + regex only
+- `balanced` - Curated subset for speed/accuracy balance
+- `slm` - End-to-end LLM-based anonymization
+
+**Language Support (24 languages):**
+English, Portuguese, Spanish, French, German, Italian, Chinese, Japanese, Korean, Russian, Polish, Dutch, Swedish, Norwegian, Danish, Finnish, Greek, Croatian, Lithuanian, Slovenian, Macedonian, Romanian, Ukrainian, Catalan
+
+**Security & Consistency:**
+- **HMAC-SHA256** pseudonym generation with secret key
+- **Reversible anonymization** - same entity = same pseudonym
+- **Controlled de-anonymization** with secret key protection
+- **Configurable slug length** (1-64 characters)
 
 ## Environment Variables
 
 | Variable | Required | Description | Default |
 |----------|----------|-------------|---------|
-| `ANON_SECRET_KEY` | **Yes** (for anonymization) | Encryption key for HMAC-SHA256 pseudonym generation. | — |
-| `ANON_LAZY_LOADING` | No | Download ML models on first use. | `1` |
-| `ANON_PRELOAD` | No | Comma-separated models to preload (e.g. `spacy:en_core_web_lg`). | — |
-| `OLLAMA_BASE_URL` | No | Ollama service URL for SLM features. | `http://ollama:11434` |
+| `ANON_SECRET_KEY` | **YES** | HMAC-SHA256 secret key for pseudonym generation | - |
+| `ANON_LAZY_LOADING` | No | Download models on first use (automatic) | `1` |
+| `ANON_PRELOAD` | No | Pre-download specific models on startup | - |
+| `OLLAMA_BASE_URL` | No | Ollama service URL (for manual Ollama) | `http://ollama:11434` |
 
-## Volumes
+## Model Persistence (CRITICAL for Production)
 
-| Path | Description |
-|------|-------------|
-| `/app/models` | Cached ML models (spaCy, transformers). Mount to persist across runs. |
-| `/app/output` | Default output directory for anonymized files. |
-| `/app/db` | SQLite database for entity mapping (needed for de-anonymization). |
+**⚠️ WITHOUT PERSISTENT VOLUMES, MODELS REDOWNLOAD EVERY TIME (2-4GB each run)**
 
-## Performance Benchmarks
+### Essential Volumes
+| Mount Path | Purpose | Size Impact | Required |
+|------------|---------|-------------|----------|
+| `/app/models` | **AI Model Cache** - spaCy + Transformer models | 2-4GB | ✅ **CRITICAL** |
+| `/app/db` | **Entity Database** - Anonymization mappings | <100MB | ✅ **For de-anonymization** |
+| `/app/output` | **Results** - Anonymized files | Variable | ✅ **Recommended** |
+| `/var/run/docker.sock` | **Docker Socket** - SLM container management | - | Only for SLM |
 
-**GPU Acceleration Impact (RTX 5060 Ti):**
-- **Transformer NER Models**: Expected 3-5x speedup with GPU vs CPU
-- **spaCy NLP Pipeline**: CPU-bound, minimal GPU benefit
-- **Large Document Processing**: Performance gains more noticeable on files >1MB
-- **Memory Usage**: GPU version uses ~2-4GB VRAM depending on model size
+### Model Download Process
+**First Run (without volumes):**
+1. Downloads spaCy model (400MB+)
+2. Downloads transformer model (1-2GB)
+3. Caches in `/app/models`
+4. **Total: 5-10 minutes download time**
 
-**Resource Requirements:**
-```
-CPU Mode:  ~2GB RAM, any x86_64 processor
-GPU Mode:  ~4GB RAM + 2-4GB VRAM, CUDA-compatible GPU
-```
+**Subsequent Runs (with persistent volumes):**
+1. Uses cached models instantly
+2. **Total: 0 seconds download time**
 
-**When to use GPU:**
-- ✅ Large document batches (>100 files)
-- ✅ Complex entity recognition (multiple languages)
-- ✅ Transformer-heavy workloads
-- ❌ Single small files (<100KB)
-- ❌ Simple regex-only anonymization
+## Complete Usage Examples
 
-**Note:** Performance benchmarks based on testing with RTX 5060 Ti. Results may vary on other GPU models.
-
-## Supported Entities
-
-`PERSON`, `ORGANIZATION`, `LOCATION`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `IP_ADDRESS`, `URL`, `HOSTNAME`, `MAC_ADDRESS`, `HASH`, `UUID`, `CVE_ID`, `CPE_STRING`, `CERT_SERIAL`, `PGP_BLOCK`, `AUTH_TOKEN`, `PASSWORD`, `USERNAME`, `FILE_PATH`, and more.
-
-Run `docker run --rm kapelinsky/anon --list-entities` for the full list.
-
-## Supported Languages (24)
-
-`ca` Catalan, `zh` Chinese, `hr` Croatian, `da` Danish, `nl` Dutch, `en` English, `fi` Finnish, `fr` French, `de` German, `el` Greek, `it` Italian, `ja` Japanese, `ko` Korean, `lt` Lithuanian, `mk` Macedonian, `nb` Norwegian, `pl` Polish, `pt` Portuguese, `ro` Romanian, `ru` Russian, `sl` Slovenian, `es` Spanish, `sv` Swedish, `uk` Ukrainian.
-
-## Anonymization Strategies
-
-| Strategy | Command | Description |
-|----------|---------|-------------|
-| `presidio` | `--anonymization-strategy presidio` | Full analysis with all recognizers. Highest accuracy. **(Default)** |
-| `fast` | `--anonymization-strategy fast` | Transformer + regex only. Fastest. |
-| `balanced` | `--anonymization-strategy balanced` | Curated subset of recognizers. Good balance. |
-| `slm` | `--anonymization-strategy slm` | End-to-end LLM-based anonymization via Ollama. |
-
-## Common Flags
-
-```
---lang LANG                     Language code (en, pt, es, ...). Default: en
---output-dir DIR                Output directory. Default: ./output
---anonymization-strategy STR    presidio | fast | balanced | slm
---transformer-model MODEL       NER model (default: Davlan/xlm-roberta-base-ner-hrl)
---preserve-entities TYPES       Comma-separated entity types to skip
---allow-list TERMS              Comma-separated terms to never anonymize
---slug-length N                 Length of anonymized slugs (1-64)
---optimize                      Enable all performance optimizations
---generate-ner-data             Generate NER training data instead of anonymizing
---db-mode MODE                  persistent | in-memory
---slm-detector                  Use SLM as additional entity detector
---slm-detector-mode MODE        hybrid | exclusive
---help                          Show all options
-```
-
-## Docker Compose Usage
-
-For more complex setups (GPU, SLM with Ollama), use the provided `docker-compose.yml`:
-
+### File Processing
 ```bash
-# CPU profile
-docker compose -f docker/docker-compose.yml --profile cpu run --rm anon /data/input/file.txt
+# Single file with language selection
+docker run --rm \
+  -e ANON_SECRET_KEY="production-key" \
+  -v $(pwd):/data \
+  kapelinsky/anon /data/incident.pdf --lang pt
 
-# GPU profile
-docker compose -f docker/docker-compose.yml --profile gpu run --rm anon-gpu /data/input/file.txt
+# Directory processing with custom output
+docker run --rm \
+  -e ANON_SECRET_KEY="production-key" \
+  -v $(pwd)/input:/data \
+  -v $(pwd)/anonymized:/output \
+  kapelinsky/anon /data/ --output-dir /output
 
-# SLM profile (auto-starts Ollama)
-docker compose -f docker/docker-compose.yml --profile slm run --rm anon /data/input/file.txt --slm-detector
+# Preserve specific entity types
+docker run --rm \
+  -e ANON_SECRET_KEY="production-key" \
+  -v $(pwd):/data \
+  kapelinsky/anon /data/logs.json --preserve-entities "HOSTNAME,IP_ADDRESS"
 ```
 
-Or use the `run.sh` wrapper for automatic profile detection:
-
+### Performance Optimization
 ```bash
-./run.sh /data/input/file.txt                      # CPU
-./run.sh /data/input/file.txt --slm-detector       # CPU + Ollama
-./run.sh --gpu /data/input/file.txt                # GPU
-./run.sh --gpu /data/input/file.txt --slm-detector # GPU + Ollama
+# Fast processing with optimization
+docker run --rm \
+  -e ANON_SECRET_KEY="production-key" \
+  -v $(pwd):/data \
+  kapelinsky/anon /data/large_dataset/ --optimize
+
+# Custom slug length for readability
+docker run --rm \
+  -e ANON_SECRET_KEY="production-key" \
+  -v $(pwd):/data \
+  kapelinsky/anon /data/report.txt --slug-length 8
+
+# GPU with persistent storage
+docker run --rm --gpus all \
+  -e ANON_SECRET_KEY="production-key" \
+  -v $(pwd):/data \
+  -v anon-models:/app/models \
+  -v anon-db:/app/db \
+  kapelinsky/anon:gpu /data/documents/
 ```
 
-## Source Code
+### Advanced Configuration
+```bash
+# Custom anonymization config for JSON/XML
+docker run --rm \
+  -e ANON_SECRET_KEY="production-key" \
+  -v $(pwd):/data \
+  -v $(pwd)/config.json:/app/config.json \
+  kapelinsky/anon /data/structured.json --anonymization-config /app/config.json
 
-[github.com/AnonShield/AnonLFI3.0](https://github.com/AnonShield/AnonLFI3.0)
+# Generate NER training data (no secret key needed)
+docker run --rm \
+  -v $(pwd):/data \
+  kapelinsky/anon /data/corpus/ --generate-ner-data --output-dir /data/ner_output/
+
+# Cybersecurity-focused model
+docker run --rm --gpus all \
+  -e ANON_SECRET_KEY="production-key" \
+  -v $(pwd):/data \
+  kapelinsky/anon:gpu /data/threat_intel.json \
+  --transformer-model attack-vector/SecureModernBERT-NER \
+  --anonymization-strategy fast
+```
+
+## Resource Requirements
+
+**Memory Usage:**
+```
+CPU Mode:  4-8GB RAM (base container + models)
+GPU Mode:  8-16GB RAM + 4-8GB VRAM (container + CUDA libraries + models)
+SLM Mode:  Additional 4-32GB depending on Ollama model size
+```
+
+**When to Use GPU:**
+- ✅ Processing transformer-based NER models
+- ✅ Large document batches
+- ✅ High-volume processing pipelines
+- ❌ Single small files
+- ❌ Regex-only anonymization (no transformers)
+
+## Common CLI Flags
+
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--lang LANG` | Document language (24 supported) | `--lang pt` |
+| `--output-dir DIR` | Output directory path | `--output-dir /data/results` |
+| `--preserve-entities TYPES` | Skip anonymizing specific types | `--preserve-entities "HOSTNAME,URL"` |
+| `--allow-list TERMS` | Never anonymize specific terms | `--allow-list "CompanyName,ProductX"` |
+| `--slug-length N` | Pseudonym length (1-64 chars) | `--slug-length 12` |
+| `--anonymization-strategy S` | Processing strategy | `--anonymization-strategy fast` |
+| `--transformer-model MODEL` | NER model selection | `--transformer-model attack-vector/SecureModernBERT-NER` |
+| `--optimize` | Enable all performance optimizations | `--optimize` |
+| `--slm-detector` | Use SLM for enhanced entity detection | `--slm-detector` |
+| `--slm-map-entities` | Generate entity analysis reports | `--slm-map-entities` |
+| `--generate-ner-data` | Create NER training data | `--generate-ner-data` |
+| `--list-entities` | Show all supported entity types | `--list-entities` |
+| `--list-languages` | Show all supported languages | `--list-languages` |
+
+Full documentation: `docker run --rm kapelinsky/anon --help`
+
+## Production Deployment
+
+### Recommended Production Setup
+```bash
+# STEP 1: Create persistent volumes (MANDATORY to avoid redownloads)
+docker volume create anon-models     # Stores 2-4GB of AI models
+docker volume create anon-db         # Stores anonymization mappings  
+docker volume create anon-output     # Stores processed files
+
+# STEP 2: Production deployment with persistent storage
+docker run -d \
+  --name anon-production \
+  --gpus all \
+  --restart unless-stopped \
+  -e ANON_SECRET_KEY="$(cat /secure/anon.key)" \
+  -v anon-models:/app/models \
+  -v anon-db:/app/db \
+  -v anon-output:/app/output \
+  -v /data/input:/app/input:ro \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  kapelinsky/anon:gpu \
+  /app/input/ --optimize --slm-detector
+
+# STEP 3: Monitor first run (downloads models, takes 5-10 minutes)
+docker logs -f anon-production
+
+# Subsequent runs will be instant (uses cached models)
+```
+
+**⚠️ Production Warning:** Without persistent volumes (`-v anon-models:/app/models`), the container will redownload 2-4GB of AI models on every restart, causing significant delays and bandwidth usage.
+
+### Security Best Practices
+- **Never hardcode** `ANON_SECRET_KEY` in commands
+- **Use Docker secrets** or external key management
+- **Mount input data read-only** (`-v /data:/app/input:ro`)
+- **Regular backups** of `/app/db` volume for de-anonymization capability
+- **Network isolation** in production environments
+
+## Source Code & Support
+
+- **GitHub Repository:** [github.com/AnonShield/AnonLFI3.0](https://github.com/AnonShield/AnonLFI3.0)
+- **License:** Open source (see repository for details)
+- **Docker Hub:** [hub.docker.com/r/kapelinsky/anon](https://hub.docker.com/r/kapelinsky/anon)
+
+**Supported Entity Types:** 25+ including PERSON, ORGANIZATION, EMAIL_ADDRESS, IP_ADDRESS, CVE_ID, HASH, UUID, and more cybersecurity-focused patterns.
+
+**Supported Languages:** English, Portuguese, Spanish, French, German, Italian, Chinese, Japanese, Korean, Russian, Polish, Dutch, Swedish, Norwegian, Danish, Finnish, Greek, Croatian, Lithuanian, Slovenian, Macedonian, Romanian, Ukrainian, Catalan.
