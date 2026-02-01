@@ -2,28 +2,21 @@
 # AnonLFI - Docker Compose Configuration
 # =============================================================================
 #
-# This configuration implements a modular, lazy-loading architecture where
-# services and models are only provisioned when needed.
-#
 # Profiles:
-#   default     - Basic anonymization (no SLM)
-#   slm         - Includes Ollama for SLM features
-#   gpu         - GPU-accelerated version with Ollama
+#   cpu       - CPU anonymization only (default, no Ollama)
+#   slm       - CPU anonymization + Ollama (CPU)
+#   gpu       - GPU anonymization only (no Ollama)
+#   gpu-slm   - GPU anonymization + Ollama (GPU)
 #
-# Usage:
-#   # Basic usage (CPU, no SLM)
-#   docker-compose run --rm anon input.txt
+# Usage via run.sh (recommended):
+#   ./run.sh input.txt                            # cpu profile
+#   ./run.sh input.txt --slm-detector             # slm profile
+#   ./run.sh --gpu input.txt                      # gpu profile
+#   ./run.sh --gpu input.txt --slm-detector       # gpu-slm profile
 #
-#   # With SLM support
-#   docker-compose --profile slm up -d ollama
-#   docker-compose --profile slm run --rm anon input.txt --slm-map-entities
-#
-#   # GPU-accelerated
-#   docker-compose --profile gpu up -d
-#   docker-compose --profile gpu run --rm anon-gpu input.txt
-#
-#   # Process a file
-#   docker-compose run --rm anon /data/input/myfile.json --output-dir /data/output
+# Manual usage:
+#   docker compose -f docker/docker-compose.yml --profile cpu \
+#       run --rm anon /data/input/file.txt
 #
 # =============================================================================
 
@@ -33,58 +26,49 @@ services:
   # ---------------------------------------------------------------------------
   anon:
     build:
-      context: .
+      context: ..
+      dockerfile: docker/Dockerfile
       target: production
     image: anon:latest
-    container_name: anon
+    container_name: anon-cpu
     environment:
       - ANON_SECRET_KEY=${ANON_SECRET_KEY:-change-me-in-production}
       - ANON_LAZY_LOADING=1
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
-      # Preload specific models if needed (comma-separated)
-      # Example: ANON_PRELOAD=en_core_web_lg,transformer:Davlan/xlm-roberta-base-ner-hrl
-      - ANON_PRELOAD=${ANON_PRELOAD:-}
     volumes:
-      # Persistent storage for ML models (survives container restarts)
       - anon-models:/app/models
-      # Output directory
       - anon-output:/app/output
-      # Database for entity mappings
       - anon-db:/app/db
-      # Input data (mount your data directory here)
-      - ${DATA_DIR:-./data}:/data:ro
+      - ${DATA_DIR:-../data}:/data:ro
     networks:
       - anon-network
-    # Don't start automatically - this is a CLI tool
     profiles:
-      - default
+      - cpu
       - slm
-    depends_on:
-      ollama:
-        condition: service_started
-        required: false
 
   # ---------------------------------------------------------------------------
   # AnonLFI - GPU-Accelerated Version
   # ---------------------------------------------------------------------------
   anon-gpu:
     build:
-      context: .
+      context: ..
+      dockerfile: docker/Dockerfile
       target: gpu
     image: anon:gpu
     container_name: anon-gpu
     environment:
       - ANON_SECRET_KEY=${ANON_SECRET_KEY:-change-me-in-production}
       - ANON_LAZY_LOADING=1
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_BASE_URL=http://ollama-gpu:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
-      - ANON_PRELOAD=${ANON_PRELOAD:-}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
       - anon-models:/app/models
       - anon-output:/app/output
       - anon-db:/app/db
-      - ${DATA_DIR:-./data}:/data:ro
+      - ${DATA_DIR:-../data}:/data:ro
     networks:
       - anon-network
     deploy:
@@ -96,22 +80,18 @@ services:
               capabilities: [gpu]
     profiles:
       - gpu
-    depends_on:
-      ollama:
-        condition: service_healthy
-        required: false
+      - gpu-slm
 
   # ---------------------------------------------------------------------------
-  # Ollama - Local LLM Service
+  # Ollama - Local LLM Service (CPU)
   # ---------------------------------------------------------------------------
   ollama:
     image: ollama/ollama:latest
-    container_name: ollama
+    container_name: ollama-cpu
     restart: unless-stopped
     ports:
       - "11434:11434"
     volumes:
-      # Persistent storage for Ollama models
       - ollama-models:/root/.ollama
     networks:
       - anon-network
@@ -125,7 +105,6 @@ services:
       start_period: 10s
     profiles:
       - slm
-      - gpu
 
   # ---------------------------------------------------------------------------
   # Ollama GPU - GPU-Accelerated Ollama
@@ -156,7 +135,7 @@ services:
       retries: 5
       start_period: 10s
     profiles:
-      - gpu
+      - gpu-slm
 
 # =============================================================================
 # Networks
@@ -170,18 +149,11 @@ networks:
 # Volumes - Persistent Storage
 # =============================================================================
 volumes:
-  # ML models (spaCy, transformers) - shared between CPU and GPU versions
   anon-models:
     name: anon-models
-
-  # Anonymization output files
   anon-output:
     name: anon-output
-
-  # SQLite database for entity tracking
   anon-db:
     name: anon-db
-
-  # Ollama models (llama3, etc.)
   ollama-models:
     name: ollama-models

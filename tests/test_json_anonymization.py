@@ -1,5 +1,6 @@
 import unittest
 import os
+import sys
 import orjson
 import shutil
 import subprocess
@@ -44,7 +45,7 @@ class TestJsonAnonymization(unittest.TestCase):
     def _run_anonymizer(self, file_path):
         """Helper to run the anonymization script."""
         command = [
-            "uv", "run", "python", "anon.py", file_path,
+            sys.executable, "anon.py", file_path,
             "--anonymization-config", self.config_file,
             "--db-mode", "in-memory",
             "--output-dir", self.output_dir,
