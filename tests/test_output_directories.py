@@ -36,14 +36,14 @@ class TestOutputDirectories(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.test_dir)
         if self.output_dir.exists():
-            shutil.rmtree(self.output_dir)
+            shutil.rmtree(self.output_dir, ignore_errors=True)
         if str(self.original_cwd) in sys.path:
             sys.path.remove(str(self.original_cwd))
 
 
     def run_script(self, script_name, args):
         script_path = self.original_cwd / "scripts" / script_name
-        command = ["uv", "run", "python", str(script_path)] + args
+        command = [sys.executable, str(script_path)] + args
         try:
             result = subprocess.run(
                 command,

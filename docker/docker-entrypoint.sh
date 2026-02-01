@@ -115,18 +115,19 @@ get_language() {
 
 ensure_spacy_model() {
     local model="$1"
+    local venv_python="/app/.venv/bin/python"
 
     log_info "Checking spaCy model: $model"
 
     # Check if model is available
-    if uv run python -c "import spacy.util; exit(0 if spacy.util.is_package('$model') else 1)" 2>/dev/null; then
+    if $venv_python -c "import spacy.util; exit(0 if spacy.util.is_package('$model') else 1)" 2>/dev/null; then
         log_success "spaCy model '$model' is available"
         return 0
     fi
 
     log_warn "spaCy model '$model' not found. Downloading..."
 
-    if uv run python -m spacy download "$model"; then
+    if $venv_python -m spacy download "$model"; then
         log_success "spaCy model '$model' downloaded successfully"
         return 0
     else
@@ -149,7 +150,7 @@ ensure_transformer_model() {
 
     log_warn "Transformer model '$model' not found. Downloading..."
 
-    if uv run python -c "
+    if /app/.venv/bin/python -c "
 from huggingface_hub import snapshot_download
 snapshot_download(repo_id='$model', cache_dir='$model_dir', max_workers=4)
 print('Download complete')
@@ -231,10 +232,10 @@ handle_preload() {
             spacy:*)
                 ensure_spacy_model "${model#spacy:}"
                 ;;
-            transformer:*)
+            transformer:*) 
                 ensure_transformer_model "${model#transformer:}"
                 ;;
-            ollama:*)
+            ollama:*) 
                 wait_for_ollama && ensure_ollama_model "${model#ollama:}"
                 ;;
             en_core_web_lg|pt_core_news_lg|*_core_*)
@@ -260,7 +261,7 @@ main() {
     # Skip lazy loading if disabled
     if [[ "${ANON_LAZY_LOADING:-1}" != "1" ]]; then
         log_info "Lazy loading disabled, running directly"
-        exec uv run python anon.py "$@"
+        exec /app/.venv/bin/python anon.py "$@"
     fi
 
     # Determine required models based on arguments
@@ -287,10 +288,16 @@ main() {
         ensure_ollama_model || exit 1
     fi
 
-    log_success "All required models ready. Starting AnonLFI..."
-
-    # Execute the main application
-    exec uv run python anon.py "$@"
+    # Check if we should run unit tests instead of anon.py
+    if [[ "$RUN_UNIT_TESTS" == "1" ]]; then
+        log_info "Running unit tests..."
+        export PATH="/app/.venv/bin:$PATH"
+        export VIRTUAL_ENV="/app/.venv"
+        python -m unittest discover -v -s tests/
+    else
+        log_success "All required models ready. Starting AnonLFI..."
+        exec /app/.venv/bin/python anon.py "$@"
+    fi
 }
 
 # Run main with all arguments

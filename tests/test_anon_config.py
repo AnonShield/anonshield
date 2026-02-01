@@ -70,7 +70,7 @@ class TestAnonymizationConfig(unittest.TestCase):
         # 3. Run the anonymization script
         script_path = os.path.join(self.original_cwd, "anon.py")
         command = [
-            "uv", "run", "python", script_path,
+            sys.executable, script_path,
             input_path,
             "--anonymization-config", config_path,
             "--lang", "en",

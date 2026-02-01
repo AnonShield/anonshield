@@ -13,7 +13,7 @@ AnonLFI 3.0 is a modular pseudonymization framework for CSIRTs that resolves the
 - [Supported Entities & Languages](#supported-entities--languages)
 - [Repository Structure](#repository-structure)
 - [Prerequisites](#prerequisites)
-- [Installation and Execution](#installation-and-execution)
+- [Setup and Execution](#setup-and-execution)
 - [Usage](#usage)
   - [Basic Commands](#basic-commands)
   - [SLM Integration (Experimental)](#slm-integration-experimental)
@@ -373,6 +373,11 @@ python anon.py complex_report.txt --anonymization-strategy slm
 ```
 .
 ├── anon.py                # Main CLI entry point for the tool
+├── run.sh                 # Docker wrapper with auto-provisioning
+├── docker/                # Docker infrastructure
+│   ├── Dockerfile         # Multi-stage build (CPU + GPU targets)
+│   ├── docker-compose.yml # Service definitions (4 profiles)
+│   └── docker-entrypoint.sh # Lazy-loading entrypoint
 ├── scripts/               # Utility scripts (e.g., deanonymize.py)
 │   ├── deanonymize.py     # Reverse anonymization script
 │   ├── get_metrics.py     # Aggregate performance statistics
@@ -404,25 +409,138 @@ python anon.py complex_report.txt --anonymization-strategy slm
 
 ## Prerequisites
 
+### Docker Usage (Recommended)
+
+When using Docker via `run.sh`, the only prerequisites are:
+
+1. **[Docker](https://docs.docker.com/get-docker/)** and **[Docker Compose](https://docs.docker.com/compose/install/)**
+2. **For GPU acceleration:** [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+
+Tesseract OCR, Ollama, spaCy models, and transformer models are all handled automatically inside the container (lazy-loaded on first use, persisted in Docker volumes).
+
+### Local Installation
+
+For running without Docker, the following are required:
+
 1.  **`uv` Tool**:
     - **Windows:** `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
     - **Linux/macOS:** `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
-2.  **Tesseract OCR**:
-    - Required to extract text from images in PDF and DOCX files.
+2.  **Tesseract OCR** (for OCR features):
     - **Ubuntu/Debian:** `sudo apt update && sudo apt install tesseract-ocr`
     - **macOS (Homebrew):** `brew install tesseract`
-    - **Windows:** Download the installer from the [Tesseract documentation](https://github.com/tesseract-ocr/tesseract#installing-tesseract) and add the installation path to the `PATH` environment variable.
+    - **Windows:** Download from the [Tesseract documentation](https://github.com/tesseract-ocr/tesseract#installing-tesseract) and add to `PATH`.
 
-3.  **Ollama (for SLM features)**:
-    - To use the experimental SLM features (`--slm-*` flags), you must have a running Ollama instance.
+3.  **Ollama** (for SLM features only):
     - Follow the [Ollama installation guide](https://ollama.com/download).
-    - After installation, pull a model:
-      ```bash
-      ollama run llama3
-      ```
+    - Pull a model: `ollama run llama3`
 
-## Installation and Execution
+## Setup and Execution
+
+The recommended way to run AnonLFI is by using Docker, as it simplifies dependency management and provides a consistent, isolated environment. A local installation option is also available for development or specific use cases.
+
+### Docker Usage (Recommended)
+
+The recommended way to run the tool is via the `run.sh` wrapper script. It provides a fully automated, "lazy-loading" experience by inspecting your commands and provisioning the necessary dependencies (like Ollama) on demand.
+
+**Prerequisites:**
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+- For GPU acceleration: A configured NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+
+**How it Works**
+The `run.sh` script is an intelligent orchestrator that:
+1.  Parses your command-line arguments.
+2.  Automatically starts the `ollama` service if you use any SLM-related flags (e.g., `--slm-detector`).
+3.  Automatically selects the GPU-accelerated services if you pass the `--gpu` flag and a valid NVIDIA environment is detected.
+4.  Persists all downloaded models and the database in Docker volumes, making subsequent runs much faster.
+
+**Quickstart:**
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/AnonShield/AnonLFI3.0.git
+    cd AnonLFI3.0
+    ```
+
+2.  **Make the script executable:**
+    ```bash
+    chmod +x run.sh
+    ```
+
+3.  **Prepare your data:**
+    Place the files you want to anonymize in the `./data/input/` directory (create it if it doesn't exist).
+    ```bash
+    mkdir -p data/input
+    cp /path/to/your/file.txt data/input/
+    ```
+
+4.  **Run the anonymization:**
+    Simply execute `./run.sh` and pass the arguments directly to `anon.py`.
+
+    -   **Set the Secret Key:**
+        ```bash
+        export ANON_SECRET_KEY='your-super-secret-key-here'
+        ```
+
+    -   **CPU-based Example:**
+        ```bash
+        # The script will use the default profile
+        ./run.sh /data/input/file.txt --output-dir /app/output
+        ```
+
+    -   **SLM Example (CPU):**
+        ```bash
+        # The script will detect the --slm-detector flag and automatically start Ollama
+        ./run.sh /data/input/file.txt --output-dir /app/output --slm-detector
+        ```
+
+    -   **GPU Example (no SLM):**
+        ```bash
+        # The --gpu flag tells the script to use the GPU-accelerated container
+        ./run.sh --gpu /data/input/file.txt --output-dir /app/output
+        ```
+
+    -   **GPU + SLM Example:**
+        ```bash
+        # Combines GPU acceleration with SLM-powered detection
+        ./run.sh --gpu /data/input/file.txt --output-dir /app/output --slm-detector
+        ```
+
+**Available Profiles:**
+
+| Profile   | Activated When             | Services                  |
+|-----------|----------------------------|---------------------------|
+| `cpu`     | No special flags           | anon (CPU)                |
+| `slm`     | `--slm-*` flags detected   | anon (CPU) + Ollama (CPU) |
+| `gpu`     | `--gpu` flag               | anon-gpu                  |
+| `gpu-slm` | `--gpu` + `--slm-*` flags  | anon-gpu + Ollama (GPU)   |
+
+**Accessing Output Files:**
+
+The anonymized files are saved inside a persistent Docker volume named `anon-output`. You can copy them to your local machine:
+
+```bash
+docker cp anon-cpu:/app/output ./local_output_directory
+# or for GPU runs:
+docker cp anon-gpu:/app/output ./local_output_directory
+```
+
+**Manual Docker Compose Usage:**
+
+```bash
+# CPU profile
+docker compose -f docker/docker-compose.yml --profile cpu run --rm anon /data/input/file.txt
+
+# GPU profile
+docker compose -f docker/docker-compose.yml --profile gpu run --rm anon-gpu /data/input/file.txt
+
+# SLM profile (start Ollama first)
+docker compose -f docker/docker-compose.yml --profile slm up -d ollama
+docker compose -f docker/docker-compose.yml --profile slm run --rm anon /data/input/file.txt --slm-detector
+```
+
+### Local Installation
 
 1. **Clone the repository:**
    ```bash

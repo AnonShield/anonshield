@@ -821,35 +821,61 @@ def main():
         logging.info("Anonymization config not provided. Proceeding without specific rules for structured files.")
 
     # --- Common Setup ---
-    # Dynamically set LD_LIBRARY_PATH for all NVIDIA CUDA libraries
-    venv_python_path = os.path.dirname(sys.executable)
-    venv_lib_path = os.path.join(os.path.dirname(venv_python_path), "lib")
-    venv_python_version_path = next((d for d in os.listdir(venv_lib_path) if d.startswith("python") and os.path.isdir(os.path.join(venv_lib_path, d))), "python3.11")
-    nvidia_base_path = os.path.join(venv_lib_path, venv_python_version_path, "site-packages", "nvidia")
+    # Dynamically set LD_LIBRARY_PATH for NVIDIA CUDA libraries.
+    # Strategy: check system-wide CUDA paths first (Docker nvidia/cuda image),
+    # then fall back to pip-installed nvidia packages (local development).
+    cuda_lib_paths = []
 
-    if os.path.exists(nvidia_base_path):
-        # Find all lib directories under nvidia packages
-        cuda_lib_paths = []
-        for package_dir in os.listdir(nvidia_base_path):
-            lib_path = os.path.join(nvidia_base_path, package_dir, "lib")
-            if os.path.isdir(lib_path):
-                cuda_lib_paths.append(lib_path)
+    # 1. System-wide CUDA installation (Docker nvidia/cuda base image)
+    for sys_path in ["/usr/local/cuda/lib64", "/usr/local/cuda/lib"]:
+        if os.path.isdir(sys_path):
+            cuda_lib_paths.append(sys_path)
 
-        if cuda_lib_paths:
-            cuda_libs_str = ":".join(cuda_lib_paths)
-            os.environ["LD_LIBRARY_PATH"] = f"{cuda_libs_str}:{os.environ.get('LD_LIBRARY_PATH', '')}"
-            logging.info(f"CUDA libraries configured ({len(cuda_lib_paths)} paths added to LD_LIBRARY_PATH)")
+    # 2. Pip-installed NVIDIA packages (local venv)
+    if not cuda_lib_paths:
+        venv_python_path = os.path.dirname(sys.executable)
+        venv_lib_path = os.path.join(os.path.dirname(venv_python_path), "lib")
+        if os.path.exists(venv_lib_path):
+            venv_pyver = next(
+                (d for d in os.listdir(venv_lib_path)
+                 if d.startswith("python") and os.path.isdir(os.path.join(venv_lib_path, d))),
+                None
+            )
+            if venv_pyver:
+                nvidia_base_path = os.path.join(venv_lib_path, venv_pyver, "site-packages", "nvidia")
+                if os.path.exists(nvidia_base_path):
+                    for pkg in os.listdir(nvidia_base_path):
+                        lib_path = os.path.join(nvidia_base_path, pkg, "lib")
+                        if os.path.isdir(lib_path):
+                            cuda_lib_paths.append(lib_path)
+
+    if cuda_lib_paths:
+        existing = os.environ.get("LD_LIBRARY_PATH", "")
+        new_paths = ":".join(cuda_lib_paths)
+        os.environ["LD_LIBRARY_PATH"] = f"{new_paths}:{existing}" if existing else new_paths
+        logging.info(f"CUDA libraries configured ({len(cuda_lib_paths)} paths added to LD_LIBRARY_PATH)")
     else:
-        logging.warning(f"NVIDIA library path not found: {nvidia_base_path}.")
+        logging.debug("No NVIDIA CUDA libraries found (CPU-only mode)")
 
     # --- GPU Activation ---
     logging.info("Verifying hardware...")
     if torch.cuda.is_available():
+        gpu_name = torch.cuda.get_device_name(0)
+        logging.info(f"CUDA GPU detected: {gpu_name}")
+        # Test if CuPy actually works on this GPU architecture before enabling spaCy GPU
+        cupy_works = False
         try:
-            spacy.require_gpu() # type: ignore
-            logging.info(f"GPU activated successfully! (Device: {torch.cuda.get_device_name(0)})")
+            import cupy
+            a = cupy.array([1.0, 2.0])
+            _ = (a * a).sum()  # Force kernel compilation to detect arch incompatibility
+            cupy.cuda.Stream.null.synchronize()
+            cupy_works = True
         except Exception as e:
-            logging.warning(f"GPU detected, but failed to activate in Spacy: {e}")
+            logging.info(f"CuPy not usable on this GPU ({e}). spaCy will use CPU, transformers will use GPU via PyTorch.")
+        if cupy_works and spacy.prefer_gpu():  # type: ignore
+            logging.info(f"spaCy GPU activated (CuPy backend on {gpu_name})")
+        else:
+            logging.info(f"Transformers/PyTorch will use GPU. spaCy NLP pipeline on CPU.")
     else:
         logging.info("CUDA not detected by PyTorch. Running on CPU.")
 

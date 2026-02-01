@@ -1,6 +1,7 @@
 import unittest
 import os
 import subprocess
+import sys
 import orjson
 import shutil
 
@@ -25,7 +26,7 @@ class TestNewConfigLogic(unittest.TestCase):
         """Helper function to run the main anonymization script with extra arguments."""
         self.assertTrue(os.path.exists(file_path), f"Test data file not found: {file_path}")
         command = [
-            "uv", "run", "python", "anon.py", file_path,
+            sys.executable, "anon.py", file_path,
             "--db-mode", "in-memory",
             "--output-dir", self.OUTPUT_DIR,
             *extra_args
