@@ -92,7 +92,7 @@ validate() {
 }
 
 check_gpu() {
-    if docker run --rm --gpus all nvidia/cuda:12.1.1-base-ubuntu22.04 nvidia-smi &>/dev/null; then
+    if docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi &>/dev/null; then
         return 0
     fi
     log_error "GPU requested but NVIDIA Docker runtime is not available."
