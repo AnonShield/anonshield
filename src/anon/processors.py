@@ -1567,8 +1567,6 @@ class JsonFileProcessor(FileProcessor):
             
         progress_desc = "Anonymizing (cached)" if use_deduplication else "Anonymizing (full context)"
         logging.debug(f"Building path-aware translation map ({progress_desc}). Total strings to process: {total_strings}.")
-        progress = tqdm(total=total_strings, desc=progress_desc, unit="str", leave=False,
-                       bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
 
         for group_key, string_list in text_groups.items():
             strings_to_process = sorted(list(set(string_list))) if use_deduplication else string_list
@@ -1576,19 +1574,17 @@ class JsonFileProcessor(FileProcessor):
             logging.debug(f"Processing group '{group_key}' with {len(strings_to_process)} strings.")
 
             forced_type: Optional[Union[str, List[str]]] = group_key if group_key != "auto" else None
-            if isinstance(forced_type, tuple): 
+            if isinstance(forced_type, tuple):
                 forced_type = list(forced_type)
 
             anonymized_strings = []
             for chunk in self._batch_iterator(strings_to_process, self.batch_size):
                 anonymized_chunk = self._process_batch_smart(chunk, forced_entity_type=forced_type)
                 anonymized_strings.extend(anonymized_chunk)
-                progress.update(len(chunk))
-            
+
             for original, anonymized in zip(strings_to_process, anonymized_strings):
                 path_aware_map[group_key][original].append(anonymized)
-        
-        progress.close()
+
         logging.debug("Path-aware translation map built successfully.")
         return path_aware_map
 
