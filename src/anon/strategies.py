@@ -54,7 +54,6 @@ class PresidioStrategy(AnonymizationStrategy):
         if not texts: return [], []
 
         original_texts = [str(text) if pd.notna(text) else "" for text in texts]
-        final_anonymized_list = []
         collected_entities: List[Tuple] = [] # Initialize collected entities for this batch
         
         # Pass the collected_entities list for the CustomSlugAnonymizer to append to
@@ -64,26 +63,42 @@ class PresidioStrategy(AnonymizationStrategy):
         entities_to_use = self._get_entities_to_anonymize(operator_params.get("entities"))
         self.logger.debug(f"Entities to use for analysis: {entities_to_use}")
 
+        # PHASE 1: Check cache and filter texts that need processing
+        anonymized_results = ["" for _ in original_texts]
+        texts_to_process = []
+        indices_to_process = []
+        
+        for idx, text in enumerate(original_texts):
+            cached_value = self.cache_manager.get(text)
+            if cached_value:
+                anonymized_results[idx] = cached_value
+            else:
+                texts_to_process.append(text)
+                indices_to_process.append(idx)
+        
+        # If all texts were cached, return early
+        if not texts_to_process:
+            self.logger.debug(f"All {len(original_texts)} texts found in cache")
+            return anonymized_results, collected_entities
+
+        self.logger.debug(f"Processing {len(texts_to_process)}/{len(original_texts)} uncached texts")
+
+        # PHASE 2: Analyze only uncached texts
         analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
-            original_texts, language=self.lang,
+            texts_to_process, language=self.lang,
             entities=entities_to_use, score_threshold=0.6,
             allow_list=self.allow_list
         )
         
         analyzer_results_list = list(analyzer_results_iterator)
 
-        if len(analyzer_results_list) != len(original_texts):
-            self.logger.error(f"Mismatch between original_texts and analyzer_results_list! Input: {len(original_texts)}, Analyzer Results: {len(analyzer_results_list)}. This will lead to batch integrity failure.")
+        if len(analyzer_results_list) != len(texts_to_process):
+            self.logger.error(f"Mismatch between texts_to_process and analyzer_results_list! Input: {len(texts_to_process)}, Analyzer Results: {len(analyzer_results_list)}. This will lead to batch integrity failure.")
             # Return empty lists to trigger the fallback mechanism in the orchestrator
             return [], []
 
-        for text, analyzer_results in zip(original_texts, analyzer_results_list):
-            cached_value = self.cache_manager.get(text)
-            if cached_value:
-                final_anonymized_list.append(cached_value)
-                continue
-
-            
+        # PHASE 3: Anonymize and cache results
+        for text, analyzer_results, original_idx in zip(texts_to_process, analyzer_results_list, indices_to_process):
             anonymizer_result = self.anonymizer_engine.anonymize(
                 text=text,
                 analyzer_results=analyzer_results,
@@ -92,9 +107,9 @@ class PresidioStrategy(AnonymizationStrategy):
             
             anonymized_text = anonymizer_result.text
             self.cache_manager.add(text, anonymized_text)
-            final_anonymized_list.append(anonymized_text)
+            anonymized_results[original_idx] = anonymized_text
         
-        return final_anonymized_list, collected_entities
+        return anonymized_results, collected_entities
 
 class FastStrategy(AnonymizationStrategy):
     """Optimized path using xlm-roberta for detection with fast anonymization."""
