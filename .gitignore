@@ -181,3 +181,7 @@ cython_debug/
 output/*example*
 Vulnerabilidades-CAIS/
 *meu_modelo_*cve_dataset_anonimizados_stratified.json
+anonlfi_*
+dados_teste*
+tests/test_data/
+teste*
