@@ -55,6 +55,7 @@ class Strategy(Enum):
     PRESIDIO = "presidio"
     FAST = "fast"
     BALANCED = "balanced"
+    SLM = "slm"
 
 
 @dataclass
@@ -124,7 +125,7 @@ VERSION_CONFIGS = {
         ),
         supports_directory=True,
         requires_secret_key=True,
-        strategies=(Strategy.PRESIDIO, Strategy.FAST, Strategy.BALANCED)
+        strategies=(Strategy.PRESIDIO, Strategy.FAST, Strategy.BALANCED, Strategy.SLM)
     ),
 }
 
@@ -986,11 +987,16 @@ class BenchmarkRunner:
         run_output_dir = self.output_dir / version_str / strat_str
         run_output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Add strategy and overwrite for v3.0
-        if self.config.version == AnonVersion.V3_0 and strategy != Strategy.DEFAULT:
-            cmd.extend(["--anonymization-strategy", strategy.value])
+        # Add strategy, overwrite and optimization flags for v3.0
+        if self.config.version == AnonVersion.V3_0:
+            if strategy != Strategy.DEFAULT:
+                cmd.extend(["--anonymization-strategy", strategy.value])
             cmd.extend(["--output-dir", str(run_output_dir.resolve())])
             cmd.append("--overwrite")
+            # SLM uses Ollama, not Presidio — skip dataset/batch flags
+            if strategy != Strategy.SLM:
+                cmd.append("--use-datasets")
+                cmd.extend(["--batch-size", "auto"])
 
         return cmd
 
@@ -1377,13 +1383,18 @@ class DirectoryBenchmarkRunner:
         abs_dir = staging_dir.resolve()
         cmd = [str(self.config.python_executable), "anon.py", str(abs_dir)]
 
-        if self.config.version == AnonVersion.V3_0 and strategy != Strategy.DEFAULT:
+        if self.config.version == AnonVersion.V3_0:
             version_str = f"v{self.config.version.value}"
             run_output_dir = self.output_dir / version_str / strategy.value
             run_output_dir.mkdir(parents=True, exist_ok=True)
-            cmd.extend(["--anonymization-strategy", strategy.value])
+            if strategy != Strategy.DEFAULT:
+                cmd.extend(["--anonymization-strategy", strategy.value])
             cmd.extend(["--output-dir", str(run_output_dir.resolve())])
             cmd.append("--overwrite")
+            # SLM uses Ollama, not Presidio — skip dataset/batch flags
+            if strategy != Strategy.SLM:
+                cmd.append("--use-datasets")
+                cmd.extend(["--batch-size", "auto"])
             cmd.extend(["--log-level", "INFO"])
 
         if self.config.version == AnonVersion.V2_0:
@@ -1589,9 +1600,14 @@ class BenchmarkOrchestrator:
         self.args = args
         self.base_dir = Path.cwd()
         self.benchmark_dir = self.base_dir / "benchmark"
-        self.log_dir = self.benchmark_dir / "run_logs"
-        self.results_dir = self.benchmark_dir / "results"
-        self.output_dir = self.benchmark_dir / "output"
+        if args.results_dir:
+            self.results_dir = Path(args.results_dir).resolve()
+            self.log_dir = self.results_dir / "run_logs"
+            self.output_dir = self.results_dir / "output"
+        else:
+            self.results_dir = self.benchmark_dir / "results"
+            self.log_dir = self.benchmark_dir / "run_logs"
+            self.output_dir = self.benchmark_dir / "output"
 
         self.results_manager = ResultsManager(self.results_dir)
 
@@ -2267,7 +2283,7 @@ class BenchmarkOrchestrator:
                     run_metrics_list: List[BenchmarkMetrics] = []
 
                     for run_num in range(1, n_runs + 1):
-                        run_id = f"REGRESSION_{subset_path.stem}"
+                        run_id = f"REGRESSION_{subset_path.stem}{subset_path.suffix}"
 
                         print(f"\n  Running: {key} | {subset_path.name} "
                               f"({actual_mb_val:.2f} MB) | Run #{run_num}")
@@ -2750,6 +2766,18 @@ class BenchmarkOrchestrator:
 
     def _collect_test_files(self) -> List[Path]:
         """Collect test files based on configuration."""
+        # Direct file paths: skip all scanning
+        if self.args.file:
+            files = []
+            for fp in self.args.file:
+                p = Path(fp).resolve()
+                if p.exists():
+                    files.append(p)
+                    print(f"  [FILE] {p.name} ({p.stat().st_size / 1024 / 1024:.1f} MB)")
+                else:
+                    print(f"  [WARN] File not found: {fp}")
+            return sorted(files, key=lambda x: x.name)
+
         data_dir = Path(self.args.data_dir)
 
         if not data_dir.exists():
@@ -2766,20 +2794,46 @@ class BenchmarkOrchestrator:
         # Excluded extensions (not processable)
         excluded_extensions = {".anonymous", ".anon", ".bak", ".tmp"}
 
-        # Collect files
-        for ext in all_extensions:
-            if ext not in excluded_extensions:
-                files.extend(data_dir.rglob(f"*{ext}"))
+        # Directories to skip during recursive scan
+        skip_dirs = {".venv", ".venv_benchmark", ".git", "node_modules",
+                     "__pycache__", ".mypy_cache", ".tox", "benchmark",
+                     "anonlfi_1.0", "anonlfi_2.0", "output"}
 
-        # Filter by extension pattern if specified
+        # If file-pattern is provided, try non-recursive first (much faster)
         if self.args.file_pattern:
             pattern = re.compile(self.args.file_pattern, re.IGNORECASE)
-            files = [f for f in files if pattern.search(f.name)]
+            # First: check top-level files
+            if data_dir.is_dir():
+                for f in data_dir.iterdir():
+                    if f.is_file() and pattern.search(f.name):
+                        files.append(f)
+            # If nothing found at top level, do filtered recursive scan
+            if not files:
+                for f in self._walk_files(data_dir, skip_dirs):
+                    if pattern.search(f.name):
+                        files.append(f)
+        else:
+            # No pattern: collect by extension with filtered walk
+            for f in self._walk_files(data_dir, skip_dirs):
+                ext = f.suffix.lower()
+                if ext in all_extensions and ext not in excluded_extensions:
+                    files.append(f)
 
         # Sort for consistent ordering
         files = sorted(set(files), key=lambda x: x.name)
 
         return files
+
+    @staticmethod
+    def _walk_files(root: Path, skip_dirs: set) -> List[Path]:
+        """Walk directory tree, skipping excluded directories."""
+        result = []
+        for dirpath, dirnames, filenames in os.walk(root):
+            # Prune excluded directories in-place
+            dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+            for fname in filenames:
+                result.append(Path(dirpath) / fname)
+        return result
 
     def _print_summary(self):
         """Print benchmark summary."""
@@ -2888,10 +2942,14 @@ Examples:
     bench_group.add_argument("--data-dir", type=str,
                             default="benchmark/smoke_test_data/dados_teste",
                             help="Directory containing test files")
+    bench_group.add_argument("--results-dir", type=str,
+                            help="Custom results directory (default: benchmark/results)")
     bench_group.add_argument("--versions", nargs="+", choices=["1.0", "2.0", "3.0"],
                             help="Versions to benchmark (default: all)")
     bench_group.add_argument("--runs", type=int, default=1,
                             help="Number of runs per configuration (default: 1)")
+    bench_group.add_argument("--file", type=str, nargs="+",
+                            help="Direct file path(s) to benchmark (no scanning)")
     bench_group.add_argument("--file-pattern", type=str,
                             help="Regex pattern to filter test files")
     bench_group.add_argument("--secret-key", type=str,
