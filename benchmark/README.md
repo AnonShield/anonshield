@@ -42,7 +42,7 @@ resilience to interruptions.
 |---------|------------|-------------|:----------:|
 | v1.0    | default    | Single file only | No |
 | v2.0    | default    | Single file or directory | Yes |
-| v3.0    | presidio, fast, balanced | Single file or directory | Yes |
+| v3.0    | presidio, fast, balanced, slm | Single file or directory | Yes |
 
 **Key capabilities:**
 
@@ -65,7 +65,7 @@ The benchmark suite follows a modular, SOLID-principled design:
 benchmark.py
 ├── Configuration Layer
 │   ├── AnonVersion          # Enum: V1_0, V2_0, V3_0
-│   ├── Strategy             # Enum: DEFAULT, PRESIDIO, FAST, BALANCED
+│   ├── Strategy             # Enum: DEFAULT, PRESIDIO, FAST, BALANCED, SLM
 │   └── VersionConfig        # Per-version paths, extensions, capabilities
 │
 ├── Data Layer
@@ -240,9 +240,11 @@ The benchmark builds version-specific commands:
   - No strategy flag, no secret key, single file only
 - **v2.0:** `python anon.py <absolute_file_path>`
   - `ANON_SECRET_KEY` set in environment
-- **v3.0:** `python anon.py <absolute_file_path> --anonymization-strategy <strategy> --output-dir <path> --overwrite`
+- **v3.0:** `python anon.py <absolute_file_path> --anonymization-strategy <strategy> --output-dir <path> --overwrite --use-datasets --batch-size auto`
   - `ANON_SECRET_KEY` set in environment
   - `--overwrite` ensures re-runs don't fail on existing output files
+  - `--use-datasets` and `--batch-size auto` for GPU optimization (presidio/fast/balanced only)
+  - SLM strategy uses Ollama instead of Presidio — `--use-datasets` and `--batch-size` are not added
 
 All file paths are resolved to absolute paths since each version executes from
 its own working directory.
@@ -293,6 +295,7 @@ dados_teste/
 | v3.0 | presidio | 9 SUCCESS | All formats, all strategies |
 | v3.0 | fast | 9 SUCCESS | May report 0 entities (by design) |
 | v3.0 | balanced | 9 SUCCESS | All formats |
+| v3.0 | slm | 9 SUCCESS | Uses Ollama (local LLM), requires Ollama running |
 
 > **Note on v3.0 fast strategy:** The fast strategy uses xlm-roberta directly
 > and may report 0 detected entities. This is expected behavior -- it counts
@@ -560,7 +563,9 @@ At least one mode must be specified. Modes can be combined:
 | `--data-dir PATH` | `benchmark/smoke_test_data/dados_teste` | Directory containing test files |
 | `--versions V [V...]` | all | Versions to benchmark (choices: 1.0, 2.0, 3.0) |
 | `--runs N` | 3 | Number of runs per configuration |
+| `--file PATH [PATH...]` | none | Direct file path(s) to benchmark (no directory scanning) |
 | `--file-pattern REGEX` | none | Regex pattern to filter test files |
+| `--results-dir PATH` | `benchmark/results` | Custom results directory (isolated state/CSV/JSON) |
 | `--secret-key KEY` | `benchmark-secret-key-2026` | Secret key for ANON_SECRET_KEY |
 | `--directory-mode` | false | Process all files in a single invocation (v2.0/v3.0 only) |
 
@@ -604,7 +609,7 @@ CSV and JSON result files.
 | Metric | Type | Description |
 |--------|------|-------------|
 | `version` | str | AnonLFI version (1.0, 2.0, 3.0) |
-| `strategy` | str | Anonymization strategy (default, presidio, fast, balanced) |
+| `strategy` | str | Anonymization strategy (default, presidio, fast, balanced, slm) |
 | `file_name` | str | Input file name |
 | `file_path` | str | Full path to input file |
 | `file_extension` | str | File extension (lowercase, with dot) |
@@ -931,6 +936,12 @@ To reproduce benchmark results:
 
 5. **Wall clock time includes I/O:** The measured wall clock time includes
    file I/O (reading input, writing output), not just processing time.
+
+6. **SLM strategy requires Ollama:** The `slm` strategy uses a local LLM
+   via Ollama (default: llama3 at `localhost:11434`). Ollama must be running
+   before starting the benchmark. Configure via `OLLAMA_BASE_URL` and
+   `OLLAMA_MODEL` environment variables. SLM does not use Presidio engines,
+   so `--use-datasets` and `--batch-size` flags are not applied.
 
 ---
 
