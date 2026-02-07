@@ -47,6 +47,8 @@ class BenchmarkAnalyzer:
     def __init__(self, csv_path: str, output_dir: str = "benchmark/results/analysis"):
         """Initialize analyzer with data validation."""
         self.data_path = Path(csv_path)
+        # Keep original path string for reports
+        self.csv_path = str(self.data_path)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -284,15 +286,37 @@ class BenchmarkAnalyzer:
         output.append("🏆 WINNERS BY CATEGORY:")
         output.append("-" * 80)
         
-        fastest = summary['Time_Mean'].idxmin()
-        highest_throughput = summary['Throughput_MB/s'].idxmax()
-        lowest_memory = summary['Peak_Mem_MB'].idxmin()
-        most_consistent = summary['Time_Std'].idxmin()
-        
-        output.append(f"⏱️  Fastest (lowest time):          {fastest} ({summary.loc[fastest, 'Time_Mean']:.2f}s)")
-        output.append(f"🚀 Highest Throughput:             {highest_throughput} ({summary.loc[highest_throughput, 'Throughput_MB/s']:.4f} MB/s)")
-        output.append(f"💾 Lowest Memory:                  {lowest_memory} ({summary.loc[lowest_memory, 'Peak_Mem_MB']:.2f} MB)")
-        output.append(f"📊 Most Consistent (lowest σ):     {most_consistent} ({summary.loc[most_consistent, 'Time_Std']:.2f}s)")
+        # Safe index selection: handle cases where agg (e.g. std) is NaN for groups with single sample
+        def _safe_idx(series: pd.Series, method: str = 'idxmin'):
+            s = series.dropna()
+            if s.empty:
+                return None
+            return getattr(s, method)()
+
+        fastest = _safe_idx(summary['Time_Mean'], 'idxmin')
+        highest_throughput = _safe_idx(summary['Throughput_MB/s'], 'idxmax')
+        lowest_memory = _safe_idx(summary['Peak_Mem_MB'], 'idxmin')
+        most_consistent = _safe_idx(summary['Time_Std'], 'idxmin')
+
+        if fastest is not None:
+            output.append(f"⏱️  Fastest (lowest time):          {fastest} ({summary.loc[fastest, 'Time_Mean']:.2f}s)")
+        else:
+            output.append("⏱️  Fastest (lowest time):          N/A")
+
+        if highest_throughput is not None:
+            output.append(f"🚀 Highest Throughput:             {highest_throughput} ({summary.loc[highest_throughput, 'Throughput_MB/s']:.4f} MB/s)")
+        else:
+            output.append("🚀 Highest Throughput:             N/A")
+
+        if lowest_memory is not None:
+            output.append(f"💾 Lowest Memory:                  {lowest_memory} ({summary.loc[lowest_memory, 'Peak_Mem_MB']:.2f} MB)")
+        else:
+            output.append("💾 Lowest Memory:                  N/A")
+
+        if most_consistent is not None:
+            output.append(f"📊 Most Consistent (lowest σ):     {most_consistent} ({summary.loc[most_consistent, 'Time_Std']:.2f}s)")
+        else:
+            output.append("📊 Most Consistent (lowest σ):     N/A")
         output.append("")
         
         # Key findings
