@@ -30,6 +30,11 @@ from tqdm.auto import tqdm  # type: ignore
 import pymupdf as fitz  # type: ignore
 from dataclasses import dataclass
 
+try:
+    import torch
+except ImportError:
+    torch = None
+
 from .config import Global, ProcessingLimits, DefaultSizes
 from .engine import AnonymizationOrchestrator
 
@@ -111,6 +116,104 @@ def extract_text_from_image(image_bytes: bytes) -> str:
         return ""
 
 
+def calculate_adaptive_batch_size(
+    file_path: str,
+    strategy_name: str = "presidio",
+    csv_columns: int = 0,
+    sample_text_lengths: Optional[List[int]] = None
+) -> int:
+    """
+    Calculate optimal batch size based on file characteristics and system resources.
+    
+    Args:
+        file_path: Path to the file being processed
+        strategy_name: Anonymization strategy (presidio, fast, balanced, slm)
+        csv_columns: Number of columns (for CSV files)
+        sample_text_lengths: Sample of text lengths for estimation
+    
+    Returns:
+        Optimal batch size
+    """
+    # Base batch sizes per strategy (presidio is CPU-bound, others GPU-bound)
+    strategy_base = {
+        "presidio": 500,   # Lower for CPU-bound
+        "balanced": 800,   # Medium
+        "fast": 1200,      # Higher for GPU-optimized
+        "slm": 300         # Lower for LLM calls
+    }
+    
+    base_size = strategy_base.get(strategy_name, 1000)
+    file_size_mb = 0
+    
+    # Factor 1: File size
+    try:
+        file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+        if file_size_mb > 500:  # Very large file
+            base_size = int(base_size * 1.5)
+        elif file_size_mb < 10:  # Small file
+            base_size = int(base_size * 0.6)
+    except:
+        pass
+    
+    # Factor 2: Text length (CRITICAL - this is the main factor for CSV with long cells)
+    if sample_text_lengths and len(sample_text_lengths) > 0:
+        avg_length = sum(sample_text_lengths) / len(sample_text_lengths)
+        max_length = max(sample_text_lengths)
+        
+        # More granular adjustments based on text length
+        if avg_length > 2000:  # Very long texts (like JSON in cells)
+            base_size = int(base_size * 0.3)
+            logging.debug(f"Batch size reduced to 30% due to very long avg text ({avg_length:.0f} chars)")
+        elif avg_length > 1000:  # Long texts
+            base_size = int(base_size * 0.5)
+            logging.debug(f"Batch size reduced to 50% due to long avg text ({avg_length:.0f} chars)")
+        elif avg_length > 500:  # Medium-long texts
+            base_size = int(base_size * 0.7)
+            logging.debug(f"Batch size reduced to 70% due to medium-long avg text ({avg_length:.0f} chars)")
+        elif avg_length < 100:  # Short texts
+            base_size = int(base_size * 1.5)
+            logging.debug(f"Batch size increased to 150% due to short avg text ({avg_length:.0f} chars)")
+        
+        # Additional adjustment for max length (outliers)
+        if max_length > 5000:  # Extremely long outliers
+            base_size = int(base_size * 0.7)
+            logging.debug(f"Batch size further reduced due to very long max text ({max_length} chars)")
+    
+    # Factor 3: CSV columns (more columns = more data per row)
+    if csv_columns > 0:
+        if csv_columns > 20:  # Many columns
+            base_size = int(base_size * 0.6)
+            logging.debug(f"Batch size reduced to 60% due to many columns ({csv_columns})")
+        elif csv_columns < 5:  # Few columns
+            base_size = int(base_size * 1.2)
+            logging.debug(f"Batch size increased to 120% due to few columns ({csv_columns})")
+    
+    # Factor 4: GPU memory (if available)
+    if torch is not None:
+        try:
+            if torch.cuda.is_available():
+                gpu_mem_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                if gpu_mem_gb >= 16:  # High-end GPU
+                    base_size = int(base_size * 1.3)
+                    logging.debug(f"Batch size increased to 130% due to high GPU memory ({gpu_mem_gb:.1f}GB)")
+                elif gpu_mem_gb <= 6:  # Low-end GPU
+                    base_size = int(base_size * 0.7)
+                    logging.debug(f"Batch size reduced to 70% due to low GPU memory ({gpu_mem_gb:.1f}GB)")
+        except:
+            pass
+    
+    # Ensure reasonable bounds
+    batch_size = max(50, min(base_size, 5000))
+    
+    logging.info(
+        f"Adaptive batch size: {batch_size} "
+        f"(strategy={strategy_name}, file={file_size_mb:.1f}MB, columns={csv_columns}, "
+        f"avg_text_len={sum(sample_text_lengths)/len(sample_text_lengths) if sample_text_lengths else 0:.0f})"
+    )
+    
+    return batch_size
+
+
 class FileProcessor(ABC):
     DEFAULT_BATCH_SIZE = DefaultSizes.BATCH_SIZE
 
@@ -126,11 +229,12 @@ class FileProcessor(ABC):
                  disable_gc: bool = False,
                  json_stream_threshold_mb: int = ProcessingLimits.JSON_STREAM_THRESHOLD_MB,
                  preserve_row_context: bool = False,
-                 batch_size: int = DefaultSizes.BATCH_SIZE,
+                 batch_size: Union[int, str] = DefaultSizes.BATCH_SIZE,
                  csv_chunk_size: int = DefaultSizes.CSV_CHUNK_SIZE,
                  json_chunk_size: int = DefaultSizes.JSON_CHUNK_SIZE,
                  ner_chunk_size: int = DefaultSizes.NER_CHUNK_SIZE,
-                 force_large_xml: bool = False):
+                 force_large_xml: bool = False,
+                 use_datasets: bool = False):
         self.file_path = file_path
         self.orchestrator = orchestrator
         self.ner_data_generation = ner_data_generation
@@ -144,14 +248,24 @@ class FileProcessor(ABC):
         self.disable_gc = disable_gc
         self.json_stream_threshold_bytes = json_stream_threshold_mb * 1024 * 1024
         self.preserve_row_context = preserve_row_context
-        self.batch_size = batch_size
+        
+        # Handle batch_size="auto"
+        self.batch_size_mode = batch_size  # Store original for reference
+        if isinstance(batch_size, str) and batch_size.lower() == "auto":
+            # Will be calculated adaptively later with file-specific info
+            self.batch_size = -1  # Placeholder
+            logging.info(f"Adaptive batch sizing enabled (--batch-size auto)")
+        else:
+            self.batch_size = int(batch_size)
+        
         self.csv_chunk_size = csv_chunk_size
         self.json_chunk_size = json_chunk_size
         self.ner_chunk_size = ner_chunk_size
         self.force_large_xml = force_large_xml
+        self.use_datasets = use_datasets
         self.ner_output_file: Optional[str] = None
         self.ner_file_handle: Optional[io.TextIOWrapper] = None
-        logging.debug(f"FileProcessor initialized for '{file_path}' with: ner_data_generation={ner_data_generation}, ner_aggregate_record={ner_aggregate_record}, min_word_length={min_word_length}, skip_numeric={skip_numeric}, output_dir='{output_dir}', overwrite={overwrite}, disable_gc={disable_gc}, force_large_xml={force_large_xml}.")
+        logging.debug(f"FileProcessor initialized for '{file_path}' with: ner_data_generation={ner_data_generation}, ner_aggregate_record={ner_aggregate_record}, min_word_length={min_word_length}, skip_numeric={skip_numeric}, output_dir='{output_dir}', overwrite={overwrite}, disable_gc={disable_gc}, force_large_xml={force_large_xml}, use_datasets={use_datasets}, batch_size={self.batch_size if self.batch_size > 0 else 'auto'}.")
 
     def _get_ner_output_path(self) -> str:
         return get_output_path(self.file_path, ".jsonl", prefix="ner_data_anon_", output_dir=self.output_dir)
@@ -428,31 +542,114 @@ class TextFileProcessor(FileProcessor):
 
     def _process_anonymization(self, output_path: str):
         """
-        Custom anonymization processing for text files to handle newlines correctly.
+        Optimized anonymization processing for text files with deduplication.
+        Uses the same optimization strategy as CSV/XML processors.
         """
-        with open(output_path, "w", encoding="utf-8") as outfile:
-            # The base iterator yields lines with newlines attached.
-            text_iterator = self._extract_texts()
-
-            for text_batch in self._batch_iterator(text_iterator, self.batch_size):
-                if not text_batch:
-                    continue
-
-                # The orchestrator expects clean text, so we strip trailing newlines.
-                lines_to_process = [line.rstrip("\r\n") for line in text_batch]
-
-                # Heuristic: Check the first line of the batch to decide if we should anonymize.
-                # This assumes batches are reasonably homogenous.
-                should_anonymize, forced_type = self._should_anonymize(lines_to_process[0])
+        use_deduplication = not self.preserve_row_context
+        
+        # Adaptive batch size calculation (if --batch-size auto)
+        if self.batch_size <= 0:
+            try:
+                # Sample first 100 lines to estimate text lengths
+                sample_lengths = []
+                lines_sampled = 0
+                with open(self.file_path, "r", encoding="utf-8") as f:
+                    for i, line in enumerate(f):
+                        if i >= 100:
+                            break
+                        line_len = len(line.strip())
+                        if line_len > 0:  # Only count non-empty lines
+                            sample_lengths.append(line_len)
+                            lines_sampled += 1
                 
-                if should_anonymize:
-                    anonymized_lines = self._process_batch_smart(lines_to_process, forced_entity_type=forced_type)
-                    for line in anonymized_lines:
-                        outfile.write(line + '\n')
-                else:
-                    # If the batch is skipped, write the original lines back.
-                    for line in text_batch:
+                if sample_lengths:
+                    avg_length = sum(sample_lengths) / len(sample_lengths)
+                    max_length = max(sample_lengths)
+                    min_length = min(sample_lengths)
+                    
+                    logging.info(
+                        f"Adaptive batch size analysis: {lines_sampled} lines sampled, "
+                        f"avg_length={avg_length:.1f}, min={min_length}, max={max_length}"
+                    )
+                
+                strategy_name = getattr(self.orchestrator, 'strategy_name', 'presidio')
+                
+                self.batch_size = calculate_adaptive_batch_size(
+                    file_path=self.file_path,
+                    strategy_name=strategy_name,
+                    csv_columns=0,
+                    sample_text_lengths=sample_lengths if sample_lengths else None
+                )
+                
+                logging.info(
+                    f"Final adaptive batch_size={self.batch_size} for text file "
+                    f"(avg line length {avg_length if sample_lengths else 0:.0f} chars)"
+                )
+                
+            except Exception as e:
+                logging.warning(f"Failed to calculate adaptive batch size: {e}. Using default.")
+                self.batch_size = DefaultSizes.BATCH_SIZE
+        
+        if use_deduplication:
+            logging.debug("TXT processing with line deduplication (faster, context-unaware).")
+            # Pass 1: Collect unique lines and build translation map
+            texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
+            all_lines = []
+            
+            with open(self.file_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    stripped_line = line.rstrip("\r\n")
+                    all_lines.append(line)  # Keep original with newline for writing
+                    
+                    if not stripped_line.strip():
+                        continue
+                    
+                    should_anon, forced_type = self._should_anonymize(stripped_line)
+                    if should_anon:
+                        group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
+                        if stripped_line not in texts_to_anonymize_map[group_key]:
+                            texts_to_anonymize_map[group_key].append(stripped_line)
+            
+            # Build translation map
+            translation_map: Dict[str, str] = {}
+            for group_key, unique_texts in texts_to_anonymize_map.items():
+                current_forced_type = group_key if group_key != "auto" else None
+                if isinstance(current_forced_type, tuple):
+                    current_forced_type = list(current_forced_type)
+                
+                if unique_texts:
+                    logging.debug(f"Anonymizing {len(unique_texts)} unique lines for group '{group_key}'.")
+                    anonymized_texts = self._process_batch_smart(unique_texts, forced_entity_type=current_forced_type)
+                    translation_map.update(dict(zip(unique_texts, anonymized_texts)))
+            
+            # Pass 2: Write output using translation map
+            with open(output_path, "w", encoding="utf-8") as outfile:
+                for line in all_lines:
+                    stripped_line = line.rstrip("\r\n")
+                    if stripped_line in translation_map:
+                        outfile.write(translation_map[stripped_line] + '\n')
+                    else:
                         outfile.write(line)
+        else:
+            logging.debug("TXT processing with line context preservation (slower, context-aware).")
+            # Original batch processing for context preservation
+            with open(output_path, "w", encoding="utf-8") as outfile:
+                text_iterator = self._extract_texts()
+
+                for text_batch in self._batch_iterator(text_iterator, self.batch_size):
+                    if not text_batch:
+                        continue
+
+                    lines_to_process = [line.rstrip("\r\n") for line in text_batch]
+                    should_anonymize, forced_type = self._should_anonymize(lines_to_process[0])
+                    
+                    if should_anonymize:
+                        anonymized_lines = self._process_batch_smart(lines_to_process, forced_entity_type=forced_type)
+                        for line in anonymized_lines:
+                            outfile.write(line + '\n')
+                    else:
+                        for line in text_batch:
+                            outfile.write(line)
 
 
 class ImageFileProcessor(FileProcessor):
@@ -492,6 +689,82 @@ class DocxFileProcessor(FileProcessor):
             if full_para_text.strip():
                 yield full_para_text + "\n"
 
+    def _process_anonymization(self, output_path: str):
+        """
+        Optimized anonymization processing for DOCX files with deduplication.
+        """
+        use_deduplication = not self.preserve_row_context
+        
+        if use_deduplication:
+            logging.debug("DOCX processing with paragraph deduplication (faster, context-unaware).")
+            # Pass 1: Extract all paragraphs and collect unique texts
+            doc = Document(self.file_path)
+            all_paragraphs = []
+            texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
+            
+            desc = f"Pass 1/2: Collecting DOCX {os.path.basename(self.file_path)}"
+            for para in tqdm(doc.paragraphs, desc=desc, unit="para", leave=False,
+                            bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]'):
+                para_content_parts = []
+                for run in para.runs:
+                    if run._r.xpath(".//w:drawing"):
+                        for r_id in run._r.xpath(".//@r:embed"):
+                            try:
+                                image_part = doc.part.related_parts[r_id]
+                                ocr_text = extract_text_from_image(image_part.blob)
+                                if ocr_text: para_content_parts.append(ocr_text)
+                            except (KeyError, AttributeError):
+                                continue
+                    else:
+                        para_content_parts.append(run.text)
+                full_para_text = "".join(para_content_parts)
+                
+                if full_para_text.strip():
+                    all_paragraphs.append(full_para_text)
+                    should_anon, forced_type = self._should_anonymize(full_para_text)
+                    if should_anon:
+                        group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
+                        if full_para_text not in texts_to_anonymize_map[group_key]:
+                            texts_to_anonymize_map[group_key].append(full_para_text)
+                else:
+                    all_paragraphs.append("")
+            
+            # Build translation map
+            translation_map: Dict[str, str] = {}
+            for group_key, unique_texts in texts_to_anonymize_map.items():
+                current_forced_type = group_key if group_key != "auto" else None
+                if isinstance(current_forced_type, tuple):
+                    current_forced_type = list(current_forced_type)
+                
+                if unique_texts:
+                    logging.debug(f"Anonymizing {len(unique_texts)} unique paragraphs for group '{group_key}'.")
+                    anonymized_texts = self._process_batch_smart(unique_texts, forced_entity_type=current_forced_type)
+                    translation_map.update(dict(zip(unique_texts, anonymized_texts)))
+            
+            # Pass 2: Write output using translation map
+            with open(output_path, "w", encoding="utf-8") as outfile:
+                for para_text in all_paragraphs:
+                    if para_text.strip() and para_text in translation_map:
+                        outfile.write(translation_map[para_text] + '\n')
+                    elif para_text.strip():
+                        outfile.write(para_text + '\n')
+                    else:
+                        outfile.write('\n')
+        else:
+            logging.debug("DOCX processing with paragraph context preservation (slower, context-aware).")
+            # Original method without deduplication
+            with open(output_path, "w", encoding="utf-8") as outfile:
+                text_iterator = self._extract_texts()
+                for text_batch in self._batch_iterator(text_iterator, self.batch_size):
+                    if not text_batch:
+                        continue
+                    should_anonymize, forced_type = self._should_anonymize(text_batch[0])
+                    if should_anonymize:
+                        anonymized_batch = self._process_batch_smart(text_batch, forced_entity_type=forced_type)
+                        outfile.write("".join(anonymized_batch))
+                    else:
+                        outfile.write("".join(text_batch))
+
 
 class PdfFileProcessor(FileProcessor):
     def _get_output_extension(self) -> str:
@@ -530,12 +803,104 @@ class PdfFileProcessor(FileProcessor):
                 page.clean_contents()
                 del page # Ensure the page object is released
 
+    def _process_anonymization(self, output_path: str):
+        """
+        Optimized anonymization processing for PDF files with deduplication.
+        PDFs often have repeated headers, footers, and boilerplate text across pages.
+        """
+        use_deduplication = not self.preserve_row_context
+        
+        if use_deduplication:
+            logging.debug("PDF processing with text block deduplication (faster, context-unaware).")
+            # Pass 1: Extract all text blocks and collect unique texts
+            all_content_blocks = []
+            texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
+            
+            with fitz.open(self.file_path) as doc:
+                desc = f"Pass 1/2: Collecting PDF {os.path.basename(self.file_path)}"
+                for page_num in tqdm(range(doc.page_count), desc=desc, unit="page", leave=False,
+                                    bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]'):
+                    page = doc[page_num]
+                    content_items = []
+                    page_dict = page.get_text("dict")
+                    text_blocks = page_dict.get("blocks", []) if isinstance(page_dict, dict) else []
+                    
+                    for block in text_blocks:
+                        if block["type"] == 0:
+                            block_text = "".join(span["text"] for line in block.get("lines", []) for span in line.get("spans", []) if "text" in span)
+                            if block_text.strip():
+                                content_items.append({"bbox": block["bbox"], "content": block_text})
+
+                    for img in page.get_images(full=True):
+                        xref = img[0]
+                        base_image = doc.extract_image(xref)
+                        if base_image:
+                            bbox = page.get_image_bbox(img)
+                            ocr_text = extract_text_from_image(base_image["image"])
+                            if ocr_text:
+                                content_items.append({"bbox": bbox, "content": ocr_text})
+
+                    content_items.sort(key=lambda item: (item["bbox"][1], item["bbox"][0]))
+                    
+                    for item in content_items:
+                        if item['content']:
+                            all_content_blocks.append(item['content'])
+                            should_anon, forced_type = self._should_anonymize(item['content'])
+                            if should_anon:
+                                group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
+                                if item['content'] not in texts_to_anonymize_map[group_key]:
+                                    texts_to_anonymize_map[group_key].append(item['content'])
+                    
+                    page.clean_contents()
+                    del page
+            
+            # Build translation map
+            translation_map: Dict[str, str] = {}
+            for group_key, unique_texts in texts_to_anonymize_map.items():
+                current_forced_type = group_key if group_key != "auto" else None
+                if isinstance(current_forced_type, tuple):
+                    current_forced_type = list(current_forced_type)
+                
+                if unique_texts:
+                    logging.debug(f"Anonymizing {len(unique_texts)} unique text blocks for group '{group_key}'.")
+                    anonymized_texts = self._process_batch_smart(unique_texts, forced_entity_type=current_forced_type)
+                    translation_map.update(dict(zip(unique_texts, anonymized_texts)))
+            
+            # Pass 2: Write output using translation map
+            with open(output_path, "w", encoding="utf-8") as outfile:
+                for block_text in all_content_blocks:
+                    if block_text in translation_map:
+                        outfile.write(translation_map[block_text] + '\n')
+                    else:
+                        outfile.write(block_text + '\n')
+        else:
+            logging.debug("PDF processing with text block context preservation (slower, context-aware).")
+            # Original method without deduplication
+            with open(output_path, "w", encoding="utf-8") as outfile:
+                text_iterator = self._extract_texts()
+                for text_batch in self._batch_iterator(text_iterator, self.batch_size):
+                    if not text_batch:
+                        continue
+                    should_anonymize, forced_type = self._should_anonymize(text_batch[0])
+                    if should_anonymize:
+                        anonymized_batch = self._process_batch_smart(text_batch, forced_entity_type=forced_type)
+                        outfile.write("".join(anonymized_batch))
+                    else:
+                        outfile.write("".join(text_batch))
+
 
 class CsvFileProcessor(FileProcessor):
     def _get_output_extension(self) -> str:
         return ".csv"
     
     def _process_anonymization(self, output_path: str):
+        # Note: --use-datasets flag is designed for GPU-intensive strategies
+        # CSV processing with presidio is CPU-bound and doesn't benefit from larger batches
+        # so we skip batch_size adjustment here (deduplication already optimizes performance)
+        if self.use_datasets:
+            logging.info("Dataset-optimized processing enabled for CSV (deduplication already active).")
+            logging.debug(f"Skipping batch_size increase for CSV (presidio is CPU-bound, not GPU-bound)")
+        
         chunk_size = self.csv_chunk_size
         temp_output_path = output_path + ".tmp"
         header_written = False
@@ -558,6 +923,62 @@ class CsvFileProcessor(FileProcessor):
                 except Exception:
                     pass
             return
+        
+        # Adaptive batch size calculation (if --batch-size auto)
+        if self.batch_size <= 0:
+            # Sample first chunk to get column count and text lengths
+            try:
+                sample_df = pd.read_csv(self.file_path, nrows=min(100, total_rows), dtype=str, encoding='utf-8')
+                num_columns = len(sample_df.columns)
+                
+                # Sample text lengths from all columns - improved sampling
+                sample_lengths = []
+                total_cells_sampled = 0
+                max_samples_per_col = 50  # Increase sample size per column
+                
+                for col in sample_df.columns:
+                    col_values = sample_df[col].dropna()
+                    if len(col_values) > 0:
+                        # Take up to 50 values from each column
+                        sample_values = col_values.head(max_samples_per_col)
+                        for val in sample_values:
+                            val_len = len(str(val))
+                            sample_lengths.append(val_len)
+                            total_cells_sampled += 1
+                
+                # Calculate statistics
+                if sample_lengths:
+                    avg_length = sum(sample_lengths) / len(sample_lengths)
+                    max_length = max(sample_lengths)
+                    min_length = min(sample_lengths)
+                    
+                    logging.info(
+                        f"Adaptive batch size analysis: {num_columns} columns, "
+                        f"{total_cells_sampled} cells sampled, "
+                        f"avg_length={avg_length:.1f}, min={min_length}, max={max_length}"
+                    )
+                else:
+                    avg_length = 0
+                    logging.warning("No text data sampled for adaptive batch sizing")
+                
+                # Get strategy name from orchestrator
+                strategy_name = getattr(self.orchestrator, 'strategy_name', 'presidio')
+                
+                self.batch_size = calculate_adaptive_batch_size(
+                    file_path=self.file_path,
+                    strategy_name=strategy_name,
+                    csv_columns=num_columns,
+                    sample_text_lengths=sample_lengths if sample_lengths else None
+                )
+                
+                logging.info(
+                    f"Final adaptive batch_size={self.batch_size} "
+                    f"(avg text length {avg_length:.0f} chars influences this)"
+                )
+                
+            except Exception as e:
+                logging.warning(f"Failed to calculate adaptive batch size: {e}. Using default.")
+                self.batch_size = DefaultSizes.BATCH_SIZE
 
         try:
             bytes_per_row = file_size / total_rows if total_rows > 0 else 0

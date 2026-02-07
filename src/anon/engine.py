@@ -97,7 +97,7 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
     # --- 1. URL & NETWORK ---
     url_pattern = Pattern(
       name="URL Pattern", 
-      regex=r"(?:https?://|ftp://|www\.)[^\s]+(?:\.(?:com|net|org|edu|gov|mil|int|br|app|dev|io|co|uk|de|fr|es|it|ru|cn|jp|kr|au|ca|mx|ar|cl|pe|co\.uk|com\.br|org\.br|gov\.br|edu\.br|net\.br|vercel\.app|herokuapp\.com|github\.io|gitlab\.io|netlify\.app|firebase\.app|appspot\.com|cloudfront\.net|amazonaws\.com|azure\.com|digitalocean\.com)|localhost|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))(?::[0-9]{1,5})?(?:/[^\s]*)?",
+      regex=r"(?:https?://|ftp://|www\.)\S+?(?:\.(?:com|net|org|edu|gov|mil|int|br|app|dev|io|co|uk|de|fr|es|it|ru|cn|jp|kr|au|ca|mx|ar|cl|pe|co\.uk|com\.br|org\.br|gov\.br|edu\.br|net\.br|vercel\.app|herokuapp\.com|github\.io|gitlab\.io|netlify\.app|firebase\.app|appspot\.com|cloudfront\.net|amazonaws\.com|azure\.com|digitalocean\.com)|localhost|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))(?::[0-9]{1,5})?(?:/[^\s]*)?",
       score=0.7 + SCORE_BOOST
     )
 
@@ -109,7 +109,7 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
     
     ipv6_pattern = Pattern(
       name="IPv6 Address Pattern", 
-      regex=r"(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))", 
+      regex=r"(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|::(?:ffff:)?(?:[0-9]{1,3}\.){3}[0-9]{1,3}|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+", 
       score=0.6 + SCORE_BOOST
     )
     serial_pattern = Pattern(
@@ -156,19 +156,19 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
     )
 
     auth_token_patterns = [
-        Pattern(name="Cookie/Session Assignment", regex=r"(?<=[=])[a-zA-Z0-9\-_]{32,128}\b", score=0.9 + SCORE_BOOST),
+        Pattern(name="Cookie/Session Assignment", regex=r"=[a-zA-Z0-9\-_]{32,128}\b", score=0.9 + SCORE_BOOST),
         Pattern(name="Generic Auth Token", regex=r"\b[a-zA-Z0-9]{32,128}\b", score=0.5 + SCORE_BOOST)
     ]
 
     password_pattern = Pattern(
         name="Contextual Password",
-        regex=r"(?:password=|passwd=|pwd=|secret=|api_key=|apikey=|access_key=|client_secret=)([^\",;']+)\b",
+        regex=r"(?:password|passwd|pwd|secret|api_key|apikey|access_key|client_secret)=([^\",;'\s]{4,128})\b",
         score=0.95 + SCORE_BOOST
     )
 
     username_pattern = Pattern(
         name="Contextual Username",
-        regex=r"(?:user=|username=|uid=|login=|user_id=)([a-zA-Z0-9_.-]+)\b",
+        regex=r"(?:user|username|uid|login|user_id)=([a-zA-Z0-9_.-]{2,64})\b",
         score=0.8 + SCORE_BOOST
     )
 
@@ -186,10 +186,10 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
 
     uuid_pattern = Pattern(name="UUID Pattern", regex=r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", score=0.8 + SCORE_BOOST)
     cert_patterns = [
-        Pattern(name="Certificate PEM Block", regex=r"-----BEGIN CERTIFICATE-----[A-Za-z0-9+/=\n\r]+-----END CERTIFICATE-----", score=0.95 + SCORE_BOOST),
-        Pattern(name="Certificate Request PEM Block", regex=r"-----BEGIN CERTIFICATE REQUEST-----[A-Za-z0-9+/=\n\r]+-----END CERTIFICATE REQUEST-----", score=0.95 + SCORE_BOOST),
-        Pattern(name="Private Key PEM Block", regex=r"-----BEGIN (?:RSA |DSA |EC )?PRIVATE KEY-----[A-Za-z0-9+/=\n\r]+-----END (?:RSA |DSA |EC )?PRIVATE KEY-----", score=0.95 + SCORE_BOOST),
-        Pattern(name="Certificate Body DER", regex=r"\bMII[A-Za-z0-9+/=\n]{100,}\b", score=0.8 + SCORE_BOOST),
+        Pattern(name="Certificate PEM Block", regex=r"-----BEGIN CERTIFICATE-----[A-Za-z0-9+/=\n\r]{50,8000}-----END CERTIFICATE-----", score=0.95 + SCORE_BOOST),
+        Pattern(name="Certificate Request PEM Block", regex=r"-----BEGIN CERTIFICATE REQUEST-----[A-Za-z0-9+/=\n\r]{50,4000}-----END CERTIFICATE REQUEST-----", score=0.95 + SCORE_BOOST),
+        Pattern(name="Private Key PEM Block", regex=r"-----BEGIN (?:RSA |DSA |EC )?PRIVATE KEY-----[A-Za-z0-9+/=\n\r]{50,4000}-----END (?:RSA |DSA |EC )?PRIVATE KEY-----", score=0.95 + SCORE_BOOST),
+        Pattern(name="Certificate Body DER", regex=r"\bMII[A-Za-z0-9+/=\n]{100,2000}\b", score=0.8 + SCORE_BOOST),
         Pattern(name="Certificate Thumbprint", regex=r"(?:thumbprint|sha1|sha256)[:=\s]+[0-9a-fA-F]{40,128}", score=0.85 + SCORE_BOOST),
     ]
 
@@ -203,7 +203,7 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
     
     pgp_pattern = Pattern(
         name="PGP Block",
-        regex=r"-----BEGIN PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----.+?-----END PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----",
+        regex=r"-----BEGIN PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----[\s\S]{10,8000}?-----END PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----",
         score=0.95 + SCORE_BOOST
     )
     recognizers = []
@@ -324,6 +324,7 @@ class AnonymizationOrchestrator:
         else:
             self.anonymization_strategy = strategy_factory(
                 strategy_name=strategy_name,
+                transformer_model=self.transformer_model,
                 analyzer_engine=self.analyzer_engine,
                 anonymizer_engine=self.anonymizer_engine,
                 entity_detector=self.entity_detector,

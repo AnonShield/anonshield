@@ -355,16 +355,25 @@ class SLMAnonymizationStrategy:
     
     This integrates the SLM anonymizer into the existing strategy pattern,
     making it a drop-in replacement for PresidioStrategy or FastStrategy.
+    
+    Now with cache support for improved performance on repetitive data!
     """
     
     def __init__(
         self,
         slm_anonymizer: SLMFullAnonymizer,
+        cache_manager=None,
         lang: str = "en"
     ):
         self.slm_anonymizer = slm_anonymizer
+        self.cache_manager = cache_manager
         self.lang = lang
         self.logger = logging.getLogger(__class__.__name__)
+        
+        if self.cache_manager:
+            self.logger.info("SLM strategy initialized with cache support")
+        else:
+            self.logger.warning("SLM strategy initialized WITHOUT cache - performance may be degraded")
     
     def anonymize(
         self, 
@@ -372,44 +381,76 @@ class SLMAnonymizationStrategy:
         operator_params: Dict
     ) -> Tuple[List[str], List[Tuple]]:
         """
-        Anonymize texts using SLM.
+        Anonymize texts using SLM with cache support.
         
         Compatible with the existing AnonymizationStrategy interface.
         
-        Note: This strategy doesn't use traditional entity collection
-        because the SLM handles everything internally.
+        Cache behavior:
+        - Checks cache before processing each text
+        - Only processes uncached texts via SLM
+        - Adds results to cache after processing
         """
         if not texts:
             return [], []
         
-        self.logger.debug(f"Anonymizing {len(texts)} texts with SLM strategy")
+        self.logger.debug(f"Anonymizing {len(texts)} texts with SLM strategy (cache: {self.cache_manager is not None})")
         
-        # Batch anonymize
-        results = self.slm_anonymizer.batch_anonymize(texts, self.lang)
-        
-        # Extract anonymized texts
-        anonymized_texts = [r.anonymized_text for r in results]
-        
-        # For compatibility with existing system, we need to return
-        # entity tuples. However, SLM doesn't provide these in the same way.
-        # We'll create synthetic tuples based on replacements.
+        anonymized_texts = []
         collected_entities = []
+        texts_to_process = []
+        text_indices = []
         
-        for result in results:
-            for original, replacement in result.replacements.items():
-                # Extract entity type from replacement (e.g., [PERSON_1] -> PERSON)
-                type_match = re.match(r'\[([A-Z_]+)_\d+\]', replacement)
-                entity_type = type_match.group(1) if type_match else "UNKNOWN"
+        # Phase 1: Check cache for each text
+        for idx, text in enumerate(texts):
+            if not text or not isinstance(text, str):
+                anonymized_texts.append(text)
+                continue
+            
+            # Try to get from cache
+            if self.cache_manager:
+                cached_value = self.cache_manager.get(text)
+                if cached_value:
+                    self.logger.debug(f"Cache hit for text {idx} (length: {len(text)})")
+                    anonymized_texts.append(cached_value)
+                    continue
+            
+            # Not in cache, need to process
+            anonymized_texts.append(None)  # Placeholder
+            texts_to_process.append(text)
+            text_indices.append(idx)
+        
+        # Phase 2: Process uncached texts via SLM
+        if texts_to_process:
+            cache_hits = len(texts) - len(texts_to_process)
+            self.logger.info(f"SLM processing: {len(texts_to_process)} texts (cache hits: {cache_hits}/{len(texts)} = {cache_hits/len(texts)*100:.1f}%)")
+            
+            results = self.slm_anonymizer.batch_anonymize(texts_to_process, self.lang)
+            
+            # Phase 3: Update results and cache
+            for result, original_text, idx in zip(results, texts_to_process, text_indices):
+                anonymized_text = result.anonymized_text
                 
-                # Create a synthetic hash (since we're not using HMAC)
-                # In a real system, you might want to generate proper hashes
-                synthetic_hash = f"slm_{hash(original) % 10000:04d}"
+                # Store in cache
+                if self.cache_manager:
+                    self.cache_manager.add(original_text, anonymized_text)
                 
-                collected_entities.append((
-                    entity_type,
-                    original,
-                    synthetic_hash[:8],  # display_hash
-                    synthetic_hash       # full_hash
-                ))
+                # Update result list
+                anonymized_texts[idx] = anonymized_text
+                
+                # Extract entities from this result
+                for original, replacement in result.replacements.items():
+                    # Extract entity type from replacement (e.g., [PERSON_1] -> PERSON)
+                    type_match = re.match(r'\[([A-Z_]+)_\d+\]', replacement)
+                    entity_type = type_match.group(1) if type_match else "UNKNOWN"
+                    
+                    # Create a synthetic hash
+                    synthetic_hash = f"slm_{hash(original) % 10000:04d}"
+                    
+                    collected_entities.append((
+                        entity_type,
+                        original,
+                        synthetic_hash[:8],  # display_hash
+                        synthetic_hash       # full_hash
+                    ))
         
         return anonymized_texts, collected_entities

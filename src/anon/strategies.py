@@ -233,8 +233,9 @@ class BalancedStrategy(PresidioStrategy):
     A balance between speed and accuracy, using Presidio with a limited set of recognizers.
     It inherits from PresidioStrategy and overrides the entity selection logic.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, transformer_model: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.transformer_model = transformer_model
         self.core_entities = self._get_core_entities()
 
     def _get_core_entities(self) -> List[str]:
@@ -242,8 +243,13 @@ class BalancedStrategy(PresidioStrategy):
         from .engine import load_custom_recognizers
         from .config import ENTITY_MAPPING, SECURE_MODERNBERT_ENTITY_MAPPING
         
-        # Use both entity mappings to support all models
-        core_entities = set(ENTITY_MAPPING.values()) | set(SECURE_MODERNBERT_ENTITY_MAPPING.values())
+        # Choose entity mapping based on transformer model
+        if "SecureModernBERT-NER" in self.transformer_model:
+            entity_mapping = SECURE_MODERNBERT_ENTITY_MAPPING
+        else:
+            entity_mapping = ENTITY_MAPPING
+        
+        core_entities = set(entity_mapping.values())
         for recognizer in load_custom_recognizers(langs=[self.lang]):
             core_entities.update(recognizer.supported_entities)
         return list(core_entities)
@@ -286,6 +292,7 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
         )
     elif strategy_name == "balanced":
         return BalancedStrategy(
+            transformer_model=kwargs["transformer_model"],
             analyzer_engine=kwargs["analyzer_engine"],
             anonymizer_engine=kwargs["anonymizer_engine"],
             cache_manager=kwargs["cache_manager"],
