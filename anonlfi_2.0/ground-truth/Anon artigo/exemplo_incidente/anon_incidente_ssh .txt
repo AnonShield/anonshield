@@ -1,0 +1,19 @@
+Cenário de Teste: PDF com Texto e Imagem (OCR)
+Este documento simula um relatório de incidente de segurança.
+Relatório (Texto Digital): Incidente RITM004515. Alerta de Brute Force SSH recebido do IP [IP_ADDRESS_e254766a] contra o host [HOSTNAME_bb42a7d9] (IP interno: [IP_ADDRESS_745f06c1]). O administrador do sistema, [PERSON_af3b1c29] ([EMAIL_ADDRESS_2dde02bd]), foi notificado para aplicar o bloqueio.
+Evidência (Imagem para OCR): O screenshot abaixo, capturado pela analista [PERSON_230a3a72] Machado, mostra os logs do auth.log com as tentativas de acesso do IP [IP_ADDRESS_e254766a].
+[beatriz.machado@servidor-web-01 ~]11269{NC} sudo tail -f /var/log/auth.log
+
+Nov 13 13:55:22 servidor-web-01 sshd[6312]: Invalid user test from [IP_ADDRESS_e254766a] port 56256
+
+Nov 13 13:55:23 seryidor web 01 sshd[6313]: pam_unix(sshd:auth): authentication failure; logname= uid=0 evid=0 tty=ssh ruser= rhost=[IP_ADDRESS_e254766a]
+Nov 13 13:55:25 servidor-web- Failed password for invalid user jimmy from [IP_ADDRESS_e254766a] port 56258 ssh2
+
+Nov 13 13:55:27 servidor-web- Failed password for invalid user admin from [IP_ADDRESS_e254766a] port 56260 ssh2
+
+Nov 13 13:55:29 servidor-web- Failed password for invalid user root from [IP_ADDRESS_e254766a] port 56262 ssh2
+
+Nov 13 13:55:29 seryvidor-web-01 sshd[6315]: Received disconnect from [IP_ADDRESS_e254766a]: 11: Bye Bye [preauth]
+
+
+Figura 1: Evidência do log auth.log (via terminal).
