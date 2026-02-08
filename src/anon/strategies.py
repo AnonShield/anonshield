@@ -36,18 +36,20 @@ class FullPresidioStrategy(AnonymizationStrategy):
     Accuracy: HIGHEST (maximum entity coverage)
     Use case: When you need maximum entity detection, regardless of performance
     """
-    def __init__(self, 
-                 analyzer_engine: BatchAnalyzerEngine, 
+    def __init__(self,
+                 analyzer_engine: BatchAnalyzerEngine,
                  anonymizer_engine: AnonymizerEngine,
                  cache_manager: CacheStrategy,
                  lang: str,
                  entities_to_preserve: Set[str],
-                 allow_list: Set[str]):
+                 allow_list: Set[str],
+                 nlp_batch_size: int = 8):
         super().__init__()
         self.analyzer_engine = analyzer_engine
         self.anonymizer_engine = anonymizer_engine
         self.cache_manager = cache_manager
         self.lang = lang
+        self.nlp_batch_size = nlp_batch_size
         self.entities_to_preserve = entities_to_preserve
         self.allow_list = allow_list
 
@@ -97,7 +99,8 @@ class FullPresidioStrategy(AnonymizationStrategy):
         analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
             texts_to_process, language=self.lang,
             entities=entities_to_use, score_threshold=0.6,
-            allow_list=self.allow_list
+            allow_list=self.allow_list,
+            batch_size=self.nlp_batch_size
         )
         
         analyzer_results_list = list(analyzer_results_iterator)
@@ -240,7 +243,8 @@ class HybridPresidioStrategy(AnonymizationStrategy):
         # Now with entity filtering to reduce unnecessary processing
         analyzer_results_iterator = self.nlp_engine.analyze_iterator(
             texts_to_process_in_batch, language=self.lang,
-            entities=entities_to_use, score_threshold=0.6
+            entities=entities_to_use, score_threshold=0.6,
+            batch_size=self.nlp_batch_size
         )
         
         analyzer_results_list = list(analyzer_results_iterator)
@@ -374,7 +378,8 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             cache_manager=kwargs["cache_manager"],
             lang=kwargs["lang"],
             entities_to_preserve=kwargs["entities_to_preserve"],
-            allow_list=kwargs["allow_list"]
+            allow_list=kwargs["allow_list"],
+            nlp_batch_size=kwargs["nlp_batch_size"]
         )
     
     elif strategy_name == "filtered":
@@ -386,7 +391,8 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             cache_manager=kwargs["cache_manager"],
             lang=kwargs["lang"],
             entities_to_preserve=kwargs["entities_to_preserve"],
-            allow_list=kwargs["allow_list"]
+            allow_list=kwargs["allow_list"],
+            nlp_batch_size=kwargs["nlp_batch_size"]
         )
     
     elif strategy_name == "hybrid":

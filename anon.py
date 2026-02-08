@@ -42,6 +42,7 @@ from src.anon.slm.anonymizers.slm_anonymizer import SLMAnonymizationStrategy, SL
 from src.anon.tqdm_handler import TqdmLoggingHandler
 
 warnings.filterwarnings("ignore")
+logging.getLogger("transformers").setLevel(logging.ERROR)
 
 # Import standalone script functions for backward compatibility
 from scripts.sample import sample_data
