@@ -292,6 +292,7 @@ def _parse_arguments():
     slm_group.add_argument("--slm-detector-mode", type=str, default="hybrid", choices=["hybrid", "exclusive"], help="Mode for the SLM detector: 'hybrid' (default) merges with traditional NER, 'exclusive' uses only SLM results.")
     slm_group.add_argument("--slm-prompt-version", type=str, default="v1", help="Specify the prompt version to use for SLM tasks.")
     slm_group.add_argument("--slm-chunk-size", type=int, default=DefaultSizes.SLM_MAPPER_CHUNK_SIZE, help=f"Max character size for chunks sent to the SLM mapper. Default: {DefaultSizes.SLM_MAPPER_CHUNK_SIZE}.")
+    slm_group.add_argument("--slm-anonymizer-chunk-size", type=int, default=DefaultSizes.SLM_ANONYMIZER_CHUNK_SIZE, help=f"Max character size for chunks sent to the SLM anonymizer (--anonymization-strategy slm). Default: {DefaultSizes.SLM_ANONYMIZER_CHUNK_SIZE}.")
     slm_group.add_argument("--slm-confidence-threshold", type=float, default=DefaultSizes.DEFAULT_SLM_CONFIDENCE_THRESHOLD, help=f"Minimum confidence score for entities from the SLM mapper. Default: {DefaultSizes.DEFAULT_SLM_CONFIDENCE_THRESHOLD}.")
     slm_group.add_argument("--slm-context-window", type=int, default=DefaultSizes.DEFAULT_SLM_CONTEXT_WINDOW, help=f"Character window size for context extraction in SLM mapper. Default: {DefaultSizes.DEFAULT_SLM_CONTEXT_WINDOW}.")
     slm_group.add_argument("--slm-temperature", type=float, default=LLM_CONFIG['ollama']['temperature'], help=f"Temperature for the SLM model. Default: {LLM_CONFIG['ollama']['temperature']}.")
@@ -599,7 +600,8 @@ def main():
                 prompt_manager = PromptManager(base_path="prompts")
                 slm_anonymizer = SLMFullAnonymizer(
                     slm_client=client,
-                    prompt_manager=prompt_manager
+                    prompt_manager=prompt_manager,
+                    max_chunk_size=args.slm_anonymizer_chunk_size
                 )
                 strategy_instance = SLMAnonymizationStrategy(
                     slm_anonymizer=slm_anonymizer,
