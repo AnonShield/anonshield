@@ -926,6 +926,126 @@ class BenchmarkAnalyzer:
         
         print(f"   ✅ Generated 8 visualization sets")
     
+    def _plot_strategy_comparison(self):
+        """Strategy comparison visualization (simplified version)."""
+        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+        fig.suptitle('Strategy Performance Comparison', fontsize=16, fontweight='bold')
+        
+        strategies = sorted(self.df_success['version_strategy'].unique())
+        colors = sns.color_palette('Set2', len(strategies))
+        
+        # 1. Execution time
+        ax = axes[0, 0]
+        means = [self.df_success[self.df_success['version_strategy'] == s]['wall_clock_time_sec'].mean() 
+                for s in strategies]
+        stds = [self.df_success[self.df_success['version_strategy'] == s]['wall_clock_time_sec'].std() 
+               for s in strategies]
+        x_pos = np.arange(len(strategies))
+        ax.bar(x_pos, means, yerr=stds, capsize=5, color=colors, alpha=0.8, edgecolor='black')
+        ax.set_ylabel('Time (s)', fontweight='bold')
+        ax.set_title('(A) Execution Time', fontweight='bold')
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels([s.replace('_', '\n') for s in strategies], fontsize=8)
+        ax.grid(axis='y', alpha=0.3)
+        
+        # 2. Throughput
+        ax = axes[0, 1]
+        means = [self.df_success[self.df_success['version_strategy'] == s]['throughput_mb_per_sec'].mean() 
+                for s in strategies]
+        ax.bar(x_pos, means, color=colors, alpha=0.8, edgecolor='black')
+        ax.set_ylabel('MB/s', fontweight='bold')
+        ax.set_title('(B) Throughput', fontweight='bold')
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels([s.replace('_', '\n') for s in strategies], fontsize=8)
+        ax.grid(axis='y', alpha=0.3)
+        
+        # 3. CPU Efficiency
+        ax = axes[0, 2]
+        means = [self.df_success[self.df_success['version_strategy'] == s]['cpu_efficiency'].mean() * 100 
+                for s in strategies]
+        ax.bar(x_pos, means, color=colors, alpha=0.8, edgecolor='black')
+        ax.axhline(y=100, color='red', linestyle='--', alpha=0.5)
+        ax.set_ylabel('Efficiency (%)', fontweight='bold')
+        ax.set_title('(C) CPU Efficiency', fontweight='bold')
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels([s.replace('_', '\n') for s in strategies], fontsize=8)
+        ax.grid(axis='y', alpha=0.3)
+        
+        # 4. Memory
+        ax = axes[1, 0]
+        means = [self.df_success[self.df_success['version_strategy'] == s]['peak_memory_mb'].mean() 
+                for s in strategies]
+        ax.barh(x_pos, means, color=colors, alpha=0.8, edgecolor='black')
+        ax.set_xlabel('Memory (MB)', fontweight='bold')
+        ax.set_title('(D) Peak Memory', fontweight='bold')
+        ax.set_yticks(x_pos)
+        ax.set_yticklabels([s.replace('_', ' ') for s in strategies], fontsize=8)
+        ax.grid(axis='x', alpha=0.3)
+        
+        # 5. I/O Wait
+        ax = axes[1, 1]
+        means = [self.df_success[self.df_success['version_strategy'] == s]['io_wait_percent'].mean() 
+                for s in strategies]
+        ax.barh(x_pos, means, color=colors, alpha=0.8, edgecolor='black')
+        ax.axvline(x=50, color='red', linestyle='--', alpha=0.5)
+        ax.set_xlabel('I/O Wait (%)', fontweight='bold')
+        ax.set_title('(E) I/O Wait', fontweight='bold')
+        ax.set_yticks(x_pos)
+        ax.set_yticklabels([s.replace('_', ' ') for s in strategies], fontsize=8)
+        ax.grid(axis='x', alpha=0.3)
+        
+        # 6. Distribution violin
+        ax = axes[1, 2]
+        data = [self.df_success[self.df_success['version_strategy'] == s]['wall_clock_time_sec'].values 
+                for s in strategies]
+        parts = ax.violinplot(data, positions=x_pos, widths=0.7, showmeans=True, showmedians=True)
+        for pc, color in zip(parts['bodies'], colors):
+            pc.set_facecolor(color)
+            pc.set_alpha(0.7)
+        ax.set_ylabel('Time (s)', fontweight='bold')
+        ax.set_title('(F) Distribution', fontweight='bold')
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels([s.replace('_', '\n') for s in strategies], fontsize=8)
+        ax.grid(axis='y', alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(self.output_dir / 'strategy_comparison.png', dpi=300, bbox_inches='tight')
+        plt.savefig(self.output_dir / 'strategy_comparison.pdf', bbox_inches='tight')
+        plt.close()
+    
+    def _plot_resource_heatmap(self):
+        """Resource utilization heatmap."""
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        metrics = ['peak_memory_mb', 'io_wait_percent', 'cpu_efficiency', 
+                   'throughput_mb_per_sec', 'voluntary_context_switches']
+        
+        data = []
+        strategies = sorted(self.df_success['version_strategy'].unique())
+        
+        for metric in metrics:
+            row = []
+            for strategy in strategies:
+                val = self.df_success[self.df_success['version_strategy'] == strategy][metric].mean()
+                row.append(val)
+            data.append(row)
+        
+        # Normalize data
+        data_array = np.array(data)
+        data_norm = (data_array - data_array.min(axis=1, keepdims=True)) / \
+                    (data_array.max(axis=1, keepdims=True) - data_array.min(axis=1, keepdims=True) + 1e-10)
+        
+        sns.heatmap(data_norm, annot=False, cmap='YlOrRd', ax=ax,
+                   xticklabels=[s.replace('_', ' ') for s in strategies],
+                   yticklabels=[m.replace('_', ' ').title() for m in metrics],
+                   cbar_kws={'label': 'Normalized Value'})
+        
+        ax.set_title('Resource Utilization Heatmap (Normalized)', fontweight='bold', fontsize=14)
+        plt.tight_layout()
+        plt.savefig(self.output_dir / 'resource_heatmap.png', dpi=300, bbox_inches='tight')
+        plt.savefig(self.output_dir / 'resource_heatmap.pdf', bbox_inches='tight')
+        plt.close()
+    
     def _plot_strategy_comparison_individual(self):
         """Generate individual strategy comparison plots."""
         strategies = sorted(self.df_success['version_strategy'].unique())
@@ -3111,6 +3231,11 @@ def main():
         action='store_true',
         help='Generate individual separated plots (one per metric) with markdown report'
     )
+    parser.add_argument(
+        '--all',
+        action='store_true',
+        help='Generate ALL outputs: standard analysis + paper outputs + individual plots'
+    )
     
     args = parser.parse_args()
     
@@ -3141,7 +3266,36 @@ def main():
     try:
         analyzer = BenchmarkAnalyzer(args.data, args.output)
         
-        if args.individual:
+        if args.all:
+            # Generate ALL outputs
+            print("\n" + "="*80)
+            print("🎯 GENERATING ALL OUTPUTS: STANDARD + PAPER + INDIVIDUAL")
+            print("="*80 + "\n")
+            
+            # 1. Standard analysis
+            print("📊 Step 1/3: Standard Analysis...")
+            analyzer.generate_complete_analysis()
+            
+            # 2. Paper outputs
+            print("\n📝 Step 2/3: Paper-Ready Outputs...")
+            analyzer.generate_paper_outputs()
+            
+            # 3. Individual plots
+            print("\n🎨 Step 3/3: Individual Separated Visualizations...")
+            from visualization_individual import IndividualVisualizer
+            visualizer = IndividualVisualizer(analyzer, f"{args.output}/individual_plots")
+            count = visualizer.generate_all()
+            
+            print("\n" + "="*80)
+            print("✨ ALL OUTPUTS COMPLETE!")
+            print("="*80)
+            print(f"📂 Standard analysis: {args.output}/")
+            print(f"📂 Paper outputs: {args.output}/paper/")
+            print(f"📂 Individual plots ({count} graphs): {args.output}/individual_plots/")
+            print(f"📄 View markdown report: {args.output}/individual_plots/README.md")
+            print("="*80 + "\n")
+            
+        elif args.individual:
             # Generate individual clean plots
             print("\n🎨 Generating individual separated visualizations...\n")
             from visualization_individual import IndividualVisualizer

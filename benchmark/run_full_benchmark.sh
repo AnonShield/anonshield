@@ -11,8 +11,17 @@ set -e  # Para em caso de erro
 # Diretórios
 BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RESULTS_BASE="$BASE_DIR/benchmark/orchestrated_results"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-SESSION_DIR="$RESULTS_BASE/session_$TIMESTAMP"
+
+# Retomar sessão existente (argumento) ou encontrar a última, ou criar nova
+if [ -n "$1" ]; then
+    SESSION_DIR="$1"
+elif LATEST=$(ls -dt "$RESULTS_BASE"/session_* 2>/dev/null | head -1) && [ -n "$LATEST" ]; then
+    SESSION_DIR="$LATEST"
+    echo "[RESUMO] Retomando sessão existente: $SESSION_DIR"
+else
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    SESSION_DIR="$RESULTS_BASE/session_$TIMESTAMP"
+fi
 
 # Arquivos de entrada
 CVE_DATASET="$BASE_DIR/cve_dataset_anonimizados_stratified.json"
