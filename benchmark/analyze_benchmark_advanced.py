@@ -926,16 +926,16 @@ class BenchmarkAnalyzer:
         
         print(f"   ✅ Generated 8 visualization sets")
     
-    def _plot_strategy_comparison(self):
-        """Publication-quality strategy comparison with statistical annotations."""
-        fig = plt.figure(figsize=VisualizationConfig.FIGSIZE_ULTRAWIDE)
-        gs = fig.add_gridspec(2, 3, hspace=0.35, wspace=0.3)
-        
+    def _plot_strategy_comparison_individual(self):
+        """Generate individual strategy comparison plots."""
         strategies = sorted(self.df_success['version_strategy'].unique())
         colors = sns.color_palette(VisualizationConfig.COLORMAP_QUALITATIVE, len(strategies))
+        count = 0
         
-        # 1. Execution Time with error bars and significance
-        ax1 = fig.add_subplot(gs[0, 0])
+        # 1. Execution Time
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        ax1 = ax
         
         means = [self.df_success[self.df_success['version_strategy'] == s]['wall_clock_time_sec'].mean() 
                 for s in strategies]
@@ -3106,6 +3106,11 @@ def main():
         action='store_true',
         help='Generate paper-ready outputs (LaTeX tables, publication-quality figures, statistical tests)'
     )
+    parser.add_argument(
+        '--individual',
+        action='store_true',
+        help='Generate individual separated plots (one per metric) with markdown report'
+    )
     
     args = parser.parse_args()
     
@@ -3135,7 +3140,16 @@ def main():
     # Run analysis
     try:
         analyzer = BenchmarkAnalyzer(args.data, args.output)
-        if args.paper:
+        
+        if args.individual:
+            # Generate individual clean plots
+            print("\n🎨 Generating individual separated visualizations...\n")
+            from visualization_individual import IndividualVisualizer
+            visualizer = IndividualVisualizer(analyzer, f"{args.output}/individual_plots")
+            count = visualizer.generate_all()
+            print(f"\n✅ Generated {count} individual plots")
+            print(f"📄 View report: {args.output}/individual_plots/README.md\n")
+        elif args.paper:
             analyzer.generate_paper_outputs()
         else:
             analyzer.generate_complete_analysis()
