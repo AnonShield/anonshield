@@ -1,7 +1,5 @@
 # Ideias de Diagramas para Arquitetura do AnonLFI 2.0
 
-Vou sugerir diagramas estratégicos que capturem diferentes aspectos críticos da arquitetura. Como Engenheiro de Software Principal, recomendo estes diagramas prioritários:
-
 ## 1. **Arquitetura em Camadas (Layered Architecture)**
 
 ```mermaid

@@ -42,7 +42,7 @@ resilience to interruptions.
 |---------|------------|-------------|:----------:|
 | v1.0    | default    | Single file only | No |
 | v2.0    | default    | Single file or directory | Yes |
-| v3.0    | presidio, fast, balanced, slm | Single file or directory | Yes |
+| v3.0    | presidio, filtered, hybrid, standalone, slm | Single file or directory | Yes |
 
 **Key capabilities:**
 
@@ -65,7 +65,7 @@ The benchmark suite follows a modular, SOLID-principled design:
 benchmark.py
 ├── Configuration Layer
 │   ├── AnonVersion          # Enum: V1_0, V2_0, V3_0
-│   ├── Strategy             # Enum: DEFAULT, PRESIDIO, FAST, BALANCED, SLM
+│   ├── Strategy             # Enum: DEFAULT, PRESIDIO, FILTERED, HYBRID, STANDALONE, SLM
 │   └── VersionConfig        # Per-version paths, extensions, capabilities
 │
 ├── Data Layer

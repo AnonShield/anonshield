@@ -24,8 +24,18 @@ class AnonymizationStrategy(ABC):
         """Anonymize a list of texts and return anonymized texts and collected entities."""
         pass
 
-class PresidioStrategy(AnonymizationStrategy):
-    """Comprehensive analysis using the full Presidio pipeline."""
+class FullPresidioStrategy(AnonymizationStrategy):
+    """
+    Comprehensive strategy using the complete Presidio pipeline without filtering.
+    
+    Architecture:
+    - Detection: Presidio AnalyzerEngine with ALL available recognizers
+    - Replacement: Presidio AnonymizerEngine (battle-tested)
+    
+    Performance: SLOWEST (processes hundreds of recognizers)
+    Accuracy: HIGHEST (maximum entity coverage)
+    Use case: When you need maximum entity detection, regardless of performance
+    """
     def __init__(self, 
                  analyzer_engine: BatchAnalyzerEngine, 
                  anonymizer_engine: AnonymizerEngine,
@@ -111,15 +121,18 @@ class PresidioStrategy(AnonymizationStrategy):
         
         return anonymized_results, collected_entities
 
-class FastStrategy(AnonymizationStrategy):
+class HybridPresidioStrategy(AnonymizationStrategy):
     """
-    Optimized strategy using Presidio's AnalyzerEngine with filtered entity scope for detection,
-    but implementing manual text replacement in pure Python instead of using AnonymizerEngine.
+    Hybrid strategy using Presidio for detection with custom text replacement.
     
-    This strategy:
-    - Uses the same filtered entity detection as BalancedStrategy (Transformer + Custom Regex only)
-    - Avoids the overhead of Presidio's AnonymizerEngine by implementing text substitution manually
-    - Trades Presidio's battle-tested replacement logic for potentially faster Python-based substitution
+    Architecture:
+    - Detection: Presidio AnalyzerEngine with filtered entity scope (same as Filtered)
+    - Replacement: Manual Python implementation (custom logic)
+    
+    Performance: FAST (filtered detection + lightweight replacement)
+    Accuracy: HIGH (same detection scope as FilteredPresidio)
+    Trade-off: Avoids Presidio's AnonymizerEngine overhead but loses its battle-tested logic
+    Use case: When you need control over the replacement logic
     """
     def __init__(self, 
                  nlp_engine,  # TransformersNlpEngine with xlm-roberta + spaCy
@@ -281,17 +294,21 @@ class FastStrategy(AnonymizationStrategy):
         return anonymized_results, collected_entities_total
 
 
-class BalancedStrategy(PresidioStrategy):
+class FilteredPresidioStrategy(FullPresidioStrategy):
     """
-    The fastest and recommended strategy, using complete Presidio pipeline with filtered entity scope.
+    Optimized strategy using complete Presidio pipeline with filtered entity scope.
     
-    This strategy:
-    - Uses both Presidio's AnalyzerEngine and AnonymizerEngine (full battle-tested pipeline)
-    - Filters entities to only those in the configured mapping (Transformer + Custom Regex)
-    - Achieves best performance by drastically reducing detection scope (avoids dozens of irrelevant recognizers)
-    - Provides robust and optimized text replacement using Presidio's AnonymizerEngine
+    Architecture:
+    - Detection: Presidio AnalyzerEngine with FILTERED recognizers (only relevant entities)
+    - Replacement: Presidio AnonymizerEngine (battle-tested, optimized)
     
-    Inherits from PresidioStrategy and overrides the entity selection logic to use only core entities.
+    Performance: FASTEST (filtered scope drastically reduces detection overhead)
+    Accuracy: HIGH (focuses on relevant entities for CSIRT context)
+    Recommended: YES - Best balance of speed and reliability
+    
+    This is the recommended strategy for production use. It achieves optimal performance
+    by filtering out irrelevant Presidio recognizers (passports, SSNs, etc.) while
+    maintaining the robust and well-tested Presidio anonymization pipeline.
     """
     def __init__(self, transformer_model: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -323,14 +340,35 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
     """
     Factory to create an anonymization strategy instance by injecting dependencies.
     
+    Strategy naming convention (semantic architecture):
+    - FullPresidio: Complete Presidio pipeline, no filtering (slowest, highest coverage)
+    - FilteredPresidio: Complete Presidio pipeline with filtered scope (FASTEST, RECOMMENDED)
+    - HybridPresidio: Presidio detection + manual replacement (fast, custom logic)
+    - Standalone: Zero Presidio dependencies (theoretical maximum performance)
+    
     Args:
-        strategy_name: The name of the strategy to create.
+        strategy_name: The name of the strategy to create
+                      ('presidio', 'filtered', 'hybrid', 'standalone')
         **kwargs: Dependencies required by the strategies.
+    
+    Returns:
+        AnonymizationStrategy instance
+        
+    Raises:
+        ValueError: If strategy_name is unknown
     """
     strategy_name = strategy_name.lower()
     
+    # Legacy name mappings for backwards compatibility
+    legacy_mappings = {
+        "fast": "hybrid",
+        "balanced": "filtered"
+    }
+    strategy_name = legacy_mappings.get(strategy_name, strategy_name)
+    
     if strategy_name == "presidio":
-        return PresidioStrategy(
+        # Full Presidio: Complete pipeline without filtering
+        return FullPresidioStrategy(
             analyzer_engine=kwargs["analyzer_engine"],
             anonymizer_engine=kwargs["anonymizer_engine"],
             cache_manager=kwargs["cache_manager"],
@@ -338,10 +376,23 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             entities_to_preserve=kwargs["entities_to_preserve"],
             allow_list=kwargs["allow_list"]
         )
-    elif strategy_name == "fast":
-        # Fast strategy: Presidio AnalyzerEngine (filtered) + manual Python text replacement
-        return FastStrategy(
-            nlp_engine=kwargs["analyzer_engine"],  # Uses Presidio's AnalyzerEngine for detection
+    
+    elif strategy_name == "filtered":
+        # Filtered Presidio: Complete pipeline with filtered entity scope (RECOMMENDED)
+        return FilteredPresidioStrategy(
+            transformer_model=kwargs["transformer_model"],
+            analyzer_engine=kwargs["analyzer_engine"],
+            anonymizer_engine=kwargs["anonymizer_engine"],
+            cache_manager=kwargs["cache_manager"],
+            lang=kwargs["lang"],
+            entities_to_preserve=kwargs["entities_to_preserve"],
+            allow_list=kwargs["allow_list"]
+        )
+    
+    elif strategy_name == "hybrid":
+        # Hybrid: Presidio detection + manual text replacement
+        return HybridPresidioStrategy(
+            nlp_engine=kwargs["analyzer_engine"],
             entity_detector=kwargs["entity_detector"],
             slm_detector=kwargs.get("slm_detector"),
             slm_detector_mode=kwargs.get("slm_detector_mode", "hybrid"),
@@ -352,17 +403,26 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             transformer_model=kwargs["transformer_model"],
             entities_to_preserve=kwargs["entities_to_preserve"]
         )
-    elif strategy_name == "balanced":
-        # Balanced strategy: Full Presidio pipeline (fastest due to filtered entity scope)
-        return BalancedStrategy(
+    
+    elif strategy_name == "standalone":
+        # Standalone: Zero Presidio dependencies
+        from .standalone_strategy import StandaloneStrategy
+        return StandaloneStrategy(
             transformer_model=kwargs["transformer_model"],
-            analyzer_engine=kwargs["analyzer_engine"],
-            anonymizer_engine=kwargs["anonymizer_engine"],
+            entity_detector=kwargs["entity_detector"],
+            hash_generator=kwargs["hash_generator"],
             cache_manager=kwargs["cache_manager"],
             lang=kwargs["lang"],
             entities_to_preserve=kwargs["entities_to_preserve"],
-            allow_list=kwargs["allow_list"]
+            slm_detector=kwargs.get("slm_detector"),
+            slm_detector_mode=kwargs.get("slm_detector_mode", "hybrid")
         )
+    
     else:
-        raise ValueError(f"Unknown anonymization strategy: {strategy_name}")
+        raise ValueError(
+            f"Unknown anonymization strategy: {strategy_name}. "
+            f"Available strategies: 'presidio', 'filtered' (recommended), 'hybrid', 'standalone'. "
+            f"Legacy names 'fast' and 'balanced' are still supported."
+        )
+
 

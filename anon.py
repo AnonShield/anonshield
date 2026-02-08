@@ -259,14 +259,22 @@ def _parse_arguments():
     # Performance & Filtering options
     parser.add_argument("--preserve-row-context", action="store_true", help="For CSV/XLSX, process all values to preserve context instead of only unique values. Slower but more accurate.")
     parser.add_argument("--json-stream-threshold-mb", type=int, default=ProcessingLimits.JSON_STREAM_THRESHOLD_MB, help=f"JSON streaming threshold in MB. Files larger than this will be streamed from disk. Default: {ProcessingLimits.JSON_STREAM_THRESHOLD_MB}")
-    parser.add_argument("--optimize", action="store_true", help="Enable all optimizations (fast strategy, cache, min-word-length=3, in-memory DB).")
+    parser.add_argument("--optimize", action="store_true", help="Enable all optimizations (filtered strategy, cache, min-word-length=3, in-memory DB).")
     parser.add_argument("--use-cache", action="store_true", default=True, help="Enable in-memory caching for the run. Enabled by default. Use --no-use-cache to disable.")
     parser.add_argument("--no-use-cache", action="store_false", dest="use_cache", help="Disable in-memory caching for the run.")
     parser.add_argument("--max-cache-size", type=int, default=ProcessingLimits.MAX_CACHE_SIZE, help=f"Maximum number of items to store in the in-memory cache. Default: {ProcessingLimits.MAX_CACHE_SIZE}")
     parser.add_argument("--min-word-length", type=int, default=DefaultSizes.DEFAULT_MIN_WORD_LENGTH, help=f"Minimum character length for a word to be processed. Default: {DefaultSizes.DEFAULT_MIN_WORD_LENGTH} (no limit).")
     parser.add_argument("--technical-stoplist", type=str, default="", help="Comma-separated list of custom words to add to the technical stoplist.")
     parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized. Default is to anonymize them if other rules permit.")
-    parser.add_argument("--anonymization-strategy", type=str, default="presidio", choices=["presidio", "fast", "balanced", "slm"], help="Anonymization strategy. 'presidio': full pipeline (slowest, highest coverage). 'balanced': filtered scope with full Presidio pipeline (fastest, recommended). 'fast': filtered detection + manual replacement. 'slm': end-to-end SLM anonymization.")
+    parser.add_argument("--anonymization-strategy", type=str, default="filtered", 
+                       choices=["presidio", "filtered", "hybrid", "standalone", "slm", "fast", "balanced"], 
+                       help="Anonymization strategy (architecture-based naming). "
+                            "'filtered': Presidio pipeline with filtered scope (FASTEST, RECOMMENDED). "
+                            "'presidio': Full Presidio pipeline (slowest, highest coverage). "
+                            "'hybrid': Presidio detection + custom replacement. "
+                            "'standalone': Zero Presidio dependencies (experimental). "
+                            "'slm': End-to-end SLM anonymization. "
+                            "Legacy names 'fast' (=hybrid) and 'balanced' (=filtered) still supported.")
     parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
     parser.add_argument("--transformer-model", type=str, default=TRANSFORMER_MODEL, help=f"Transformer model for NER detection. Options: 'Davlan/xlm-roberta-base-ner-hrl' (default, multilingual), 'attack-vector/SecureModernBERT-NER' (cybersecurity-focused), 'dslim/bert-base-NER' (English-only, fast). Default: {TRANSFORMER_MODEL}.")
     parser.add_argument("--parallel-workers", type=int, default=1, help="Number of parallel workers for processing. Default: 1 (sequential processing).")
@@ -321,8 +329,8 @@ def _parse_arguments():
 
     # Handle the --optimize flag
     if args.optimize:
-        logging.info("Optimization mode enabled: setting fast strategy, in-memory DB, cache, and min-word-length=3.")
-        args.anonymization_strategy = "fast"
+        logging.info("Optimization mode enabled: setting filtered strategy, in-memory DB, cache, and min-word-length=3.")
+        args.anonymization_strategy = "filtered"
         args.db_mode = "in-memory"
         args.use_cache = True
         if args.min_word_length == 0:

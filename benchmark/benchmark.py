@@ -53,9 +53,13 @@ class Strategy(Enum):
     """Anonymization strategies (v3.0 only)."""
     DEFAULT = "default"
     PRESIDIO = "presidio"
-    FAST = "fast"
-    BALANCED = "balanced"
+    FILTERED = "filtered"  # Formerly "balanced" - Presidio with filtered scope (FASTEST)
+    HYBRID = "hybrid"      # Formerly "fast" - Presidio detection + custom replacement
+    STANDALONE = "standalone"  # NEW - Zero Presidio dependencies
     SLM = "slm"
+    # Legacy aliases for backwards compatibility
+    FAST = "hybrid"        # Alias for HYBRID
+    BALANCED = "filtered"  # Alias for FILTERED
 
 
 @dataclass
@@ -125,7 +129,7 @@ VERSION_CONFIGS = {
         ),
         supports_directory=True,
         requires_secret_key=True,
-        strategies=(Strategy.PRESIDIO, Strategy.FAST, Strategy.BALANCED, Strategy.SLM)
+        strategies=(Strategy.PRESIDIO, Strategy.FILTERED, Strategy.HYBRID, Strategy.STANDALONE, Strategy.SLM)
     ),
 }
 
@@ -2973,10 +2977,11 @@ Examples:
                                  "invocation to eliminate per-file model loading overhead (~55-77s). "
                                  "v1.0 falls back to single-file mode. Records aggregate metrics.")
     bench_group.add_argument("--strategies", nargs="+",
-                            choices=["presidio", "fast", "balanced", "slm"],
+                            choices=["presidio", "filtered", "hybrid", "standalone", "slm", "fast", "balanced"],
                             help="Strategies to benchmark for v3.0 (default: all strategies). "
-                                 "Choices: presidio, fast, balanced, slm. "
-                                 "Example: --strategies fast balanced")
+                                 "New names: 'filtered' (fastest, recommended), 'hybrid', 'standalone'. "
+                                 "Legacy names 'fast' (=hybrid) and 'balanced' (=filtered) still work. "
+                                 "Example: --strategies filtered hybrid")
 
     # Regression options
     regression_group = parser.add_argument_group("Regression Options (use with --regression)")
@@ -3059,13 +3064,17 @@ def main():
 
     # Filter strategies if specified
     if hasattr(args, 'strategies') and args.strategies:
-        # Convert strings to Strategy enum
+        # Convert strings to Strategy enum (with legacy name support)
         selected_strategies = []
         strategy_map = {
             "presidio": Strategy.PRESIDIO,
-            "fast": Strategy.FAST,
-            "balanced": Strategy.BALANCED,
-            "slm": Strategy.SLM
+            "filtered": Strategy.FILTERED,
+            "hybrid": Strategy.HYBRID,
+            "standalone": Strategy.STANDALONE,
+            "slm": Strategy.SLM,
+            # Legacy aliases
+            "fast": Strategy.HYBRID,
+            "balanced": Strategy.FILTERED
         }
         for s in args.strategies:
             if s in strategy_map:

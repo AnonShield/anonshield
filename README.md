@@ -51,7 +51,7 @@ graph TD
         RawText -- "orchestrator.anonymize()" --> Orch;
         Orch -- "Selects Strategy (--strategy)" --> STR_CHOICE{Strategy};
         
-        STR_CHOICE -- "'presidio', 'fast', 'balanced'" --> PRESIDIO_STR(Traditional Strategy);
+        STR_CHOICE -- "'presidio', 'filtered', 'hybrid', 'standalone'" --> PRESIDIO_STR(Traditional Strategy);
         STR_CHOICE -- "'slm' or '--slm-detector'" --> SLM_STR(SLM Strategy);
     end
 
@@ -267,7 +267,7 @@ python anon.py file.txt --anonymization-strategy presidio
 
 #### 2. `fast` (Optimized)  
 ```bash
-python anon.py file.txt --anonymization-strategy fast
+python anon.py file.txt --anonymization-strategy hybrid
 ```
 - **Entity Detection:** Transformer model + Custom regex patterns (filtered scope, same as Balanced)
 - **Text Replacement:** Manual Python implementation (not using Presidio's AnonymizerEngine)
@@ -281,7 +281,7 @@ python anon.py file.txt --anonymization-strategy fast
 
 #### 3. `balanced` (Optimal Performance)
 ```bash
-python anon.py file.txt --anonymization-strategy balanced
+python anon.py file.txt --anonymization-strategy filtered
 ```
 - **Entity Detection:** Transformer model + Custom regex patterns (filtered scope)
 - **Text Replacement:** Presidio's AnonymizerEngine (battle-tested implementation)
@@ -293,7 +293,7 @@ python anon.py file.txt --anonymization-strategy balanced
 - **From Custom Regex:** All custom patterns listed below
 - **Excluded:** spaCy built-in entities, Presidio default built-in recognizers not in entity mapping
 
-#### 4. `slm` (Context-Aware)
+#### 5. `slm` (Context-Aware)
 ```bash
 python anon.py file.txt --anonymization-strategy slm
 ```
@@ -343,14 +343,14 @@ The following entities are detected using custom regex patterns and are availabl
 
 ### Choosing the Right Configuration
 
-**For General PII Detection:**
+**For General PII Detection (Recommended):**
 ```bash
-python anon.py file.txt --anonymization-strategy fast
+python anon.py file.txt --anonymization-strategy filtered
 ```
 
 **For Cybersecurity Documents:**
 ```bash
-python anon.py threat_report.pdf --transformer-model attack-vector/SecureModernBERT-NER --anonymization-strategy fast
+python anon.py threat_report.pdf --transformer-model attack-vector/SecureModernBERT-NER --anonymization-strategy filtered
 ```
 
 **For Maximum Accuracy:**
@@ -361,6 +361,11 @@ python anon.py sensitive_doc.txt --anonymization-strategy presidio --transformer
 **For Complex Context Understanding:**
 ```bash
 python anon.py complex_report.txt --anonymization-strategy slm
+```
+
+**For Experimental Zero-Presidio Mode:**
+```bash
+python anon.py file.txt --anonymization-strategy standalone
 ```
 
 ### Memory Requirements
@@ -663,7 +668,7 @@ uv run anon.py chat_logs.txt --anonymization-strategy slm
 
 #### Performance & Filtering Options
 
-- `--optimize`: A shorthand to enable all performance optimizations (`--anonymization-strategy fast`, `--db-mode in-memory`, `--use-cache`, and `--min-word-length 3`).
+- `--optimize`: A shorthand to enable all performance optimizations (`--anonymization-strategy filtered`, `--db-mode in-memory`, `--use-cache`, and `--min-word-length 3`).
 - `--use-cache`: Enables in-memory caching for the run to speed up repeated anonymizations. **Enabled by default**. Use `--no-use-cache` to disable.
 - `--preserve-row-context`: For CSV/XLSX files, process every value to preserve row context, which is more accurate but slower. The default behavior is to only process unique values, which is faster.
 - `--json-stream-threshold-mb <NUM>`: Sets the threshold (in MB) for streaming JSON files. Files larger than this will be streamed from disk to conserve memory. Default: `100`.
@@ -789,7 +794,7 @@ uv run anon.py large_dataset/ --optimize
 ```
 
 This enables:
-- Fast anonymization strategy (uses Presidio for entity detection with filtered recognizers, manual text replacement)
+- Filtered anonymization strategy (uses Presidio with filtered scope - fastest, recommended)
 - In-memory database (no disk I/O)
 - Caching enabled
 - Minimum word length of 3 characters
@@ -805,7 +810,7 @@ uv run anon.py file.csv --use-cache --max-cache-size 50000
 
 **Fast Strategy:**
 ```bash
-uv run anon.py file.json --anonymization-strategy fast
+uv run anon.py file.json --anonymization-strategy filtered
 ```
 
 **In-Memory Database:**
@@ -856,10 +861,11 @@ The core anonymization logic is encapsulated within a set of interchangeable str
 
 - **Decoupled Logic**: Each strategy is self-contained. It receives its required dependencies (like `analyzer_engine`, `entity_detector`, `cache_manager`) upon creation.
 - **Key Strategies**:
-    1.  **`PresidioStrategy` (Comprehensive):** Contains the logic for the full Presidio pipeline, using all available recognizers for the highest accuracy. Uses both Presidio's AnalyzerEngine and AnonymizerEngine.
-    2.  **`FastStrategy` (Optimized):** Uses Presidio's AnalyzerEngine with a filtered set of recognizers (same as Balanced) for entity detection, but implements manual text replacement in Python instead of using AnonymizerEngine. This reduces overhead from Presidio's anonymization logic.
-    3.  **`BalancedStrategy` (Optimal Balance):** Uses the complete Presidio pipeline (both AnalyzerEngine and AnonymizerEngine) but with a limited, curated set of recognizers, offering the best balance between speed and accuracy.
-    4.  **`SLMAnonymizationStrategy` (Experimental):** Uses a local SLM to perform end-to-end contextual anonymization.
+    1.  **`FullPresidioStrategy` (Comprehensive):** Contains the logic for the full Presidio pipeline, using all available recognizers for the highest accuracy. Uses both Presidio's AnalyzerEngine and AnonymizerEngine.
+    2.  **`FilteredPresidioStrategy` (Optimal Performance - RECOMMENDED):** Uses the complete Presidio pipeline (both AnalyzerEngine and AnonymizerEngine) but with a filtered, curated set of recognizers. This is the fastest strategy due to reduced detection scope.
+    3.  **`HybridPresidioStrategy` (Custom Replacement):** Uses Presidio's AnalyzerEngine with filtered scope (same as Filtered) for entity detection, but implements manual text replacement in Python instead of using AnonymizerEngine.
+    4.  **`StandaloneStrategy` (Zero Presidio - EXPERIMENTAL):** Bypasses Presidio entirely, loading models directly and handling all detection and replacement manually. Theoretical maximum performance.
+    5.  **`SLMAnonymizationStrategy` (Experimental):** Uses a local SLM to perform end-to-end contextual anonymization.
 
 #### 3. File Processors (`processors.py`)
 

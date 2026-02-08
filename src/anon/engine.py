@@ -51,6 +51,85 @@ SUPPORTED_LANGUAGES = {
 }
 
 
+# =============================================================================
+# SHARED REGEX PATTERNS - DRY PRINCIPLE
+# Used by both Presidio-based strategies and Standalone strategy
+# =============================================================================
+
+class RegexPatterns:
+    """
+    Centralized repository of all regex patterns used across the system.
+    
+    Design Principle: Don't Repeat Yourself (DRY)
+    - Presidio strategies: Wrap these in Pattern objects with scores
+    - Standalone strategy: Use these regexes directly
+    
+    Benefits:
+    - Single source of truth for all pattern definitions
+    - Easy to update and maintain
+    - Consistent behavior across all strategies
+    """
+    
+    # URL & Network Patterns
+    URL = r"(?:https?://|ftp://|www\.)\S+?(?:\.(?:com|net|org|edu|gov|mil|int|br|app|dev|io|co|uk|de|fr|es|it|ru|cn|jp|kr|au|ca|mx|ar|cl|pe|co\.uk|com\.br|org\.br|gov\.br|edu\.br|net\.br|vercel\.app|herokuapp\.com|github\.io|gitlab\.io|netlify\.app|firebase\.app|appspot\.com|cloudfront\.net|amazonaws\.com|azure\.com|digitalocean\.com)|localhost|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))(?::[0-9]{1,5})?(?:/[^\s]*)?"
+    
+    IPV4 = r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b"
+    
+    IPV6 = r"(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|::(?:ffff:)?(?:[0-9]{1,3}\.){3}[0-9]{1,3}|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+"
+    
+    MAC_ADDRESS = r"\b([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})\b"
+    
+    PORT = r"\b\d{1,5}/(?:tcp|udp|sctp)\b"
+    
+    # Hostname Patterns
+    FQDN = r"\b(?<!@)(?!Not-A\.Brand)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b"
+    CERT_CN = r"CN=([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]|[a-f0-9]{8,16})\b"
+    HEX_HOSTNAME = r"(?<![:/])(?<![vV])\b(?!20\d{10})[a-f0-9]{12,16}\b(?!\.)"
+    
+    # Hash Patterns (ordered by specificity)
+    SHA512 = r"\b[0-9a-fA-F]{128}\b"
+    SHA256 = r"\b[0-9a-fA-F]{64}\b(?![0-9a-fA-F])"
+    SHA1 = r"\b[0-9a-fA-F]{40}\b(?![0-9a-fA-F])"
+    MD5_COLON = r"\b([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}\b"
+    MD5 = r"\b[0-9a-fA-F]{32}\b(?![0-9a-fA-F])"
+    
+    # Security Identifiers
+    CVE = r"\bCVE-\d{4}-\d{4,}\b"
+    CPE = r"\bcpe:(?:/|2\.3:)[aho](?::[A-Za-z0-9\._\-~%*]+){2,}\b"
+    CERT_SERIAL = r"\b[0-9a-fA-F]{16,40}\b"
+    OID = r"\b[0-2](?:\.\d+){3,}\b"
+    
+    # Authentication & Secrets
+    COOKIE_SESSION = r"=[a-zA-Z0-9\-_]{32,128}\b"
+    AUTH_TOKEN = r"\b[a-zA-Z0-9]{32,128}\b"
+    PASSWORD_CONTEXT = r"(?:password|passwd|pwd|secret|api_key|apikey|access_key|client_secret)=([^\",;'\s]{4,128})\b"
+    USERNAME_CONTEXT = r"(?:user|username|uid|login|user_id)=([a-zA-Z0-9_.-]{2,64})\b"
+    
+    # PII Patterns
+    EMAIL = r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b"
+    PHONE = r"\b(?:\+?\d{1,3}[-. ]?)?\(?\d{2,3}\)?[-. ]?\d{4,5}[-. ]?\d{4}\b"
+    CPF = r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b"
+    CREDIT_CARD = r"\b(?:\d{4}[- ]?){3}\d{4}\b"
+    UUID = r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+    
+    # Certificate & Cryptographic Patterns
+    CERT_PEM = r"-----BEGIN CERTIFICATE-----[A-Za-z0-9+/=\n\r]{50,8000}-----END CERTIFICATE-----"
+    CERT_REQUEST_PEM = r"-----BEGIN CERTIFICATE REQUEST-----[A-Za-z0-9+/=\n\r]{50,4000}-----END CERTIFICATE REQUEST-----"
+    PRIVATE_KEY_PEM = r"-----BEGIN (?:RSA |DSA |EC )?PRIVATE KEY-----[A-Za-z0-9+/=\n\r]{50,4000}-----END (?:RSA |DSA |EC )?PRIVATE KEY-----"
+    CERT_DER = r"\bMII[A-Za-z0-9+/=\n]{100,2000}\b"
+    CERT_THUMBPRINT = r"(?:thumbprint|sha1|sha256)[:=\s]+[0-9a-fA-F]{40,128}"
+    
+    RSA_MODULUS = r"(?:Modulus|n)[:=\s]+[0-9a-fA-F]{128,512}"
+    JWT = r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
+    BASE64_KEY = r"(?:key|secret|password)[:=\s]+([A-Za-z0-9+/]{40,}={0,2})"
+    
+    # File System
+    USER_PATH = r"(?:/home/|/Users/|C:\\Users\\)([^/\\]+)"
+    
+    # PGP
+    PGP_BLOCK = r"-----BEGIN PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----[\s\S]{10,8000}?-----END PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----"
+
+
 class CustomSlugAnonymizer(Operator):
     """
     Custom Presidio operator that replaces text with an HMAC-based slug.
@@ -89,123 +168,159 @@ class CustomSlugAnonymizer(Operator):
 
 
 def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> List[PatternRecognizer]:
-    """Loads Regex recognizers optimized for infrastructure/cybersecurity/PII entities."""
+    """
+    Loads Presidio PatternRecognizers using centralized regex patterns.
+    
+    Architecture: Uses RegexPatterns class as single source of truth (DRY principle).
+    The same regexes are used by StandaloneStrategy without Presidio wrapping.
+    """
     
     # Define a score boost for regex patterns if priority is enabled
     SCORE_BOOST = 0.15 if regex_priority else 0.0
 
     # --- 1. URL & NETWORK ---
     url_pattern = Pattern(
-      name="URL Pattern", 
-      regex=r"(?:https?://|ftp://|www\.)\S+?(?:\.(?:com|net|org|edu|gov|mil|int|br|app|dev|io|co|uk|de|fr|es|it|ru|cn|jp|kr|au|ca|mx|ar|cl|pe|co\.uk|com\.br|org\.br|gov\.br|edu\.br|net\.br|vercel\.app|herokuapp\.com|github\.io|gitlab\.io|netlify\.app|firebase\.app|appspot\.com|cloudfront\.net|amazonaws\.com|azure\.com|digitalocean\.com)|localhost|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))(?::[0-9]{1,5})?(?:/[^\s]*)?",
-      score=0.7 + SCORE_BOOST
+        name="URL Pattern", 
+        regex=RegexPatterns.URL,
+        score=0.7 + SCORE_BOOST
     )
 
     ip_pattern = Pattern(
-        name="IP Address Pattern", 
-        regex=r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b", 
+        name="IPv4 Address Pattern", 
+        regex=RegexPatterns.IPV4, 
         score=0.85 + SCORE_BOOST
     )
     
     ipv6_pattern = Pattern(
-      name="IPv6 Address Pattern", 
-      regex=r"(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|::(?:ffff:)?(?:[0-9]{1,3}\.){3}[0-9]{1,3}|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+", 
-      score=0.6 + SCORE_BOOST
-    )
-    serial_pattern = Pattern(
-        name="Certificate Serial",
-        regex=r"\b[0-9a-fA-F]{16,40}\b",
-        score=0.75 + SCORE_BOOST
+        name="IPv6 Address Pattern", 
+        regex=RegexPatterns.IPV6, 
+        score=0.6 + SCORE_BOOST
     )
     
-    oid_pattern = Pattern(
-        name="OID Pattern",
-        regex=r"\b[0-2](?:\.\d+){3,}\b", 
-        score=0.95 + SCORE_BOOST
+    mac_pattern = Pattern(
+        name="MAC Address", 
+        regex=RegexPatterns.MAC_ADDRESS, 
+        score=0.8 + SCORE_BOOST
     )
+    
     port_pattern = Pattern(
         name="Port/Protocol",
-        regex=r"\b\d{1,5}/(?:tcp|udp|sctp)\b",
+        regex=RegexPatterns.PORT,
         score=0.85 + SCORE_BOOST
     )
+    
     hostname_patterns = [
-        Pattern(name="FQDN Pattern", regex=r"\b(?<!@)(?!Not-A\.Brand)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b", score=0.6 + SCORE_BOOST),
-        Pattern(name="Certificate CN Pattern", regex=r"CN=([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]|[a-f0-9]{8,16})\b", score=0.7 + SCORE_BOOST),
-        Pattern(name="Standalone Hex Hostname Pattern", regex=r"(?<![:/])(?<![vV])\b(?!20\d{10})[a-f0-9]{12,16}\b(?!\.)", score=0.6 + SCORE_BOOST),
+        Pattern(name="FQDN Pattern", regex=RegexPatterns.FQDN, score=0.6 + SCORE_BOOST),
+        Pattern(name="Certificate CN Pattern", regex=RegexPatterns.CERT_CN, score=0.7 + SCORE_BOOST),
+        Pattern(name="Standalone Hex Hostname Pattern", regex=RegexPatterns.HEX_HOSTNAME, score=0.6 + SCORE_BOOST),
     ]
 
     hash_patterns = [
         # Hash patterns ordered by specificity (most specific first)
-        Pattern(name="SHA512 Hash", regex=r"\b[0-9a-fA-F]{128}\b", score=0.95 + SCORE_BOOST),
-        Pattern(name="SHA256 Hash", regex=r"\b[0-9a-fA-F]{64}\b(?![0-9a-fA-F])", score=0.92 + SCORE_BOOST),
-        Pattern(name="SHA1 Hash", regex=r"\b[0-9a-fA-F]{40}\b(?![0-9a-fA-F])", score=0.88 + SCORE_BOOST),
-        Pattern(name="MD5 Colon-Separated Hash", regex=r"\b([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}\b", score=0.93 + SCORE_BOOST),
-        Pattern(name="MD5 Hash", regex=r"\b[0-9a-fA-F]{32}\b(?![0-9a-fA-F])", score=0.88 + SCORE_BOOST),
+        Pattern(name="SHA512 Hash", regex=RegexPatterns.SHA512, score=0.95 + SCORE_BOOST),
+        Pattern(name="SHA256 Hash", regex=RegexPatterns.SHA256, score=0.92 + SCORE_BOOST),
+        Pattern(name="SHA1 Hash", regex=RegexPatterns.SHA1, score=0.88 + SCORE_BOOST),
+        Pattern(name="MD5 Colon-Separated Hash", regex=RegexPatterns.MD5_COLON, score=0.93 + SCORE_BOOST),
+        Pattern(name="MD5 Hash", regex=RegexPatterns.MD5, score=0.88 + SCORE_BOOST),
     ]
 
     cve_pattern = Pattern(
         name="CVE ID Pattern",
-        regex=r"\bCVE-\d{4}-\d{4,}\b", 
+        regex=RegexPatterns.CVE, 
         score=0.95 + SCORE_BOOST
     )
 
     cpe_pattern = Pattern(
         name="CPE String",
-        regex=r"\bcpe:(?:/|2\.3:)[aho](?::[A-Za-z0-9\._\-~%*]+){2,}\b",
+        regex=RegexPatterns.CPE,
         score=0.9 + SCORE_BOOST
+    )
+    
+    serial_pattern = Pattern(
+        name="Certificate Serial",
+        regex=RegexPatterns.CERT_SERIAL,
+        score=0.75 + SCORE_BOOST
+    )
+    
+    oid_pattern = Pattern(
+        name="OID Pattern",
+        regex=RegexPatterns.OID, 
+        score=0.95 + SCORE_BOOST
     )
 
     auth_token_patterns = [
-        Pattern(name="Cookie/Session Assignment", regex=r"=[a-zA-Z0-9\-_]{32,128}\b", score=0.9 + SCORE_BOOST),
-        Pattern(name="Generic Auth Token", regex=r"\b[a-zA-Z0-9]{32,128}\b", score=0.5 + SCORE_BOOST)
+        Pattern(name="Cookie/Session Assignment", regex=RegexPatterns.COOKIE_SESSION, score=0.9 + SCORE_BOOST),
+        Pattern(name="Generic Auth Token", regex=RegexPatterns.AUTH_TOKEN, score=0.5 + SCORE_BOOST)
     ]
 
     password_pattern = Pattern(
         name="Contextual Password",
-        regex=r"(?:password|passwd|pwd|secret|api_key|apikey|access_key|client_secret)=([^\",;'\s]{4,128})\b",
+        regex=RegexPatterns.PASSWORD_CONTEXT,
         score=0.95 + SCORE_BOOST
     )
 
     username_pattern = Pattern(
         name="Contextual Username",
-        regex=r"(?:user|username|uid|login|user_id)=([a-zA-Z0-9_.-]{2,64})\b",
+        regex=RegexPatterns.USERNAME_CONTEXT,
         score=0.8 + SCORE_BOOST
     )
 
-    email_pattern = Pattern(name="Email Pattern", regex=r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b", score=1.0 + SCORE_BOOST)
+    email_pattern = Pattern(
+        name="Email Pattern", 
+        regex=RegexPatterns.EMAIL, 
+        score=1.0 + SCORE_BOOST
+    )
     
     phone_pattern = Pattern(
         name="Phone Number Pattern",
-        regex=r"\b(?:\+?\d{1,3}[-. ]?)?\(?\d{2,3}\)?[-. ]?\d{4,5}[-. ]?\d{4}\b",
+        regex=RegexPatterns.PHONE,
         score=0.6 + SCORE_BOOST
     )
 
-    cpf_pattern = Pattern(name="CPF Pattern", regex=r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b", score=0.85 + SCORE_BOOST)
+    cpf_pattern = Pattern(
+        name="CPF Pattern", 
+        regex=RegexPatterns.CPF, 
+        score=0.85 + SCORE_BOOST
+    )
 
-    cc_pattern = Pattern(name="Credit Card Pattern", regex=r"\b(?:\d{4}[- ]?){3}\d{4}\b", score=0.7 + SCORE_BOOST)
+    cc_pattern = Pattern(
+        name="Credit Card Pattern", 
+        regex=RegexPatterns.CREDIT_CARD, 
+        score=0.7 + SCORE_BOOST
+    )
 
-    uuid_pattern = Pattern(name="UUID Pattern", regex=r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", score=0.8 + SCORE_BOOST)
+    uuid_pattern = Pattern(
+        name="UUID Pattern", 
+        regex=RegexPatterns.UUID, 
+        score=0.8 + SCORE_BOOST
+    )
+    
     cert_patterns = [
-        Pattern(name="Certificate PEM Block", regex=r"-----BEGIN CERTIFICATE-----[A-Za-z0-9+/=\n\r]{50,8000}-----END CERTIFICATE-----", score=0.95 + SCORE_BOOST),
-        Pattern(name="Certificate Request PEM Block", regex=r"-----BEGIN CERTIFICATE REQUEST-----[A-Za-z0-9+/=\n\r]{50,4000}-----END CERTIFICATE REQUEST-----", score=0.95 + SCORE_BOOST),
-        Pattern(name="Private Key PEM Block", regex=r"-----BEGIN (?:RSA |DSA |EC )?PRIVATE KEY-----[A-Za-z0-9+/=\n\r]{50,4000}-----END (?:RSA |DSA |EC )?PRIVATE KEY-----", score=0.95 + SCORE_BOOST),
-        Pattern(name="Certificate Body DER", regex=r"\bMII[A-Za-z0-9+/=\n]{100,2000}\b", score=0.8 + SCORE_BOOST),
-        Pattern(name="Certificate Thumbprint", regex=r"(?:thumbprint|sha1|sha256)[:=\s]+[0-9a-fA-F]{40,128}", score=0.85 + SCORE_BOOST),
+        Pattern(name="Certificate PEM Block", regex=RegexPatterns.CERT_PEM, score=0.95 + SCORE_BOOST),
+        Pattern(name="Certificate Request PEM Block", regex=RegexPatterns.CERT_REQUEST_PEM, score=0.95 + SCORE_BOOST),
+        Pattern(name="Private Key PEM Block", regex=RegexPatterns.PRIVATE_KEY_PEM, score=0.95 + SCORE_BOOST),
+        Pattern(name="Certificate Body DER", regex=RegexPatterns.CERT_DER, score=0.8 + SCORE_BOOST),
+        Pattern(name="Certificate Thumbprint", regex=RegexPatterns.CERT_THUMBPRINT, score=0.85 + SCORE_BOOST),
     ]
 
     crypto_patterns = [
-        Pattern(name="RSA Public Key Modulus", regex=r"(?:Modulus|n)[:=\s]+[0-9a-fA-F]{128,512}", score=0.8 + SCORE_BOOST),
-        Pattern(name="JWT Token", regex=r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", score=0.9 + SCORE_BOOST),
-        Pattern(name="Base64 Encoded Key", regex=r"(?:key|secret|password)[:=\s]+([A-Za-z0-9+/]{40,}={0,2})", score=0.7 + SCORE_BOOST),
+        Pattern(name="RSA Public Key Modulus", regex=RegexPatterns.RSA_MODULUS, score=0.8 + SCORE_BOOST),
+        Pattern(name="JWT Token", regex=RegexPatterns.JWT, score=0.9 + SCORE_BOOST),
+        Pattern(name="Base64 Encoded Key", regex=RegexPatterns.BASE64_KEY, score=0.7 + SCORE_BOOST),
     ]
-    mac_pattern = Pattern(name="MAC Address", regex=r"\b([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})\b", score=0.8 + SCORE_BOOST)
-    path_pattern = Pattern(name="User Home Path", regex=r"(?:/home/|/Users/|C:\\Users\\)([^/\\]+)", score=0.6 + SCORE_BOOST)
+    
+    path_pattern = Pattern(
+        name="User Home Path", 
+        regex=RegexPatterns.USER_PATH, 
+        score=0.6 + SCORE_BOOST
+    )
     
     pgp_pattern = Pattern(
         name="PGP Block",
-        regex=r"-----BEGIN PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----[\s\S]{10,8000}?-----END PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----",
+        regex=RegexPatterns.PGP_BLOCK,
         score=0.95 + SCORE_BOOST
     )
+    
     recognizers = []
     for lang in langs:
         recognizers.extend([
@@ -283,13 +398,13 @@ class AnonymizationOrchestrator:
         if analyzer_engine and anonymizer_engine:
             self.analyzer_engine = analyzer_engine
             self.anonymizer_engine = anonymizer_engine
-        elif strategy_name == "slm":
-            # SLM strategy doesn't need Presidio engines
+        elif strategy_name in ("slm", "standalone"):
+            # SLM and Standalone strategies don't need Presidio engines
             self.analyzer_engine = None
             self.anonymizer_engine = None
-            logging.info(f"Skipping Presidio initialization for '{strategy_name}' strategy.")
+            logging.info(f"Skipping Presidio initialization for '{strategy_name}' strategy (Presidio-free mode).")
         else:
-            # Initialize Presidio for presidio, fast, and balanced strategies
+            # Initialize Presidio for presidio, filtered, and hybrid strategies
             self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
 
         # If entity_detector was not provided, create a default one.

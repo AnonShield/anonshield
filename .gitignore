@@ -187,9 +187,12 @@ teste*
 scripts/
 anon.py.bal
 cve*
-run*
-benchmark/
+run
+benchmark/output
+benchmark/results
+benchmark/run_logs  
 anonlfi_*/output/*
 anonlfi_*/models/*
 anonlfi_*/logs/*
 anonlfi_*/db/*
+vulnnet*
