@@ -610,20 +610,22 @@ class TextFileProcessor(FileProcessor):
             logging.debug("TXT processing with line deduplication (faster, context-unaware).")
             # Pass 1: Collect unique lines and build translation map
             texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
+            seen_texts: Dict[Union[str, Tuple[str, ...]], set] = defaultdict(set)
             all_lines = []
-            
+
             with open(self.file_path, "r", encoding="utf-8") as f:
                 for line in f:
                     stripped_line = line.rstrip("\r\n")
-                    all_lines.append(line)  # Keep original with newline for writing
-                    
+                    all_lines.append(line)
+
                     if not stripped_line.strip():
                         continue
-                    
+
                     should_anon, forced_type = self._should_anonymize(stripped_line)
                     if should_anon:
                         group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
-                        if stripped_line not in texts_to_anonymize_map[group_key]:
+                        if stripped_line not in seen_texts[group_key]:
+                            seen_texts[group_key].add(stripped_line)
                             texts_to_anonymize_map[group_key].append(stripped_line)
             
             # Build translation map
@@ -717,7 +719,8 @@ class DocxFileProcessor(FileProcessor):
             doc = Document(self.file_path)
             all_paragraphs = []
             texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
-            
+            seen_texts: Dict[Union[str, Tuple[str, ...]], set] = defaultdict(set)
+
             desc = f"Pass 1/2: Collecting DOCX {os.path.basename(self.file_path)}"
             for para in tqdm(doc.paragraphs, desc=desc, unit="para", leave=False,
                             bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]'):
@@ -734,13 +737,14 @@ class DocxFileProcessor(FileProcessor):
                     else:
                         para_content_parts.append(run.text)
                 full_para_text = "".join(para_content_parts)
-                
+
                 if full_para_text.strip():
                     all_paragraphs.append(full_para_text)
                     should_anon, forced_type = self._should_anonymize(full_para_text)
                     if should_anon:
                         group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
-                        if full_para_text not in texts_to_anonymize_map[group_key]:
+                        if full_para_text not in seen_texts[group_key]:
+                            seen_texts[group_key].add(full_para_text)
                             texts_to_anonymize_map[group_key].append(full_para_text)
                 else:
                     all_paragraphs.append("")
@@ -831,7 +835,8 @@ class PdfFileProcessor(FileProcessor):
             # Pass 1: Extract all text blocks and collect unique texts
             all_content_blocks = []
             texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
-            
+            seen_texts: Dict[Union[str, Tuple[str, ...]], set] = defaultdict(set)
+
             with fitz.open(self.file_path) as doc:
                 desc = f"Pass 1/2: Collecting PDF {os.path.basename(self.file_path)}"
                 for page_num in tqdm(range(doc.page_count), desc=desc, unit="page", leave=False,
@@ -840,7 +845,7 @@ class PdfFileProcessor(FileProcessor):
                     content_items = []
                     page_dict = page.get_text("dict")
                     text_blocks = page_dict.get("blocks", []) if isinstance(page_dict, dict) else []
-                    
+
                     for block in text_blocks:
                         if block["type"] == 0:
                             block_text = "".join(span["text"] for line in block.get("lines", []) for span in line.get("spans", []) if "text" in span)
@@ -857,14 +862,15 @@ class PdfFileProcessor(FileProcessor):
                                 content_items.append({"bbox": bbox, "content": ocr_text})
 
                     content_items.sort(key=lambda item: (item["bbox"][1], item["bbox"][0]))
-                    
+
                     for item in content_items:
                         if item['content']:
                             all_content_blocks.append(item['content'])
                             should_anon, forced_type = self._should_anonymize(item['content'])
                             if should_anon:
                                 group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
-                                if item['content'] not in texts_to_anonymize_map[group_key]:
+                                if item['content'] not in seen_texts[group_key]:
+                                    seen_texts[group_key].add(item['content'])
                                     texts_to_anonymize_map[group_key].append(item['content'])
                     
                     page.clean_contents()
@@ -1002,54 +1008,49 @@ class CsvFileProcessor(FileProcessor):
                 progress_bar = tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024,
                                     desc=f"Processing CSV {os.path.basename(self.file_path)}", leave=False,
                                     bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
-                for chunk_idx, chunk in enumerate(reader):
-                    logging.debug(f"Processing CSV chunk {chunk_idx + 1} with {len(chunk)} rows.")
+                # Global translation map: persists across chunks in cache mode.
+                global_translation_map: Dict[str, str] = {} if use_deduplication else None
+
+                for chunk in reader:
                     anonymized_chunk = chunk.copy()
-                    
+
                     if use_deduplication:
-                        logging.debug("CSV processing with value deduplication (faster, context-unaware).")
                         texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
                         for col in chunk.columns:
                             for val in chunk[col].dropna().unique():
                                 val_str = str(val)
+                                if global_translation_map is not None and val_str in global_translation_map:
+                                    continue
                                 should_anon, forced_type = self._should_anonymize(val_str, col)
                                 if should_anon:
                                     group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
                                     texts_to_anonymize_map[group_key][col].append(val_str)
 
-                        translation_map: Dict[str, str] = {}
                         for group_key, cols_data in texts_to_anonymize_map.items():
                             current_forced_type = group_key if group_key != "auto" else None
                             if isinstance(current_forced_type, tuple): current_forced_type = list(current_forced_type)
-                            
-                            unique_texts_for_group = list(set(val for sublist in cols_data.values() for val in sublist))
-                            if unique_texts_for_group:
-                                logging.debug(f"Anonymizing {len(unique_texts_for_group)} unique texts for group '{group_key}'.")
-                                anonymized_texts = self._process_batch_smart(unique_texts_for_group, forced_entity_type=current_forced_type)
-                                translation_map.update(dict(zip(unique_texts_for_group, anonymized_texts)))
 
-                        if translation_map:
+                            unique_texts_for_group = sorted(set(val for sublist in cols_data.values() for val in sublist))
+                            if unique_texts_for_group:
+                                anonymized_texts = self._process_batch_smart(unique_texts_for_group, forced_entity_type=current_forced_type)
+                                global_translation_map.update(dict(zip(unique_texts_for_group, anonymized_texts)))
+
+                        if global_translation_map:
                             for col in chunk.columns:
-                                logging.debug(f"Applying anonymization map to column '{col}'.")
-                                anonymized_chunk[col] = anonymized_chunk[col].map(lambda x: translation_map.get(str(x), x))
+                                anonymized_chunk[col] = anonymized_chunk[col].map(lambda x: global_translation_map.get(str(x), x))
                     else:
-                        logging.debug("CSV processing with row context preservation (slower, context-aware).")
                         for col in chunk.columns:
                             series = chunk[col].dropna()
-                            if series.empty: 
-                                logging.debug(f"Column '{col}' is empty, skipping.")
+                            if series.empty:
                                 continue
-                            
+
                             if not any(self._should_anonymize(str(val), col)[0] for val in series):
-                                logging.debug(f"Column '{col}' contains no PII to anonymize based on current rules.")
                                 continue
 
                             values_to_process = series.tolist()
                             _, forced_type = self._should_anonymize(values_to_process[0], col)
-                            
-                            logging.debug(f"Processing {len(values_to_process)} values in column '{col}' for anonymization.")
                             anonymized_values = self._process_batch_smart(values_to_process, forced_entity_type=forced_type)
-                            
+
                             anonymized_series = pd.Series(anonymized_values, index=series.index)
                             anonymized_chunk[col].update(anonymized_series)
 
@@ -1291,7 +1292,8 @@ class XmlFileProcessor(FileProcessor):
         text_groups: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
         logging.debug(f"XML processing with deduplication: {use_deduplication}.")
 
-        # Otimização: Evita iterar a árvore duas vezes. O tqdm funciona sem um total.
+        # Pass 1: Collect texts. Pass 2: Apply anonymization. Two passes are required
+        # because the batch anonymization needs all texts collected before processing.
         desc_collect = f"Pass 1/2: Collecting texts from {os.path.basename(self.file_path)}"
         for element in tqdm(tree.iter(), desc=desc_collect, unit="node", leave=False,
                            bar_format='{desc}: {n_fmt} nodes [{elapsed}, {rate_fmt}]'):
