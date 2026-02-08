@@ -112,7 +112,15 @@ class PresidioStrategy(AnonymizationStrategy):
         return anonymized_results, collected_entities
 
 class FastStrategy(AnonymizationStrategy):
-    """Optimized path using xlm-roberta for detection with fast anonymization."""
+    """
+    Optimized strategy using Presidio's AnalyzerEngine with filtered entity scope for detection,
+    but implementing manual text replacement in pure Python instead of using AnonymizerEngine.
+    
+    This strategy:
+    - Uses the same filtered entity detection as BalancedStrategy (Transformer + Custom Regex only)
+    - Avoids the overhead of Presidio's AnonymizerEngine by implementing text substitution manually
+    - Trades Presidio's battle-tested replacement logic for potentially faster Python-based substitution
+    """
     def __init__(self, 
                  nlp_engine,  # TransformersNlpEngine with xlm-roberta + spaCy
                  entity_detector: EntityDetector,
@@ -120,6 +128,8 @@ class FastStrategy(AnonymizationStrategy):
                  cache_manager: CacheStrategy,
                  lang: str,
                  nlp_batch_size: int,
+                 transformer_model: str,
+                 entities_to_preserve: Set[str],
                  slm_detector: Optional['SLMEntityDetector'] = None,
                  slm_detector_mode: str = "hybrid"):
         super().__init__()
@@ -129,8 +139,31 @@ class FastStrategy(AnonymizationStrategy):
         self.cache_manager = cache_manager
         self.lang = lang
         self.nlp_batch_size = nlp_batch_size
+        self.transformer_model = transformer_model
+        self.entities_to_preserve = entities_to_preserve
         self.slm_detector = slm_detector
         self.slm_detector_mode = slm_detector_mode
+        self.core_entities = self._get_core_entities()
+    
+    def _get_core_entities(self) -> List[str]:
+        """Returns a curated list of entities supported by our core recognizers (NLP + Custom Regex)."""
+        from .engine import load_custom_recognizers
+        from .config import ENTITY_MAPPING, SECURE_MODERNBERT_ENTITY_MAPPING
+        
+        # Choose entity mapping based on transformer model
+        if "SecureModernBERT-NER" in self.transformer_model:
+            entity_mapping = SECURE_MODERNBERT_ENTITY_MAPPING
+        else:
+            entity_mapping = ENTITY_MAPPING
+        
+        core_entities = set(entity_mapping.values())
+        for recognizer in load_custom_recognizers(langs=[self.lang]):
+            core_entities.update(recognizer.supported_entities)
+        return list(core_entities)
+    
+    def _get_entities_to_anonymize(self) -> List[str]:
+        """Returns the list of entities to be analyzed, excluding those to preserve."""
+        return [e for e in self.core_entities if e not in self.entities_to_preserve]
     
     def _generate_anonymized_text_and_collect_entities(self, original_doc_text: str, merged_entities: List[Dict], operator_params: Dict) -> Tuple[str, List[Tuple]]:
         """Generates the anonymized text and collects entities based on merged entities."""
@@ -186,10 +219,15 @@ class FastStrategy(AnonymizationStrategy):
 
         self.logger.debug(f"Processing batch of {len(texts_to_process_in_batch)} texts in fast path.")
 
+        # Get the filtered list of entities to analyze
+        entities_to_use = self._get_entities_to_anonymize()
+        self.logger.debug(f"Entities to use for analysis: {entities_to_use}")
+
         # Detect entities using xlm-roberta transformer via Presidio's batch analyzer
+        # Now with entity filtering to reduce unnecessary processing
         analyzer_results_iterator = self.nlp_engine.analyze_iterator(
             texts_to_process_in_batch, language=self.lang,
-            score_threshold=0.6
+            entities=entities_to_use, score_threshold=0.6
         )
         
         analyzer_results_list = list(analyzer_results_iterator)
@@ -245,8 +283,15 @@ class FastStrategy(AnonymizationStrategy):
 
 class BalancedStrategy(PresidioStrategy):
     """
-    A balance between speed and accuracy, using Presidio with a limited set of recognizers.
-    It inherits from PresidioStrategy and overrides the entity selection logic.
+    The fastest and recommended strategy, using complete Presidio pipeline with filtered entity scope.
+    
+    This strategy:
+    - Uses both Presidio's AnalyzerEngine and AnonymizerEngine (full battle-tested pipeline)
+    - Filters entities to only those in the configured mapping (Transformer + Custom Regex)
+    - Achieves best performance by drastically reducing detection scope (avoids dozens of irrelevant recognizers)
+    - Provides robust and optimized text replacement using Presidio's AnonymizerEngine
+    
+    Inherits from PresidioStrategy and overrides the entity selection logic to use only core entities.
     """
     def __init__(self, transformer_model: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -294,18 +339,21 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             allow_list=kwargs["allow_list"]
         )
     elif strategy_name == "fast":
-        # Fast strategy uses xlm-roberta for detection with optimized anonymization
+        # Fast strategy: Presidio AnalyzerEngine (filtered) + manual Python text replacement
         return FastStrategy(
-            nlp_engine=kwargs["analyzer_engine"],  # Use Presidio engine with xlm-roberta
+            nlp_engine=kwargs["analyzer_engine"],  # Uses Presidio's AnalyzerEngine for detection
             entity_detector=kwargs["entity_detector"],
             slm_detector=kwargs.get("slm_detector"),
             slm_detector_mode=kwargs.get("slm_detector_mode", "hybrid"),
             hash_generator=kwargs["hash_generator"],
             cache_manager=kwargs["cache_manager"],
             lang=kwargs["lang"],
-            nlp_batch_size=kwargs["nlp_batch_size"]
+            nlp_batch_size=kwargs["nlp_batch_size"],
+            transformer_model=kwargs["transformer_model"],
+            entities_to_preserve=kwargs["entities_to_preserve"]
         )
     elif strategy_name == "balanced":
+        # Balanced strategy: Full Presidio pipeline (fastest due to filtered entity scope)
         return BalancedStrategy(
             transformer_model=kwargs["transformer_model"],
             analyzer_engine=kwargs["analyzer_engine"],

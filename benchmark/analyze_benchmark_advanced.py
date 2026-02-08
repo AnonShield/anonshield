@@ -160,10 +160,15 @@ class BenchmarkAnalyzer:
         
         # Compute efficiency metrics
         self.df['cpu_efficiency'] = (self.df['user_time_sec'] + self.df['system_time_sec']) / \
-                                     self.df['wall_clock_time_sec'].replace(0, np.nan)
-        self.df['io_wait_sec'] = self.df['wall_clock_time_sec'] - \
-                                  (self.df['user_time_sec'] + self.df['system_time_sec'])
-        self.df['io_wait_percent'] = (self.df['io_wait_sec'] / self.df['wall_clock_time_sec'] * 100)
+                         self.df['wall_clock_time_sec'].replace(0, np.nan)
+
+        # Compute I/O wait robustly: CPU time can exceed wall clock on multi-core systems
+        cpu_time = (self.df['user_time_sec'].fillna(0) + self.df['system_time_sec'].fillna(0))
+        wall_time = self.df['wall_clock_time_sec'].fillna(0)
+        # io_wait_sec = wall_time - cpu_time, but clamp to 0 to avoid negatives caused by multi-core accounting
+        self.df['io_wait_sec'] = (wall_time - cpu_time).clip(lower=0.0)
+        # Avoid division by zero; if wall_time == 0 use NaN
+        self.df['io_wait_percent'] = self.df['io_wait_sec'] / self.df['wall_clock_time_sec'].replace(0, np.nan) * 100
         
         # Memory efficiency
         self.df['memory_efficiency_mb_per_sec'] = self.df['peak_memory_mb'] / \

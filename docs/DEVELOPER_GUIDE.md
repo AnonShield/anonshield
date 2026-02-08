@@ -113,9 +113,9 @@ graph TD
 -   **Localização:** `src/anon/strategies.py`
 -   **Responsabilidade:** Encapsular os diferentes algoritmos de anonimização.
 -   **Estratégias Implementadas:**
-    1.  **`PresidioStrategy` (Abrangente):** Utiliza o pipeline completo do Presidio, com todos os reconhecedores disponíveis, para a máxima precisão de detecção.
-    2.  **`FastStrategy` (Otimizada):** Um caminho mais rápido que combina o modelo NLP do spaCy com os reconhecedores de regex customizados, contornando o motor principal do Presidio para ganhar velocidade. É ideal para grandes volumes de dados onde a performance é crítica.
-    3.  **`BalancedStrategy` (Equilibrada):** Usa o motor do Presidio, mas com um conjunto curado e limitado de reconhecedores, oferecendo um bom equilíbrio entre a precisão da `PresidioStrategy` e a velocidade da `FastStrategy`.
+    1.  **`PresidioStrategy` (Abrangente):** Utiliza o pipeline completo do Presidio, com todos os reconhecedores disponíveis, para a máxima precisão de detecção. Usa tanto o AnalyzerEngine quanto o AnonymizerEngine do Presidio.
+    2.  **`FastStrategy` (Otimizada):** Usa o AnalyzerEngine do Presidio com escopo filtrado de entidades (mesmo da Balanced) para detecção, mas implementa a substituição de texto manualmente em Python puro. Evita o overhead do AnonymizerEngine do Presidio.
+    3.  **`BalancedStrategy` (Performance Ideal):** Usa o pipeline completo do Presidio (AnalyzerEngine + AnonymizerEngine), mas com um conjunto filtrado de reconhecedores. É a estratégia mais rápida devido à redução do escopo de detecção, sendo ideal para grandes volumes de dados onde a performance é crítica.
 
 ### 4. Processadores de Arquivo: `processors.py`
 
@@ -134,7 +134,7 @@ graph TD
 -   **Componentes:**
     -   **Motores Presidio (`AnalyzerEngine`):** O `engine.py` configura o `AnalyzerEngine` com um `TransformersNlpEngine`, que utiliza tanto modelos **spaCy** (para velocidade e entidades básicas) quanto um modelo **Transformer** (`xlm-roberta-base-ner-hrl`) para alta precisão em várias línguas.
     -   **Reconhecedores Customizados (`PatternRecognizer`):** Em `engine.py`, a função `load_custom_recognizers` define uma lista de reconhecedores baseados em **regex**, otimizados para detectar entidades técnicas comuns em CSIRTs (IPs, URLs, Hashes, CVEs, etc.).
-    -   **`EntityDetector` (`entity_detector.py`):** Esta classe é usada principalmente pela `FastStrategy`. Ela executa os modelos NLP e os padrões de regex compilados, e contém a lógica crucial para **mesclar entidades sobrepostas**, priorizando aquelas com maior pontuação (`score`) e comprimento.
+    -   **`EntityDetector` (`entity_detector.py`):** Esta classe é usada pela `FastStrategy` para mesclar entidades sobrepostas. Contém a lógica de fusão customizada que prioriza entidades com maior pontuação (`score`) e comprimento. Note que a detecção em si é feita pelo `AnalyzerEngine` do Presidio.
 
 ### 6. Camada de Persistência: `database.py` e `repository.py`
 

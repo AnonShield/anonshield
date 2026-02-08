@@ -254,39 +254,44 @@ The tool supports multiple transformer models for Named Entity Recognition (NER)
 ```bash
 python anon.py file.txt --anonymization-strategy presidio
 ```
-- **Entity Detection:** Transformer model + spaCy NLP + Custom regex patterns
-- **Accuracy:** Highest (all available recognizers)
+- **Entity Detection:** All Presidio recognizers (Transformer + spaCy + Custom regex + Built-in patterns)
+- **Text Replacement:** Presidio's AnonymizerEngine
+- **Speed:** Slower (processes all available recognizers)
+- **Accuracy:** Highest (maximum entity coverage, including low-relevance entities)
 
 **Complete Entity List:**
 - **From Transformer Model:** Depends on `--transformer-model` choice (see above)
 - **From spaCy NLP:** `DATE`, `TIME`, `MONEY`, `PERCENT`, `CARDINAL`, `ORDINAL`, `QUANTITY`, `GPE`, `NORP`, `FAC`, `EVENT`, `WORK_OF_ART`, `LAW`, `LANGUAGE`, `PRODUCT`
-- **From Custom Regex:** All 25+ patterns listed below
+- **From Custom Regex:** All custom patterns listed below
 - **From Presidio Built-in:** `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `PERSON`, `US_SSN`, `US_DRIVER_LICENSE`, etc.
 
 #### 2. `fast` (Optimized)  
 ```bash
 python anon.py file.txt --anonymization-strategy fast
 ```
-- **Entity Detection:** Transformer model + Custom regex patterns only
-- **Accuracy:** High (no spaCy built-in entities)
+- **Entity Detection:** Transformer model + Custom regex patterns (filtered scope, same as Balanced)
+- **Text Replacement:** Manual Python implementation (not using Presidio's AnonymizerEngine)
+- **Speed:** Fast (filtered entity detection + lightweight replacement logic)
+- **Accuracy:** High (same detection scope as Balanced)
 
 **Complete Entity List:**
 - **From Transformer Model:** Depends on `--transformer-model` choice (see above)
-- **From Custom Regex:** All 25+ patterns listed below
-- **Excluded:** spaCy built-in entities, Presidio built-in recognizers
+- **From Custom Regex:** All custom patterns listed below
+- **Excluded:** spaCy built-in entities, Presidio default built-in recognizers not in entity mapping
 
-#### 3. `balanced` (Mixed Approach)
+#### 3. `balanced` (Optimal Performance)
 ```bash
 python anon.py file.txt --anonymization-strategy balanced
 ```
-- **Entity Detection:** Selected Presidio recognizers + Custom patterns
-- **Accuracy:** Good (curated subset for performance)
+- **Entity Detection:** Transformer model + Custom regex patterns (filtered scope)
+- **Text Replacement:** Presidio's AnonymizerEngine (battle-tested implementation)
+- **Speed:** Fastest (filtered entity detection reduces processing overhead significantly)
+- **Accuracy:** High (curated subset focusing on relevant entities)
 
 **Complete Entity List:**
 - **From Transformer Model:** Depends on `--transformer-model` choice
-- **From Presidio Built-in:** `EMAIL_ADDRESS`, `PHONE_NUMBER`, `PERSON`, `ORGANIZATION`, `LOCATION`
-- **From Custom Regex:** High-confidence patterns only (IP_ADDRESS, HASH, CVE_ID, URL, UUID)
-- **Excluded:** spaCy built-in entities, low-confidence regex patterns
+- **From Custom Regex:** All custom patterns listed below
+- **Excluded:** spaCy built-in entities, Presidio default built-in recognizers not in entity mapping
 
 #### 4. `slm` (Context-Aware)
 ```bash
@@ -784,7 +789,7 @@ uv run anon.py large_dataset/ --optimize
 ```
 
 This enables:
-- Fast anonymization strategy (bypasses Presidio completely, loads spaCy directly)
+- Fast anonymization strategy (uses Presidio for entity detection with filtered recognizers, manual text replacement)
 - In-memory database (no disk I/O)
 - Caching enabled
 - Minimum word length of 3 characters
@@ -851,9 +856,9 @@ The core anonymization logic is encapsulated within a set of interchangeable str
 
 - **Decoupled Logic**: Each strategy is self-contained. It receives its required dependencies (like `analyzer_engine`, `entity_detector`, `cache_manager`) upon creation.
 - **Key Strategies**:
-    1.  **`PresidioStrategy` (Comprehensive):** Contains the logic for the full Presidio pipeline, using all available recognizers for the highest accuracy.
-    2.  **`FastStrategy` (Optimized):** Contains the logic for the optimized pipeline that loads spaCy directly and uses custom regex recognizers, completely bypassing the Presidio engine initialization for maximum speed.
-    3.  **`BalancedStrategy` (Optimal Balance):** Uses the Presidio engine but with a limited, curated set of recognizers, offering a balance between the `presidio` and `fast` strategies.
+    1.  **`PresidioStrategy` (Comprehensive):** Contains the logic for the full Presidio pipeline, using all available recognizers for the highest accuracy. Uses both Presidio's AnalyzerEngine and AnonymizerEngine.
+    2.  **`FastStrategy` (Optimized):** Uses Presidio's AnalyzerEngine with a filtered set of recognizers (same as Balanced) for entity detection, but implements manual text replacement in Python instead of using AnonymizerEngine. This reduces overhead from Presidio's anonymization logic.
+    3.  **`BalancedStrategy` (Optimal Balance):** Uses the complete Presidio pipeline (both AnalyzerEngine and AnonymizerEngine) but with a limited, curated set of recognizers, offering the best balance between speed and accuracy.
     4.  **`SLMAnonymizationStrategy` (Experimental):** Uses a local SLM to perform end-to-end contextual anonymization.
 
 #### 3. File Processors (`processors.py`)

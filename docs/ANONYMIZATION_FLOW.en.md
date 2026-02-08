@@ -71,19 +71,19 @@ Once `_should_anonymize` gives the green light, the `AnonymizationOrchestrator` 
 - **Pro:** Highest accuracy and broadest detection capability.
 - **Con:** Slower due to the extensive analysis and complex aggregation.
 
-#### `fast` Strategy (The Quick One)
-- **How it works:** Completely bypasses the `AnalyzerEngine`. It runs a direct, manual pipeline:
-    1. Passes the text through the **spaCy + Transformer** pipeline (as configured by Presidio's `TransformersNlpEngine`).
-    2. In parallel, passes the text through the **custom Regex** list.
-    3. Uses a simpler merge logic (`_merge_overlapping_entities`) to combine the results from both sources.
-    4. Reconstructs the text manually without the `AnonymizerEngine`'s full pipeline.
-- **Pro:** Significantly faster by eliminating the overhead of the `AnalyzerEngine` and its multiple internal recognizers.
-- **Con:** Less robust in resolving entity conflicts and does not benefit from the full range of Presidio's additional recognizers.
+#### `fast` Strategy (Optimized)
+- **How it works:** Uses Presidio's `AnalyzerEngine` with filtered entity scope (same set as `balanced`) for detection, but implements text replacement manually:
+    1. Passes text through Presidio's `AnalyzerEngine` with entity filtering.
+    2. Receives detection results (**Transformer + Custom Regex**, without Presidio's internal recognizers).
+    3. Uses custom merge logic (`merge_overlapping_entities`) to combine results.
+    4. Reconstructs text manually in pure Python, without using the `AnonymizerEngine`.
+- **Pro:** Avoids overhead from Presidio's `AnonymizerEngine`. Filtered scope reduces detection load.
+- **Con:** Manual replacement logic may have Python overhead. Does not use battle-tested AnonymizerEngine logic.
 
-#### `balanced` Strategy (NEW! Optimal Balance)
-- **How it works:** This strategy offers a smart middle ground. It *uses* the Presidio `AnalyzerEngine` (thus benefiting from its more robust result aggregation logic than `fast` mode), but it invokes it selectively. Instead of using all recognizers, it instructs the engine to use **only** the main **spaCy + Transformer** pipeline and the **custom Regex** list, effectively disabling Presidio's other built-in recognizers.
-- **Pro:** Offers an ideal balance, being faster than `presidio` (by ignoring many internal recognizers) and more robust than `fast` (by using Presidio's superior aggregation logic).
-- **Con:** May not detect very specific entities that only the full `presidio` strategy would cover.
+#### `balanced` Strategy (Optimal Performance) - **RECOMMENDED!**
+- **How it works:** Uses complete Presidio pipeline (`AnalyzerEngine` + `AnonymizerEngine`), but with filtered scope. Invokes the `AnalyzerEngine` instructing it to use **only** entities from the configured mapping (**Transformer + Custom Regex**).
+- **Pro:** **Fastest of all** by drastically reducing detection scope (avoids running dozens of irrelevant recognizers). Uses robust and optimized Presidio logic for text replacement.
+- **Con:** May not detect very specific entities that only Presidio's internal recognizers would cover (which are generally irrelevant for CSIRT context).
 
 ### C. How Text Reaches the Transformer: The Tokenization Process
 

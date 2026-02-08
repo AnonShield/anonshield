@@ -457,11 +457,21 @@ class EnvironmentSetup:
 
         if self.gpu_mode:
             print(f"  [INFO] Configuring PyTorch for GPU (CUDA 12.8)...")
+            
+            # Step 1: Uninstall existing torch first to free up space
+            print(f"  [INFO] Removing existing PyTorch installation...")
+            subprocess.run([str(pip_exe), "uninstall", "-y", "torch"], 
+                         stdout=log, stderr=subprocess.STDOUT, text=True)
+            
+            # Step 2: Clean pip cache to free up more space
+            print(f"  [INFO] Cleaning pip cache...")
+            subprocess.run([str(pip_exe), "cache", "purge"], 
+                         stdout=log, stderr=subprocess.STDOUT, text=True)
 
-            # Install GPU torch (following Dockerfile builder-gpu logic)
+            # Step 3: Install GPU torch (following Dockerfile builder-gpu logic)
             # torch --index-url https://download.pytorch.org/whl/cu128
             cmd = [
-                str(pip_exe), "install", "--no-cache-dir", "--force-reinstall",
+                str(pip_exe), "install", "--no-cache-dir",
                 "torch", "--index-url", "https://download.pytorch.org/whl/cu128"
             ]
             log.write(f"\nInstalling GPU PyTorch: {' '.join(cmd)}\n")
@@ -472,7 +482,7 @@ class EnvironmentSetup:
                 print(f"  [WARN] GPU torch installation failed, trying CPU fallback...")
                 return self._install_cpu_torch(pip_exe, log)
 
-            # Install cupy-cuda12x (following Dockerfile)
+            # Step 4: Install cupy-cuda12x (following Dockerfile)
             print(f"  [INFO] Installing CuPy for CUDA 12.x...")
             cmd = [str(pip_exe), "install", "--no-cache-dir", "cupy-cuda12x==12.3.0"]
             log.write(f"\nInstalling CuPy: {' '.join(cmd)}\n")
@@ -2894,6 +2904,9 @@ Examples:
   # Run specific versions only
   python benchmark.py --benchmark --versions 2.0 3.0 --data-dir ./dados_teste
 
+  # Run v3.0 with specific strategies only
+  python benchmark.py --benchmark --versions 3.0 --strategies fast balanced --data-dir ./dados_teste
+
   # Resume interrupted run
   python benchmark.py --benchmark --data-dir ./dados_teste
 
@@ -2959,6 +2972,11 @@ Examples:
                             help="Use directory mode for v2.0/v3.0: pass all files in a single "
                                  "invocation to eliminate per-file model loading overhead (~55-77s). "
                                  "v1.0 falls back to single-file mode. Records aggregate metrics.")
+    bench_group.add_argument("--strategies", nargs="+",
+                            choices=["presidio", "fast", "balanced", "slm"],
+                            help="Strategies to benchmark for v3.0 (default: all strategies). "
+                                 "Choices: presidio, fast, balanced, slm. "
+                                 "Example: --strategies fast balanced")
 
     # Regression options
     regression_group = parser.add_argument_group("Regression Options (use with --regression)")
@@ -3038,6 +3056,37 @@ def main():
         if results_dir.exists():
             shutil.rmtree(results_dir)
         results_dir.mkdir(parents=True, exist_ok=True)
+
+    # Filter strategies if specified
+    if hasattr(args, 'strategies') and args.strategies:
+        # Convert strings to Strategy enum
+        selected_strategies = []
+        strategy_map = {
+            "presidio": Strategy.PRESIDIO,
+            "fast": Strategy.FAST,
+            "balanced": Strategy.BALANCED,
+            "slm": Strategy.SLM
+        }
+        for s in args.strategies:
+            if s in strategy_map:
+                selected_strategies.append(strategy_map[s])
+        
+        # Update v3.0 config with selected strategies
+        if selected_strategies:
+            VERSION_CONFIGS[AnonVersion.V3_0] = VersionConfig(
+                version=AnonVersion.V3_0,
+                relative_path=".",
+                venv_name=".venv_benchmark",
+                supported_extensions=(
+                    ".txt", ".log", ".pdf", ".docx", ".csv", ".xlsx", ".xml",
+                    ".json", ".jsonl",
+                    ".jpeg", ".jpg", ".png", ".gif", ".bmp", ".tiff", ".tif", ".webp", ".jp2", ".pnm"
+                ),
+                supports_directory=True,
+                requires_secret_key=True,
+                strategies=tuple(selected_strategies)
+            )
+            print(f"[INFO] Using selected v3.0 strategies: {[s.value for s in selected_strategies]}")
 
     # Create orchestrator
     orchestrator = BenchmarkOrchestrator(args)

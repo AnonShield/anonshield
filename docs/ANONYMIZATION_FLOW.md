@@ -71,19 +71,19 @@ Uma vez que `_should_anonymize` dá o sinal verde, o `AnonymizationOrchestrator`
 - **Pró:** Máxima precisão e capacidade de detecção.
 - **Contra:** Mais lenta devido ao grande número de reconhecedores e à complexa lógica de agregação.
 
-#### Estratégia `fast` (A Rápida)
-- **Como funciona:** Ignora completamente o `AnalyzerEngine`. Ela executa um pipeline manual e direto:
-    1. Passa o texto pelo pipeline **spaCy+Transformer**.
-    2. Em paralelo, passa o texto pelas **Regex customizadas**.
-    3. Usa uma lógica de fusão (`_merge_overlapping_entities`) mais simples para combinar os resultados das duas fontes.
-    4. Reconstrói o texto manualmente.
-- **Pró:** Significativamente mais rápida por eliminar a sobrecarga do `AnalyzerEngine` e seus múltiplos reconhecedores internos.
-- **Contra:** Menos robusta na resolução de conflitos de entidades e não utiliza os reconhecedores adicionais do Presidio.
+#### Estratégia `fast` (Otimizada)
+- **Como funciona:** Usa o `AnalyzerEngine` do Presidio com escopo filtrado de entidades (mesmo conjunto da `balanced`) para detecção, mas implementa a substituição de texto manualmente:
+    1. Passa o texto pelo `AnalyzerEngine` do Presidio com filtro de entidades.
+    2. Recebe os resultados de detecção (**Transformer + Regex customizadas**, sem os recognizers internos do Presidio).
+    3. Usa lógica de fusão própria (`merge_overlapping_entities`) para combinar resultados.
+    4. Reconstrói o texto manualmente em Python puro, sem usar o `AnonymizerEngine`.
+- **Pró:** Evita o overhead do `AnonymizerEngine` do Presidio. Escopo filtrado reduz carga de detecção.
+- **Contra:** Lógica de substituição manual pode ter overhead em Python. Não usa a lógica battle-tested do AnonymizerEngine.
 
-#### Estratégia `balanced` (O Melhor de Dois Mundos) - **NOVO!**
-- **Como funciona:** Esta estratégia é um meio-termo inteligente. Ela usa o `AnalyzerEngine` do Presidio (garantindo uma lógica de agregação de resultados mais robusta que a do modo `fast`), mas o invoca de forma seletiva. Em vez de usar todos os reconhecedores, ela o instrui a usar **apenas** o pipeline **spaCy+Transformer** e as **Regex customizadas**.
-- **Pró:** Oferece um equilíbrio ideal, sendo mais rápida que a `presidio` (pois ignora os reconhecedores internos lentos) e mais robusta que a `fast` (pois usa a lógica de agregação superior do Presidio).
-- **Contra:** Pode não detectar entidades muito específicas que apenas os reconhecedores internos do Presidio cobririam.
+#### Estratégia `balanced` (Performance Ideal) - **RECOMENDADA!**
+- **Como funciona:** Usa o pipeline completo do Presidio (`AnalyzerEngine` + `AnonymizerEngine`), mas com escopo filtrado. Invoca o `AnalyzerEngine` instruindo-o a usar **apenas** entidades do mapeamento configurado (**Transformer + Regex customizadas**).
+- **Pró:** **Mais rápida de todas** por reduzir drasticamente o escopo de detecção (evita executar dezenas de recognizers irrelevantes). Usa a lógica robusta e otimizada do Presidio para substituição.
+- **Contra:** Pode não detectar entidades muito específicas que apenas os reconhecedores internos do Presidio cobririam (e que geralmente são irrelevantes para o contexto de CSIRT).
 
 ### C. Como o Texto Chega ao Transformer: O Processo de Tokenização
 
