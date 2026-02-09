@@ -1734,7 +1734,9 @@ class BenchmarkOrchestrator:
             overhead_data[key] = []
 
             runner = BenchmarkRunner(
-                config, self.output_dir, self.log_dir, self.args.secret_key
+                config, self.output_dir, self.log_dir, self.args.secret_key,
+                transformer_model=self.args.transformer_model,
+                db_dir=self.args.db_dir
             )
 
             for run_num in range(1, self.args.runs + 1):
@@ -1862,7 +1864,9 @@ class BenchmarkOrchestrator:
                         config,
                         self.output_dir,
                         self.log_dir,
-                        self.args.secret_key
+                        self.args.secret_key,
+                        transformer_model=self.args.transformer_model,
+                        db_dir=self.args.db_dir
                     )
 
                     for strategy in config.strategies:
@@ -1970,7 +1974,10 @@ class BenchmarkOrchestrator:
 
                         try:
                             dir_runner = DirectoryBenchmarkRunner(
-                                config, self.output_dir, self.log_dir, self.args.secret_key
+                                config, self.output_dir, self.log_dir, self.args.secret_key,
+                                results_manager=self.results_manager,
+                                transformer_model=self.args.transformer_model,
+                                db_dir=self.args.db_dir
                             )
                             metrics_list = dir_runner.run(
                                 test_files, strategy, run_num,
@@ -1996,7 +2003,9 @@ class BenchmarkOrchestrator:
                     else:
                         # === SINGLE-FILE FALLBACK for v1.0 ===
                         runner = BenchmarkRunner(
-                            config, self.output_dir, self.log_dir, self.args.secret_key
+                            config, self.output_dir, self.log_dir, self.args.secret_key,
+                            transformer_model=self.args.transformer_model,
+                            db_dir=self.args.db_dir
                         )
 
                         for file_path in test_files:
@@ -2318,7 +2327,9 @@ class BenchmarkOrchestrator:
                 regression_data[key] = []
 
                 runner = BenchmarkRunner(
-                    config, self.output_dir, self.log_dir, self.args.secret_key
+                    config, self.output_dir, self.log_dir, self.args.secret_key,
+                    transformer_model=self.args.transformer_model,
+                    db_dir=self.args.db_dir
                 )
 
                 print(f"\n  --- {key} ---")

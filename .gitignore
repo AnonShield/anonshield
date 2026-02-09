@@ -197,3 +197,4 @@ anonlfi_*/logs/*
 anonlfi_*/db/*
 vulnnet*
 analysis/*
+benchmark/orchestrated_results/*

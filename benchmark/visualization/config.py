@@ -63,6 +63,27 @@ class ColorScheme:
         # RdBu is reasonably colorblind-safe
         return 'RdBu_r'
 
+    @classmethod
+    def get_version_strategy_colors(cls) -> Dict[str, str]:
+        """Get consistent color mapping for version+strategy combinations.
+
+        This ensures the same version+strategy always gets the same color
+        across all visualizations.
+        """
+        return {
+            # Version 1.0
+            '1.0_default': cls.WONG_BLUE,
+
+            # Version 2.0
+            '2.0_default': cls.WONG_PURPLE,
+
+            # Version 3.0
+            '3.0_filtered': cls.WONG_YELLOW,
+            '3.0_hybrid': cls.WONG_GREEN,
+            '3.0_presidio': cls.WONG_ORANGE,
+            '3.0_standalone': cls.WONG_SKY_BLUE,
+        }
+
 
 @dataclass(frozen=True)
 class FigureSize:
@@ -286,9 +307,46 @@ class VisualizationConfig:
         }
         return size_map.get(layout, self.sizes.DOUBLE_WIDE)
 
-    def get_colors(self, n: int = 8) -> list:
-        """Get N categorical colors."""
+    def get_colors(self, n: int = 8, strategies: list = None) -> list:
+        """Get N categorical colors.
+
+        Args:
+            n: Number of colors needed
+            strategies: Optional list of version_strategy names for consistent mapping
+
+        Returns:
+            List of colors (hex strings)
+        """
+        if strategies:
+            # Use consistent color mapping for version+strategy
+            color_map = self.colors.get_version_strategy_colors()
+            return [color_map.get(s, self.colors.get_categorical_palette(n)[i % 8])
+                    for i, s in enumerate(strategies)]
         return self.colors.get_categorical_palette(n)
+
+    @staticmethod
+    def sort_strategies_by_version(strategies: list) -> list:
+        """Sort strategies by version first, then alphabetically.
+
+        Args:
+            strategies: List of version_strategy strings (e.g., ['3.0_standalone', '1.0_default'])
+
+        Returns:
+            Sorted list grouped by version (e.g., ['1.0_default', '2.0_default', '3.0_filtered', ...])
+        """
+        def parse_version(s: str):
+            """Extract version and strategy from version_strategy string."""
+            parts = s.split('_', 1)
+            if len(parts) == 2:
+                try:
+                    version = float(parts[0])
+                    strategy = parts[1]
+                    return (version, strategy)
+                except ValueError:
+                    pass
+            return (999, s)  # Fallback for unparseable strings
+
+        return sorted(strategies, key=parse_version)
 
     def save_figure(self, fig, filepath: str, dpi: int | None = None):
         """Save figure with proper settings.

@@ -55,13 +55,14 @@ class ScientificBenchmarkAnalyzer:
     """Main analyzer class orchestrating all analyses."""
 
     def __init__(self, csv_path: str, output_dir: str = "benchmark/results/scientific",
-                 mode: str = 'paper'):
+                 mode: str = 'paper', overhead_data_path: str = None):
         """Initialize analyzer.
 
         Args:
             csv_path: Path to benchmark CSV/JSON results
             output_dir: Output directory for results
             mode: 'paper' (publication), 'presentation', or 'screen'
+            overhead_data_path: Path to overhead calibration CSV (optional)
         """
         self.data_path = Path(csv_path)
         self.output_dir = Path(output_dir)
@@ -93,6 +94,19 @@ class ScientificBenchmarkAnalyzer:
             print("   Format: CSV")
         else:
             raise ValueError(f"Unsupported format: {self.data_path.suffix}")
+
+        # Load overhead data if provided
+        self.overhead_df = None
+        if overhead_data_path:
+            overhead_path = Path(overhead_data_path)
+            if overhead_path.exists():
+                if overhead_path.suffix == '.csv':
+                    self.overhead_df = pd.read_csv(overhead_data_path)
+                elif overhead_path.suffix == '.json':
+                    self.overhead_df = pd.read_json(overhead_data_path)
+                print(f"   Overhead data: {overhead_data_path} ({len(self.overhead_df)} records)")
+            else:
+                print(f"   ⚠️  Overhead data not found: {overhead_data_path}")
 
         # Preprocess data
         self._preprocess_data()
@@ -246,8 +260,11 @@ class ScientificBenchmarkAnalyzer:
             self.factory.regression.create_overhead_decomposition(
                 data,
                 'version_strategy',
-                str(output_dir / "03_overhead_decomposition")
+                str(output_dir / "03_overhead_decomposition"),
+                overhead_data=self.overhead_df
             )
+            if self.overhead_df is not None:
+                print("   ℹ️  Using real overhead from calibration data")
             print("   ✅ Saved: 03_overhead_decomposition.png/pdf")
         else:
             print("   ⚠️  Skipped: Requires variation in file sizes (only 1 size found)")
@@ -464,6 +481,11 @@ Output:
         help='Baseline strategy for effect size comparisons (default: first alphabetically)'
     )
 
+    parser.add_argument(
+        '--overhead',
+        help='Path to overhead calibration CSV/JSON file (optional, uses real overhead instead of regression)'
+    )
+
     args = parser.parse_args()
 
     # Validate input file
@@ -476,7 +498,8 @@ Output:
         analyzer = ScientificBenchmarkAnalyzer(
             args.csv_path,
             args.output_dir,
-            mode=args.mode
+            mode=args.mode,
+            overhead_data_path=args.overhead
         )
 
         analyzer.run_complete_analysis(baseline_strategy=args.baseline)
