@@ -31,6 +31,87 @@ from .statistics import (
 )
 
 
+class LayoutHelper:
+    """Helper class for improving chart layouts and preventing label overlap."""
+
+    @staticmethod
+    def rotate_xlabels(ax, rotation=45, ha='right'):
+        """Rotate x-axis labels to prevent overlap."""
+        for label in ax.get_xticklabels():
+            label.set_rotation(rotation)
+            label.set_ha(ha)
+
+    @staticmethod
+    def rotate_ylabels(ax, rotation=0, ha='right'):
+        """Rotate y-axis labels if needed."""
+        for label in ax.get_yticklabels():
+            label.set_rotation(rotation)
+            label.set_ha(ha)
+
+    @staticmethod
+    def adjust_heatmap_size(n_rows, n_cols, base_size=0.5, min_size=8, max_size=20):
+        """Calculate appropriate figure size for heatmap based on elements.
+
+        Args:
+            n_rows: Number of rows in heatmap
+            n_cols: Number of columns in heatmap
+            base_size: Size per cell in inches
+            min_size: Minimum dimension
+            max_size: Maximum dimension
+
+        Returns:
+            Tuple of (width, height) in inches
+        """
+        width = max(min_size, min(max_size, n_cols * base_size + 2))
+        height = max(min_size, min(max_size, n_rows * base_size + 2))
+        return (width, height)
+
+    @staticmethod
+    def smart_tick_spacing(ax, axis='x', max_ticks=10):
+        """Reduce tick density if too many ticks."""
+        if axis == 'x':
+            ticks = ax.get_xticks()
+            labels = ax.get_xticklabels()
+        else:
+            ticks = ax.get_yticks()
+            labels = ax.get_yticklabels()
+
+        if len(ticks) > max_ticks:
+            # Keep every Nth tick
+            step = len(ticks) // max_ticks + 1
+            if axis == 'x':
+                ax.set_xticks(ticks[::step])
+            else:
+                ax.set_yticks(ticks[::step])
+
+    @staticmethod
+    def improve_legend_placement(ax, ncol=None, loc='best', fontsize=None):
+        """Improve legend placement to avoid overlap with data."""
+        legend = ax.get_legend()
+        if legend is None:
+            return
+
+        # Calculate number of columns based on number of entries
+        if ncol is None:
+            n_entries = len(legend.get_texts())
+            ncol = min(3, max(1, n_entries // 4))
+
+        # Recreate legend with better parameters
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles, labels, loc=loc, ncol=ncol,
+                 fontsize=fontsize, framealpha=0.9,
+                 edgecolor='gray', fancybox=True)
+
+    @staticmethod
+    def apply_tight_layout(fig, pad=1.5):
+        """Apply tight layout with generous padding."""
+        try:
+            fig.tight_layout(pad=pad)
+        except:
+            # Fallback to manual adjustment
+            fig.subplots_adjust(left=0.1, right=0.95, top=0.95, bottom=0.1)
+
+
 class BaseChart(ABC):
     """Abstract base class for all charts (Template Method pattern)."""
 
@@ -121,9 +202,6 @@ class PerformanceCharts:
             data: Benchmark DataFrame
             output_path: Save path
         """
-        fig = plt.figure(figsize=self.config.get_figure_size('double_wide'))
-        gs = gridspec.GridSpec(1, 3, figure=fig, wspace=0.3)
-
         # Compute normalized metric: seconds per MB
         data_clean = data[data['file_size_mb'] > 0].copy()
         data_clean['time_per_mb'] = (
@@ -137,7 +215,16 @@ class PerformanceCharts:
 
         strategies = sorted(data_clean['version_strategy'].unique())
         formats = sorted(data_clean['file_extension'].unique())
-        colors = self.config.get_colors(len(strategies))
+        n_strategies = len(strategies)
+        n_formats = len(formats)
+
+        # Adjust figure size based on data complexity
+        base_width = max(12, 4 * 3)  # 3 panels, at least 4" each
+        base_height = max(8, n_strategies * 0.4 + 2)  # Dynamic height based on strategies
+        fig = plt.figure(figsize=(base_width, base_height))
+        gs = gridspec.GridSpec(1, 3, figure=fig, wspace=0.35, hspace=0.3)
+
+        colors = self.config.get_colors(n_strategies)
 
         # Panel A: Time per MB by strategy
         ax1 = fig.add_subplot(gs[0, 0])
@@ -153,15 +240,21 @@ class PerformanceCharts:
                        capsize=4, error_kw={'linewidth': 1.5})
 
         ax1.set_yticks(x_pos)
-        ax1.set_yticklabels(strategy_stats.index, fontsize=self.config.typography.SIZE_AXIS_TICK)
-        ax1.set_xlabel('Time per MB (sec/MB)', fontweight='bold')
+        # Truncate long labels if needed
+        labels = [s[:25] + '...' if len(s) > 25 else s for s in strategy_stats.index]
+        ax1.set_yticklabels(labels, fontsize=self.config.typography.SIZE_AXIS_TICK)
+        ax1.set_xlabel('Time per MB (sec/MB)', fontweight='bold',
+                      fontsize=self.config.typography.SIZE_AXIS_LABEL)
         ax1.set_title('(A) Normalized Execution Time', fontweight='bold', pad=10)
         ax1.grid(axis='x', alpha=0.3)
 
-        # Add value labels
-        for i, (mean, std) in enumerate(zip(strategy_stats['mean'], strategy_stats['std'])):
-            ax1.text(mean + std + 0.5, i, f'{mean:.2f}±{std:.2f}',
-                    va='center', fontsize=self.config.typography.SIZE_ANNOTATION)
+        # Add value labels (only if not too crowded)
+        if n_strategies <= 8:
+            for i, (mean, std) in enumerate(zip(strategy_stats['mean'], strategy_stats['std'])):
+                # Use dynamic offset
+                offset = max(std * 0.1, mean * 0.05)
+                ax1.text(mean + std + offset, i, f'{mean:.2f}',
+                        va='center', fontsize=self.config.typography.SIZE_ANNOTATION)
 
         # Panel B: Throughput by strategy (inverse validation)
         ax2 = fig.add_subplot(gs[0, 1])
@@ -177,15 +270,19 @@ class PerformanceCharts:
                         capsize=4, error_kw={'linewidth': 1.5})
 
         ax2.set_yticks(x_pos2)
-        ax2.set_yticklabels(throughput_stats.index, fontsize=self.config.typography.SIZE_AXIS_TICK)
-        ax2.set_xlabel('Throughput (MB/sec)', fontweight='bold')
+        labels2 = [s[:25] + '...' if len(s) > 25 else s for s in throughput_stats.index]
+        ax2.set_yticklabels(labels2, fontsize=self.config.typography.SIZE_AXIS_TICK)
+        ax2.set_xlabel('Throughput (MB/sec)', fontweight='bold',
+                      fontsize=self.config.typography.SIZE_AXIS_LABEL)
         ax2.set_title('(B) Processing Throughput', fontweight='bold', pad=10)
         ax2.grid(axis='x', alpha=0.3)
 
-        # Add value labels
-        for i, (mean, std) in enumerate(zip(throughput_stats['mean'], throughput_stats['std'])):
-            ax2.text(mean + std + 0.001, i, f'{mean:.4f}±{std:.4f}',
-                    va='center', fontsize=self.config.typography.SIZE_ANNOTATION)
+        # Add value labels (only if not too crowded)
+        if n_strategies <= 8:
+            for i, (mean, std) in enumerate(zip(throughput_stats['mean'], throughput_stats['std'])):
+                offset = max(std * 0.1, mean * 0.05)
+                ax2.text(mean + std + offset, i, f'{mean:.3f}',
+                        va='center', fontsize=self.config.typography.SIZE_ANNOTATION)
 
         # Panel C: Heatmap - Time per MB by strategy × format
         ax3 = fig.add_subplot(gs[0, 2])
@@ -196,17 +293,28 @@ class PerformanceCharts:
             aggfunc='mean'
         )
 
-        sns.heatmap(pivot, annot=True, fmt='.2f', cmap='YlOrRd',
+        # Adjust annotation based on matrix size
+        show_annot = (n_strategies * n_formats) <= 40  # Only annotate if not too dense
+        annot_fontsize = max(6, 10 - n_formats // 2)  # Smaller font for more columns
+
+        sns.heatmap(pivot, annot=show_annot, fmt='.2f', cmap='YlOrRd',
                    cbar_kws={'label': 'sec/MB'}, ax=ax3, linewidths=0.5,
-                   linecolor='white')
+                   linecolor='white', annot_kws={'fontsize': annot_fontsize})
         ax3.set_title('(C) Time per MB Matrix', fontweight='bold', pad=10)
-        ax3.set_xlabel('File Format', fontweight='bold')
-        ax3.set_ylabel('Strategy', fontweight='bold')
+        ax3.set_xlabel('File Format', fontweight='bold',
+                      fontsize=self.config.typography.SIZE_AXIS_LABEL)
+        ax3.set_ylabel('Strategy', fontweight='bold',
+                      fontsize=self.config.typography.SIZE_AXIS_LABEL)
+
+        # Rotate x labels if many formats
+        if n_formats > 3:
+            LayoutHelper.rotate_xlabels(ax3, rotation=45, ha='right')
 
         plt.suptitle('Normalized Performance Comparison (Size-Adjusted)',
                     fontsize=self.config.typography.SIZE_TITLE + 2,
                     fontweight='bold', y=0.98)
 
+        LayoutHelper.apply_tight_layout(fig, pad=2.0)
         self.config.save_figure(fig, output_path)
         return fig
 
@@ -594,52 +702,104 @@ class StatisticalCharts:
         else:
             p_corrected_matrix = p_matrix
 
-        # Create figure with 2 subplots
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.config.get_figure_size('double_wide'))
+        # Adjust figure size based on number of groups
+        fig_width, fig_height = LayoutHelper.adjust_heatmap_size(
+            n_groups, n_groups, base_size=0.6, min_size=10, max_size=18
+        )
+        # Double width for 2 panels
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(fig_width * 1.8, fig_height))
+
+        # Determine annotation settings based on matrix size
+        show_annot = n_groups <= 10  # Only show numbers if not too dense
+        annot_fontsize = max(6, 9 - n_groups // 3)  # Smaller font for larger matrices
+
+        # Truncate long group names
+        group_labels = [g[:15] + '...' if len(g) > 15 else g for g in groups]
 
         # Panel A: P-value heatmap
-        sns.heatmap(p_corrected_matrix, annot=True, fmt='.4f',
-                   cmap='RdYlGn', center=0.05, vmin=0, vmax=0.1,
-                   cbar_kws={'label': f'P-value ({correction_method})'},
-                   xticklabels=groups, yticklabels=groups, ax=ax1,
-                   linewidths=0.5, linecolor='white')
+        # Don't show values and stars together if too crowded
+        if show_annot and n_groups <= 6:
+            # Show both values and stars
+            sns.heatmap(p_corrected_matrix, annot=True, fmt='.3f',
+                       cmap='RdYlGn', center=0.05, vmin=0, vmax=0.1,
+                       cbar_kws={'label': f'P-value ({correction_method})'},
+                       xticklabels=group_labels, yticklabels=group_labels, ax=ax1,
+                       linewidths=0.5, linecolor='white',
+                       annot_kws={'fontsize': annot_fontsize})
+
+            # Add significance stars (smaller if many groups)
+            star_fontsize = max(6, self.config.typography.SIZE_ANNOTATION - n_groups // 4)
+            for i in range(n_groups):
+                for j in range(n_groups):
+                    p_val = p_corrected_matrix[i, j]
+                    if p_val < 0.0001:
+                        stars = '****'
+                    elif p_val < 0.001:
+                        stars = '***'
+                    elif p_val < 0.01:
+                        stars = '**'
+                    elif p_val < 0.05:
+                        stars = '*'
+                    else:
+                        stars = ''
+
+                    if stars:
+                        ax1.text(j + 0.5, i + 0.75, stars, ha='center', va='center',
+                                color='white', fontweight='bold',
+                                fontsize=star_fontsize)
+        else:
+            # Just show stars for crowded matrices
+            star_matrix = np.empty((n_groups, n_groups), dtype=object)
+            for i in range(n_groups):
+                for j in range(n_groups):
+                    p_val = p_corrected_matrix[i, j]
+                    if i == j:
+                        star_matrix[i, j] = '─'
+                    elif p_val < 0.0001:
+                        star_matrix[i, j] = '****'
+                    elif p_val < 0.001:
+                        star_matrix[i, j] = '***'
+                    elif p_val < 0.01:
+                        star_matrix[i, j] = '**'
+                    elif p_val < 0.05:
+                        star_matrix[i, j] = '*'
+                    else:
+                        star_matrix[i, j] = 'ns'
+
+            sns.heatmap(p_corrected_matrix, annot=star_matrix, fmt='',
+                       cmap='RdYlGn', center=0.05, vmin=0, vmax=0.1,
+                       cbar_kws={'label': f'P-value ({correction_method})'},
+                       xticklabels=group_labels, yticklabels=group_labels, ax=ax1,
+                       linewidths=0.5, linecolor='white',
+                       annot_kws={'fontsize': annot_fontsize})
 
         ax1.set_title('(A) Pairwise Statistical Significance', fontweight='bold', pad=10)
 
-        # Add significance stars
-        for i in range(n_groups):
-            for j in range(n_groups):
-                p_val = p_corrected_matrix[i, j]
-                if p_val < 0.0001:
-                    stars = '****'
-                elif p_val < 0.001:
-                    stars = '***'
-                elif p_val < 0.01:
-                    stars = '**'
-                elif p_val < 0.05:
-                    stars = '*'
-                else:
-                    stars = ''
-
-                if stars:
-                    ax1.text(j + 0.5, i + 0.7, stars, ha='center', va='center',
-                            color='white', fontweight='bold',
-                            fontsize=self.config.typography.SIZE_ANNOTATION)
+        # Rotate labels if needed
+        if n_groups > 4 or max(len(g) for g in groups) > 10:
+            LayoutHelper.rotate_xlabels(ax1, rotation=45, ha='right')
+            LayoutHelper.rotate_ylabels(ax1, rotation=0, ha='right')
 
         # Panel B: Effect size heatmap
-        sns.heatmap(effect_matrix, annot=True, fmt='.3f',
+        sns.heatmap(effect_matrix, annot=show_annot, fmt='.2f',
                    cmap='RdBu_r', center=0, vmin=-1, vmax=1,
                    cbar_kws={'label': 'Rank-Biserial r'},
-                   xticklabels=groups, yticklabels=groups, ax=ax2,
-                   linewidths=0.5, linecolor='white')
+                   xticklabels=group_labels, yticklabels=group_labels, ax=ax2,
+                   linewidths=0.5, linecolor='white',
+                   annot_kws={'fontsize': annot_fontsize})
 
         ax2.set_title('(B) Effect Size (Rank-Biserial)', fontweight='bold', pad=10)
+
+        # Rotate labels if needed
+        if n_groups > 4 or max(len(g) for g in groups) > 10:
+            LayoutHelper.rotate_xlabels(ax2, rotation=45, ha='right')
+            LayoutHelper.rotate_ylabels(ax2, rotation=0, ha='right')
 
         plt.suptitle(f'Pairwise Comparison: {metric}\n(Corrected: {correction_method})',
                     fontsize=self.config.typography.SIZE_TITLE,
                     fontweight='bold', y=1.02)
 
-        plt.tight_layout()
+        LayoutHelper.apply_tight_layout(fig, pad=2.5)
         self.config.save_figure(fig, output_path)
         return fig
 
@@ -663,11 +823,16 @@ class DistributionCharts:
             metric: Metric to visualize
             output_path: Save path
         """
-        fig = plt.figure(figsize=self.config.get_figure_size('double_wide'))
-        gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.3, wspace=0.3)
-
         groups = sorted(data[group_by].unique())
-        colors = self.config.get_colors(len(groups))
+        n_groups = len(groups)
+
+        # Adjust figure size based on number of groups
+        base_width = max(12, n_groups * 1.2)
+        base_height = max(10, 8 + n_groups * 0.15)
+        fig = plt.figure(figsize=(base_width, base_height))
+        gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.35, wspace=0.35)
+
+        colors = self.config.get_colors(n_groups)
 
         # Panel A: Violin + Box + Strip
         ax1 = fig.add_subplot(gs[0, :])
@@ -693,7 +858,12 @@ class DistributionCharts:
                        color=colors[idx], edgecolors='black', linewidths=0.3)
 
         ax1.set_xticks(range(len(groups)))
-        ax1.set_xticklabels(groups, rotation=45, ha='right')
+        # Truncate and rotate labels based on group count
+        group_labels = [g[:20] + '...' if len(g) > 20 else g for g in groups]
+        rotation = 45 if n_groups > 3 or max(len(g) for g in groups) > 12 else 0
+        ax1.set_xticklabels(group_labels, rotation=rotation,
+                           ha='right' if rotation > 0 else 'center',
+                           fontsize=self.config.typography.SIZE_AXIS_TICK)
         ax1.set_ylabel(metric.replace('_', ' ').title(), fontweight='bold')
         ax1.set_title('(A) Distribution with Individual Points', fontweight='bold', pad=10)
         ax1.grid(axis='y', alpha=0.3)
@@ -706,13 +876,19 @@ class DistributionCharts:
                 from scipy.stats import gaussian_kde
                 kde = gaussian_kde(group_data)
                 x_range = np.linspace(group_data.min(), group_data.max(), 200)
-                ax2.plot(x_range, kde(x_range), label=group, color=colors[idx],
+                # Truncate label for legend
+                label = group[:15] + '...' if len(group) > 15 else group
+                ax2.plot(x_range, kde(x_range), label=label, color=colors[idx],
                         linewidth=2, alpha=0.8)
 
         ax2.set_xlabel(metric.replace('_', ' ').title(), fontweight='bold')
         ax2.set_ylabel('Density', fontweight='bold')
         ax2.set_title('(B) Kernel Density Estimation', fontweight='bold', pad=10)
-        ax2.legend(fontsize=self.config.typography.SIZE_LEGEND)
+        # Smart legend placement
+        LayoutHelper.improve_legend_placement(ax2,
+                                             ncol=min(2, (n_groups + 2) // 3),
+                                             loc='best',
+                                             fontsize=self.config.typography.SIZE_LEGEND)
         ax2.grid(alpha=0.3)
 
         # Panel C: ECDF
@@ -722,20 +898,27 @@ class DistributionCharts:
             if len(group_data) > 0:
                 sorted_data = np.sort(group_data)
                 y = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
-                ax3.plot(sorted_data, y, label=group, color=colors[idx],
+                # Truncate label for legend
+                label = group[:15] + '...' if len(group) > 15 else group
+                ax3.plot(sorted_data, y, label=label, color=colors[idx],
                         linewidth=2, alpha=0.8, marker='o', markersize=3,
                         markevery=max(1, len(sorted_data) // 20))
 
         ax3.set_xlabel(metric.replace('_', ' ').title(), fontweight='bold')
         ax3.set_ylabel('Cumulative Probability', fontweight='bold')
         ax3.set_title('(C) Empirical CDF', fontweight='bold', pad=10)
-        ax3.legend(fontsize=self.config.typography.SIZE_LEGEND)
+        # Smart legend placement
+        LayoutHelper.improve_legend_placement(ax3,
+                                             ncol=min(2, (n_groups + 2) // 3),
+                                             loc='best',
+                                             fontsize=self.config.typography.SIZE_LEGEND)
         ax3.grid(alpha=0.3)
 
         plt.suptitle(f'Distribution Analysis: {metric}',
                     fontsize=self.config.typography.SIZE_TITLE + 1,
                     fontweight='bold', y=0.995)
 
+        LayoutHelper.apply_tight_layout(fig, pad=2.0)
         self.config.save_figure(fig, output_path)
         return fig
 
