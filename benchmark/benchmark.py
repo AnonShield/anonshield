@@ -869,7 +869,9 @@ class BenchmarkRunner:
         log_dir: Path,
         secret_key: str = "benchmark-secret-key-2026",
         transformer_model: Optional[str] = None,
-        db_dir: Optional[str] = None
+        db_dir: Optional[str] = None,
+        entities_to_preserve: Optional[str] = None,
+        anonymization_config: Optional[str] = None
     ):
         self.config = config
         self.output_dir = output_dir
@@ -877,6 +879,8 @@ class BenchmarkRunner:
         self.secret_key = secret_key
         self.transformer_model = transformer_model
         self.db_dir = db_dir
+        self.entities_to_preserve = entities_to_preserve
+        self.anonymization_config = anonymization_config
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -1022,6 +1026,14 @@ class BenchmarkRunner:
                 db_dir_path.mkdir(parents=True, exist_ok=True)
                 cmd.extend(["--db-dir", str(db_dir_path.resolve())])
 
+            # Add entities to preserve if specified
+            if self.entities_to_preserve:
+                cmd.extend(["--preserve-entities", self.entities_to_preserve])
+
+            # Add anonymization config if specified
+            if self.anonymization_config:
+                cmd.extend(["--anonymization-config", self.anonymization_config])
+
             # SLM uses Ollama, not Presidio — skip dataset/batch flags
             if strategy != Strategy.SLM:
                 cmd.append("--use-datasets")
@@ -1099,7 +1111,9 @@ class DirectoryBenchmarkRunner:
         secret_key: str = "benchmark-secret-key-2026",
         results_manager: Optional['ResultsManager'] = None,
         transformer_model: Optional[str] = None,
-        db_dir: Optional[str] = None
+        db_dir: Optional[str] = None,
+        entities_to_preserve: Optional[str] = None,
+        anonymization_config: Optional[str] = None
     ):
         self.config = config
         self.output_dir = output_dir
@@ -1108,6 +1122,8 @@ class DirectoryBenchmarkRunner:
         self.results_manager = results_manager
         self.transformer_model = transformer_model
         self.db_dir = db_dir
+        self.entities_to_preserve = entities_to_preserve
+        self.anonymization_config = anonymization_config
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -1435,6 +1451,14 @@ class DirectoryBenchmarkRunner:
                 db_dir_path.mkdir(parents=True, exist_ok=True)
                 cmd.extend(["--db-dir", str(db_dir_path.resolve())])
 
+            # Add entities to preserve if specified
+            if self.entities_to_preserve:
+                cmd.extend(["--preserve-entities", self.entities_to_preserve])
+
+            # Add anonymization config if specified
+            if self.anonymization_config:
+                cmd.extend(["--anonymization-config", self.anonymization_config])
+
             # SLM uses Ollama, not Presidio — skip dataset/batch flags
             if strategy != Strategy.SLM:
                 cmd.append("--use-datasets")
@@ -1736,7 +1760,9 @@ class BenchmarkOrchestrator:
             runner = BenchmarkRunner(
                 config, self.output_dir, self.log_dir, self.args.secret_key,
                 transformer_model=self.args.transformer_model,
-                db_dir=self.args.db_dir
+                db_dir=self.args.db_dir,
+                entities_to_preserve=self.args.entities_to_preserve,
+                anonymization_config=self.args.anonymization_config
             )
 
             for run_num in range(1, self.args.runs + 1):
@@ -1866,7 +1892,9 @@ class BenchmarkOrchestrator:
                         self.log_dir,
                         self.args.secret_key,
                         transformer_model=self.args.transformer_model,
-                        db_dir=self.args.db_dir
+                        db_dir=self.args.db_dir,
+                        entities_to_preserve=self.args.entities_to_preserve,
+                        anonymization_config=self.args.anonymization_config
                     )
 
                     for strategy in config.strategies:
@@ -1977,7 +2005,9 @@ class BenchmarkOrchestrator:
                                 config, self.output_dir, self.log_dir, self.args.secret_key,
                                 results_manager=self.results_manager,
                                 transformer_model=self.args.transformer_model,
-                                db_dir=self.args.db_dir
+                                db_dir=self.args.db_dir,
+                                entities_to_preserve=self.args.entities_to_preserve,
+                                anonymization_config=self.args.anonymization_config
                             )
                             metrics_list = dir_runner.run(
                                 test_files, strategy, run_num,
@@ -3031,6 +3061,14 @@ Examples:
                             help="Base directory for database files (v3.0 only). "
                                  "Creates separate subdirectories per strategy automatically. "
                                  "Example: 'benchmark/databases'")
+    bench_group.add_argument("--entities-to-preserve", type=str,
+                            help="Comma-separated list of entities to preserve (not anonymize). "
+                                 "Example: 'CVE_ID,CPE_STRING,OID' will keep these entities unchanged. "
+                                 "Available entities: IP_ADDRESS, URL, EMAIL_ADDRESS, PERSON, ORGANIZATION, etc.")
+    bench_group.add_argument("--anonymization-config", type=str,
+                            help="Path to JSON file with advanced anonymization rules for structured files. "
+                                 "Defines force_anonymize, fields_to_anonymize, and fields_to_exclude. "
+                                 "Example: 'benchmark/openvas_anonymization_config.json'")
 
     # Regression options
     regression_group = parser.add_argument_group("Regression Options (use with --regression)")
