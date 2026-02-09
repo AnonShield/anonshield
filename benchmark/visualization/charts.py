@@ -209,11 +209,15 @@ class PerformanceCharts:
         )
 
         # Also compute throughput for validation (should be inverse)
-        data_clean['throughput_mb_per_sec'] = (
-            data_clean['file_size_mb'] / data_clean['wall_clock_time_sec']
+        # Using KB/s for better readability
+        data_clean['throughput_kb_per_sec'] = (
+            data_clean['file_size_mb'] * 1024 / data_clean['wall_clock_time_sec']
         )
 
-        strategies = sorted(data_clean['version_strategy'].unique())
+        # Sort strategies by version (1.0, 2.0, 3.0, ...) for consistent grouping
+        strategies = self.config.sort_strategies_by_version(
+            list(data_clean['version_strategy'].unique())
+        )
         formats = sorted(data_clean['file_extension'].unique())
         n_strategies = len(strategies)
         n_formats = len(formats)
@@ -224,7 +228,8 @@ class PerformanceCharts:
         fig = plt.figure(figsize=(base_width, base_height))
         gs = gridspec.GridSpec(1, 3, figure=fig, wspace=0.35, hspace=0.3)
 
-        colors = self.config.get_colors(n_strategies)
+        # Use consistent colors for version+strategy across all charts
+        colors = self.config.get_colors(n_strategies, strategies)
 
         # Panel A: Time per MB by strategy
         ax1 = fig.add_subplot(gs[0, 0])
@@ -232,7 +237,8 @@ class PerformanceCharts:
             'time_per_mb': ['mean', 'std']
         })
         strategy_stats.columns = ['mean', 'std']
-        strategy_stats = strategy_stats.sort_values('mean')
+        # Keep order by version (1.0, 2.0, 3.0) instead of sorting by value
+        strategy_stats = strategy_stats.reindex(strategies)
 
         x_pos = np.arange(len(strategy_stats))
         bars = ax1.barh(x_pos, strategy_stats['mean'], xerr=strategy_stats['std'],
@@ -259,10 +265,11 @@ class PerformanceCharts:
         # Panel B: Throughput by strategy (inverse validation)
         ax2 = fig.add_subplot(gs[0, 1])
         throughput_stats = data_clean.groupby('version_strategy').agg({
-            'throughput_mb_per_sec': ['mean', 'std']
+            'throughput_kb_per_sec': ['mean', 'std']
         })
         throughput_stats.columns = ['mean', 'std']
-        throughput_stats = throughput_stats.sort_values('mean', ascending=False)
+        # Keep order by version (1.0, 2.0, 3.0) instead of sorting by value
+        throughput_stats = throughput_stats.reindex(strategies)
 
         x_pos2 = np.arange(len(throughput_stats))
         bars2 = ax2.barh(x_pos2, throughput_stats['mean'], xerr=throughput_stats['std'],
@@ -272,7 +279,7 @@ class PerformanceCharts:
         ax2.set_yticks(x_pos2)
         labels2 = [s[:25] + '...' if len(s) > 25 else s for s in throughput_stats.index]
         ax2.set_yticklabels(labels2, fontsize=self.config.typography.SIZE_AXIS_TICK)
-        ax2.set_xlabel('Throughput (MB/sec)', fontweight='bold',
+        ax2.set_xlabel('Throughput (KB/sec)', fontweight='bold',
                       fontsize=self.config.typography.SIZE_AXIS_LABEL)
         ax2.set_title('(B) Processing Throughput', fontweight='bold', pad=10)
         ax2.grid(axis='x', alpha=0.3)
@@ -292,6 +299,8 @@ class PerformanceCharts:
             columns='file_extension',
             aggfunc='mean'
         )
+        # Keep order by version (1.0, 2.0, 3.0) in heatmap rows
+        pivot = pivot.reindex(strategies)
 
         # Adjust annotation based on matrix size
         show_annot = (n_strategies * n_formats) <= 40  # Only annotate if not too dense
@@ -330,8 +339,10 @@ class PerformanceCharts:
         """
         fig, ax = plt.subplots(figsize=self.config.get_figure_size('single_tall'))
 
-        strategies = sorted([s for s in data['version_strategy'].unique()
-                           if s != baseline_strategy])
+        # Sort by version for consistent grouping
+        strategies = self.config.sort_strategies_by_version([
+            s for s in data['version_strategy'].unique() if s != baseline_strategy
+        ])
 
         baseline_data = data[data['version_strategy'] == baseline_strategy]['wall_clock_time_sec'].values
 
@@ -427,11 +438,18 @@ class RegressionCharts:
         self.reg_analyzer = RegressionAnalyzer()
 
     def create_overhead_decomposition(self, data: pd.DataFrame,
-                                     group_by: str, output_path: str):
+                                     group_by: str, output_path: str,
+                                     overhead_data: pd.DataFrame = None):
         """Create overhead decomposition analysis.
 
         Model: time = overhead + size/throughput
         Shows overhead and throughput components for each strategy.
+
+        Args:
+            data: Benchmark data
+            group_by: Column to group by (e.g., 'version_strategy')
+            output_path: Path to save output (without extension)
+            overhead_data: Optional DataFrame with real overhead measurements
 
         Args:
             data: Benchmark DataFrame
@@ -441,8 +459,9 @@ class RegressionCharts:
         fig = plt.figure(figsize=self.config.get_figure_size('double_tall'))
         gs = gridspec.GridSpec(3, 2, figure=fig, hspace=0.3, wspace=0.3)
 
-        groups = sorted(data[group_by].unique())
-        colors = self.config.get_colors(len(groups))
+        # Sort by version for consistent grouping
+        groups = self.config.sort_strategies_by_version(list(data[group_by].unique()))
+        colors = self.config.get_colors(len(groups), groups)
 
         overhead_results = []
 
@@ -459,17 +478,39 @@ class RegressionCharts:
 
             # Fit model
             model = self.reg_analyzer.overhead_model(sizes, times, method='linear')
+
+            # Use real overhead if provided, otherwise use regression overhead
+            overhead_sec = model.overhead_sec
+            overhead_ci_lower = model.overhead_ci[0]
+            overhead_ci_upper = model.overhead_ci[1]
+
+            if overhead_data is not None:
+                # Try to find matching overhead from calibration data
+                # Match by version and strategy from group name (e.g., "3.0_standalone")
+                if '_' in group:
+                    parts = group.split('_', 1)
+                    if len(parts) == 2:
+                        version, strategy = parts
+                        overhead_match = overhead_data[
+                            (overhead_data['version'].astype(str) == version) &
+                            (overhead_data['strategy'] == strategy)
+                        ]
+                        if not overhead_match.empty:
+                            overhead_sec = overhead_match['wall_clock_time_sec'].mean()
+                            overhead_ci_lower = overhead_sec - overhead_match['wall_clock_time_sec'].std()
+                            overhead_ci_upper = overhead_sec + overhead_match['wall_clock_time_sec'].std()
+
             overhead_results.append({
                 'group': group,
-                'overhead_sec': model.overhead_sec,
+                'overhead_sec': overhead_sec,
                 'throughput_kbps': model.throughput_kb_per_sec,
                 'r_squared': model.r_squared,
-                'overhead_ci_lower': model.overhead_ci[0],
-                'overhead_ci_upper': model.overhead_ci[1],
+                'overhead_ci_lower': overhead_ci_lower,
+                'overhead_ci_upper': overhead_ci_upper,
                 'sizes': sizes,
                 'times': times,
-                'predicted': model.overhead_sec + sizes / model.throughput_kb_per_sec,
-                'residuals': model.residuals
+                'predicted': overhead_sec + sizes / model.throughput_kb_per_sec,
+                'residuals': times - (overhead_sec + sizes / model.throughput_kb_per_sec)
             })
 
         # Panel A: Overhead bar chart
@@ -577,7 +618,7 @@ class RegressionCharts:
             metric: Metric to test (e.g., 'wall_clock_time_sec')
             output_path: Save path
         """
-        groups = sorted(data[group_by].unique())
+        groups = self.config.sort_strategies_by_version(list(data[group_by].unique()))
         n_groups = len(groups)
 
         # Create grid
@@ -657,7 +698,7 @@ class StatisticalCharts:
             correction_method: 'bonferroni', 'fdr_bh', etc.
             output_path: Save path
         """
-        groups = sorted(data[group_by].unique())
+        groups = self.config.sort_strategies_by_version(list(data[group_by].unique()))
         n_groups = len(groups)
 
         # Compute pairwise p-values
@@ -823,7 +864,7 @@ class DistributionCharts:
             metric: Metric to visualize
             output_path: Save path
         """
-        groups = sorted(data[group_by].unique())
+        groups = self.config.sort_strategies_by_version(list(data[group_by].unique()))
         n_groups = len(groups)
 
         # Adjust figure size based on number of groups
@@ -941,8 +982,8 @@ class ResourceCharts:
         fig = plt.figure(figsize=self.config.get_figure_size('double_square'))
         gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.3, wspace=0.3)
 
-        groups = sorted(data[group_by].unique())
-        colors = self.config.get_colors(len(groups))
+        groups = self.config.sort_strategies_by_version(list(data[group_by].unique()))
+        colors = self.config.get_colors(len(groups), groups)
 
         # Panel A: Memory efficiency (Memory / Time)
         ax1 = fig.add_subplot(gs[0, 0])
@@ -957,7 +998,7 @@ class ResourceCharts:
         ax1.barh(x_pos, mem_eff['efficiency'], color=colors, edgecolor='black', linewidth=0.8)
         ax1.set_yticks(x_pos)
         ax1.set_yticklabels(mem_eff.index)
-        ax1.set_xlabel('Memory Efficiency (MB/sec)', fontweight='bold')
+        ax1.set_xlabel('Memory Efficiency (KB/sec)', fontweight='bold')
         ax1.set_title('(A) Memory per Second', fontweight='bold', pad=10)
         ax1.grid(axis='x', alpha=0.3)
 
@@ -993,11 +1034,11 @@ class ResourceCharts:
         # Panel D: Throughput normalized by memory
         ax4 = fig.add_subplot(gs[1, 1])
         throughput_mem = data.groupby(group_by).agg({
-            'throughput_mb_per_sec': 'mean',
+            'throughput_kb_per_sec': 'mean',
             'peak_memory_mb': 'mean'
         })
         throughput_mem['norm_throughput'] = (
-            throughput_mem['throughput_mb_per_sec'] / throughput_mem['peak_memory_mb'] * 1000
+            throughput_mem['throughput_kb_per_sec'] / throughput_mem['peak_memory_mb'] * 1000
         )
         throughput_mem = throughput_mem.sort_values('norm_throughput', ascending=False)
 
@@ -1040,14 +1081,18 @@ class ScalabilityCharts:
         """
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.config.get_figure_size('double_wide'))
 
-        strategies = sorted([s for s in data['version_strategy'].unique() if s != baseline_strategy])
-        all_strategies = [baseline_strategy] + strategies
-        colors = self.config.get_colors(len(all_strategies))
+        # Sort by version for consistent grouping
+        strategies = self.config.sort_strategies_by_version([
+            s for s in data['version_strategy'].unique() if s != baseline_strategy
+        ])
+        all_strategies = self.config.sort_strategies_by_version([baseline_strategy] + strategies)
+        # Use consistent colors for version+strategy
+        colors = self.config.get_colors(len(all_strategies), all_strategies)
 
         # Prepare data: group by strategy and file size
         size_col = 'file_size_mb'
         time_col = 'wall_clock_time_sec'
-        throughput_col = 'throughput_mb_per_sec'
+        throughput_col = 'throughput_kb_per_sec'
 
         # Panel A: Time vs Size (LOG SCALE)
         for idx, strategy in enumerate(all_strategies):
@@ -1141,7 +1186,7 @@ class ScalabilityCharts:
         ax2.set_xscale('log')
         ax2.set_title('(B) Throughput & Scalability', fontweight='bold', pad=10)
         ax2.set_xlabel('File Size (MB)', fontweight='bold')
-        ax2.set_ylabel('Throughput (MB/sec)', fontweight='bold')
+        ax2.set_ylabel('Throughput (KB/sec)', fontweight='bold')
         ax2.legend(fontsize=self.config.typography.SIZE_LEGEND, loc='best')
         ax2.grid(True, alpha=0.3, linestyle=':')
 
@@ -1189,8 +1234,8 @@ class ScalabilityCharts:
         fig = plt.figure(figsize=self.config.get_figure_size('double_square'))
         gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.3, wspace=0.3)
 
-        groups = sorted(data[group_by].unique())
-        colors = self.config.get_colors(len(groups))
+        groups = self.config.sort_strategies_by_version(list(data[group_by].unique()))
+        colors = self.config.get_colors(len(groups), groups)
 
         # Panel A: Linear scale (time vs size)
         ax1 = fig.add_subplot(gs[0, 0])
@@ -1282,9 +1327,9 @@ class ScalabilityCharts:
         ax4 = fig.add_subplot(gs[1, 1])
         for idx, group in enumerate(groups):
             group_data = data[data[group_by] == group]
-            valid = (group_data['file_size_mb'] > 0) & (group_data['throughput_mb_per_sec'] > 0)
+            valid = (group_data['file_size_mb'] > 0) & (group_data['throughput_kb_per_sec'] > 0)
             x = group_data.loc[valid, 'file_size_mb'].values
-            y = group_data.loc[valid, 'throughput_mb_per_sec'].values
+            y = group_data.loc[valid, 'throughput_kb_per_sec'].values
 
             if len(x) > 0:
                 ax4.scatter(x, y, alpha=0.5, s=30, color=colors[idx], label=group,
@@ -1296,7 +1341,7 @@ class ScalabilityCharts:
                            linewidth=1.5, alpha=0.5)
 
         ax4.set_xlabel('File Size (MB)', fontweight='bold')
-        ax4.set_ylabel('Throughput (MB/sec)', fontweight='bold')
+        ax4.set_ylabel('Throughput (KB/sec)', fontweight='bold')
         ax4.set_title('(D) Throughput Stability', fontweight='bold', pad=10)
         ax4.legend(fontsize=self.config.typography.SIZE_LEGEND - 1, loc='best')
         ax4.grid(alpha=0.3)
@@ -1319,8 +1364,8 @@ class ScalabilityCharts:
         fig = plt.figure(figsize=self.config.get_figure_size('double_wide'))
         gs = gridspec.GridSpec(2, 3, figure=fig, hspace=0.3, wspace=0.3)
 
-        groups = sorted(data[group_by].unique())[:6]  # Max 6 groups
-        colors = self.config.get_colors(len(groups))
+        groups = self.config.sort_strategies_by_version(list(data[group_by].unique()))[:6]  # Max 6 groups
+        colors = self.config.get_colors(len(groups), groups)
 
         for idx, group in enumerate(groups):
             row = idx // 3
@@ -1402,7 +1447,7 @@ class CorrelationCharts:
         metric_cols = [
             'wall_clock_time_sec', 'user_time_sec', 'system_time_sec',
             'peak_memory_mb', 'cpu_percent', 'io_wait_percent',
-            'throughput_mb_per_sec', 'file_size_mb'
+            'throughput_kb_per_sec', 'file_size_mb'
         ]
         available_cols = [c for c in metric_cols if c in data.columns]
         data_numeric = data[available_cols].dropna()
@@ -1485,8 +1530,8 @@ class VarianceCharts:
         fig = plt.figure(figsize=self.config.get_figure_size('double_wide'))
         gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.3, wspace=0.3)
 
-        groups = sorted(data[group_by].unique())
-        colors = self.config.get_colors(len(groups))
+        groups = self.config.sort_strategies_by_version(list(data[group_by].unique()))
+        colors = self.config.get_colors(len(groups), groups)
 
         # Prepare data
         group_arrays = [data[data[group_by] == g][metric].dropna().values for g in groups]
