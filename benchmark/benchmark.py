@@ -867,12 +867,16 @@ class BenchmarkRunner:
         config: VersionConfig,
         output_dir: Path,
         log_dir: Path,
-        secret_key: str = "benchmark-secret-key-2026"
+        secret_key: str = "benchmark-secret-key-2026",
+        transformer_model: Optional[str] = None,
+        db_dir: Optional[str] = None
     ):
         self.config = config
         self.output_dir = output_dir
         self.log_dir = log_dir
         self.secret_key = secret_key
+        self.transformer_model = transformer_model
+        self.db_dir = db_dir
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -1007,6 +1011,17 @@ class BenchmarkRunner:
                 cmd.extend(["--anonymization-strategy", strategy.value])
             cmd.extend(["--output-dir", str(run_output_dir.resolve())])
             cmd.append("--overwrite")
+
+            # Add transformer model if specified
+            if self.transformer_model:
+                cmd.extend(["--transformer-model", self.transformer_model])
+
+            # Add database directory if specified (create per-strategy subdirectory)
+            if self.db_dir:
+                db_dir_path = Path(self.db_dir) / version_str / strat_str
+                db_dir_path.mkdir(parents=True, exist_ok=True)
+                cmd.extend(["--db-dir", str(db_dir_path.resolve())])
+
             # SLM uses Ollama, not Presidio — skip dataset/batch flags
             if strategy != Strategy.SLM:
                 cmd.append("--use-datasets")
@@ -1083,12 +1098,16 @@ class DirectoryBenchmarkRunner:
         log_dir: Path,
         secret_key: str = "benchmark-secret-key-2026",
         results_manager: Optional['ResultsManager'] = None,
+        transformer_model: Optional[str] = None,
+        db_dir: Optional[str] = None
     ):
         self.config = config
         self.output_dir = output_dir
         self.log_dir = log_dir
         self.secret_key = secret_key
         self.results_manager = results_manager
+        self.transformer_model = transformer_model
+        self.db_dir = db_dir
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -1405,6 +1424,17 @@ class DirectoryBenchmarkRunner:
                 cmd.extend(["--anonymization-strategy", strategy.value])
             cmd.extend(["--output-dir", str(run_output_dir.resolve())])
             cmd.append("--overwrite")
+
+            # Add transformer model if specified
+            if self.transformer_model:
+                cmd.extend(["--transformer-model", self.transformer_model])
+
+            # Add database directory if specified (create per-strategy subdirectory)
+            if self.db_dir:
+                db_dir_path = Path(self.db_dir) / version_str / strategy.value
+                db_dir_path.mkdir(parents=True, exist_ok=True)
+                cmd.extend(["--db-dir", str(db_dir_path.resolve())])
+
             # SLM uses Ollama, not Presidio — skip dataset/batch flags
             if strategy != Strategy.SLM:
                 cmd.append("--use-datasets")
@@ -2982,6 +3012,14 @@ Examples:
                                  "New names: 'filtered' (fastest, recommended), 'hybrid', 'standalone'. "
                                  "Legacy names 'fast' (=hybrid) and 'balanced' (=filtered) still work. "
                                  "Example: --strategies filtered hybrid")
+    bench_group.add_argument("--transformer-model", type=str,
+                            help="Transformer model for NER detection (v3.0 only). "
+                                 "Example: 'attack-vector/SecureModernBERT-NER'. "
+                                 "If not specified, uses the default model from config.py")
+    bench_group.add_argument("--db-dir", type=str,
+                            help="Base directory for database files (v3.0 only). "
+                                 "Creates separate subdirectories per strategy automatically. "
+                                 "Example: 'benchmark/databases'")
 
     # Regression options
     regression_group = parser.add_argument_group("Regression Options (use with --regression)")
