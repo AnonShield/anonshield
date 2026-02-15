@@ -12,7 +12,8 @@ Where:
 
 Calibration sources:
 1. Overhead: benchmark runs against a near-zero content file (benchmark/overhead_calibration/)
-2. Throughput: derived from smoke test runs by subtracting overhead from observed time
+2. Throughput: for each calibration point, calculate (file_size_kb / processing_time) 
+   after subtracting overhead, then use the MEAN across all points
 
 Usage:
     python benchmark/estimate.py [--data-dir path] [--runs N] [--results-csv path]
@@ -99,6 +100,23 @@ class ThroughputProfile:
 
 
 @dataclass
+class FileEstimate:
+    """Time estimate for a specific file."""
+    version: str
+    strategy: str
+    file_name: str
+    file_path: str
+    extension: str
+    file_size_mb: float
+    file_size_kb: float
+    overhead_sec: float
+    throughput_kbps: float
+    estimated_time_sec: float
+    estimated_time_hours: float
+    calibration_source: str
+
+
+@dataclass
 class Estimate:
     """Time estimate for a specific (version, strategy, extension) combination."""
     version: str
@@ -112,6 +130,7 @@ class Estimate:
     estimated_time_n_runs_sec: float
     estimated_time_n_runs_hours: float
     calibration_source: str
+    file_estimates: List[FileEstimate] = field(default_factory=list)
 
 
 # =============================================================================
@@ -210,15 +229,14 @@ def compute_throughput_profiles(
 ) -> Dict[Tuple[str, str, str], ThroughputProfile]:
     """Compute throughput profiles from calibration data.
 
-    Strategy:
-    - With 2+ data points of different sizes: linear regression (time = a + b*size)
-      to separate per-file overhead from content-proportional processing.
-    - With 1 data point: use the single observation, preferring the largest file
-      available since larger files give better signal-to-noise for throughput.
+    Strategy (matching generate_heatmap_chart.py methodology):
+    - Subtract overhead from each data point's wall time
+    - Calculate throughput for each point: file_size_kb / processing_time
+    - Use the MEAN of all throughput values
+    - Filter out negative processing times (if overhead > wall_time)
 
-    The key insight: small files (~5 KB) have significant per-file processing
-    overhead (tokenization, chunking) that makes their apparent throughput
-    artificially low. Using the largest available file minimizes this bias.
+    This approach averages the throughput across all file sizes, which is
+    consistent with how the heatmap chart estimates processing time.
 
     Returns:
         Dict mapping (version, strategy, extension) -> ThroughputProfile
@@ -235,46 +253,23 @@ def compute_throughput_profiles(
     for (ver, strat, ext), ext_points in grouped.items():
         overhead = overheads.get((ver, strat), 0)
 
-        # Sort by file size descending (prefer larger files for throughput)
-        ext_points.sort(key=lambda p: p.file_size_kb, reverse=True)
-
-        if len(ext_points) >= 2:
-            # Two-point (or more) linear regression: time = a + b * size_kb
-            # where a captures per-file overhead and 1/b is throughput
-            sizes = [p.file_size_kb for p in ext_points]
-            times = [p.wall_time_sec - overhead for p in ext_points]
-
-            # Simple least squares: b = Cov(x,y) / Var(x)
-            n = len(sizes)
-            mean_x = sum(sizes) / n
-            mean_y = sum(times) / n
-
-            cov_xy = sum((x - mean_x) * (y - mean_y) for x, y in zip(sizes, times)) / n
-            var_x = sum((x - mean_x) ** 2 for x in sizes) / n
-
-            if var_x > 0 and cov_xy > 0:
-                slope = cov_xy / var_x  # seconds per KB
-                throughput = 1.0 / slope  # KB per second
-                source = "regression"
-
-                # Compute R-squared for fit quality
-                a = mean_y - slope * mean_x
-                ss_res = sum((y - (a + slope * x)) ** 2 for x, y in zip(sizes, times))
-                ss_tot = sum((y - mean_y) ** 2 for y in times)
-                r_squared = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
-            else:
-                # Fallback: use largest file
-                p = ext_points[0]
-                processing_time = p.wall_time_sec - overhead
-                throughput = p.file_size_kb / processing_time if processing_time > 0 else 0.0
-                source = "largest_file"
-                r_squared = 0.0
-        else:
-            # Single data point: compute throughput from this observation
-            p = ext_points[0]
+        # Calculate throughput for each point
+        throughputs = []
+        for p in ext_points:
             processing_time = p.wall_time_sec - overhead
-            throughput = p.file_size_kb / processing_time if processing_time > 0 else 0.0
-            source = "single_point"
+            if processing_time > 0:  # Filter out negative times
+                tp = p.file_size_kb / processing_time
+                throughputs.append(tp)
+
+        if throughputs:
+            # Use mean throughput across all points
+            avg_throughput = sum(throughputs) / len(throughputs)
+            source = "mean_throughput"
+            r_squared = 0.0  # Not applicable for simple averaging
+        else:
+            # Fallback: very conservative estimate
+            avg_throughput = 0.001
+            source = "fallback"
             r_squared = 0.0
 
         profiles[(ver, strat, ext)] = ThroughputProfile(
@@ -282,7 +277,7 @@ def compute_throughput_profiles(
             strategy=strat,
             extension=ext,
             overhead_sec=overhead,
-            throughput_kbps=max(throughput, 0.001),  # Floor to avoid div-by-zero
+            throughput_kbps=max(avg_throughput, 0.001),  # Floor to avoid div-by-zero
             source=source,
             data_points=len(ext_points),
             r_squared=r_squared,
@@ -380,9 +375,26 @@ def generate_estimates(
                 total_size_mb = sum(f.size_mb for f in ext_files)
 
                 # Estimate each file individually based on its size
+                file_estimates = []
                 total_1_run = 0.0
                 for f in ext_files:
-                    total_1_run += profile.estimate_time(f.size_kb)
+                    file_time = profile.estimate_time(f.size_kb)
+                    total_1_run += file_time
+                    
+                    file_estimates.append(FileEstimate(
+                        version=version,
+                        strategy=strategy,
+                        file_name=f.name,
+                        file_path=str(f.path),
+                        extension=f.extension,
+                        file_size_mb=f.size_mb,
+                        file_size_kb=f.size_kb,
+                        overhead_sec=profile.overhead_sec,
+                        throughput_kbps=profile.throughput_kbps,
+                        estimated_time_sec=file_time,
+                        estimated_time_hours=file_time / 3600,
+                        calibration_source=profile.source,
+                    ))
 
                 total_n_runs = total_1_run * n_runs
 
@@ -398,6 +410,7 @@ def generate_estimates(
                     estimated_time_n_runs_sec=total_n_runs,
                     estimated_time_n_runs_hours=total_n_runs / 3600,
                     calibration_source=profile.source,
+                    file_estimates=file_estimates,
                 ))
 
     return estimates
@@ -478,12 +491,12 @@ def generate_markdown_report(
     lines.append("")
 
     # ==== THROUGHPUT PROFILES ====
-    lines.append("## 3. Throughput Profiles (from smoke test)")
+    lines.append("## 3. Throughput Profiles (from calibration runs)")
     lines.append("")
-    lines.append("Processing rate after subtracting model loading overhead.")
+    lines.append("Processing rate calculated as mean(file_size_kb / (wall_time - overhead)).")
     lines.append("")
-    lines.append("| Version | Strategy | Extension | Throughput (KB/s) | Source | Data Points | R^2 |")
-    lines.append("|---------|----------|-----------|------------------:|--------|------------:|----:|")
+    lines.append("| Version | Strategy | Extension | Throughput (KB/s) | Source | Data Points |")
+    lines.append("|---------|----------|-----------|------------------:|--------|------------:|")
 
     all_profile_keys = set()
     for version in ["1.0", "2.0", "3.0"]:
@@ -495,8 +508,7 @@ def generate_markdown_report(
     for key in sorted(all_profile_keys):
         ver, strat, ext = key
         profile = resolve_profile(profiles, overheads, ver, strat, ext)
-        r2_str = f"{profile.r_squared:.3f}" if profile.r_squared > 0 else "-"
-        lines.append(f"| v{ver} | {strat} | `{ext}` | {profile.throughput_kbps:.3f} | {profile.source} | {profile.data_points} | {r2_str} |")
+        lines.append(f"| v{ver} | {strat} | `{ext}` | {profile.throughput_kbps:.3f} | {profile.source} | {profile.data_points} |")
 
     lines.append("")
 
@@ -558,6 +570,48 @@ def generate_markdown_report(
         lines.append(f"**v{version} Total: {ver_total_h:.1f} hours ({ver_total_d:.1f} days)**")
         lines.append("")
 
+    # ==== INDIVIDUAL FILE ESTIMATES ====
+    lines.append("## 5.4 Individual File Estimates by Version & Strategy")
+    lines.append("")
+    lines.append("Detailed time estimates for each file, showing how file size affects processing time.")
+    lines.append("")
+
+    for version in ["1.0", "2.0", "3.0"]:
+        ver_estimates = [e for e in estimates if e.version == version]
+        if not ver_estimates:
+            continue
+
+        lines.append(f"### v{version}")
+        lines.append("")
+
+        strategies = VERSION_STRATEGIES[version]
+        for strategy in strategies:
+            strat_estimates = [e for e in ver_estimates if e.strategy == strategy]
+            if not strat_estimates:
+                continue
+
+            if len(strategies) > 1:
+                lines.append(f"#### Strategy: `{strategy}`")
+                lines.append("")
+
+            for ext_estimate in sorted(strat_estimates, key=lambda x: x.extension):
+                lines.append(f"**Format: `{ext_estimate.extension}`** (Throughput: {ext_estimate.throughput_kbps:.3f} KB/s, Overhead: {ext_estimate.overhead_sec:.1f}s)")
+                lines.append("")
+                lines.append(f"| File | Size (MB) | Time (1 run) | Time ({n_runs} runs) |")
+                lines.append(f"|------|----------:|-------------:|---------------:|")
+                
+                for fe in ext_estimate.file_estimates:
+                    time_1_str = f"{fe.estimated_time_hours:.2f}h" if fe.estimated_time_hours >= 1 else f"{fe.estimated_time_sec/60:.1f}min"
+                    time_n = fe.estimated_time_sec * n_runs
+                    time_n_h = time_n / 3600
+                    time_n_str = f"{time_n_h:.2f}h" if time_n_h >= 1 else f"{time_n/60:.1f}min"
+                    lines.append(f"| {fe.file_name} | {fe.file_size_mb:.1f} | {time_1_str} | {time_n_str} |")
+                
+                ext_total_h = ext_estimate.estimated_time_n_runs_hours
+                ext_total_str = f"{ext_total_h:.2f}h" if ext_total_h >= 1 else f"{ext_estimate.estimated_time_n_runs_sec / 60:.1f}min"
+                lines.append(f"| **Total** | **{ext_estimate.total_size_mb:.1f}** | | **{ext_total_str}** |")
+                lines.append("")
+
     # ==== GRAND TOTAL ====
     lines.append("## 6. Grand Total")
     lines.append("")
@@ -597,10 +651,12 @@ def generate_markdown_report(
     lines.append("- This represents: Python startup + model loading + NLP pipeline init")
     lines.append("")
     lines.append("### Throughput Derivation")
-    lines.append("- For each (version, strategy, extension) observed in smoke tests:")
+    lines.append("- For each (version, strategy, extension) observed in calibration:")
     lines.append("  - processing_time = observed_time - overhead")
     lines.append("  - throughput = file_size_kb / processing_time")
-    lines.append("- Multiple data points are averaged to reduce noise")
+    lines.append("  - avg_throughput = mean of all throughput values")
+    lines.append("- Negative processing times are filtered out")
+    lines.append("- This averaging method matches the heatmap chart methodology")
     lines.append("- When direct observations are unavailable, throughput is")
     lines.append("  extrapolated from similar combinations (same version/different")
     lines.append("  strategy, or same extension/different version)")
@@ -619,12 +675,145 @@ def generate_markdown_report(
     lines.append("  where memory pressure causes swapping)")
     lines.append("")
     lines.append("### Limitations")
-    lines.append("- Throughput is derived from small smoke test files (<400 KB)")
+    lines.append("- Throughput is calculated as mean across all calibration points")
+    lines.append("- Small files may have proportionally higher per-file overhead")
+    lines.append("  (tokenization, chunking) that isn't captured in the fixed overhead")
     lines.append("- Very large files (>100 MB) may exhibit sub-linear throughput")
     lines.append("  due to memory pressure, chunking, or I/O bottlenecks")
     lines.append("- GPU utilization may vary with batch size and file content")
-    lines.append("- Overhead may vary slightly by format due to format-specific")
-    lines.append("  processor initialization")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def generate_before_after_comparison(
+    estimates: List[Estimate],
+    n_runs: int,
+) -> str:
+    """Generate before/after comparison report for migration scenarios."""
+    lines = []
+    now = datetime.now().isoformat(timespec='seconds')
+
+    lines.append("# AnonLFI Processing Time: Before & After Comparison")
+    lines.append("")
+    lines.append(f"**Generated:** {now}")
+    lines.append(f"**Runs per configuration:** {n_runs}")
+    lines.append("")
+    lines.append("This report shows the expected processing time for each file when migrating")
+    lines.append("from older versions (v1.0, v2.0) to the new v3.0 with different strategies.")
+    lines.append("")
+
+    # Collect all unique files
+    all_files = {}
+    for e in estimates:
+        for fe in e.file_estimates:
+            key = (fe.file_name, fe.extension)
+            if key not in all_files:
+                all_files[key] = {
+                    'name': fe.file_name,
+                    'extension': fe.extension,
+                    'size_mb': fe.file_size_mb,
+                    'estimates': []
+                }
+            all_files[key]['estimates'].append({
+                'version': fe.version,
+                'strategy': fe.strategy,
+                'time_hours': fe.estimated_time_hours * n_runs,
+                'time_sec': fe.estimated_time_sec * n_runs,
+                'throughput': fe.throughput_kbps,
+            })
+
+    # Generate comparison for each file
+    for (fname, ext), fdata in sorted(all_files.items()):
+        lines.append(f"## {fname}")
+        lines.append("")
+        lines.append(f"- **Format:** `{ext}`")
+        lines.append(f"- **Size:** {fdata['size_mb']:.1f} MB")
+        lines.append("")
+        
+        # Build comparison table
+        lines.append(f"| Version | Strategy | Throughput (KB/s) | Time ({n_runs} run{'s' if n_runs > 1 else ''}) | vs v1.0 | vs v2.0 |")
+        lines.append("|---------|----------|------------------:|---------------:|--------:|--------:|")
+        
+        # Sort: v1.0, v2.0, then v3.0 strategies
+        sorted_ests = sorted(fdata['estimates'], key=lambda x: (
+            {'1.0': 0, '2.0': 1, '3.0': 2}[x['version']],
+            x['strategy']
+        ))
+        
+        v1_time = None
+        v2_time = None
+        
+        for est in sorted_ests:
+            ver = est['version']
+            strat = est['strategy']
+            tp = est['throughput']
+            time_h = est['time_hours']
+            time_s = est['time_sec']
+            
+            # Store baseline times
+            if ver == '1.0':
+                v1_time = time_s
+            elif ver == '2.0':
+                v2_time = time_s
+            
+            # Format time display
+            if time_h >= 1:
+                time_str = f"{time_h:.2f}h"
+            elif time_s >= 60:
+                time_str = f"{time_s/60:.1f}min"
+            else:
+                time_str = f"{time_s:.1f}s"
+            
+            # Calculate speedups
+            vs_v1 = "-"
+            vs_v2 = "-"
+            
+            if v1_time and time_s > 0:
+                speedup = v1_time / time_s
+                vs_v1 = f"{speedup:.1f}x" if speedup != 1 else "baseline"
+            
+            if v2_time and time_s > 0 and ext == '.json':  # v1.0 doesn't support JSON
+                speedup = v2_time / time_s
+                vs_v2 = f"{speedup:.1f}x" if speedup != 1 else "baseline"
+            
+            lines.append(f"| v{ver} | {strat} | {tp:.3f} | {time_str} | {vs_v1} | {vs_v2} |")
+        
+        lines.append("")
+        
+        # Add interpretation
+        if len(sorted_ests) > 1:
+            v3_ests = [e for e in sorted_ests if e['version'] == '3.0']
+            if v3_ests:
+                fastest_v3 = min(v3_ests, key=lambda x: x['time_sec'])
+                
+                lines.append("**Recommendation:**")
+                if ext == '.csv' and v1_time:
+                    improvement = (v1_time / fastest_v3['time_sec'])
+                    lines.append(f"- Migrating from v1.0 to v3.0 (`{fastest_v3['strategy']}`) provides **{improvement:.1f}x speedup**")
+                    lines.append(f"- Time reduction: {v1_time/3600:.2f}h → {fastest_v3['time_sec']/3600:.2f}h (saves {(v1_time - fastest_v3['time_sec'])/3600:.2f}h)")
+                elif ext == '.json' and v2_time:
+                    improvement = (v2_time / fastest_v3['time_sec'])
+                    lines.append(f"- Migrating from v2.0 to v3.0 (`{fastest_v3['strategy']}`) provides **{improvement:.1f}x speedup**")
+                    lines.append(f"- Time reduction: {v2_time/3600:.2f}h → {fastest_v3['time_sec']/3600:.2f}h (saves {(v2_time - fastest_v3['time_sec'])/3600:.2f}h)")
+                lines.append("")
+
+    # Summary section
+    lines.append("## Summary: Total Processing Time")
+    lines.append("")
+    lines.append(f"| Version | Strategies | Total Time ({n_runs} run{'s' if n_runs > 1 else ''}) |")
+    lines.append("|---------|------------|---------------:|")
+    
+    for version in ["1.0", "2.0", "3.0"]:
+        ver_total = sum(e.estimated_time_n_runs_hours for e in estimates if e.version == version)
+        if ver_total > 0:
+            ver_d = ver_total / 24
+            strats = ", ".join(VERSION_STRATEGIES[version])
+            lines.append(f"| v{version} | {strats} | {ver_total:.1f}h ({ver_d:.1f}d) |")
+    
+    grand_total = sum(e.estimated_time_n_runs_hours for e in estimates)
+    grand_d = grand_total / 24
+    lines.append(f"| **TOTAL** | | **{grand_total:.1f}h ({grand_d:.1f}d)** |")
     lines.append("")
 
     return "\n".join(lines)
@@ -643,7 +832,9 @@ def main():
     parser.add_argument("--runs", type=int, default=10,
                        help="Number of runs to estimate for (default: 10)")
     parser.add_argument("--results-csv", type=str, default="benchmark/results/benchmark_results.csv",
-                       help="Path to benchmark results CSV (smoke test + overhead calibration)")
+                       help="Path to benchmark results CSV (regression/throughput data)")
+    parser.add_argument("--overhead-csv", type=str, default=None,
+                       help="Path to overhead calibration CSV (optional, if separate from results-csv)")
     parser.add_argument("--output", type=str, default="benchmark/ESTIMATES.md",
                        help="Output Markdown file path")
     parser.add_argument("--overhead-pattern", type=str, default="minimal",
@@ -669,9 +860,18 @@ def main():
     cal_points = load_calibration_data(csv_path)
     print(f"[INFO] Loaded {len(cal_points)} successful calibration points")
 
+    # Load overhead data separately if specified
+    overhead_csv = Path(args.overhead_csv) if args.overhead_csv else csv_path
+    if args.overhead_csv:
+        print(f"\n[INFO] Loading overhead calibration from: {overhead_csv}")
+        overhead_points = load_calibration_data(overhead_csv)
+        print(f"[INFO] Loaded {len(overhead_points)} overhead calibration points")
+    else:
+        overhead_points = cal_points
+
     # 3. Compute overhead from minimal file runs
     print(f"\n[INFO] Computing model loading overhead (pattern: '{args.overhead_pattern}')...")
-    overheads = compute_overhead(cal_points, args.overhead_pattern)
+    overheads = compute_overhead(overhead_points, args.overhead_pattern)
 
     if not overheads:
         print("[WARN] No overhead calibration data found!")
@@ -710,6 +910,14 @@ def main():
         f.write(report)
 
     print(f"\n[INFO] Report saved to: {output_path}")
+
+    # 7. Generate before/after comparison report
+    comparison_report = generate_before_after_comparison(estimates, args.runs)
+    comparison_path = output_path.parent / (output_path.stem + "_comparison.md")
+    with open(comparison_path, 'w') as f:
+        f.write(comparison_report)
+    
+    print(f"[INFO] Comparison report saved to: {comparison_path}")
 
     # Print summary to terminal
     grand_total_h = sum(e.estimated_time_n_runs_hours for e in estimates)

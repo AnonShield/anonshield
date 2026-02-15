@@ -113,14 +113,15 @@ python3 "$BASE_DIR/benchmark/benchmark.py" \
 
 # 3c: XLSX (gerado a partir de CSV) e DOCX (gerado a partir de TXT)
 echo "[FASE 3c] Regressão com XLSX e DOCX (gerados)..."
-# Pega um CSV e um TXT do vulnnet para gerar xlsx e docx
-SAMPLE_CSV=$(find "$VULNNET_DIR" -name "*.csv" -size +10k | head -1)
-SAMPLE_TXT=$(find "$VULNNET_DIR" -name "*.txt" -size +10k | head -1)
+# Pega os MAIORES arquivos CSV e TXT do vulnnet para gerar xlsx e docx
+SAMPLE_CSV=$(find "$VULNNET_DIR" -name "*.csv" -size +100k -exec ls -S {} + | head -1)
+SAMPLE_TXT=$(find "$VULNNET_DIR" -name "*.txt" -size +100k -exec ls -S {} + | head -1)
 
 if [ -n "$SAMPLE_CSV" ] && [ -n "$SAMPLE_TXT" ]; then
     python3 "$BASE_DIR/benchmark/benchmark.py" \
         --regression \
         --regression-source "$SAMPLE_CSV,$SAMPLE_TXT" \
+        --regression-sizes "0.05,0.1,0.2,0.4" \
         --regression-max-file-mb 1 \
         --strategies $STRATEGIES \
         --runs 3 \
@@ -144,7 +145,7 @@ python3 "$BASE_DIR/benchmark/benchmark.py" \
     --benchmark \
     --data-dir "$VULNNET_DIR" \
     --strategies $STRATEGIES \
-    --runs 1 \
+    --runs 10 \
     --results-dir "$PHASE4_DIR" \
     --continue-on-error
 
@@ -165,7 +166,7 @@ python3 "$BASE_DIR/benchmark/benchmark.py" \
     --directory-mode \
     --data-dir "$VULNNET_DIR" \
     --strategies $STRATEGIES \
-    --runs 1 \
+    --runs 10 \
     --results-dir "$PHASE5_DIR" \
     --continue-on-error
 

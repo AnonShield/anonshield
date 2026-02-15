@@ -476,14 +476,13 @@ class RegressionCharts:
             if len(sizes) < 3:
                 continue
 
-            # Fit model
-            model = self.reg_analyzer.overhead_model(sizes, times, method='linear')
-
-            # Use real overhead if provided, otherwise use regression overhead
-            overhead_sec = model.overhead_sec
-            overhead_ci_lower = model.overhead_ci[0]
-            overhead_ci_upper = model.overhead_ci[1]
-
+            # Check if we have real overhead data first
+            use_real_overhead = False
+            overhead_sec = None
+            overhead_ci_lower = None
+            overhead_ci_upper = None
+            throughput_kbps = None
+            
             if overhead_data is not None:
                 # Try to find matching overhead from calibration data
                 # Match by version and strategy from group name (e.g., "3.0_standalone")
@@ -496,21 +495,51 @@ class RegressionCharts:
                             (overhead_data['strategy'] == strategy)
                         ]
                         if not overhead_match.empty:
+                            # Use REAL overhead from calibration data
                             overhead_sec = overhead_match['wall_clock_time_sec'].mean()
-                            overhead_ci_lower = overhead_sec - overhead_match['wall_clock_time_sec'].std()
-                            overhead_ci_upper = overhead_sec + overhead_match['wall_clock_time_sec'].std()
+                            overhead_std = overhead_match['wall_clock_time_sec'].std()
+                            overhead_ci_lower = overhead_sec - overhead_std
+                            overhead_ci_upper = overhead_sec + overhead_std
+                            use_real_overhead = True
+                            
+                            # Calculate throughput based on real overhead
+                            # throughput = size / (time - overhead)
+                            processing_times = times - overhead_sec
+                            processing_times = processing_times[processing_times > 0]  # Filter valid
+                            if len(processing_times) > 0:
+                                throughputs = sizes[times - overhead_sec > 0] / processing_times
+                                throughput_kbps = np.mean(throughputs)
+                            else:
+                                # Fallback to regression if calculation fails
+                                use_real_overhead = False
+            
+            # If no real overhead data, use regression model
+            if not use_real_overhead:
+                model = self.reg_analyzer.overhead_model(sizes, times, method='linear')
+                overhead_sec = model.overhead_sec
+                overhead_ci_lower = model.overhead_ci[0]
+                overhead_ci_upper = model.overhead_ci[1]
+                throughput_kbps = model.throughput_kb_per_sec
+                r_squared = model.r_squared
+            else:
+                # Calculate R² for real overhead model
+                predicted = overhead_sec + sizes / throughput_kbps
+                ss_res = np.sum((times - predicted) ** 2)
+                ss_tot = np.sum((times - np.mean(times)) ** 2)
+                r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
 
             overhead_results.append({
                 'group': group,
                 'overhead_sec': overhead_sec,
-                'throughput_kbps': model.throughput_kb_per_sec,
-                'r_squared': model.r_squared,
+                'throughput_kbps': throughput_kbps,
+                'r_squared': r_squared,
                 'overhead_ci_lower': overhead_ci_lower,
                 'overhead_ci_upper': overhead_ci_upper,
                 'sizes': sizes,
                 'times': times,
-                'predicted': overhead_sec + sizes / model.throughput_kb_per_sec,
-                'residuals': times - (overhead_sec + sizes / model.throughput_kb_per_sec)
+                'predicted': overhead_sec + sizes / throughput_kbps,
+                'residuals': times - (overhead_sec + sizes / throughput_kbps),
+                'source': 'calibration' if use_real_overhead else 'regression'
             })
 
         # Panel A: Overhead bar chart
@@ -533,6 +562,28 @@ class RegressionCharts:
         for i, (oh, err) in enumerate(zip(overheads, overhead_errs)):
             ax1.text(i, oh + err + 1, f'{oh:.1f}±{err:.1f}s',
                     ha='center', fontsize=self.config.typography.SIZE_ANNOTATION)
+        
+        # Add source indicator
+        sources = [r['source'] for r in overhead_results]
+        if any(s == 'calibration' for s in sources):
+            # Add legend to indicate data source
+            from matplotlib.patches import Patch
+            legend_elements = []
+            if 'calibration' in sources:
+                legend_elements.append(Patch(facecolor='lightgreen', edgecolor='black', 
+                                            label='Real overhead (calibration)'))
+            if 'regression' in sources:
+                legend_elements.append(Patch(facecolor='lightcoral', edgecolor='black',
+                                            label='Estimated (regression)'))
+            
+            # Color bars based on source
+            for i, source in enumerate(sources):
+                if source == 'calibration':
+                    ax1.patches[i].set_facecolor('lightgreen')
+                else:
+                    ax1.patches[i].set_facecolor('lightcoral')
+            
+            ax1.legend(handles=legend_elements, loc='upper left', fontsize=8)
 
         # Panel B: Throughput bar chart
         ax2 = fig.add_subplot(gs[0, 1])
@@ -1349,6 +1400,112 @@ class ScalabilityCharts:
         plt.suptitle('Scalability and Complexity Analysis',
                     fontsize=self.config.typography.SIZE_TITLE + 1,
                     fontweight='bold', y=0.995)
+
+        self.config.save_figure(fig, output_path)
+        return fig
+
+    def create_scaling_analysis_simplified(self, data: pd.DataFrame, group_by: str, output_path: str):
+        """Create simplified scaling analysis with 3 panels (A, B, C) side by side.
+
+        Args:
+            data: Benchmark DataFrame
+            group_by: Grouping column
+            output_path: Save path
+        """
+        from .statistics import RegressionAnalyzer
+
+        fig = plt.figure(figsize=(self.config.get_figure_size('double_square')[0] * 1.5, 
+                                   self.config.get_figure_size('double_square')[1] * 0.5))
+        gs = gridspec.GridSpec(1, 3, figure=fig, hspace=0.3, wspace=0.3)
+
+        groups = self.config.sort_strategies_by_version(list(data[group_by].unique()))
+        colors = self.config.get_colors(len(groups), groups)
+
+        # Panel A: Linear scale (time vs size)
+        ax1 = fig.add_subplot(gs[0, 0])
+        for idx, group in enumerate(groups):
+            group_data = data[data[group_by] == group]
+            valid = (group_data['file_size_mb'] > 0) & (group_data['wall_clock_time_sec'] > 0)
+            x = group_data.loc[valid, 'file_size_mb'].values
+            y = group_data.loc[valid, 'wall_clock_time_sec'].values
+
+            ax1.scatter(x, y, alpha=0.5, s=30, color=colors[idx], label=group,
+                       edgecolors='black', linewidth=0.3)
+
+        ax1.set_xlabel('File Size (MB)', fontweight='bold')
+        ax1.set_ylabel('Execution Time (sec)', fontweight='bold')
+        ax1.set_title('(A) Linear Scale', fontweight='bold', pad=10)
+        ax1.legend(fontsize=self.config.typography.SIZE_LEGEND - 1, loc='best')
+        ax1.grid(alpha=0.3)
+
+        # Panel B: Log-log scale (identify complexity)
+        ax2 = fig.add_subplot(gs[0, 1])
+        complexity_results = []
+
+        for idx, group in enumerate(groups):
+            group_data = data[data[group_by] == group]
+            valid = (group_data['file_size_mb'] > 0) & (group_data['wall_clock_time_sec'] > 0)
+            x = group_data.loc[valid, 'file_size_mb'].values
+            y = group_data.loc[valid, 'wall_clock_time_sec'].values
+
+            if len(x) < 3:
+                continue
+
+            # Log-log regression
+            result = RegressionAnalyzer.log_log_regression(x, y)
+
+            if 'error' not in result:
+                ax2.scatter(x, y, alpha=0.5, s=30, color=colors[idx], label=group,
+                           edgecolors='black', linewidth=0.3)
+
+                # Plot fitted line in log space
+                x_sorted = np.sort(x)
+                log_x_sorted = np.log(x_sorted)
+                log_y_fit = result['intercept'] + result['slope'] * log_x_sorted
+                y_fit = np.exp(log_y_fit)
+                ax2.plot(x_sorted, y_fit, '--', color=colors[idx], linewidth=2, alpha=0.8)
+
+                complexity_results.append({
+                    'group': group,
+                    'slope': result['slope'],
+                    'complexity': result['complexity'],
+                    'r_squared': result['r_squared']
+                })
+
+        ax2.set_xlabel('File Size (MB)', fontweight='bold')
+        ax2.set_ylabel('Execution Time (sec)', fontweight='bold')
+        ax2.set_title('(B) Log-Log Scale (Complexity)', fontweight='bold', pad=10)
+        ax2.set_xscale('log')
+        ax2.set_yscale('log')
+        ax2.legend(fontsize=self.config.typography.SIZE_LEGEND - 1, loc='best')
+        ax2.grid(alpha=0.3, which='both')
+
+        # Panel C: Throughput vs size (should be constant for linear algorithms)
+        ax3 = fig.add_subplot(gs[0, 2])
+        for idx, group in enumerate(groups):
+            group_data = data[data[group_by] == group]
+            valid = (group_data['file_size_mb'] > 0) & (group_data['throughput_kb_per_sec'] > 0)
+            x = group_data.loc[valid, 'file_size_mb'].values
+            y = group_data.loc[valid, 'throughput_kb_per_sec'].values
+
+            if len(x) > 0:
+                ax3.scatter(x, y, alpha=0.5, s=30, color=colors[idx], label=group,
+                           edgecolors='black', linewidth=0.3)
+
+                # Add mean line
+                mean_throughput = np.mean(y)
+                ax3.axhline(mean_throughput, color=colors[idx], linestyle='--',
+                           linewidth=1.5, alpha=0.5)
+
+        ax3.set_xlabel('File Size (MB)', fontweight='bold')
+        ax3.set_ylabel('Throughput (KB/sec)', fontweight='bold')
+        ax3.set_title('(C) Throughput Stability', fontweight='bold', pad=10)
+        ax3.legend(fontsize=self.config.typography.SIZE_LEGEND - 1, loc='best')
+        ax3.grid(alpha=0.3)
+
+        plt.suptitle('Scalability Analysis',
+                    fontsize=self.config.typography.SIZE_TITLE + 1,
+                    fontweight='bold', y=0.98)
 
         self.config.save_figure(fig, output_path)
         return fig

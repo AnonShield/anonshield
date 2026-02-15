@@ -20,6 +20,7 @@ import argparse
 import csv
 import hashlib
 import json
+import logging
 import os
 import platform
 import psutil
@@ -35,6 +36,7 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from shlex import quote
 from typing import Optional, List, Dict, Any, Iterator, Callable
 
 
@@ -871,7 +873,9 @@ class BenchmarkRunner:
         transformer_model: Optional[str] = None,
         db_dir: Optional[str] = None,
         entities_to_preserve: Optional[str] = None,
-        anonymization_config: Optional[str] = None
+        anonymization_config: Optional[str] = None,
+        cache_size: Optional[int] = None,
+        cleanup_outputs: bool = False
     ):
         self.config = config
         self.output_dir = output_dir
@@ -881,9 +885,36 @@ class BenchmarkRunner:
         self.db_dir = db_dir
         self.entities_to_preserve = entities_to_preserve
         self.anonymization_config = anonymization_config
+        self.cache_size = cache_size
+        self.cleanup_outputs = cleanup_outputs
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
+
+    def _get_output_file_path(self, input_file: Path, strategy: Strategy) -> Path:
+        """Calculate the expected output file path for a given input file."""
+        version_str = f"v{self.config.version.value}"
+        output_dir = self.output_dir / version_str / strategy.value
+        
+        # Output filename pattern: anon_{basename}{ext}
+        base_name = input_file.stem
+        extension = input_file.suffix
+        output_filename = f"anon_{base_name}{extension}"
+        
+        return output_dir / output_filename
+    
+    def _cleanup_output(self, input_file: Path, strategy: Strategy):
+        """Delete the specific output file generated for this input."""
+        if not self.cleanup_outputs:
+            return
+        
+        output_file = self._get_output_file_path(input_file, strategy)
+        if output_file.exists():
+            try:
+                output_file.unlink()
+                logging.debug(f"Deleted output file: {output_file}")
+            except Exception as e:
+                logging.warning(f"Failed to delete output file {output_file}: {e}")
 
     def run(
         self,
@@ -925,7 +956,7 @@ class BenchmarkRunner:
 
         try:
             # Execute with /usr/bin/time -v for detailed metrics
-            full_cmd = f"/usr/bin/time -v {' '.join(cmd)} 2>&1"
+            full_cmd = f"/usr/bin/time -v {' '.join(quote(str(c)) for c in cmd)} 2>&1"
 
             with open(log_file, 'w') as log:
                 process = subprocess.Popen(
@@ -1034,6 +1065,10 @@ class BenchmarkRunner:
             if self.anonymization_config:
                 cmd.extend(["--anonymization-config", self.anonymization_config])
 
+            # Add cache size if specified
+            if self.cache_size is not None:
+                cmd.extend(["--max-cache-size", str(self.cache_size)])
+
             # SLM uses Ollama, not Presidio — skip dataset/batch flags
             if strategy != Strategy.SLM:
                 cmd.append("--use-datasets")
@@ -1113,7 +1148,9 @@ class DirectoryBenchmarkRunner:
         transformer_model: Optional[str] = None,
         db_dir: Optional[str] = None,
         entities_to_preserve: Optional[str] = None,
-        anonymization_config: Optional[str] = None
+        anonymization_config: Optional[str] = None,
+        cache_size: Optional[int] = None,
+        cleanup_outputs: bool = False
     ):
         self.config = config
         self.output_dir = output_dir
@@ -1124,6 +1161,8 @@ class DirectoryBenchmarkRunner:
         self.db_dir = db_dir
         self.entities_to_preserve = entities_to_preserve
         self.anonymization_config = anonymization_config
+        self.cache_size = cache_size
+        self.cleanup_outputs = cleanup_outputs
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -1267,7 +1306,7 @@ class DirectoryBenchmarkRunner:
               f"{file_count} files ({metrics.file_size_mb:.1f} MB) | Run #{run_number}")
 
         try:
-            full_cmd = f"/usr/bin/time -v {' '.join(cmd)} 2>&1"
+            full_cmd = f"/usr/bin/time -v {' '.join(quote(str(c)) for c in cmd)} 2>&1"
 
             with open(log_file, 'w') as log:
                 log.write(f"# Directory mode benchmark\n")
@@ -1458,6 +1497,10 @@ class DirectoryBenchmarkRunner:
             # Add anonymization config if specified
             if self.anonymization_config:
                 cmd.extend(["--anonymization-config", self.anonymization_config])
+
+            # Add cache size if specified
+            if self.cache_size is not None:
+                cmd.extend(["--max-cache-size", str(self.cache_size)])
 
             # SLM uses Ollama, not Presidio — skip dataset/batch flags
             if strategy != Strategy.SLM:
@@ -1762,7 +1805,9 @@ class BenchmarkOrchestrator:
                 transformer_model=self.args.transformer_model,
                 db_dir=self.args.db_dir,
                 entities_to_preserve=self.args.entities_to_preserve,
-                anonymization_config=self.args.anonymization_config
+                anonymization_config=self.args.anonymization_config,
+                cache_size=self.args.cache_size,
+                cleanup_outputs=self.args.cleanup_outputs
             )
 
             for run_num in range(1, self.args.runs + 1):
@@ -1791,6 +1836,9 @@ class BenchmarkOrchestrator:
                         overhead_data[key].append(metrics.wall_clock_time_sec)
                         print(f"    Overhead: {metrics.wall_clock_time_sec:.2f}s | "
                               f"Memory: {metrics.max_resident_set_kb / 1024:.0f} MB")
+                        
+                        # Delete specific output file after successful calibration  (if enabled)
+                        runner._cleanup_output(cal_file, strategy)
                     else:
                         print(f"    {metrics.status}: {metrics.error_message}")
 
@@ -1894,7 +1942,9 @@ class BenchmarkOrchestrator:
                         transformer_model=self.args.transformer_model,
                         db_dir=self.args.db_dir,
                         entities_to_preserve=self.args.entities_to_preserve,
-                        anonymization_config=self.args.anonymization_config
+                        anonymization_config=self.args.anonymization_config,
+                        cache_size=self.args.cache_size,
+                        cleanup_outputs=self.args.cleanup_outputs
                     )
 
                     for strategy in config.strategies:
@@ -1915,6 +1965,11 @@ class BenchmarkOrchestrator:
                                 show_output=self.args.show_output
                             )
                             self.results_manager.add_result(metrics)
+                            
+                            # Delete specific output file after successful run (if enabled)
+                            if metrics.status == "SUCCESS":
+                                runner._cleanup_output(file_path, strategy)
+                            
                             completed += 1
 
                             print(f"  Progress: {completed}/{total_runs} ({100*completed/total_runs:.1f}%)")
@@ -2007,7 +2062,9 @@ class BenchmarkOrchestrator:
                                 transformer_model=self.args.transformer_model,
                                 db_dir=self.args.db_dir,
                                 entities_to_preserve=self.args.entities_to_preserve,
-                                anonymization_config=self.args.anonymization_config
+                                anonymization_config=self.args.anonymization_config,
+                                cache_size=self.args.cache_size,
+                                cleanup_outputs=self.args.cleanup_outputs
                             )
                             metrics_list = dir_runner.run(
                                 test_files, strategy, run_num,
@@ -2017,6 +2074,16 @@ class BenchmarkOrchestrator:
                             for m in metrics_list:
                                 self.results_manager.add_result(m)
                             completed += 1
+                            
+                            # Delete entire output directory after successful directory run (if enabled)
+                            # Directory mode processes multiple files at once, so we clean the whole output
+                            if dir_runner.cleanup_outputs and metrics_list[0].status == "SUCCESS":
+                                version_str = f"v{version.value}"
+                                output_path = self.output_dir / version_str / strategy.value
+                                if output_path.exists() and output_path.is_dir():
+                                    import shutil
+                                    shutil.rmtree(output_path, ignore_errors=True)
+                                    logging.debug(f"Deleted directory output: {output_path}")
 
                             if total_all > 0:
                                 print(f"  Progress: {completed}/{total_all} ({100*completed/total_all:.1f}%)")
@@ -2035,7 +2102,9 @@ class BenchmarkOrchestrator:
                         runner = BenchmarkRunner(
                             config, self.output_dir, self.log_dir, self.args.secret_key,
                             transformer_model=self.args.transformer_model,
-                            db_dir=self.args.db_dir
+                            db_dir=self.args.db_dir,
+                            cache_size=self.args.cache_size,
+                            cleanup_outputs=self.args.cleanup_outputs
                         )
 
                         for file_path in test_files:
@@ -2359,7 +2428,9 @@ class BenchmarkOrchestrator:
                 runner = BenchmarkRunner(
                     config, self.output_dir, self.log_dir, self.args.secret_key,
                     transformer_model=self.args.transformer_model,
-                    db_dir=self.args.db_dir
+                    db_dir=self.args.db_dir,
+                    cache_size=self.args.cache_size,
+                    cleanup_outputs=self.args.cleanup_outputs
                 )
 
                 print(f"\n  --- {key} ---")
@@ -2397,7 +2468,11 @@ class BenchmarkOrchestrator:
                                 print(f"\n  [OK] SUCCESS")
                                 print(f"      Time: {metrics.wall_clock_time_sec:.2f}s "
                                       f"| Memory: {metrics.max_resident_set_kb/1024:.1f}MB "
-                                      f"| Throughput: {kbps:.2f} KB/s")
+                                      f"| Throughput: {kbps:.1f} KB/s")
+                                
+                                # Delete specific output file after successful regression (if enabled)
+                                runner._cleanup_output(subset_path, strategy)
+                                
                                 print(f"    {actual_mb_val:.2f} MB | run #{run_num}: "
                                       f"{metrics.wall_clock_time_sec:.2f}s")
                             else:
@@ -3069,6 +3144,13 @@ Examples:
                             help="Path to JSON file with advanced anonymization rules for structured files. "
                                  "Defines force_anonymize, fields_to_anonymize, and fields_to_exclude. "
                                  "Example: 'benchmark/openvas_anonymization_config.json'")
+    bench_group.add_argument("--max-cache-size", type=int, dest="cache_size",
+                            help="Maximum cache size for anonymization mappings (v3.0 only). "
+                                 "Controls the LRU cache size for consistent entity mapping. "
+                                 "Example: 200000")
+    bench_group.add_argument("--cleanup-outputs", action="store_true",
+                            help="Automatically delete anonymized output files after each successful run. "
+                                 "Useful when disk space is limited. Metrics and results CSV are preserved.")
 
     # Regression options
     regression_group = parser.add_argument_group("Regression Options (use with --regression)")
