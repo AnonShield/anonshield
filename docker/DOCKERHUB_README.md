@@ -173,10 +173,11 @@ docker run --rm \
 
 ### Advanced Processing
 **Anonymization Strategies:**
-- `presidio` (default) - Full analysis with all recognizers
-- `fast` - Optimized transformer + regex only
-- `balanced` - Curated subset for speed/accuracy balance
-- `slm` - End-to-end LLM-based anonymization
+- `presidio` (default) - Full Microsoft Presidio pipeline with all recognizers
+- `filtered` - Filtered scope Presidio pipeline (focused entity types)
+- `hybrid` - Hybrid approach with custom replacement logic
+- `standalone` - Zero Presidio dependencies, regex-based (fastest)
+- `slm` - End-to-end LLM-based anonymization (experimental)
 
 **Language Support (24 languages):**
 English, Portuguese, Spanish, French, German, Italian, Chinese, Japanese, Korean, Russian, Polish, Dutch, Swedish, Norwegian, Danish, Finnish, Greek, Croatian, Lithuanian, Slovenian, Macedonian, Romanian, Ukrainian, Catalan
@@ -280,13 +281,13 @@ docker run --rm \
   -v $(pwd):/data \
   kapelinsky/anon /data/corpus/ --generate-ner-data --output-dir /data/ner_output/
 
-# Cybersecurity-focused model
+# Cybersecurity-focused model with hybrid strategy
 docker run --rm --gpus all \
   -e ANON_SECRET_KEY="production-key" \
   -v $(pwd):/data \
   kapelinsky/anon:gpu /data/threat_intel.json \
   --transformer-model attack-vector/SecureModernBERT-NER \
-  --anonymization-strategy fast
+  --anonymization-strategy hybrid
 ```
 
 ## Resource Requirements
@@ -314,7 +315,7 @@ SLM Mode:  Additional 4-32GB depending on Ollama model size
 | `--preserve-entities TYPES` | Skip anonymizing specific types | `--preserve-entities "HOSTNAME,URL"` |
 | `--allow-list TERMS` | Never anonymize specific terms | `--allow-list "CompanyName,ProductX"` |
 | `--slug-length N` | Pseudonym length (1-64 chars) | `--slug-length 12` |
-| `--anonymization-strategy S` | Processing strategy | `--anonymization-strategy fast` |
+| `--anonymization-strategy S` | Processing strategy | `--anonymization-strategy filtered` |
 | `--transformer-model MODEL` | NER model selection | `--transformer-model attack-vector/SecureModernBERT-NER` |
 | `--optimize` | Enable all performance optimizations | `--optimize` |
 | `--slm-detector` | Use SLM for enhanced entity detection | `--slm-detector` |
