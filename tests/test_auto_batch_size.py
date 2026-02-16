@@ -81,7 +81,7 @@ def main():
     print("   • File size (larger = bigger batch)")
     print("   • Text length (longer = smaller batch)")
     print("   • CSV columns (more = smaller batch)")
-    print("   • Strategy (presidio=500, fast=1200, balanced=800, slm=300)")
+    print("   • Strategy (presidio=500, filtered=800, hybrid=1200, standalone=1500, slm=300)")
     print("   • GPU memory (more = bigger batch)")
     print("\nUsage:")
     print("  python3 anon.py file.csv --batch-size auto")
