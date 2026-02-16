@@ -362,14 +362,7 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
         ValueError: If strategy_name is unknown
     """
     strategy_name = strategy_name.lower()
-    
-    # Legacy name mappings for backwards compatibility
-    legacy_mappings = {
-        "fast": "hybrid",
-        "balanced": "filtered"
-    }
-    strategy_name = legacy_mappings.get(strategy_name, strategy_name)
-    
+
     if strategy_name == "presidio":
         # Full Presidio: Complete pipeline without filtering
         return FullPresidioStrategy(

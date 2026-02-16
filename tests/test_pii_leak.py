@@ -29,7 +29,7 @@ class TestPiiLeak(unittest.TestCase):
         if "ANON_SECRET_KEY" in os.environ:
             del os.environ["ANON_SECRET_KEY"]
 
-    @patch('src.anon.strategies.PresidioStrategy.anonymize')
+    @patch('src.anon.strategies.FullPresidioStrategy.anonymize')
     def test_fallback_strategy_prevents_pii_leak_error(self, mock_anonymize_strategy):
         """
         Tests that the fallback strategy prevents the PII leak RuntimeError
