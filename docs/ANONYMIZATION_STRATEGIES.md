@@ -381,7 +381,7 @@ analyzer.analyze(text, entities=entities_to_use)
 # Explicit strategy selection
 python anon.py data.txt --anonymization-strategy filtered
 
-# Or using default (filtered is the default strategy)
+# Or using default (presidio is the default strategy)
 python anon.py data.txt
 ```
 
@@ -1406,69 +1406,6 @@ If you need:
 
 ---
 
-## Migration Guide
-
-### From v2.0 to v3.0
-
-```bash
-# v2.0 (Old naming)
-python anon.py file.txt --anonymization-strategy balanced
-
-# v3.0 (New naming - semantic)
-python anon.py file.txt --anonymization-strategy filtered
-
-# Legacy aliases still work
-python anon.py file.txt --anonymization-strategy balanced  # OK - maps to 'filtered'
-python anon.py file.txt --anonymization-strategy fast      # OK - maps to 'hybrid'
-```
-
-### Strategy Name Mapping
-
-| v2.0 Name | v3.0 Name | Alias Support |
-|-----------|-----------|---------------|
-| `presidio` | `presidio` | (unchanged) |
-| `balanced` | `filtered` | ✅ Yes |
-| `fast` | `hybrid` | ✅ Yes |
-| (new) | `standalone` | - |
-| `slm` | `slm` | (unchanged) |
-
-### Default Strategy Change
-
-```yaml
-v2.0 Default: presidio
-v3.0 Default: filtered
-
-Change:
-  - Default changed from FullPresidio to FilteredPresidio
-  - FullPresidio still available via --anonymization-strategy presidio
-  - Legacy aliases supported for backwards compatibility
-```
-
-### Updating Existing Code
-
-```python
-# v2.0 Code
-orchestrator = AnonymizationOrchestrator(
-    strategy_name="balanced"  # Old name
-)
-
-# v3.0 Code (option 1: use new name)
-orchestrator = AnonymizationOrchestrator(
-    strategy_name="filtered"  # New semantic name
-)
-
-# v3.0 Code (option 2: legacy alias)
-orchestrator = AnonymizationOrchestrator(
-    strategy_name="balanced"  # Still works via alias
-)
-
-# v3.0 Code (option 3: default)
-orchestrator = AnonymizationOrchestrator()
-# Now defaults to 'filtered' instead of 'presidio'
-```
-
----
-
 ## Advanced Configuration
 
 ### Custom Strategy Implementation
@@ -1642,15 +1579,11 @@ os.environ['CUDA_VISIBLE_DEVICES'] = ''
 python anon.py file.txt --anonymization-strategy <strategy>
 
 # Available strategies
---anonymization-strategy presidio      # FullPresidio (maximum coverage)
---anonymization-strategy filtered      # FilteredPresidio (RECOMMENDED)
+--anonymization-strategy presidio      # FullPresidio (default, maximum coverage)
+--anonymization-strategy filtered      # FilteredPresidio (filtered scope)
 --anonymization-strategy hybrid        # HybridPresidio (custom logic)
 --anonymization-strategy standalone    # Standalone (maximum speed)
 --anonymization-strategy slm           # SLM (experimental)
-
-# Legacy aliases (still supported)
---anonymization-strategy balanced      # → filtered
---anonymization-strategy fast          # → hybrid
 
 # Performance options
 --use-datasets                         # Enable dataset mode (faster batching)
@@ -1667,8 +1600,7 @@ python anon.py file.txt --anonymization-strategy <strategy>
 
 ```yaml
 v3.0 (Current):
-  - Strategy names: presidio, filtered, hybrid, standalone, slm
-  - Legacy aliases supported: balanced → filtered, fast → hybrid
+  - Strategy names: presidio (default), filtered, hybrid, standalone, slm
   - Centralized RegexPatterns class (DRY principle)
   - Standalone strategy implementation (no Presidio dependencies)
   - Automatic GPU detection via torch.cuda.is_available()

@@ -4,14 +4,7 @@ AnonLFI 3.0 is a modular pseudonymization framework for CSIRTs that resolves the
 
 ## Table of Contents
 
-- [System Architecture](#system-architecture)
 - [Key Features](#key-features)
-- [Technology Stack](#technology-stack)
-- [Anonymization Mechanism](#anonymization-mechanism)
-- [Database Schema](#database-schema)
-- [Performance Validation](#performance-validation)
-- [Supported Entities & Languages](#supported-entities--languages)
-- [Repository Structure](#repository-structure)
 - [Prerequisites](#prerequisites)
 - [Setup and Execution](#setup-and-execution)
 - [Usage](#usage)
@@ -21,6 +14,13 @@ AnonLFI 3.0 is a modular pseudonymization framework for CSIRTs that resolves the
   - [Advanced Configuration for Structured Files](#advanced-configuration-for-structured-files)
   - [NER Data Generation Mode](#ner-data-generation-mode)
   - [Performance Optimization](#performance-optimization)
+- [System Architecture](#system-architecture)
+- [Technology Stack](#technology-stack)
+- [Anonymization Mechanism](#anonymization-mechanism)
+- [Database Schema](#database-schema)
+- [Supported Entities & Languages](#supported-entities--languages)
+- [Anonymization Strategies](#anonymization-strategies)
+- [Repository Structure](#repository-structure)
 - [Architecture Deep Dive](#architecture-deep-dive)
   - [Core Components](#core-components)
   - [Processing Pipeline](#processing-pipeline)
@@ -29,57 +29,9 @@ AnonLFI 3.0 is a modular pseudonymization framework for CSIRTs that resolves the
   - [Fallback Architecture](#fallback-architecture)
 - [Utility Scripts](#utility-scripts)
 - [Running Tests](#running-tests)
+- [Benchmarking](#benchmarking)
+- [Documentation](#documentation)
 - [License](#license)
-
-## System Architecture
-
-The tool is designed with a modular, layered architecture to separate responsibilities and allow for extensibility. The following diagram illustrates the main components and workflows, including the choice between traditional and SLM-based anonymization engines.
-
-```mermaid
-%% Anonymization Architecture Flow (AnonLFI 3.0 with SLM)
-graph TD
-    A[User] -- "uv run anon.py <file> [args]" --> B(anon.py CLI);
-
-    subgraph "1. Orchestration & File Processing"
-        B -- "Instantiates" --> Orch(AnonymizationOrchestrator);
-        B -- "Gets Processor" --> F(ProcessorFactory);
-        F -- "e.g., .pdf" --> P_PDF(PdfFileProcessor);
-        P_PDF -- "Extracts" --> RawText(Raw Text Content);
-    end
-
-    subgraph "2. Anonymization Core"
-        RawText -- "orchestrator.anonymize()" --> Orch;
-        Orch -- "Selects Strategy (--strategy)" --> STR_CHOICE{Strategy};
-        
-        STR_CHOICE -- "'presidio', 'filtered', 'hybrid', 'standalone'" --> PRESIDIO_STR(Traditional Strategy);
-        STR_CHOICE -- "'slm' or '--slm-detector'" --> SLM_STR(SLM Strategy);
-    end
-
-    subgraph "3a. Traditional Engine (Presidio/Regex)"
-        PRESIDIO_STR -- "Uses" --> Presidio(Presidio Engine);
-        Presidio -- "Loads Models" --> Models(NLP Models);
-        Presidio -- "Uses Recognizers" --> Regex(Custom Recognizers);
-        Presidio -- "Generates Slug" --> Anonymizer(CustomSlugAnonymizer);
-        Anonymizer -- "HMAC + DB" --> DB[(entities.db)];
-        Anonymizer -- "Replaces PII" --> AnonymizedText1[Anonymized Text];
-    end
-
-    subgraph "3b. SLM Engine (Ollama)"
-        SLM_STR -- "Uses" --> SLM_MOD(src/anon/slm/);
-        SLM_MOD -- "Sends Prompt" --> Client(OllamaClient);
-        Client -- "Queries" --> SLM_LLM(Local LLM e.g., Llama3);
-        SLM_LLM -- "Returns Response" --> Client;
-        Client -- "Result to" --> SLM_MOD;
-        SLM_MOD -- "Generates Output" --> AnonymizedText2[Anonymized Text or Entity Map];
-    end
-
-    subgraph "4. Output Generation"
-        AnonymizedText1 --> P_PDF;
-        AnonymizedText2 --> P_PDF;
-        P_PDF -- "Writes File" --> OUT(output/anon_file...);
-        B -- "Writes Report" --> LOG(logs/report.txt);
-    end
-```
 
 ## Key Features
 
@@ -96,328 +48,9 @@ graph TD
 - **Performance Optimizations:** Includes caching, batch processing, fast-path strategies, configurable database modes, and memory management options.
 - **Fallback Architecture:** Implements robust error handling with automatic fallback to item-by-item processing when batch integrity issues are detected.
 
-## Technology Stack
-
-This tool is built on top of a powerful stack of open-source libraries:
-
-- **[Presidio](https://microsoft.github.io/presidio/):** Core engine for PII identification and anonymization.
-- **[spaCy](https://spacy.io/) & [Hugging Face Transformers](https://huggingface.co/docs/transformers/index):** For state-of-the-art NLP and Named Entity Recognition (NER).
-- **[Ollama](https://ollama.com/):** For running local Small Language Models (SLMs) used in advanced anonymization tasks.
-- **[Pandas](https://pandas.pydata.org/):** For efficient processing of structured data formats like CSV and XLSX.
-- **[PyMuPDF](https://pymupdf.readthedocs.io/en/latest/) & [python-docx](https://python-docx.readthedocs.io/en/latest/):** For parsing PDF and DOCX files.
-- **[Pytesseract](https://github.com/madmaze/pytesseract):** For OCR capabilities to extract text from images.
-- **[ijson](https://github.com/ICRAR/ijson):** For streaming large JSON files efficiently.
-- **[orjson](https://github.com/ijl/orjson):** For fast JSON serialization/deserialization.
-- **[openpyxl](https://openpyxl.readthedocs.io/):** For Excel file processing.
-- **[lxml](https://lxml.de/):** For robust XML parsing and processing.
-
-## Anonymization Mechanism
-
-The integrity of the anonymization process is guaranteed by a secure and consistent hashing mechanism. For each sensitive entity detected (e.g., a person's name), the system performs the following steps:
-
-1. The entity's text is normalized to remove extra spaces.
-2. An **HMAC-SHA256** hash is generated from the normalized text, using the `ANON_SECRET_KEY` as a secret key. This ensures the hash is unique and impossible to recreate without the key.
-3. The full hash (64 characters) is used as a unique and persistent identifier in the database.
-4. A "slug" (a prefix of the full hash, with a customizable length via `--slug-length`) is used for substitution in the text, making the output more readable.
-
-This process ensures that the same entity (e.g., "John Doe") will always be replaced by the same slug (e.g., `[PERSON_a1b2c3d4]`), maintaining referential consistency in the anonymized data, which is crucial for training AI models.
-
-**Note:** The SLM-based anonymization strategy (`--anonymization-strategy slm`) uses a different, context-aware mechanism and does not rely on HMAC hashing or the database.
-
-## Database Schema
-
-The tool uses a SQLite database (`db/entities.db`) to persist the mapping between original entities and their anonymized slugs. The main table, `entities`, has the following structure:
-
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `id` | INTEGER | Primary key. |
-| `entity_type` | TEXT | The type of the entity (e.g., `PERSON`, `LOCATION`). |
-| `original_name` | TEXT | The original text of the detected entity. |
-| `slug_name` | TEXT | The short hash (slug) displayed in the anonymized text. |
-| `full_hash` | TEXT | The full HMAC-SHA256 hash, used as a unique identifier (UNIQUE constraint). |
-| `first_seen` | TEXT | Timestamp of when the entity was first seen. |
-| `last_seen` | TEXT | Timestamp of when the entity was last seen. |
-
-An index on `full_hash` ensures fast lookups.
-
-## Performance Validation
-
-The tool's effectiveness was validated in two representative case studies from the research paper, demonstrating high precision in complex scenarios:
-
-| Scenario | Description | Precision | Recall | F1-Score |
-| :--- | :--- | :--- | :--- | :--- |
-| **PDF with OCR** | An incident report with PII in text and embedded terminal screenshots. | 100% | 61.9% | 76.5% |
-| **OpenVAS XML** | A vulnerability report with nested technical entities (hashes, certs, etc.). | 100% | 85.42% | 92.13% |
-
-The results confirm the engine's accuracy and the value of the specialized OCR and technical recognizers.
-
-## Supported Entities & Languages
-
-### Entities
-
-By default, the tool is configured to detect and anonymize a wide range of PII and cybersecurity-related entities:
-
-- `AUTH_TOKEN` - Authentication tokens and session IDs
-- `CERT_BODY` - Base64-encoded certificate bodies (e.g., PEM format)
-- `CERT_SERIAL` - Certificate serial numbers
-- `CPE_STRING` - Common Platform Enumeration identifiers
-- `CREDIT_CARD` - Credit card numbers
-- `CVE_ID` - Common Vulnerabilities and Exposures identifiers
-- `EMAIL_ADDRESS` - Email addresses
-- `FILE_PATH` - User home directory paths
-- `HASH` - Cryptographic hashes (SHA256, MD5, etc.)
-- `HOSTNAME` - Fully qualified domain names and hostnames
-- `IP_ADDRESS` - IPv4 and IPv6 addresses
-- `LOCATION` - Geographic locations
-- `MAC_ADDRESS` - MAC addresses
-- `ORGANIZATION` - Organization names
-- `PASSWORD` - Contextual passwords from key=value pairs
-- `PERSON` - Person names
-- `PGP_BLOCK` - PGP signature and public key blocks
-- `PHONE_NUMBER` - Phone numbers (including Brazilian CPF format)
-- `URL` - Web URLs
-- `USERNAME` - Contextual usernames from key=value pairs
-- `UUID` - Universally Unique Identifiers
-
-*This list can be retrieved by running `uv run anon.py --list-entities`.*
-
-### Languages
-
-The tool is pre-configured for **24 languages**:
-
-| Code | Language |
-| :--- | :--- |
-| `ca` | Catalan |
-| `zh` | Chinese |
-| `hr` | Croatian |
-| `da` | Danish |
-| `nl` | Dutch |
-| `en` | English |
-| `fi` | Finnish |
-| `fr` | French |
-| `de` | German |
-| `el` | Greek |
-| `it` | Italian |
-| `ja` | Japanese |
-| `ko` | Korean |
-| `lt` | Lithuanian |
-| `mk` | Macedonian |
-| `nb` | Norwegian Bokmål |
-| `pl` | Polish |
-| `pt` | Portuguese |
-| `ro` | Romanian |
-| `ru` | Russian |
-| `sl` | Slovenian |
-| `es` | Spanish |
-| `sv` | Swedish |
-| `uk` | Ukrainian |
-
-*For a full list of supported languages, run `uv run anon.py --list-languages`.*
-
-## Anonymization Strategies & Entity Detection
-
-The tool offers multiple anonymization strategies with different transformer models and entity detection approaches. Each strategy provides different trade-offs between speed, accuracy, and entity type coverage.
-
-### Transformer Models
-
-The tool supports multiple transformer models for Named Entity Recognition (NER), each optimized for different use cases:
-
-#### 1. `Davlan/xlm-roberta-base-ner-hrl` (Default)
-- **Type:** Multilingual general-purpose NER model
-- **Languages:** 24+ languages (multilingual)
-- **Size:** ~1.1 GB VRAM
-- **Use Case:** General PII detection across multiple languages
-
-**Detected Entity Types:**
-- `PERSON` - Person names
-- `ORGANIZATION` - Organization names  
-- `LOCATION` - Geographic locations
-
-#### 2. `attack-vector/SecureModernBERT-NER`
-- **Type:** Cybersecurity-focused NER model
-- **Languages:** English only
-- **Size:** ~1.1 GB VRAM  
-- **Use Case:** Cybersecurity threat intelligence and incident reports
-
-**Detected Entity Types (22 specific types):**
-- **Threat Intelligence:** `MALWARE`, `THREAT-ACTOR`, `CAMPAIGN`, `MITRE-TACTIC`
-- **Vulnerabilities:** `CVE_ID`, `TOOL`, `PLATFORM`, `PRODUCT`
-- **Network Indicators:** `URL`, `IPV4`, `IPV6`, `DOMAIN` → `HOSTNAME`
-- **Cryptographic:** `MD5` → `HASH`, `SHA1` → `HASH`, `SHA256` → `HASH`, `FILEPATH` → `FILE_PATH`, `REGISTRY-KEYS` → `REGISTRY_KEY`
-- **Organizations:** `ORG` → `ORGANIZATION`, `SECTOR`, `SERVICE`
-- **Geographic:** `LOC` → `LOCATION`
-- **Personal:** `EMAIL` → `EMAIL_ADDRESS`
-
-### Anonymization Strategies
-
-#### 1. `presidio` (Comprehensive)
-```bash
-python anon.py file.txt --anonymization-strategy presidio
-```
-- **Entity Detection:** All Presidio recognizers (Transformer + spaCy + Custom regex + Built-in patterns)
-- **Text Replacement:** Presidio's AnonymizerEngine
-- **Speed:** Slower (processes all available recognizers)
-- **Accuracy:** Highest (maximum entity coverage, including low-relevance entities)
-
-**Complete Entity List:**
-- **From Transformer Model:** Depends on `--transformer-model` choice (see above)
-- **From spaCy NLP:** `DATE`, `TIME`, `MONEY`, `PERCENT`, `CARDINAL`, `ORDINAL`, `QUANTITY`, `GPE`, `NORP`, `FAC`, `EVENT`, `WORK_OF_ART`, `LAW`, `LANGUAGE`, `PRODUCT`
-- **From Custom Regex:** All custom patterns listed below
-- **From Presidio Built-in:** `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `PERSON`, `US_SSN`, `US_DRIVER_LICENSE`, etc.
-
-#### 2. `fast` (Optimized)  
-```bash
-python anon.py file.txt --anonymization-strategy hybrid
-```
-- **Entity Detection:** Transformer model + Custom regex patterns (filtered scope, same as Balanced)
-- **Text Replacement:** Manual Python implementation (not using Presidio's AnonymizerEngine)
-- **Speed:** Fast (filtered entity detection + lightweight replacement logic)
-- **Accuracy:** High (same detection scope as Balanced)
-
-**Complete Entity List:**
-- **From Transformer Model:** Depends on `--transformer-model` choice (see above)
-- **From Custom Regex:** All custom patterns listed below
-- **Excluded:** spaCy built-in entities, Presidio default built-in recognizers not in entity mapping
-
-#### 3. `balanced` (Optimal Performance)
-```bash
-python anon.py file.txt --anonymization-strategy filtered
-```
-- **Entity Detection:** Transformer model + Custom regex patterns (filtered scope)
-- **Text Replacement:** Presidio's AnonymizerEngine (battle-tested implementation)
-- **Speed:** Fastest (filtered entity detection reduces processing overhead significantly)
-- **Accuracy:** High (curated subset focusing on relevant entities)
-
-**Complete Entity List:**
-- **From Transformer Model:** Depends on `--transformer-model` choice
-- **From Custom Regex:** All custom patterns listed below
-- **Excluded:** spaCy built-in entities, Presidio default built-in recognizers not in entity mapping
-
-#### 5. `slm` (Context-Aware)
-```bash
-python anon.py file.txt --anonymization-strategy slm
-```
-- **Entity Detection:** Local LLM (via Ollama) with contextual understanding
-- **Accuracy:** Context-dependent (dynamic entity recognition)
-
-**Complete Entity List:**
-- **Dynamic Detection:** Entities identified based on context and LLM understanding
-- **Custom Entities:** Can create new entity types based on document content
-- **No Fixed List:** Entity types vary per document and LLM model capabilities
-- **Note:** Does not use HMAC hashing or database storage
-
-### Custom Regex Entities (Available in All Strategies)
-
-The following entities are detected using custom regex patterns and are available across all anonymization strategies:
-
-**Network & Infrastructure:**
-- `URL` - Web addresses and obfuscated links
-- `IP_ADDRESS` - IPv4 and IPv6 addresses  
-- `HOSTNAME` - Domain names and FQDNs
-- `MAC_ADDRESS` - MAC addresses
-- `PORT` - Port/protocol combinations
-
-**Cryptographic & Security:**
-- `HASH` - MD5, SHA1, SHA256, SHA512 hashes
-- `CERTIFICATE` - PEM certificates and private keys
-- `CRYPTOGRAPHIC_KEY` - RSA keys, JWT tokens, Base64 keys
-- `CERT_SERIAL` - Certificate serial numbers
-- `PGP_BLOCK` - PGP signature and key blocks
-
-**Cybersecurity Identifiers:**
-- `CVE_ID` - Common Vulnerabilities and Exposures
-- `CPE_STRING` - Common Platform Enumeration
-- `UUID` - Universally Unique Identifiers
-- `OID` - Object Identifiers
-
-**Authentication & Credentials:**
-- `AUTH_TOKEN` - Session tokens and API keys
-- `PASSWORD` - Contextual passwords from key=value pairs
-- `USERNAME` - Contextual usernames from key=value pairs
-
-**Personal Information:**
-- `EMAIL_ADDRESS` - Email addresses
-- `PHONE_NUMBER` - Phone numbers (including Brazilian CPF)
-- `CREDIT_CARD` - Credit card numbers
-- `FILE_PATH` - User home directory paths
-
-### Choosing the Right Configuration
-
-**For General PII Detection (Recommended):**
-```bash
-python anon.py file.txt --anonymization-strategy filtered
-```
-
-**For Cybersecurity Documents:**
-```bash
-python anon.py threat_report.pdf --transformer-model attack-vector/SecureModernBERT-NER --anonymization-strategy filtered
-```
-
-**For Maximum Accuracy:**
-```bash
-python anon.py sensitive_doc.txt --anonymization-strategy presidio --transformer-model attack-vector/SecureModernBERT-NER
-```
-
-**For Complex Context Understanding:**
-```bash
-python anon.py complex_report.txt --anonymization-strategy slm
-```
-
-**For Experimental Zero-Presidio Mode:**
-```bash
-python anon.py file.txt --anonymization-strategy standalone
-```
-
-### Memory Requirements
-
-| Configuration | VRAM Usage | Notes |
-|---------------|------------|--------|
-| Any transformer model | ~2 GB | Base transformer + spaCy models |
-| + Presidio strategy | +200 MB | Additional Presidio recognizers |
-| + SLM strategy | 8-26 GB | Depends on Ollama model size (7B-70B params) |
-
-*Processing time varies significantly based on file size, content complexity, and hardware.*
-
-## Repository Structure
-
-```
-.
-├── anon.py                # Main CLI entry point for the tool
-├── run.sh                 # Docker wrapper with auto-provisioning
-├── docker/                # Docker infrastructure
-│   ├── Dockerfile         # Multi-stage build (CPU + GPU targets)
-│   ├── docker-compose.yml # Service definitions (4 profiles)
-│   └── docker-entrypoint.sh # Lazy-loading entrypoint
-├── scripts/               # Utility scripts (e.g., deanonymize.py)
-│   ├── deanonymize.py     # Reverse anonymization script
-│   ├── get_metrics.py     # Aggregate performance statistics
-│   ├── get_runs_metrics.py # Multiple run benchmarking
-│   ├── get_ticket_count.py # Ticket counting utility
-│   └── count_eng.py       # English word counter for CSVs
-├── src/anon/              # Main application source code
-│   ├── __init__.py
-│   ├── config.py          # Configuration, constants, and database functions
-│   ├── engine.py          # Core anonymization logic and Presidio orchestration
-│   ├── processors.py      # File-specific processing classes (PDF, DOCX, etc.)
-│   ├── repository.py      # Database operations layer
-│   └── slm/               # SLM integration module
-│       ├── anonymizers/   # Task 3: End-to-end anonymization
-│       ├── detectors/     # Task 2: SLM as an entity detector
-│       ├── mappers/       # Task 1: SLM for entity mapping
-│       ├── client.py      # Ollama client
-│       └── prompts.py     # Prompt management
-├── tests/                 # Integration and unit tests
-├── db/                    # (Generated) SQLite database for entity storage
-├── logs/                  # (Generated) Execution reports
-├── models/                # (Generated) Downloaded NLP models
-├── output/                # (Generated) Anonymized output files
-├── prompts/               # Directory for SLM prompt templates
-├── pyproject.toml         # Project dependencies for `uv`
-├── uv.lock                # Locked dependency versions
-└── README.md              # This file
-```
-
 ## Prerequisites
+
+> **For evaluators/reviewers:** The quickest way to reproduce results is using Docker (see [Docker Usage](#docker-usage-recommended)). For local execution, see [Local Installation](#local-installation-with-uv).
 
 ### Docker Usage (Recommended)
 
@@ -432,7 +65,7 @@ Tesseract OCR, Ollama, spaCy models, and transformer models are all handled auto
 
 For running without Docker, the following are required:
 
-1.  **`uv` Tool**:
+1.  **`uv` Tool** (recommended) or **`pip`**:
     - **Windows:** `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
     - **Linux/macOS:** `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
@@ -444,6 +77,10 @@ For running without Docker, the following are required:
 3.  **Ollama** (for SLM features only):
     - Follow the [Ollama installation guide](https://ollama.com/download).
     - Pull a model: `ollama run llama3`
+
+4. **NVIDIA GPU** (for GPU acceleration without Docker):
+    - NVIDIA driver compatible with CUDA 12.8+
+    - Python 3.12+
 
 ## Setup and Execution
 
@@ -550,7 +187,7 @@ docker compose -f docker/docker-compose.yml --profile slm up -d ollama
 docker compose -f docker/docker-compose.yml --profile slm run --rm anon /data/input/file.txt --slm-detector
 ```
 
-### Local Installation
+### Local Installation (with `uv`)
 
 1. **Clone the repository:**
    ```bash
@@ -567,6 +204,57 @@ docker compose -f docker/docker-compose.yml --profile slm run --rm anon /data/in
    ```bash
    uv sync
    ```
+   *On the first run, the required AI models will be downloaded, which may take a few minutes.*
+
+### Local Installation with GPU (without `uv`)
+
+This method replicates the Docker GPU environment locally using `pip`. Requires an NVIDIA GPU with drivers compatible with CUDA 12.8+.
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/AnonShield/AnonLFI3.0.git
+   cd AnonLFI3.0
+   ```
+
+2. **Install system dependencies (Ubuntu/Debian):**
+   ```bash
+   sudo apt update && sudo apt install -y \
+       python3.12 python3.12-venv python3.12-dev \
+       tesseract-ocr tesseract-ocr-por \
+       libmagic1 build-essential curl git
+   ```
+
+3. **Create and activate a virtual environment:**
+   ```bash
+   python3.12 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+4. **Install project dependencies:**
+   ```bash
+   pip install .
+   ```
+
+5. **Install PyTorch with CUDA 12.8 support:**
+   ```bash
+   pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128
+   ```
+
+6. **Install CuPy for GPU-accelerated operations:**
+   ```bash
+   pip install cupy-cuda12x==12.3.0
+   ```
+
+7. **Set the Secret Key:**
+   ```bash
+   export ANON_SECRET_KEY='your-super-secret-key-here'
+   ```
+
+8. **Run the tool:**
+   ```bash
+   python anon.py path/to/your/file.txt
+   ```
+
    *On the first run, the required AI models will be downloaded, which may take a few minutes.*
 
 ## Usage
@@ -605,7 +293,7 @@ uv run anon.py --list-languages
 
 ### SLM Integration (Experimental)
 
-The SLM integration allows you to leverage a local language model for more advanced, context-aware PII detection. It offers three distinct operational modes. For a detailed technical overview, see the [SLM Integration Guide](./SLM_INTEGRATION_GUIDE.md).
+The SLM integration allows you to leverage a local language model for more advanced, context-aware PII detection. It offers three distinct operational modes.
 
 **Task 1: Map Potential Entities (for Analysis)**
 This mode scans a document and generates a detailed report (`.jsonl` and `.csv`) of potential PII, along with confidence scores and reasoning from the SLM. It does not anonymize the file. It's an analytical tool to help you understand a document's PII surface or develop new recognizers.
@@ -652,7 +340,7 @@ uv run anon.py chat_logs.txt --anonymization-strategy slm
 
 - `--preserve-entities <TYPES>`: A comma-separated list of entity types to *not* anonymize (e.g., `"LOCATION,HOSTNAME"`).
 - `--allow-list <TERMS>`: A comma-separated list of terms to ignore during anonymization.
-- `--slug-length <NUM>`: Sets the character length of the hash in the slug (1-64). Defaults to the full 64-character hash.
+- `--slug-length <NUM>`: Sets the character length of the hash in the slug (0-64). If 0, only the entity type is used. Default: `64`.
 - `--anonymization-config <PATH>`: Path to a JSON file with advanced rules for structured files (see Advanced Configuration section).
 
 #### SLM Options
@@ -676,7 +364,7 @@ uv run anon.py chat_logs.txt --anonymization-strategy slm
 - `--min-word-length <NUM>`: Minimum character length for a word to be processed. Default: `0` (no limit).
 - `--technical-stoplist <TERMS>`: A comma-separated list of custom words to add to the technical stoplist.
 - `--skip-numeric`: If set, numeric-only strings will not be anonymized.
-- `--anonymization-strategy <strategy>`: Anonymization strategy. Options: `presidio` (full analysis), `fast` (optimized), `balanced` (mix of speed/accuracy), `slm` (end-to-end SLM). Default: `presidio`.
+- `--anonymization-strategy <strategy>`: Anonymization strategy. Options: `presidio` (full Presidio pipeline, default), `filtered` (filtered scope), `hybrid` (Presidio detection + custom replacement), `standalone` (experimental), `slm` (end-to-end SLM). Default: `presidio`.
 - `--transformer-model <model>`: Transformer model for NER detection. Options: `Davlan/xlm-roberta-base-ner-hrl` (default, multilingual), `attack-vector/SecureModernBERT-NER` (cybersecurity-focused), `dslim/bert-base-NER` (English-only, fast). Default: `Davlan/xlm-roberta-base-ner-hrl`.
 - `--regex-priority`: Give priority to custom regex recognizers over model-based ones (adds 0.15 to regex pattern scores).
 - `--db-mode <MODE>`: Sets the database mode. Options: `persistent` (saves to disk), `in-memory` (temporary database). Default: `persistent`.
@@ -794,7 +482,7 @@ uv run anon.py large_dataset/ --optimize
 ```
 
 This enables:
-- Filtered anonymization strategy (uses Presidio with filtered scope - fastest, recommended)
+- Filtered anonymization strategy (Presidio with filtered scope)
 - In-memory database (no disk I/O)
 - Caching enabled
 - Minimum word length of 3 characters
@@ -808,7 +496,7 @@ For fine-tuned control, use individual flags:
 uv run anon.py file.csv --use-cache --max-cache-size 50000
 ```
 
-**Fast Strategy:**
+**Filtered Strategy:**
 ```bash
 uv run anon.py file.json --anonymization-strategy filtered
 ```
@@ -826,6 +514,272 @@ uv run anon.py huge_file.pdf --disable-gc
 **Database Tuning:**
 ```bash
 uv run anon.py dataset/ --db-synchronous-mode OFF
+```
+
+## System Architecture
+
+The tool is designed with a modular, layered architecture to separate responsibilities and allow for extensibility. The following diagram illustrates the main components and workflows.
+
+```mermaid
+%% Anonymization Architecture Flow (AnonLFI 3.0 with SLM)
+graph TD
+    A[User] -- "uv run anon.py <file> [args]" --> B(anon.py CLI);
+
+    subgraph "1. Orchestration & File Processing"
+        B -- "Instantiates" --> Orch(AnonymizationOrchestrator);
+        B -- "Gets Processor" --> F(ProcessorRegistry);
+        F -- "e.g., .pdf" --> P_PDF(PdfFileProcessor);
+        P_PDF -- "Extracts" --> RawText(Raw Text Content);
+    end
+
+    subgraph "2. Anonymization Core"
+        RawText -- "orchestrator.anonymize()" --> Orch;
+        Orch -- "Selects Strategy (--strategy)" --> STR_CHOICE{Strategy};
+        STR_CHOICE -- "'presidio', 'filtered', 'hybrid', 'standalone'" --> PRESIDIO_STR(Traditional Strategy);
+        STR_CHOICE -- "'slm' or '--slm-detector'" --> SLM_STR(SLM Strategy);
+    end
+
+    subgraph "3a. Traditional Engine (Presidio/Regex)"
+        PRESIDIO_STR -- "Uses" --> Presidio(Presidio Engine);
+        Presidio -- "Loads Models" --> Models(NLP Models);
+        Presidio -- "Uses Recognizers" --> Regex(Custom Recognizers);
+        Presidio -- "Generates Slug" --> Anonymizer(CustomSlugAnonymizer);
+        Anonymizer -- "HMAC + DB" --> DB[(entities.db)];
+        Anonymizer -- "Replaces PII" --> AnonymizedText1[Anonymized Text];
+    end
+
+    subgraph "3b. SLM Engine (Ollama)"
+        SLM_STR -- "Uses" --> SLM_MOD(src/anon/slm/);
+        SLM_MOD -- "Sends Prompt" --> Client(OllamaClient);
+        Client -- "Queries" --> SLM_LLM(Local LLM e.g., Llama3);
+        SLM_LLM -- "Returns Response" --> Client;
+        Client -- "Result to" --> SLM_MOD;
+        SLM_MOD -- "Generates Output" --> AnonymizedText2[Anonymized Text or Entity Map];
+    end
+
+    subgraph "4. Output Generation"
+        AnonymizedText1 --> P_PDF;
+        AnonymizedText2 --> P_PDF;
+        P_PDF -- "Writes File" --> OUT(output/anon_file...);
+        B -- "Writes Report" --> LOG(logs/report.txt);
+    end
+```
+
+## Technology Stack
+
+- **[Presidio](https://microsoft.github.io/presidio/):** Core engine for PII identification and anonymization.
+- **[spaCy](https://spacy.io/) & [Hugging Face Transformers](https://huggingface.co/docs/transformers/index):** NLP and Named Entity Recognition (NER).
+- **[Ollama](https://ollama.com/):** Local Small Language Models (SLMs) for advanced anonymization tasks.
+- **[Pandas](https://pandas.pydata.org/):** Structured data processing (CSV, XLSX).
+- **[PyMuPDF](https://pymupdf.readthedocs.io/en/latest/) & [python-docx](https://python-docx.readthedocs.io/en/latest/):** PDF and DOCX parsing.
+- **[Pytesseract](https://github.com/madmaze/pytesseract):** OCR for text extraction from images.
+- **[ijson](https://github.com/ICRAR/ijson):** Streaming large JSON files.
+- **[orjson](https://github.com/ijl/orjson):** JSON serialization/deserialization.
+- **[openpyxl](https://openpyxl.readthedocs.io/):** Excel file processing.
+- **[lxml](https://lxml.de/):** XML parsing and processing.
+
+## Anonymization Mechanism
+
+For each sensitive entity detected, the system:
+
+1. Normalizes the entity text (removes extra spaces).
+2. Generates an **HMAC-SHA256** hash using the `ANON_SECRET_KEY`.
+3. Stores the full hash (64 characters) as a unique identifier in the database.
+4. Substitutes the entity in text with a slug of configurable length (e.g., `[PERSON_a1b2c3d4]`).
+
+The same entity always produces the same slug, maintaining referential consistency across the anonymized output.
+
+**Note:** The `slm` strategy uses a different, context-aware mechanism and does not rely on HMAC hashing or the database.
+
+## Database Schema
+
+The tool uses a SQLite database (`db/entities.db`) to persist the mapping between original entities and their anonymized slugs.
+
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `id` | INTEGER | Primary key. |
+| `entity_type` | TEXT | The type of the entity (e.g., `PERSON`, `LOCATION`). |
+| `original_name` | TEXT | The original text of the detected entity. |
+| `slug_name` | TEXT | The short hash (slug) displayed in the anonymized text. |
+| `full_hash` | TEXT | The full HMAC-SHA256 hash (UNIQUE constraint). |
+| `first_seen` | TEXT | Timestamp of when the entity was first seen. |
+| `last_seen` | TEXT | Timestamp of when the entity was last seen. |
+
+## Supported Entities & Languages
+
+### Detected Entity Types
+
+The system detects and anonymizes the following PII and technical entity types:
+
+**Standard PII Entities:**
+
+`PERSON`, `LOCATION`, `ORGANIZATION`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `USERNAME`, `PASSWORD`
+
+**Cybersecurity & Technical Entities (Custom Recognizers):**
+
+`IP_ADDRESS`, `URL`, `HOSTNAME`, `MAC_ADDRESS`, `FILE_PATH`, `HASH`, `AUTH_TOKEN`, `CVE_ID`, `CPE_STRING`, `CERT_SERIAL`, `CERTIFICATE`, `CRYPTOGRAPHIC_KEY`, `UUID`, `PGP_BLOCK`, `PORT`, `OID`
+
+**Additional Entities (SecureModernBERT-NER model only):**
+
+`MALWARE`, `REGISTRY_KEY`, `THREAT_ACTOR`, `PLATFORM`, `PRODUCT`, `SECTOR`, `TOOL`, `CAMPAIGN`, `MITRE_TACTIC`, `SERVICE`
+
+**Non-PII Entities (Automatically Preserved):**
+
+`CARDINAL`, `ORDINAL`, `QUANTITY`, `MONEY`, `PERCENT`, `TIME`, `LANGUAGE`, `LAW`, `EVENT`, `WORK_OF_ART`, `FAC`
+
+### Supported Languages
+
+The tool supports 24 languages for entity detection via the multilingual transformer model:
+
+| Code | Language | Code | Language | Code | Language |
+|:-----|:---------|:-----|:---------|:-----|:---------|
+| `ca` | Catalan | `fr` | French | `pl` | Polish |
+| `zh` | Chinese | `de` | German | `pt` | Portuguese |
+| `hr` | Croatian | `el` | Greek | `ro` | Romanian |
+| `da` | Danish | `it` | Italian | `ru` | Russian |
+| `nl` | Dutch | `ja` | Japanese | `sl` | Slovenian |
+| `en` | English | `ko` | Korean | `es` | Spanish |
+| `fi` | Finnish | `lt` | Lithuanian | `sv` | Swedish |
+| `mk` | Macedonian | `nb` | Norwegian Bokmål | `uk` | Ukrainian |
+
+### Transformer Models
+
+| Model | Scope | Languages |
+|:------|:------|:----------|
+| `Davlan/xlm-roberta-base-ner-hrl` (default) | General-purpose NER | Multilingual (24 languages) |
+| `attack-vector/SecureModernBERT-NER` | Cybersecurity-focused NER | English |
+| `dslim/bert-base-NER` | General-purpose NER | English |
+
+## Anonymization Strategies
+
+The anonymization logic is encapsulated in interchangeable strategy classes following the Strategy Design Pattern. Each strategy can be selected via `--anonymization-strategy`.
+
+| Strategy | Class | Description |
+|:---------|:------|:------------|
+| `presidio` (default) | `FullPresidioStrategy` | Full Presidio pipeline with all available recognizers. Uses both AnalyzerEngine and AnonymizerEngine. |
+| `filtered` | `FilteredPresidioStrategy` | Presidio pipeline with a curated, filtered set of recognizers. |
+| `hybrid` | `HybridPresidioStrategy` | Presidio AnalyzerEngine for detection with manual text replacement instead of AnonymizerEngine. |
+| `standalone` | `StandaloneStrategy` | Bypasses Presidio entirely, loading NER models directly and handling all detection and replacement manually. Experimental. |
+| `slm` | `SLMAnonymizationStrategy` | Uses a local SLM via Ollama for end-to-end contextual anonymization. Does not use HMAC hashing. Experimental. |
+
+**Custom Regex Entities:**
+
+All Presidio-based strategies (`presidio`, `filtered`, `hybrid`) load custom regex recognizers for cybersecurity-specific patterns (IP addresses, CVE IDs, hashes, etc.). The `--regex-priority` flag increases regex recognizer scores by 0.15 to prioritize pattern-based detection over model-based detection.
+
+**Memory Requirements:**
+
+| Strategy | Approximate Memory |
+|:---------|:-------------------|
+| `presidio`, `filtered`, `hybrid` | ~2 GB (Presidio + Transformer model) |
+| `standalone` | ~1.5 GB (Transformer model only) |
+| `slm` | Depends on the SLM model size |
+
+## Repository Structure
+
+```
+.
+├── anon.py                          # CLI entry point
+├── pyproject.toml                   # Project metadata and dependencies
+├── uv.lock                          # Dependency lock file
+├── run.sh                           # Docker orchestration script
+├── anonymization_config.json        # Default anonymization config
+├── anonymization_config_cve.json    # CVE-specific config
+│
+├── docker/
+│   ├── Dockerfile                   # Multi-stage build (CPU + GPU)
+│   ├── docker-compose.yml           # Service profiles
+│   └── docker-entrypoint.sh         # Container entrypoint
+│
+├── src/anon/                        # Core library
+│   ├── config.py                    # Entity mappings, language lists
+│   ├── engine.py                    # AnonymizationOrchestrator
+│   ├── strategies.py                # FullPresidio, Filtered, Hybrid strategies
+│   ├── standalone_strategy.py       # StandaloneStrategy
+│   ├── entity_detector.py           # NER entity detection
+│   ├── processors.py                # File processors (Text, PDF, CSV, etc.)
+│   ├── repository.py                # EntityRepository (SQLite)
+│   ├── database.py                  # Thread-safe DB writer queue
+│   ├── hash_generator.py            # HMAC-SHA256 hash generation
+│   ├── cache_manager.py             # LRU cache
+│   ├── security.py                  # Key validation
+│   ├── model_manager.py             # Model loading and management
+│   ├── tqdm_handler.py              # Progress bar handler
+│   ├── core/
+│   │   ├── config_loader.py         # Configuration loading
+│   │   └── protocols.py             # Protocol interfaces
+│   ├── evaluation/
+│   │   ├── ground_truth.py          # Ground truth handling
+│   │   ├── hash_tracker.py          # Hash tracking for evaluation
+│   │   └── metrics_calculator.py    # Evaluation metrics
+│   └── slm/
+│       ├── client.py                # OllamaClient
+│       ├── prompts.py               # Prompt management
+│       ├── ollama_manager.py        # Ollama lifecycle management
+│       ├── anonymizers/
+│       │   └── slm_anonymizer.py    # SLMAnonymizationStrategy
+│       ├── detectors/
+│       │   └── slm_detector.py      # SLMEntityDetector
+│       └── mappers/
+│           └── entity_mapper.py     # Entity mapping
+│
+├── prompts/                         # SLM prompt templates
+│   ├── entity_detector/             # Detector prompts (v1–v4)
+│   ├── entity_mapper/               # Mapper prompts (v1, v11)
+│   └── full_anonymizer/             # Anonymizer prompts (v1)
+│
+├── scripts/                         # Utility scripts
+│   ├── deanonymize.py               # Controlled de-anonymization
+│   ├── evaluate.py                  # Evaluation metrics
+│   ├── create_ground_truth.py       # Ground truth generation
+│   ├── sample.py                    # Data sampling
+│   ├── generate_cve_dataset.py      # CVE dataset generation
+│   ├── analyze_entity_map.py        # Entity map analysis
+│   ├── analyze_json.py              # JSON analysis
+│   ├── cluster_entities.py          # Entity clustering (HDBSCAN)
+│   ├── get_metrics.py               # Performance statistics
+│   ├── get_runs_metrics.py          # Multi-run metrics
+│   ├── get_ticket_count.py          # Ticket counting
+│   ├── count_eng.py                 # English word counting
+│   ├── export_and_clear_db.py       # DB export/clear
+│   ├── slm_regex_generator.py       # SLM-based regex generation
+│   ├── estimate.py                  # Size estimation
+│   ├── estimate_regression.py       # Regression estimation
+│   ├── generate_heatmap_chart.py    # Heatmap visualization
+│   └── utils.py                     # Shared utilities
+│
+├── tests/                           # Test suite
+│   ├── test_anon_integration.py     # Integration tests
+│   ├── test_anon_config.py          # Configuration tests
+│   ├── test_json_anonymization.py   # JSON processing tests
+│   ├── test_pii_leak.py             # PII leak detection tests
+│   ├── test_security.py             # Security tests
+│   ├── test_secret_key_validation.py
+│   ├── test_deanonymization.py      # De-anonymization tests
+│   ├── test_evaluation.py           # Evaluation tests
+│   ├── test_slm_cache.py            # SLM cache tests
+│   ├── test_slm_detector.py         # SLM detector tests
+│   └── ...                          # Additional test modules
+│
+├── benchmark/                       # Benchmarking suite
+│   ├── benchmark.py                 # Main benchmark orchestrator
+│   ├── analyze_benchmark_scientific.py  # Statistical analysis
+│   ├── visualization/               # Charts and visualization
+│   │   ├── charts.py                # Chart generation
+│   │   ├── config.py                # Visualization config
+│   │   └── statistics.py            # Statistical computations
+│   ├── orchestrated_results/        # Benchmark results
+│   ├── overhead_calibration/        # Overhead measurement
+│   └── README.md                    # Benchmark documentation
+│
+├── docs/                            # Documentation
+│   ├── ANONYMIZATION_STRATEGIES.md  # Strategy technical guide
+│   ├── EVALUATION_GUIDE.md          # Quality evaluation workflow
+│   ├── SLM_INTEGRATION_GUIDE.md     # SLM architecture guide
+│   ├── UTILITY_SCRIPTS_GUIDE.md     # Scripts reference
+│   └── cluster_analysis_documentation.md  # Clustering guide
+│
+└── examples/
+    └── teste-exemplo-artigo.txt     # Example input file
 ```
 
 ## Architecture Deep Dive
@@ -849,7 +803,7 @@ The `AnonymizationOrchestrator` is the central coordinator of the anonymization 
 
 **Responsibilities:**
 - Initializes and holds the Presidio `AnalyzerEngine` and `AnonymizerEngine`.
-- Selects the appropriate anonymization strategy (`presidio`, `fast`, `balanced`, `slm`) based on user input.
+- Selects the appropriate anonymization strategy (`presidio`, `filtered`, `hybrid`, `standalone`, `slm`) based on user input.
 - Injects the required dependencies (engines, detectors, etc.) into the chosen strategy.
 - Manages the overall workflow, including the fallback mechanism for batch processing failures.
 - Collects and maintains entity statistics for reporting.
@@ -861,10 +815,10 @@ The core anonymization logic is encapsulated within a set of interchangeable str
 
 - **Decoupled Logic**: Each strategy is self-contained. It receives its required dependencies (like `analyzer_engine`, `entity_detector`, `cache_manager`) upon creation.
 - **Key Strategies**:
-    1.  **`FullPresidioStrategy` (Comprehensive):** Contains the logic for the full Presidio pipeline, using all available recognizers for the highest accuracy. Uses both Presidio's AnalyzerEngine and AnonymizerEngine.
-    2.  **`FilteredPresidioStrategy` (Optimal Performance - RECOMMENDED):** Uses the complete Presidio pipeline (both AnalyzerEngine and AnonymizerEngine) but with a filtered, curated set of recognizers. This is the fastest strategy due to reduced detection scope.
-    3.  **`HybridPresidioStrategy` (Custom Replacement):** Uses Presidio's AnalyzerEngine with filtered scope (same as Filtered) for entity detection, but implements manual text replacement in Python instead of using AnonymizerEngine.
-    4.  **`StandaloneStrategy` (Zero Presidio - EXPERIMENTAL):** Bypasses Presidio entirely, loading models directly and handling all detection and replacement manually. Theoretical maximum performance.
+    1.  **`FullPresidioStrategy`:** Full Presidio pipeline with all available recognizers. Uses both Presidio's AnalyzerEngine and AnonymizerEngine.
+    2.  **`FilteredPresidioStrategy`:** Presidio pipeline (AnalyzerEngine + AnonymizerEngine) with a filtered, curated set of recognizers.
+    3.  **`HybridPresidioStrategy`:** Presidio's AnalyzerEngine with filtered scope for entity detection, with manual text replacement in Python instead of AnonymizerEngine.
+    4.  **`StandaloneStrategy` (Experimental):** Bypasses Presidio entirely, loading models directly and handling all detection and replacement manually.
     5.  **`SLMAnonymizationStrategy` (Experimental):** Uses a local SLM to perform end-to-end contextual anonymization.
 
 #### 3. File Processors (`processors.py`)
@@ -968,100 +922,83 @@ To prevent database write locks from blocking the main processing threads, all d
 
 ### Memory Management
 
-
-
 The tool employs several strategies for efficient memory management, crucial for processing large files:
 
-
-
 1.  **Streaming for Large Files:**
-
     -   **PDFs:** Processed page-by-page with explicit cleanup of PyMuPDF page objects (`page.clean_contents()`, `del page`) to prevent memory accumulation.
-
     -   **JSON:** Uses `ijson` for streaming large JSON arrays and line-by-line processing for `.jsonl` files, avoiding loading entire files into memory.
-
     -   **CSV/XLSX:** Processes CSV files in chunks using Pandas and XLSX files by iterating through cells without loading the full workbook at once.
 
 2.  **Garbage Collection Control:** Provides an option to disable Python's automatic garbage collection (`--disable-gc`) for large single-file processing, which can reduce overhead at the cost of higher peak memory usage. Explicit `gc.collect()` calls are strategically placed, especially during PDF processing, to reclaim memory.
 
-
-
 ### Caching Strategy
-
-
 
 To enhance performance, especially for repeated anonymization of the same text fragments within a single run, the tool implements an in-memory cache:
 
-
-
 -   **LRU Cache:** Utilizes `collections.OrderedDict` to maintain a Least Recently Used (LRU) cache. When the cache limit is reached, the least recently used items are evicted.
-
 -   **Configurable Size:** The maximum number of items in the cache can be configured via `--max-cache-size` (default: 10,000).
-
 -   **Usage:** Caching is enabled with the `--use-cache` flag or automatically when the `--optimize` flag is used. Cached values (original text and its anonymized slug) are retrieved quickly, avoiding redundant entity detection and hashing.
-
-
 
 ### Fallback Architecture
 
-
-
 Robust error handling is critical, especially when dealing with varied and potentially malformed input data. The tool incorporates a "Safe Fallback Mechanism" to prevent data integrity issues and potential PII leaks during batch processing:
 
-
-
 -   **Batch Integrity Check:** After attempting to anonymize a batch of texts, the `AnonymizationOrchestrator` verifies that the number of input texts matches the number of anonymized output texts.
-
 -   **Triggering Fallback:** If a mismatch is detected (indicating a failure in batch processing for one or more items), the `_safe_fallback_processing` method is invoked.
-
 -   **Item-by-Item Processing:** The fallback mechanism re-processes the original texts one-by-one. This ensures that even if an issue occurs with a single item, it is isolated, and the remaining items can still be processed correctly. This approach guarantees atomicity and maintains alignment between input and output, preventing accidental data loss or corruption.
-
 -   **Error Handling:** Errors during fallback processing are logged, and in critical cases, the original text for the problematic item is returned to maintain file structure, preventing a complete processing halt and ensuring data alignment in structured files like CSVs or JSONs. This prevents the system from crashing or outputting an incomplete or misaligned file, which could inadvertently lead to PII exposure.
-
-
 
 ## Utility Scripts
 
-
-
 The `scripts/` directory contains several helper scripts:
 
-
-
--   `count_eng.py`: A script to count English words in a given text, potentially useful for linguistic analysis or data profiling.
-
--   `deanonymize.py`: A crucial utility that allows for the controlled reversal of anonymization. Given a generated slug and the `ANON_SECRET_KEY`, it retrieves the original sensitive data from the database.
-
+-   `deanonymize.py`: Controlled reversal of anonymization. Given a slug and the `ANON_SECRET_KEY`, retrieves original data from the database.
+-   `evaluate.py`: Runs evaluation metrics against ground truth for anonymization quality assessment.
+-   `create_ground_truth.py`: Generates ground truth files for evaluation.
+-   `sample.py`: Data sampling utility for generating random samples from files or directories.
+-   `generate_cve_dataset.py`: Generates CVE datasets following CAIS vulnerability distribution (stratified sampling).
+-   `analyze_entity_map.py`: Analyzes entity maps generated by SLM mapping.
+-   `analyze_json.py`: JSON file analysis utility.
+-   `cluster_entities.py`: Entity clustering with sentence-transformers and HDBSCAN.
 -   `get_metrics.py`: Aggregates and reports performance statistics from anonymization runs.
-
--   `get_runs_metrics.py`: Designed for benchmarking, this script collects metrics from multiple anonymization runs.
-
--   `get_ticket_count.py`: A specialized utility for counting entries or tickets, likely within specific data formats used by CSIRTs.
-
-
+-   `get_runs_metrics.py`: Collects metrics from multiple anonymization runs for benchmarking.
+-   `get_ticket_count.py`: Counts entries or tickets within CSIRT data formats.
+-   `count_eng.py`: Counts English words in text for linguistic analysis.
+-   `export_and_clear_db.py`: Exports the entity database and optionally clears it.
+-   `slm_regex_generator.py`: Uses SLM to generate regex patterns from entity examples.
 
 ## Running Tests
 
-
-
 The project uses `unittest` for its test suite. To run all tests, ensure you have the `uv` tool and project dependencies installed, then execute:
 
-
-
 ```bash
-
 uv run python -m unittest discover tests/
-
 ```
-
-
 
 This command will discover and run all test cases located in the `tests/` directory. Individual test files or classes can also be run specifically if needed (e.g., `uv run python -m unittest tests.test_anon_integration`).
 
+## Benchmarking
 
+AnonLFI includes a comprehensive benchmarking suite for comparing versions 1.0, 2.0, and 3.0 across performance, accuracy, and resource usage metrics. The benchmark framework supports:
+
+- Cross-version comparison with 40+ performance metrics
+- File format support matrix validation (TXT, CSV, JSON, XML, XLSX, DOCX, PDF, images)
+- Smoke tests, time estimation, overhead calibration, and regression estimation
+- Resume capability and fault tolerance
+- Scientific visualization with charts and statistical analysis
+
+For detailed documentation on running benchmarks, metrics reference, CLI options, and methodology, see [benchmark/README.md](benchmark/README.md).
+
+## Documentation
+
+AnonLFI provides specialized documentation for advanced features and evaluation workflows:
+
+- **[ANONYMIZATION_STRATEGIES.md](docs/ANONYMIZATION_STRATEGIES.md)** — In-depth technical guide covering all 5 anonymization strategies, regex patterns, benchmark comparisons, entity detection analysis, and GPU configuration
+- **[EVALUATION_GUIDE.md](docs/EVALUATION_GUIDE.md)** — Workflow for evaluating anonymization quality using Doccano for ground truth annotation and metrics calculation
+- **[SLM_INTEGRATION_GUIDE.md](docs/SLM_INTEGRATION_GUIDE.md)** — Architecture and usage guide for the Small Language Model (SLM) integration with Ollama, covering entity detection, mapping, and full anonymization modes
+- **[UTILITY_SCRIPTS_GUIDE.md](docs/UTILITY_SCRIPTS_GUIDE.md)** — Comprehensive reference for all utility scripts including sampling, dataset generation, evaluation, deanonymization, entity analysis, and clustering
+- **[cluster_analysis_documentation.md](docs/cluster_analysis_documentation.md)** — HDBSCAN clustering hyperparameter tuning for entity deduplication
 
 ## License
-
-
 
 This project is licensed under the Apache 3.0 License. See the [LICENSE](LICENSE) file for details.
