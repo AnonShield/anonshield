@@ -7,6 +7,19 @@ models/*
 output/*
 ignore*
 
+# Datasets folder (too large for git)
+paper_data/datasets/
+paper_data/test_minimal/datasets/
+paper_data/test_minimal/results/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Generated analysis output folders
+**/analysis/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -196,5 +209,6 @@ anonlfi_*/models/*
 anonlfi_*/logs/*
 anonlfi_*/db/*
 vulnnet*
-analysis/*
 benchmark/orchestrated_results/*
+benchmark/converted_datasets/
+benchmark/dataset_statistics/
