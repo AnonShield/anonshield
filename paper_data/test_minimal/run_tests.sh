@@ -22,6 +22,8 @@
 #   --skip-d1    Skip D1 and D1C
 #   --skip-d2    Skip D2
 #   --skip-d3    Skip D3
+#   --cpu-only   Use CPU-only PyTorch (no CUDA); pass this on machines without
+#                an NVIDIA GPU
 #   --dry-run    Print commands without executing
 # =============================================================================
 
@@ -40,6 +42,7 @@ SKIP_D1=false
 SKIP_D2=false
 SKIP_D3=false
 DRY_RUN=false
+CPU_ONLY=false
 
 for arg in "$@"; do
     case "$arg" in
@@ -47,12 +50,15 @@ for arg in "$@"; do
         --skip-d2)  SKIP_D2=true ;;
         --skip-d3)  SKIP_D3=true ;;
         --dry-run)  DRY_RUN=true ;;
+        --cpu-only) CPU_ONLY=true ;;
         -h|--help)
             sed -n '2,30p' "$0" | grep '^#' | sed 's/^# \?//'
             exit 0 ;;
     esac
 done
-
+# Derive CPU_FLAG — forwarded to every benchmark.py invocation
+CPU_FLAG=""
+[[ "$CPU_ONLY" == "true" ]] && CPU_FLAG="--cpu-only"
 # ── Helpers ──────────────────────────────────────────────────────────────────
 PASS=0
 FAIL=0
@@ -62,7 +68,7 @@ run_cmd() {
     echo ""
     echo "  \$ $*"
     if [[ "$DRY_RUN" == "false" ]]; then
-        if "$@"; then
+        if "$@" $CPU_FLAG; then
             PASS=$((PASS + 1))
         else
             FAIL=$((FAIL + 1))
@@ -95,6 +101,7 @@ echo "  AnonShield — Minimal Smoke Test"
 echo "  test_minimal : $TEST"
 echo "  benchmark.py : $BENCHMARK"
 [[ "$DRY_RUN" == "true" ]] && echo "  DRY RUN enabled"
+[[ "$CPU_ONLY" == "true" ]] && echo "  CPU ONLY   : --cpu-only passed to all benchmark invocations"
 echo "======================================================================"
 
 # ── D1 — OpenVAS (3 targets × 4 native formats) ──────────────────────────────
