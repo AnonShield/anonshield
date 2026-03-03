@@ -121,7 +121,7 @@ VERSION_CONFIGS = {
     AnonVersion.V3_0: VersionConfig(
         version=AnonVersion.V3_0,
         relative_path=".",
-        venv_name=".venv_benchmark",
+        venv_name=".venv",
         # v3.0: All v2.0 formats + .log, .jsonl, .tif, .webp, .jp2, .pnm (19 formats)
         supported_extensions=(
             ".txt", ".log", ".pdf", ".docx", ".csv", ".xlsx", ".xml",
@@ -350,9 +350,19 @@ class EnvironmentSetup:
         self.gpu_mode = gpu_mode
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self._uv_path = self._find_uv()
+        if self._uv_path is None:
+            print("")
+            print("  [ERROR] 'uv' is required but was not found.")
+            print("  Install it with one of:")
+            print("    curl -LsSf https://astral.sh/uv/install.sh | sh")
+            print("    pip install uv       # if pip is available")
+            print("    brew install uv      # macOS / Linuxbrew")
+            print("  Then re-run the script.")
+            print("")
+            sys.exit(1)
 
-    def _find_uv(self) -> str:
-        """Find the uv binary in common locations, installing it if absent."""
+    def _find_uv(self) -> Optional[str]:
+        """Find the uv binary in common locations. Returns None if not found."""
         candidates = [
             "uv",  # In PATH
             os.path.expanduser("~/.local/bin/uv"),
@@ -363,7 +373,7 @@ class EnvironmentSetup:
 
         for candidate in candidates:
             if shutil.which(candidate):
-                return candidate
+                return shutil.which(candidate)
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 return candidate
 
@@ -371,28 +381,7 @@ class EnvironmentSetup:
         if result.returncode == 0:
             return result.stdout.strip()
 
-        # uv not found — install it via pip (uv is available as a PyPI package)
-        print(f"  [INFO] 'uv' not found — installing via pip...")
-        install_result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--quiet", "uv"],
-            capture_output=True, text=True
-        )
-        if install_result.returncode == 0:
-            # Re-check common locations after install
-            for candidate in candidates:
-                if shutil.which(candidate):
-                    print(f"  [OK] 'uv' installed at: {shutil.which(candidate)}")
-                    return shutil.which(candidate)
-                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-                    print(f"  [OK] 'uv' installed at: {candidate}")
-                    return candidate
-            # Last resort: run as python module
-            print(f"  [INFO] Running uv as 'python -m uv'")
-            return f"{sys.executable} -m uv"  # handled below
-        else:
-            print(f"  [WARN] Could not install uv: {install_result.stderr.strip()}")
-
-        return "uv"  # let it fail with a clear error
+        return None
 
     def setup(self, force: bool = False) -> bool:
         """Setup the virtual environment for a version."""
@@ -443,11 +432,7 @@ class EnvironmentSetup:
         """Run uv sync to install dependencies."""
         print(f"  [INFO] Running 'uv sync'...")
 
-        # Support 'python -m uv' fallback (path contains spaces)
-        if " " in self._uv_path:
-            cmd = self._uv_path.split() + ["sync"]
-        else:
-            cmd = [self._uv_path, "sync"]
+        cmd = [self._uv_path, "sync"]
 
         # Show the command being run
         log.write(f"Running: {' '.join(cmd)}\n")
@@ -2978,7 +2963,7 @@ class BenchmarkOrchestrator:
         excluded_extensions = {".anonymous", ".anon", ".bak", ".tmp"}
 
         # Directories to skip during recursive scan
-        skip_dirs = {".venv", ".venv_benchmark", ".git", "node_modules",
+        skip_dirs = {".venv", ".venv", ".git", "node_modules",
                      "__pycache__", ".mypy_cache", ".tox", "benchmark",
                      "anonlfi_1.0", "anonlfi_2.0", "output"}
 
@@ -3277,7 +3262,7 @@ def main():
             VERSION_CONFIGS[AnonVersion.V3_0] = VersionConfig(
                 version=AnonVersion.V3_0,
                 relative_path=".",
-                venv_name=".venv_benchmark",
+                venv_name=".venv",
                 supported_extensions=(
                     ".txt", ".log", ".pdf", ".docx", ".csv", ".xlsx", ".xml",
                     ".json", ".jsonl",

@@ -272,10 +272,10 @@ benchmark results from the paper. Read it fully before running anything.
 ### Step 1 — First-time environment setup
 
 `benchmark.py` automatically creates and manages its own virtual environment
-(`.venv_benchmark/`) the first time any script is run. **No manual setup needed.**
+(`.venv/`) the first time any script is run. **No manual setup needed.**
 
 All scripts (`run_tests.sh`, `reproduce_all_runs.sh`, `analyze_all.sh`) detect
-whether `.venv_benchmark` exists and run `benchmark.py --force-setup` automatically
+whether `.venv` exists and run `benchmark.py --force-setup` automatically
 if it's missing.
 
 To manually trigger setup (e.g., to switch GPU/CPU mode):

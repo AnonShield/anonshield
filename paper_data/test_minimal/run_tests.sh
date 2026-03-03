@@ -60,15 +60,15 @@ CPU_FLAG=""
 [[ "$CPU_ONLY" == "true" ]] && CPU_FLAG="--cpu-only"
 
 # ── Python resolution ─────────────────────────────────────────────────────────
-# benchmark.py creates .venv_benchmark automatically on first run.
+# benchmark.py creates .venv automatically on first run.
 # convert_d1_to_d1c.py and analyze_benchmark_scientific.py need venv packages,
-# so we use .venv_benchmark/bin/python3 once it exists.
-VENV_PY="$WORKSPACE_ROOT/.venv_benchmark/bin/python3"
+# so we use .venv/bin/python3 once it exists.
+VENV_PY="$WORKSPACE_ROOT/.venv/bin/python3"
 
 bootstrap_venv() {
     if [[ ! -x "$VENV_PY" ]]; then
         echo ""
-        echo "  .venv_benchmark not found — running benchmark.py --setup --force-setup to create it..."
+        echo "  .venv not found — running benchmark.py --setup --force-setup to create it..."
         python3 "$BENCHMARK" --setup --force-setup $CPU_FLAG
         if [[ ! -x "$VENV_PY" ]]; then
             echo "  ERROR: venv setup failed. Check benchmark.py output above."

@@ -14,7 +14,7 @@ Output structure mirrors the original D1C_converted/:
   <output>/json/<target>/<target>_xml.json
   <output>/pdf_images/<target>/<target>_images.pdf
 
-Usage (from workspace root, with .venv_benchmark activated):
+Usage (from workspace root, with .venv activated):
   python3 paper_data/scripts/convert_d1_to_d1c.py \\
       --source  paper_data/datasets/D1_openvas \\
       --output  paper_data/datasets/D1C_converted \\
@@ -68,7 +68,7 @@ def check_dependencies() -> bool:
         log.error("Missing required packages:")
         for m in missing:
             log.error("  %s", m)
-        log.error("Activate .venv_benchmark: source .venv_benchmark/bin/activate")
+        log.error("Activate .venv: source .venv/bin/activate")
         return False
     return True
 

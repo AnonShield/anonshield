@@ -19,7 +19,7 @@ fi
 echo ""
 
 # Activate virtual environment
-source /home/kapelinski/Documents/tool/.venv_benchmark/bin/activate
+source /home/kapelinski/Documents/tool/.venv/bin/activate
 
 # List of subdirectories to analyze
 SUBDIRS=(

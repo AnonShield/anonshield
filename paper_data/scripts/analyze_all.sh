@@ -19,11 +19,11 @@ PAPER_DATA="$WORKSPACE_ROOT/paper_data"
 RESULTS_DIR="$PAPER_DATA/results"
 ANALYZER="$WORKSPACE_ROOT/benchmark/analyze_benchmark_scientific.py"
 OVERHEAD_CSV="$RESULTS_DIR/overhead_calibration__v3__all_strategies__10runs/benchmark_results.csv"
-VENV_PY="$WORKSPACE_ROOT/.venv_benchmark/bin/python3"
+VENV_PY="$WORKSPACE_ROOT/.venv/bin/python3"
 
 # ── Auto-bootstrap venv if needed ────────────────────────────────────────
 if [[ ! -x "$VENV_PY" ]]; then
-    echo "  .venv_benchmark not found — running benchmark.py --setup --force-setup..."
+    echo "  .venv not found — running benchmark.py --setup --force-setup..."
     python3 "$WORKSPACE_ROOT/benchmark/benchmark.py" --setup --force-setup
     if [[ ! -x "$VENV_PY" ]]; then
         echo "ERROR: venv setup failed."

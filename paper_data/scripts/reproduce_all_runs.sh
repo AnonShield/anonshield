@@ -75,13 +75,13 @@ CPU_FLAG=""
 
 # ── Python resolution ─────────────────────────────────────────────────────────
 # benchmark.py manages its own venvs and is called with system python3.
-# convert_d1_to_d1c.py and analyze_all.sh need packages from .venv_benchmark.
-VENV_PY="$WORKSPACE_ROOT/.venv_benchmark/bin/python3"
+# convert_d1_to_d1c.py and analyze_all.sh need packages from .venv.
+VENV_PY="$WORKSPACE_ROOT/.venv/bin/python3"
 
 bootstrap_venv() {
     if [[ ! -x "$VENV_PY" ]]; then
         echo ""
-        echo "  .venv_benchmark not found — running benchmark.py --setup --force-setup..."
+        echo "  .venv not found — running benchmark.py --setup --force-setup..."
         python3 "$BENCHMARK" --setup --force-setup $CPU_FLAG
         if [[ ! -x "$VENV_PY" ]]; then
             echo "  ERROR: venv setup failed."
