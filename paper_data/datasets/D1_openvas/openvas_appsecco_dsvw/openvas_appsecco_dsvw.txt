@@ -1,0 +1,5612 @@
+I Summary
+=========
+
+This document reports on the results of an automatic security scan.
+The report first summarises the results found.
+Then, for each host, the report describes every issue found.
+Please consider the advice given in each description, in order to rectify
+the issue.
+
+All dates are displayed using the timezone "Coordinated Universal Time",
+which is abbreviated "UTC".
+
+Vendor security updates are not trusted.
+
+Overrides are off.  Even when a result has an override, this report uses
+the actual threat of the result.
+
+Notes are included in the report.Information on overrides is included in the report.
+
+This report might not show details of all issues that were found.
+Issues with the threat level "Debug" are not shown.
+
+This report contains all 78 results selected by the
+filtering described above.  Before filtering there were 1257 results.
+
+Scan started: Mon Jan 26 16:34:56 2026 UTC
+Scan ended:   Mon Jan 26 18:37:11 2026 UTC
+Task:         metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67
+
+Host Summary
+************
+
+Host            Critical  High  Medium  Low  Log  False Positive
+172.30.40.1           15    17      28    6   12               0    dsvw.trabalho_vulnnet
+Total: 1              15    17      28    6   12               0
+
+
+II Results per Host
+===================
+
+Host 172.30.40.1
+****************
+
+Scanning of this host started at: Mon Jan 26 16:36:01 2026 UTC
+Number of results: 78
+
+Port Summary for Host 172.30.40.1
+---------------------------------
+
+Service (Port)          Threat Level
+8000/tcp                Critical (CVSS: 10.0)
+general/tcp             Low (CVSS: 2.6)
+general/icmp            Low (CVSS: 2.1)
+general/CPE-T           Log (CVSS: 0.0)
+
+Security Issues for Host 172.30.40.1
+------------------------------------
+
+Issue
+-----
+NVT:    Python End of Life (EOL) Detection - Linux
+OID:    1.3.6.1.4.1.25623.1.0.117199
+Threat: Critical (CVSS: 10.0)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+The Python version on the remote host has reached the end of
+  life (EOL) and should not be used anymore.
+
+Vulnerability Detection Result:
+The "Python" version on the remote host has reached the end of life.
+CPE:               cpe:/a:python:python:2.7.13
+Installed version: 2.7.13
+Location/URL:      8000/tcp
+EOL version:       2.7
+EOL date:          2020-01-01
+
+Impact:
+An EOL version of Python is not receiving any security updates
+  from the vendor. Unfixed security vulnerabilities might be leveraged by an att!
+acker to compromise
+  the security of this host.
+
+Solution:
+Solution type: VendorFix
+Update the Python version on the remote host to a still
+  supported version.
+
+Vulnerability Detection Method:
+Checks if an EOL version is present on the target host.
+Details:
+Python End of Life (EOL) Detection - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.117199)
+Version used: 2025-04-15T05:54:49Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ url: https://en.wikipedia.org/wiki/History_of_Python#Table_of_versions
+
+
+Issue
+-----
+NVT:    Python 2.7.x < 2.7.17, 3.5.x < 3.5.7, 3.6.x < 3.6.9, 3.7.x < 3.7.3 Information Disclosure Vulnerability (bpo-36216) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118225
+Threat: Critical (CVSS: 9.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an information disclosure vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+Impact:
+Information disclosure (credentials, cookies, etc. that are
+  cached against a given hostname).
+
+Solution:
+Solution type: VendorFix
+The vendor has released updates. Please see the references for
+  more information.
+
+Affected Software/OS:
+Python 2.7.x prior to version 2.7.17, versions 3.5.x prior to 3.5.7,
+  3.6.x prior to 3.6.9 and 3.7.x prior to 3.7.3.
+
+Vulnerability Insight:
+Python is affected by improper Handling of Unicode Encoding
+  (with an incorrect netloc) during NFKC normalization.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.7.x < 2.7.17, 3.5.x < 3.5.7, 3.6.x < 3.6.9, 3.7.x < 3.7.3 Informati...
+(OID: 1.3.6.1.4.1.25623.1.0.118225)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2019-9636
+ url: https://python-security.readthedocs.io/vuln/urlsplit-nfkc-normalization.html
+ advisory-id: bpo-36216
+ cert-bund: WID-SEC-2024-1600
+ cert-bund: CB-K20/0041
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2020-1839
+ dfn-cert: DFN-CERT-2020-1540
+ dfn-cert: DFN-CERT-2020-1078
+ dfn-cert: DFN-CERT-2020-0231
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2020-0111
+ dfn-cert: DFN-CERT-2020-0102
+ dfn-cert: DFN-CERT-2020-0048
+ dfn-cert: DFN-CERT-2019-2252
+ dfn-cert: DFN-CERT-2019-2078
+ dfn-cert: DFN-CERT-2019-1877
+ dfn-cert: DFN-CERT-2019-1339
+ dfn-cert: DFN-CERT-2019-1288
+ dfn-cert: DFN-CERT-2019-1285
+ dfn-cert: DFN-CERT-2019-1095
+ dfn-cert: DFN-CERT-2019-0941
+ dfn-cert: DFN-CERT-2019-0915
+ dfn-cert: DFN-CERT-2019-0912
+ dfn-cert: DFN-CERT-2019-0841
+ dfn-cert: DFN-CERT-2019-0770
+ dfn-cert: DFN-CERT-2019-0702
+ dfn-cert: DFN-CERT-2019-0565
+
+
+Issue
+-----
+NVT:    Python < 3.9.5 Authentication Bypass Vulnerability - Linux
+OID:    1.3.6.1.4.1.25623.1.0.113820
+Threat: Critical (CVSS: 9.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an authentication bypass vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.9.5
+Installation
+path / port:       8000/tcp
+
+Impact:
+Successful exploitation would allow an attacker to
+  gain unauthorized access to the target system.
+
+Solution:
+Solution type: VendorFix
+Update to version 3.9.5 or later.
+
+Affected Software/OS:
+Python through version 3.9.4.
+
+Vulnerability Insight:
+The vulnerability exists in the ipaddress library,
+  which mishandles leading zero characters in the octets of an IP address string!
+.
+  This would allow an attacker to bypass IP-based access control.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.9.5 Authentication Bypass Vulnerability - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.113820)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2021-29921
+ url: https://bugs.python.org/issue36384
+ url: https://docs.python.org/3/whatsnew/changelog.html#python-3-9-5-final
+ cert-bund: WID-SEC-2023-2460
+ cert-bund: WID-SEC-2022-1908
+ cert-bund: WID-SEC-2022-0624
+ cert-bund: WID-SEC-2022-0464
+ cert-bund: CB-K21/0783
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2021-2354
+ dfn-cert: DFN-CERT-2021-2353
+ dfn-cert: DFN-CERT-2021-1801
+ dfn-cert: DFN-CERT-2021-1534
+ dfn-cert: DFN-CERT-2021-1414
+ dfn-cert: DFN-CERT-2021-1303
+ dfn-cert: DFN-CERT-2021-1184
+ dfn-cert: DFN-CERT-2021-0956
+
+
+Issue
+-----
+NVT:    Python 2.7.x < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 Information Disclosure Vulnerability (bpo-36742) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118202
+Threat: Critical (CVSS: 9.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an information disclosure vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+Impact:
+Information disclosure (credentials, cookies, etc. that are
+  cached against a given hostname).
+
+Solution:
+Solution type: VendorFix
+The vendor has released updates. Please see the references for
+  more information.
+
+Affected Software/OS:
+Python 2.7.x  prior to version 2.7.17, versions 3.5.x prior to 3.5.8,
+  3.6.x prior to 3.6.9 and 3.7.x prior to 3.7.4.
+
+Vulnerability Insight:
+'urlsplit' is affected by a NFKD normalization vulnerability
+  in 'user:password@'.
+  Note: The fix for 'CVE-2019-9636' ignored the 'user/password' before '@' where!
+as it still
+  allowed to exploit the vulnerability.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.7.x < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 Informati...
+(OID: 1.3.6.1.4.1.25623.1.0.118202)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2019-10160
+ url: https://python-security.readthedocs.io/vuln/urlsplit-nfkc-normalization2.html
+ advisory-id: bpo-36742
+ cert-bund: WID-SEC-2024-1598
+ cert-bund: CB-K20/0109
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2020-1839
+ dfn-cert: DFN-CERT-2020-1540
+ dfn-cert: DFN-CERT-2020-0231
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2020-0111
+ dfn-cert: DFN-CERT-2019-2560
+ dfn-cert: DFN-CERT-2019-2252
+ dfn-cert: DFN-CERT-2019-2078
+ dfn-cert: DFN-CERT-2019-2046
+ dfn-cert: DFN-CERT-2019-1883
+ dfn-cert: DFN-CERT-2019-1877
+ dfn-cert: DFN-CERT-2019-1678
+ dfn-cert: DFN-CERT-2019-1610
+ dfn-cert: DFN-CERT-2019-1596
+ dfn-cert: DFN-CERT-2019-1370
+ dfn-cert: DFN-CERT-2019-1339
+ dfn-cert: DFN-CERT-2019-1288
+ dfn-cert: DFN-CERT-2019-1263
+
+
+Issue
+-----
+NVT:    Python <= 3.10.x Buffer Overflow Vulnerability - Linux
+OID:    1.3.6.1.4.1.25623.1.0.148942
+Threat: Critical (CVSS: 9.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a buffer overflow vulnerability in the _sha3
+  module.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.7.16
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.7.16, 3.8.16, 3.9.16, 3.10.9 or later.
+
+Affected Software/OS:
+Python prior to version 3.7.16, version 3.8.x through 3.8.15,
+  3.9.x through 3.9.15 and 3.10.x through 3.10.8.
+
+Vulnerability Insight:
+The Keccak XKCP SHA-3 reference implementation has an integer
+  overflow and resultant buffer overflow that allows attackers to execute arbitr!
+ary code or
+  eliminate expected cryptographic properties. This occurs in the sponge functio!
+n interface.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python <= 3.10.x Buffer Overflow Vulnerability - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.148942)
+Version used: 2023-10-19T05:05:21Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2022-37454
+ url: https://python-security.readthedocs.io/vuln/sha3-buffer-overflow.html
+ url: https://github.com/python/cpython/issues/98517
+ cert-bund: WID-SEC-2023-0561
+ cert-bund: WID-SEC-2023-0138
+ cert-bund: WID-SEC-2022-1816
+ dfn-cert: DFN-CERT-2026-0215
+ dfn-cert: DFN-CERT-2023-0552
+ dfn-cert: DFN-CERT-2023-0422
+ dfn-cert: DFN-CERT-2023-0028
+ dfn-cert: DFN-CERT-2022-2869
+ dfn-cert: DFN-CERT-2022-2793
+ dfn-cert: DFN-CERT-2022-2715
+ dfn-cert: DFN-CERT-2022-2639
+ dfn-cert: DFN-CERT-2022-2638
+ dfn-cert: DFN-CERT-2022-2598
+ dfn-cert: DFN-CERT-2022-2535
+ dfn-cert: DFN-CERT-2022-2523
+ dfn-cert: DFN-CERT-2022-2420
+ dfn-cert: DFN-CERT-2022-2380
+
+
+Issue
+-----
+NVT:    Python < 2.7.14, 3.3.x < 3.3.7, 3.4.x < 3.4.7, 3.5.x < 3.5.4, 3.6.x < 3.6.2 Expat 2.2 (bpo-29591) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118255
+Threat: Critical (CVSS: 9.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to various security vulnerabilities in bundled
+  expat.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.14
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 2.7.14, 3.3.7, 3.4.7, 3.5.4, 3.6.2 or later.
+
+Affected Software/OS:
+Python prior to version 2.7.14, versions 3.3.x prior to 3.3.7,
+  3.4.x prior to 3.4.7, 3.5.x prior to 3.5.3 and 3.6.x prior to 3.6.2.
+
+Vulnerability Insight:
+The following vulnerabilities exist:
+  - CVE-2016-0718: Expat allows context-dependent attackers to cause a denial of!
+ service (crash) or
+  possibly execute arbitrary code via a malformed input document, which triggers!
+ a buffer overflow.
+  - CVE-2016-4472: The overflow protection in Expat is removed by compilers with!
+ certain optimization
+  settings, which allows remote attackers to cause a denial of service (crash) o!
+r possibly execute
+  arbitrary code via crafted XML data.
+  NOTE: this vulnerability exists because of an incomplete fix for CVE-2015-1283!
+ and CVE-2015-2716.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.14, 3.3.x < 3.3.7, 3.4.x < 3.4.7, 3.5.x < 3.5.4, 3.6.x < 3.6.2 ...
+(OID: 1.3.6.1.4.1.25623.1.0.118255)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2016-0718
+ cve: CVE-2016-4472
+ url: https://python-security.readthedocs.io/vuln/expat-2.2.html
+ advisory-id: bpo-29591
+ cert-bund: WID-SEC-2025-0045
+ cert-bund: WID-SEC-2025-0044
+ cert-bund: CB-K17/1709
+ cert-bund: CB-K17/1010
+ cert-bund: CB-K17/0536
+ cert-bund: CB-K17/0492
+ cert-bund: CB-K17/0356
+ cert-bund: CB-K16/1849
+ cert-bund: CB-K16/1816
+ cert-bund: CB-K16/1740
+ cert-bund: CB-K16/1739
+ cert-bund: CB-K16/1182
+ cert-bund: CB-K16/1090
+ cert-bund: CB-K16/0939
+ cert-bund: CB-K16/0931
+ cert-bund: CB-K16/0808
+ cert-bund: CB-K16/0754
+ dfn-cert: DFN-CERT-2025-0064
+ dfn-cert: DFN-CERT-2020-0405
+ dfn-cert: DFN-CERT-2018-1673
+ dfn-cert: DFN-CERT-2018-1408
+ dfn-cert: DFN-CERT-2017-1785
+ dfn-cert: DFN-CERT-2017-1044
+ dfn-cert: DFN-CERT-2017-0551
+ dfn-cert: DFN-CERT-2017-0508
+ dfn-cert: DFN-CERT-2017-0366
+ dfn-cert: DFN-CERT-2016-1954
+ dfn-cert: DFN-CERT-2016-1923
+ dfn-cert: DFN-CERT-2016-1844
+ dfn-cert: DFN-CERT-2016-1843
+ dfn-cert: DFN-CERT-2016-1248
+ dfn-cert: DFN-CERT-2016-1160
+ dfn-cert: DFN-CERT-2016-1000
+ dfn-cert: DFN-CERT-2016-0984
+ dfn-cert: DFN-CERT-2016-0864
+ dfn-cert: DFN-CERT-2016-0861
+ dfn-cert: DFN-CERT-2016-0810
+
+
+Issue
+-----
+NVT:    Python < 2.7.14, 3.4.x < 3.4.8, 3.5.x < 3.5.5 PyString_DecodeEscape integer overflow (bpo-30657) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118247
+Threat: Critical (CVSS: 9.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+CPython (aka Python) is prone to an integer overflow
+  vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.14
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 2.7.14, 3.4.8, 3.5.5 or later.
+
+Affected Software/OS:
+Python prior to version 2.7.14, versions 3.4.x prior to 3.4.8
+  and 3.5.x prior to 3.5.5.
+
+Vulnerability Insight:
+An integer overflow in the 'PyString_DecodeEscape' function in
+  'stringobject.c' is resulting in a heap-based buffer overflow (and possible ar!
+bitrary code
+  execution).
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.14, 3.4.x < 3.4.8, 3.5.x < 3.5.5 PyString_DecodeEscape integer ...
+(OID: 1.3.6.1.4.1.25623.1.0.118247)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2017-1000158
+ url: https://python-security.readthedocs.io/vuln/pystring_decodeescape-integer-overflow.html
+ advisory-id: bpo-30657
+ cert-bund: CB-K17/2057
+ dfn-cert: DFN-CERT-2020-0405
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2018-2030
+ dfn-cert: DFN-CERT-2018-1942
+ dfn-cert: DFN-CERT-2018-0995
+ dfn-cert: DFN-CERT-2018-0733
+ dfn-cert: DFN-CERT-2018-0659
+ dfn-cert: DFN-CERT-2017-2145
+
+
+Issue
+-----
+NVT:    Python Multiple Vulnerabilities (Aug 2024) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.170805
+Threat: Critical (CVSS: 9.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an infinite loop vulnerability leading to a
+  denial of service (DoS).
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.8.20
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.6 or
+  later.
+
+Affected Software/OS:
+Python prior to version 3.8.20, 3.9.x prior to 3.9.20, 3.10.x
+  prior to 3.10.15, 3.11.x prior to 3.11.10 and 3.12.x prior to 3.12.6.
+
+Vulnerability Insight:
+The following flaws exist:
+  - CVE-2024-6232: Regular expressions that allowed excessive backtracking durin!
+g tarfile.TarFile
+  header parsing are vulnerable to ReDoS via specifically-crafted tar archives.
+  - CVE-2024-7592: When parsing cookies that contained backslashes for quoted ch!
+aracters in the
+  cookie value, the parser would use an algorithm with quadratic complexity, res!
+ulting in excess
+  CPU resources being used while parsing the value.
+  - CVE-2024-8088: When iterating over names of entries in a zip archive (for ex!
+ample, methods of
+  'zipfile.Path' like 'namelist()', 'iterdir()', etc) the process can be put int!
+o an infinite loop
+  with a maliciously crafted zip archive. This defect applies when reading only !
+metadata or
+  extracting the contents of the zip archive.This vulnerability only affects zip!
+file.Path, while the
+  more common API zipfile.ZipFile class is unaffected.
+  - CVE-2024-45490, CVE-2024-45491, CVE-2024-45492: Vulnerabilities in libexpat !
+prior to version
+  2.6.3
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python Multiple Vulnerabilities (Aug 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.170805)
+Version used: 2025-10-10T05:39:02Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2024-6232
+ cve: CVE-2024-7592
+ cve: CVE-2024-8088
+ cve: CVE-2024-45490
+ cve: CVE-2024-45491
+ cve: CVE-2024-45492
+ url: https://github.com/python/cpython/issues/123678
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/JRYFTPRHZRTLMZLWQEUHZSJXNHM4ACTY/
+ url: https://github.com/python/cpython/issues/121285
+ url: https://github.com/python/cpython/pull/121286
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/HXJAAAALNUNGCQUS2W7WR6GFIZIHFOOK/
+ url: https://github.com/python/cpython/issues/123067
+ url: https://github.com/python/cpython/pull/123075
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/GNFCKVI4TCATKQLALJ5SN4L4CSPSMILU/
+ url: https://github.com/python/cpython/issues/122905
+ url: https://github.com/python/cpython/pull/122906
+ url: https://docs.python.org/3/whatsnew/changelog.html#python-3-12-6-final
+ url: https://docs.python.org/3.11/whatsnew/changelog.html#python-3-11-10-final
+ url: https://docs.python.org/3.10/whatsnew/changelog.html#python-3-10-15-final
+ url: https://docs.python.org/3.9/whatsnew/changelog.html#python-3-9-20-final
+ url: https://docs.python.org/3.8/whatsnew/changelog.html#python-3-8-20-final
+ url: https://osv.dev/vulnerability/PSF-2024-9
+ url: https://osv.dev/vulnerability/PSF-2024-10
+ url: https://osv.dev/vulnerability/PSF-2024-11
+ url: https://osv.dev/vulnerability/CVE-2024-45490
+ url: https://osv.dev/vulnerability/CVE-2024-45491
+ url: https://osv.dev/vulnerability/CVE-2024-45492
+ cert-bund: WID-SEC-2025-0794
+ cert-bund: WID-SEC-2025-0225
+ cert-bund: WID-SEC-2025-0166
+ cert-bund: WID-SEC-2025-0148
+ cert-bund: WID-SEC-2025-0144
+ cert-bund: WID-SEC-2025-0143
+ cert-bund: WID-SEC-2025-0135
+ cert-bund: WID-SEC-2025-0001
+ cert-bund: WID-SEC-2024-3692
+ cert-bund: WID-SEC-2024-3691
+ cert-bund: WID-SEC-2024-3684
+ cert-bund: WID-SEC-2024-3196
+ cert-bund: WID-SEC-2024-3195
+ cert-bund: WID-SEC-2024-3191
+ cert-bund: WID-SEC-2024-2047
+ cert-bund: WID-SEC-2024-1951
+ cert-bund: WID-SEC-2024-1914
+ cert-bund: WID-SEC-2024-1889
+ dfn-cert: DFN-CERT-2025-3631
+ dfn-cert: DFN-CERT-2025-3045
+ dfn-cert: DFN-CERT-2025-2077
+ dfn-cert: DFN-CERT-2025-1477
+ dfn-cert: DFN-CERT-2025-1463
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2025-1433
+ dfn-cert: DFN-CERT-2025-1148
+ dfn-cert: DFN-CERT-2025-0933
+ dfn-cert: DFN-CERT-2025-0880
+ dfn-cert: DFN-CERT-2025-0854
+ dfn-cert: DFN-CERT-2025-0509
+ dfn-cert: DFN-CERT-2025-0179
+ dfn-cert: DFN-CERT-2025-0175
+ dfn-cert: DFN-CERT-2025-0170
+ dfn-cert: DFN-CERT-2025-0041
+ dfn-cert: DFN-CERT-2024-3317
+ dfn-cert: DFN-CERT-2024-3316
+ dfn-cert: DFN-CERT-2024-3315
+ dfn-cert: DFN-CERT-2024-3314
+ dfn-cert: DFN-CERT-2024-3313
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-3103
+ dfn-cert: DFN-CERT-2024-3083
+ dfn-cert: DFN-CERT-2024-2994
+ dfn-cert: DFN-CERT-2024-2993
+ dfn-cert: DFN-CERT-2024-2937
+ dfn-cert: DFN-CERT-2024-2933
+ dfn-cert: DFN-CERT-2024-2783
+ dfn-cert: DFN-CERT-2024-2743
+ dfn-cert: DFN-CERT-2024-2664
+ dfn-cert: DFN-CERT-2024-2571
+ dfn-cert: DFN-CERT-2024-2540
+ dfn-cert: DFN-CERT-2024-2525
+ dfn-cert: DFN-CERT-2024-2512
+ dfn-cert: DFN-CERT-2024-2509
+ dfn-cert: DFN-CERT-2024-2497
+ dfn-cert: DFN-CERT-2024-2492
+ dfn-cert: DFN-CERT-2024-2466
+ dfn-cert: DFN-CERT-2024-2463
+ dfn-cert: DFN-CERT-2024-2456
+ dfn-cert: DFN-CERT-2024-2425
+ dfn-cert: DFN-CERT-2024-2399
+ dfn-cert: DFN-CERT-2024-2340
+ dfn-cert: DFN-CERT-2024-2332
+ dfn-cert: DFN-CERT-2024-2251
+ dfn-cert: DFN-CERT-2024-2245
+ dfn-cert: DFN-CERT-2024-2244
+ dfn-cert: DFN-CERT-2024-2227
+
+
+Issue
+-----
+NVT:    Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 Python Issue (bpo-41944) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118185
+Threat: Critical (CVSS: 9.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a remote code execution (RCE)
+  vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.6.13
+Installation
+path / port:       8000/tcp
+
+Impact:
+If an attacker can compromise the pythontest.net server, they gain
+  arbitrary code execution on all buildbots.
+  If an attacker has control over the network connection of a machine running th!
+e Python test suite,
+  they gain arbitrary code execution there.
+
+Solution:
+Solution type: VendorFix
+Update to version 3.6.13, 3.7.10, 3.8.7, 3.9.1 or later.
+
+Affected Software/OS:
+Python prior to version 3.6.13, versions 3.7.x prior to 3.7.10,
+  3.8.x prior to 3.8.7 and 3.9.x prior to 3.9.1.
+
+Vulnerability Insight:
+By default, the tests are not run with network resources enabled
+  and so the Python test suite is safe. But if the Python test suite is run expl!
+icitly with the
+  'network' resource enabled (-u network or -u all command line option), the CJK!
+ codecs tests of the
+  Python test suite run eval() on content received via HTTP from pythontest.net.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 Python Issue (...
+(OID: 1.3.6.1.4.1.25623.1.0.118185)
+Version used: 2024-06-28T15:38:46Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2020-27619
+ url: https://python-security.readthedocs.io/vuln/cjk-codec-download-eval.html
+ advisory-id: bpo-41944
+ cert-bund: WID-SEC-2025-0227
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2021-2350
+ dfn-cert: DFN-CERT-2021-1801
+ dfn-cert: DFN-CERT-2021-1330
+ dfn-cert: DFN-CERT-2021-1110
+ dfn-cert: DFN-CERT-2021-1080
+ dfn-cert: DFN-CERT-2021-1053
+ dfn-cert: DFN-CERT-2021-0533
+ dfn-cert: DFN-CERT-2021-0444
+ dfn-cert: DFN-CERT-2021-0430
+ dfn-cert: DFN-CERT-2020-2805
+ dfn-cert: DFN-CERT-2020-2757
+
+
+Issue
+-----
+NVT:    Python 2.7 Command Injection Vulnerability (Sep 2018) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118272
+Threat: Critical (CVSS: 9.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to multiple vulnerabilities.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     See advisory
+Installation
+path / port:       8000/tcp
+
+Impact:
+This can result in Denial of service, Information gain via
+  injection of arbitrary files on the system or entire drive. This attack appear!
+ to be
+  exploitable via Passage of unfiltered user input to the function.
+  This vulnerability appears to have been fixed in versions after commit
+  'add531a1e55b0a739b0f42582f1c9747e5649ace'.
+
+Solution:
+Solution type: VendorFix
+See the referenced vendor advisory for a solution.
+
+Affected Software/OS:
+Python version 2.7.
+
+Vulnerability Insight:
+Python (CPython) version 2.7 contains a command injection
+  vulnerability in shutil module.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.7 Command Injection Vulnerability (Sep 2018) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.118272)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2018-1000802
+ url: https://bugs.python.org/issue32056
+ cert-bund: WID-SEC-2024-1181
+ dfn-cert: DFN-CERT-2020-0231
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2020-0111
+ dfn-cert: DFN-CERT-2019-1610
+ dfn-cert: DFN-CERT-2018-2332
+ dfn-cert: DFN-CERT-2018-2030
+ dfn-cert: DFN-CERT-2018-1969
+ dfn-cert: DFN-CERT-2018-1942
+ dfn-cert: DFN-CERT-2018-1918
+
+
+Issue
+-----
+NVT:    Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.8, 3.9.x < 3.9.2 Python Issue (bpo-42938) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118178
+Threat: Critical (CVSS: 9.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a buffer overflow vulnerability in
+  'PyCArg_repr'.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.6.13
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.6.13, 3.7.10, 3.8.8, 3.9.2 or later.
+
+Affected Software/OS:
+Python prior to version 3.6.13, versions 3.7.x prior to
+  3.7.10, 3.8.x prior to 3.8.8 and 3.9.x prior to 3.9.2.
+
+Vulnerability Insight:
+A buffer overflow in 'PyCArg_repr' in '_ctypes/callproc.c'
+  exists, which may lead to remote code execution in certain Python applications!
+ that accept
+  floating-point numbers as untrusted input, as demonstrated by a '1e300' argume!
+nt to
+  'c_double.from_param'. This occurs because sprintf is used unsafely.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.8, 3.9.x < 3.9.2 Python Issue (...
+(OID: 1.3.6.1.4.1.25623.1.0.118178)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2021-3177
+ url: https://python-security.readthedocs.io/vuln/ctypes-buffer-overflow-pycarg_repr.html
+ advisory-id: bpo-42938
+ cert-bund: WID-SEC-2024-1591
+ cert-bund: WID-SEC-2022-0767
+ cert-bund: WID-SEC-2022-0495
+ cert-bund: CB-K22/0076
+ cert-bund: CB-K21/0782
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2023-1200
+ dfn-cert: DFN-CERT-2023-0082
+ dfn-cert: DFN-CERT-2022-1438
+ dfn-cert: DFN-CERT-2022-0351
+ dfn-cert: DFN-CERT-2021-1801
+ dfn-cert: DFN-CERT-2021-1541
+ dfn-cert: DFN-CERT-2021-1414
+ dfn-cert: DFN-CERT-2021-1330
+ dfn-cert: DFN-CERT-2021-1080
+ dfn-cert: DFN-CERT-2021-1079
+ dfn-cert: DFN-CERT-2021-1071
+ dfn-cert: DFN-CERT-2021-0810
+ dfn-cert: DFN-CERT-2021-0675
+ dfn-cert: DFN-CERT-2021-0533
+ dfn-cert: DFN-CERT-2021-0430
+ dfn-cert: DFN-CERT-2021-0367
+ dfn-cert: DFN-CERT-2021-0297
+ dfn-cert: DFN-CERT-2021-0151
+
+
+Issue
+-----
+NVT:    Python < 2.7.14, 3.3.x < 3.3.7, 3.4.x < 3.4.7, 3.5.x < 3.5.4, 3.6.x < 3.6.2 Expat 2.2.1 (bpo-30694) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118250
+Threat: Critical (CVSS: 9.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+'Expat' in Python is prone to multiple vulnerabilities.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.14
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 2.7.14, 3.3.7, 3.4.7, 3.5.4, 3.6.2 or later.
+
+Affected Software/OS:
+Python prior to version 2.7.14, versions 3.3.x prior to 3.3.7,
+  3.4.x prior to 3.4.7, 3.5.x prior to 3.5.4 and 3.6.x prior to 3.6.2.
+
+Vulnerability Insight:
+The following vulnerabilities exist:
+  - CVE-2012-0876: The XML parser (xmlparse.c) in expat computes hash values wit!
+hout restricting the
+  ability to trigger hash collisions predictably, which allows context-dependent!
+ attackers to cause
+  a denial of service (CPU consumption) via an XML file with many identifiers wi!
+th the same value.
+  - CVE-2016-0718: Expat allows context-dependent attackers to cause a denial of!
+ service (crash) or
+  possibly execute arbitrary code via a malformed input document, which triggers!
+ a buffer overflow.
+  - CVE-2016-9063: An integer overflow during the parsing of XML using the Expat!
+ library. This
+  vulnerability affects Firefox < 50.
+  - CVE-2017-9233: XML External Entity vulnerability in libexpat 2.2.0 and earli!
+er (Expat XML Parser
+  Library) allows attackers to put the parser in an infinite loop using a malfor!
+med external entity
+  definition from an external DTD.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.14, 3.3.x < 3.3.7, 3.4.x < 3.4.7, 3.5.x < 3.5.4, 3.6.x < 3.6.2 ...
+(OID: 1.3.6.1.4.1.25623.1.0.118250)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2012-0876
+ cve: CVE-2016-0718
+ cve: CVE-2016-9063
+ cve: CVE-2017-9233
+ url: https://python-security.readthedocs.io/vuln/expat-2.2.1.html
+ advisory-id: bpo-30694
+ cert-bund: WID-SEC-2025-0370
+ cert-bund: WID-SEC-2025-0045
+ cert-bund: WID-SEC-2022-2037
+ cert-bund: CB-K17/1709
+ cert-bund: CB-K17/1622
+ cert-bund: CB-K17/1585
+ cert-bund: CB-K17/1563
+ cert-bund: CB-K17/1218
+ cert-bund: CB-K17/1066
+ cert-bund: CB-K17/1010
+ cert-bund: CB-K17/0536
+ cert-bund: CB-K17/0492
+ cert-bund: CB-K17/0356
+ cert-bund: CB-K16/1849
+ cert-bund: CB-K16/1816
+ cert-bund: CB-K16/1774
+ cert-bund: CB-K16/1740
+ cert-bund: CB-K16/1739
+ cert-bund: CB-K16/1182
+ cert-bund: CB-K16/1090
+ cert-bund: CB-K16/0939
+ cert-bund: CB-K16/0931
+ cert-bund: CB-K16/0808
+ cert-bund: CB-K16/0754
+ cert-bund: CB-K16/0112
+ cert-bund: CB-K15/1792
+ cert-bund: CB-K15/0987
+ cert-bund: CB-K13/0845
+ dfn-cert: DFN-CERT-2025-0064
+ dfn-cert: DFN-CERT-2022-2566
+ dfn-cert: DFN-CERT-2020-0405
+ dfn-cert: DFN-CERT-2018-1673
+ dfn-cert: DFN-CERT-2018-1408
+ dfn-cert: DFN-CERT-2017-1785
+ dfn-cert: DFN-CERT-2017-1692
+ dfn-cert: DFN-CERT-2017-1655
+ dfn-cert: DFN-CERT-2017-1630
+ dfn-cert: DFN-CERT-2017-1262
+ dfn-cert: DFN-CERT-2017-1101
+ dfn-cert: DFN-CERT-2017-1044
+ dfn-cert: DFN-CERT-2017-0551
+ dfn-cert: DFN-CERT-2017-0508
+ dfn-cert: DFN-CERT-2017-0366
+ dfn-cert: DFN-CERT-2016-1954
+ dfn-cert: DFN-CERT-2016-1923
+ dfn-cert: DFN-CERT-2016-1875
+ dfn-cert: DFN-CERT-2016-1844
+ dfn-cert: DFN-CERT-2016-1843
+ dfn-cert: DFN-CERT-2016-1248
+ dfn-cert: DFN-CERT-2016-1160
+ dfn-cert: DFN-CERT-2016-1000
+ dfn-cert: DFN-CERT-2016-0984
+ dfn-cert: DFN-CERT-2016-0864
+ dfn-cert: DFN-CERT-2016-0861
+ dfn-cert: DFN-CERT-2016-0810
+ dfn-cert: DFN-CERT-2016-0125
+ dfn-cert: DFN-CERT-2015-1898
+ dfn-cert: DFN-CERT-2015-1035
+ dfn-cert: DFN-CERT-2013-1847
+ dfn-cert: DFN-CERT-2012-2129
+ dfn-cert: DFN-CERT-2012-1530
+ dfn-cert: DFN-CERT-2012-1522
+ dfn-cert: DFN-CERT-2012-1513
+ dfn-cert: DFN-CERT-2012-1292
+ dfn-cert: DFN-CERT-2012-1214
+ dfn-cert: DFN-CERT-2012-1213
+ dfn-cert: DFN-CERT-2012-1133
+ dfn-cert: DFN-CERT-2012-0948
+ dfn-cert: DFN-CERT-2012-0835
+ dfn-cert: DFN-CERT-2012-0693
+ dfn-cert: DFN-CERT-2012-0567
+ dfn-cert: DFN-CERT-2012-0559
+
+
+Issue
+-----
+NVT:    Python Multiple Vulnerabilities (Jun 2025) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.154642
+Threat: Critical (CVSS: 9.7)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to multiple vulnerabilities.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.9.23
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.9.23, 3.10.18, 3.11.13, 3.12.11, 3.13.4 or
+  later.
+
+Affected Software/OS:
+Python versions prior to 3.9.23, 3.10.x prior to 3.10.18,
+  3.11.x prior to 3.11.13, 3.12.x prior to 3.12.11 and 3.13.x prior to 3.13.4.
+
+Vulnerability Insight:
+The following flaws exist:
+  - CVE-2024-12718: Allows modifying some file metadata (e.g. last modified) wit!
+h filter='data' or
+  file permissions (chmod) with filter='tar' of files outside the extraction dir!
+ectory.
+  - CVE-2025-4138: Allows creating arbitrary symlinks outside the extraction dir!
+ectory during
+  extraction with filter='data'.
+  - CVE-2025-4330: Allows the extraction filter to be ignored, allowing symlink !
+targets to point
+  outside the destination directory, and the modification of some file metadata.
+  - CVE-2025-4435: Filtered members not skipped with TarFile.errorlevel = 0
+  - CVE-2025-4517: Allows arbitrary filesystem writes outside the extraction dir!
+ectory during
+  extraction with filter='data'.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python Multiple Vulnerabilities (Jun 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.154642)
+Version used: 2025-10-10T05:39:02Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2024-12718
+ cve: CVE-2025-4138
+ cve: CVE-2025-4330
+ cve: CVE-2025-4435
+ cve: CVE-2025-4517
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/MAXIJJCUUMCL7ATZNDVEGGHUMQMUUKLG/
+ url: https://mail.python.org/archives/list/security-announce@python.org/message/HE3RYGNB64QZAE3HZ6A64XC7PTQ5IGVE/
+ url: https://github.com/python/cpython/issues/135034
+ url: https://github.com/python/cpython/pull/135037
+ url: https://docs.python.org/release/3.13.4/whatsnew/changelog.html#python-3-13-4
+ url: https://docs.python.org/release/3.12.11/whatsnew/changelog.html#python-3-12-11
+ url: https://docs.python.org/release/3.11.12/whatsnew/changelog.html#python-3-11-13
+ url: https://docs.python.org/release/3.10.18/whatsnew/changelog.html
+ url: https://docs.python.org/release/3.9.23/whatsnew/changelog.html
+ url: https://gist.github.com/sethmlarson/52398e33eff261329a0180ac1d54f42f
+ url: https://osv.dev/vulnerability/PSF-2025-5
+ url: https://osv.dev/vulnerability/PSF-2025-6
+ url: https://osv.dev/vulnerability/PSF-2025-7
+ url: https://osv.dev/vulnerability/PSF-2025-8
+ url: https://osv.dev/vulnerability/PSF-2025-9
+ url: https://www.cve.org/CVERecord?id=CVE-2024-12718
+ url: https://www.cve.org/CVERecord?id=CVE-2025-4138
+ url: https://www.cve.org/CVERecord?id=CVE-2025-4330
+ url: https://www.cve.org/CVERecord?id=CVE-2025-4435
+ url: https://www.cve.org/CVERecord?id=CVE-2025-4517
+ cert-bund: WID-SEC-2025-2367
+ cert-bund: WID-SEC-2025-2363
+ cert-bund: WID-SEC-2025-2361
+ cert-bund: WID-SEC-2025-2360
+ cert-bund: WID-SEC-2025-2352
+ cert-bund: WID-SEC-2025-1850
+ cert-bund: WID-SEC-2025-1318
+ cert-bund: WID-SEC-2025-1231
+ dfn-cert: DFN-CERT-2026-0247
+ dfn-cert: DFN-CERT-2026-0243
+ dfn-cert: DFN-CERT-2025-3555
+ dfn-cert: DFN-CERT-2025-2946
+ dfn-cert: DFN-CERT-2025-2945
+ dfn-cert: DFN-CERT-2025-2938
+ dfn-cert: DFN-CERT-2025-2295
+ dfn-cert: DFN-CERT-2025-2212
+ dfn-cert: DFN-CERT-2025-2148
+ dfn-cert: DFN-CERT-2025-2047
+ dfn-cert: DFN-CERT-2025-1980
+ dfn-cert: DFN-CERT-2025-1936
+ dfn-cert: DFN-CERT-2025-1905
+ dfn-cert: DFN-CERT-2025-1868
+ dfn-cert: DFN-CERT-2025-1682
+ dfn-cert: DFN-CERT-2025-1653
+ dfn-cert: DFN-CERT-2025-1640
+ dfn-cert: DFN-CERT-2025-1489
+
+
+Issue
+-----
+NVT:    Python 2.x < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 Protection Bypass Vulnerability (bpo-35907) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118205
+Threat: Critical (CVSS: 9.1)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a protection bypass vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+The vendor has released updates. Please see the references for
+  more information.
+
+Affected Software/OS:
+Python 2.x prior to version 2.7.17, versions 3.5.x prior to 3.5.8,
+  3.6.x prior to 3.6.9 and 3.7.x prior to 3.7.4.
+
+Vulnerability Insight:
+urllib supports the 'local_file:' scheme, which makes it easier
+  for remote attackers to bypass protection mechanisms that blacklist 'file:' UR!
+Is, as demonstrated
+  by triggering a 'urllib.urlopen('local_file:///etc/passwd')' call.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.x < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 Protection ...
+(OID: 1.3.6.1.4.1.25623.1.0.118205)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2019-9948
+ url: https://python-security.readthedocs.io/vuln/urllib-local-file-scheme.html
+ advisory-id: bpo-35907
+ cert-bund: WID-SEC-2024-1599
+ cert-bund: CB-K20/0109
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2020-1839
+ dfn-cert: DFN-CERT-2020-1540
+ dfn-cert: DFN-CERT-2020-0783
+ dfn-cert: DFN-CERT-2020-0668
+ dfn-cert: DFN-CERT-2020-0200
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2019-2312
+ dfn-cert: DFN-CERT-2019-2302
+ dfn-cert: DFN-CERT-2019-2078
+ dfn-cert: DFN-CERT-2019-1877
+ dfn-cert: DFN-CERT-2019-1418
+ dfn-cert: DFN-CERT-2019-1370
+ dfn-cert: DFN-CERT-2019-1288
+ dfn-cert: DFN-CERT-2019-0770
+
+
+Issue
+-----
+NVT:    Python DoS Vulnerability (Dec 2025) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.125558
+Threat: Critical (CVSS: 9.1)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.13.11
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.14.1 or later, or to the latest
+  maintenance release of your Python version series (3.10.x, 3.12.x) once patche!
+s
+  are available. Please see the references for more information.
+
+Affected Software/OS:
+Python prior to version 3.13.11 and 3.14.x prior to 3.14.1.
+  Note: Fixes have been backported to maintenance branches (3.10, 3.12) but spec!
+ific
+  patch versions are not yet available.
+
+Vulnerability Insight:
+When reading an HTTP response from a server, if no read amount
+  is specified, the default behavior will be to use Content-Length. This allows !
+a malicious
+  server to cause the client to read large amounts of data into memory, potentia!
+lly causing
+  out-of-memory (OOM) or other DoS conditions.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Dec 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.125558)
+Version used: 2026-01-01T05:49:19Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2025-13836
+ url: https://github.com/python/cpython/issues/119451
+ url: https://github.com/python/cpython/pull/119454
+ url: https://github.com/python/cpython/commit/4ce27904b597c77d74dd93f2c912676021a99155
+ url: https://github.com/python/cpython/commit/5a4c4a033a4a54481be6870aa1896fad732555b5
+ url: https://www.cve.org/CVERecord?id=CVE-2025-13836
+ cert-bund: WID-SEC-2025-2706
+ dfn-cert: DFN-CERT-2026-0215
+ dfn-cert: DFN-CERT-2026-0174
+ dfn-cert: DFN-CERT-2026-0167
+ dfn-cert: DFN-CERT-2026-0086
+ dfn-cert: DFN-CERT-2025-3621
+
+
+Issue
+-----
+NVT:    Python Command Injection Vulnerability (Oct 2024) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.114839
+Threat: High (CVSS: 7.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a command injection vulnerability in the venv
+  module.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.9.21
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.9.21, 3.10.16, 3.11.11, 3.12.8, 3.13.1
+  or later.
+
+Affected Software/OS:
+Python versions prior to 3.9.21, 3.10.x prior to 3.10.16,
+  3.11.x prior to 3.11.11, 3.12.x prior to 3.12.8 and 3.13.x prior to 3.13.1.
+
+Vulnerability Insight:
+A vulnerability has been found in the venv module and CLI where
+  path names provided when creating a virtual environment were not quoted proper!
+ly, allowing the
+  virtual environment creator to inject commands into virtual environment 'activ!
+ation' scripts (ie
+  'source venv/bin/activate'). This means that attacker-controlled virtual envir!
+onments are able to
+  run commands when the virtual environment is activated. Virtual environments w!
+hich are not created
+  by an attacker or which aren't activated before being used (ie './venv/bin/pyt!
+hon') are not
+  affected.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python Command Injection Vulnerability (Oct 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.114839)
+Version used: 2025-02-11T05:38:07Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2024-9287
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/RSPJ2B5JL22FG3TKUJ7D7DQ4N5JRRBZL/
+ url: https://github.com/python/cpython/issues/124651
+ url: https://github.com/python/cpython/pull/124712
+ url: https://docs.python.org/release/3.13.1/whatsnew/changelog.html#changelog
+ url: https://docs.python.org/release/3.12.8/whatsnew/changelog.html#changelog
+ url: https://docs.python.org/release/3.11.11/whatsnew/changelog.html#changelog
+ url: https://docs.python.org/release/3.10.16/whatsnew/changelog.html#python-3-10-16-final
+ url: https://docs.python.org/release/3.9.21/whatsnew/changelog.html#python-3-9-21-final
+ url: https://osv.dev/vulnerability/PSF-2024-12
+ cert-bund: WID-SEC-2025-1567
+ cert-bund: WID-SEC-2025-1560
+ cert-bund: WID-SEC-2025-1559
+ cert-bund: WID-SEC-2024-3270
+ dfn-cert: DFN-CERT-2025-3555
+ dfn-cert: DFN-CERT-2025-1902
+ dfn-cert: DFN-CERT-2025-1682
+ dfn-cert: DFN-CERT-2025-1477
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2025-1148
+ dfn-cert: DFN-CERT-2025-0655
+ dfn-cert: DFN-CERT-2025-0179
+ dfn-cert: DFN-CERT-2024-3255
+ dfn-cert: DFN-CERT-2024-3220
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-3141
+ dfn-cert: DFN-CERT-2024-2837
+
+
+Issue
+-----
+NVT:    Python DoS Vulnerability (Jul 2025) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.155051
+Threat: High (CVSS: 7.8)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.9.24
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.9.24, 3.10.19, 3.11.14, 3.12.12, 3.13.6 or
+  later.
+
+Affected Software/OS:
+Python versions prior to 3.9.24, 3.10.x prior to 3.10.19,
+  3.11.x prior to 3.11.14, 3.12.x prior to 3.12.12 and 3.13.x prior to 3.13.6.
+
+Vulnerability Insight:
+There is a defect in the CPython 'tarfile' module affecting the
+  'TarFile' extraction and entry enumeration APIs. The tar implementation would !
+process tar
+  archives with negative offsets without error, resulting in an infinite loop an!
+d deadlock during
+  the parsing of maliciously crafted tar archives.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Jul 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.155051)
+Version used: 2025-12-18T05:46:55Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2025-8194
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/ZULLF3IZ726XP5EY7XJ7YIN3K5MDYR2D/
+ url: https://github.com/python/cpython/issues/130577
+ url: https://github.com/python/cpython/pull/137027
+ url: https://gist.github.com/sethmlarson/1716ac5b82b73dbcbf23ad2eff8b33e1
+ url: https://www.openwall.com/lists/oss-security/2025/07/29/1
+ url: https://osv.dev/vulnerability/PSF-2025-11
+ url: https://www.cve.org/CVERecord?id=CVE-2025-8194
+ cert-bund: WID-SEC-2026-0157
+ cert-bund: WID-SEC-2026-0153
+ cert-bund: WID-SEC-2025-2043
+ cert-bund: WID-SEC-2025-1664
+ dfn-cert: DFN-CERT-2026-0215
+ dfn-cert: DFN-CERT-2026-0202
+ dfn-cert: DFN-CERT-2025-3313
+ dfn-cert: DFN-CERT-2025-2372
+ dfn-cert: DFN-CERT-2025-2304
+ dfn-cert: DFN-CERT-2025-2235
+ dfn-cert: DFN-CERT-2025-2212
+ dfn-cert: DFN-CERT-2025-2148
+ dfn-cert: DFN-CERT-2025-2063
+
+
+Issue
+-----
+NVT:    Python Shell Command Injection Vulnerability (bpo-24778) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.113930
+Threat: High (CVSS: 7.6)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a shell command injection vulnerability in
+  the mailcap module.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.7.16
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.7.16, 3.8.16, 3.9.16, 3.10.8, 3.11
+  or later.
+
+Affected Software/OS:
+Python prior to version 3.7.16, 3.8.x prior to 3.8.16,
+  3.9.x prior to 3.9.16 and 3.10.x prior to 3.10.8.
+
+Vulnerability Insight:
+In Python (aka CPython) the mailcap module does not add escape
+  characters into commands discovered in the system mailcap file. This may allow!
+ attackers to inject
+  shell commands into applications that call mailcap.findmatch with untrusted in!
+put (if they lack
+  validation of user-provided filenames or arguments).
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python Shell Command Injection Vulnerability (bpo-24778) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.113930)
+Version used: 2025-01-21T05:37:33Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2015-20107
+ url: https://bugs.python.org/issue24778
+ url: https://github.com/python/cpython/issues/68966
+ url: https://github.com/python/cpython/issues/68966#issuecomment-1326478972
+ url: https://python-security.readthedocs.io/vuln/mailcap-shell-injection.html
+ advisory-id: bpo-24778
+ cert-bund: WID-SEC-2023-1542
+ cert-bund: WID-SEC-2023-0561
+ cert-bund: WID-SEC-2023-0395
+ cert-bund: WID-SEC-2022-0253
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2023-1517
+ dfn-cert: DFN-CERT-2023-1200
+ dfn-cert: DFN-CERT-2023-0552
+ dfn-cert: DFN-CERT-2022-2572
+ dfn-cert: DFN-CERT-2022-2264
+ dfn-cert: DFN-CERT-2022-2184
+ dfn-cert: DFN-CERT-2022-2020
+ dfn-cert: DFN-CERT-2022-1537
+ dfn-cert: DFN-CERT-2022-1307
+
+
+Issue
+-----
+NVT:    Python < 3.6.11, 3.7.x < 3.7.7, 3.8.x < 3.8.2 Use After Free Vulnerability (bpo-39421) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.170578
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an use after free vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.6.11
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.6.11, 3.7.7, 3.8.2, 3.9.0 or later.
+
+Affected Software/OS:
+Python prior to version 3.6.11, versions 3.7.x prior to 3.7.7,
+  3.8.x prior to 3.8.2 and 3.9.x prior to 3.9.0.
+
+Vulnerability Insight:
+A use-after-free exists in Python via heappushpop in heapq.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.11, 3.7.x < 3.7.7, 3.8.x < 3.8.2 Use After Free Vulnerability (...
+(OID: 1.3.6.1.4.1.25623.1.0.170578)
+Version used: 2023-10-13T05:06:10Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2022-48560
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/TRTM4UVSANUWNHC2QY2X73E5IBQLQU76/
+ url: https://bugs.python.org/issue39421
+ advisory-id: bpo-39421
+ cert-bund: WID-SEC-2024-1086
+ cert-bund: WID-SEC-2023-2119
+ dfn-cert: DFN-CERT-2025-0046
+ dfn-cert: DFN-CERT-2024-2179
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2024-1392
+ dfn-cert: DFN-CERT-2024-1325
+ dfn-cert: DFN-CERT-2024-0278
+ dfn-cert: DFN-CERT-2024-0227
+ dfn-cert: DFN-CERT-2024-0074
+ dfn-cert: DFN-CERT-2023-2485
+ dfn-cert: DFN-CERT-2023-2243
+ dfn-cert: DFN-CERT-2023-2227
+
+
+Issue
+-----
+NVT:    Python DoS Vulnerability (Oct 2022) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.104477
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.7.16
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.7.16, 3.8.16, 3.9.16, 3.10.9, 3.11.1 or
+  later.
+
+Affected Software/OS:
+Python prior to version 3.7.16, versions 3.8.x prior to 3.8.16,
+  3.9.x prior to 3.9.16, 3.10.x prior to 3.10.9 and version 3.11.0.
+
+Vulnerability Insight:
+An unnecessary quadratic algorithm exists in one path when
+  processing some inputs to the IDNA (RFC 3490) decoder, such that a crafted, un!
+reasonably long name
+  being presented to the decoder could lead to a CPU denial of service. Hostname!
+s are often supplied
+  by remote servers that could be controlled by a malicious actor. In such a sce!
+nario, they could
+  trigger excessive CPU consumption on the client attempting to make use of an a!
+ttacker-supplied
+  supposed hostname. For example, the attack payload could be placed in the Loca!
+tion header of an
+  HTTP response with status code 302.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Oct 2022) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.104477)
+Version used: 2023-10-19T05:05:21Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2022-45061
+ url: https://python-security.readthedocs.io/vuln/slow-idna-large-strings.html
+ url: https://github.com/python/cpython/issues/98433
+ cert-bund: WID-SEC-2024-0794
+ cert-bund: WID-SEC-2023-2679
+ cert-bund: WID-SEC-2023-1812
+ cert-bund: WID-SEC-2023-1793
+ cert-bund: WID-SEC-2023-1542
+ cert-bund: WID-SEC-2023-1007
+ cert-bund: WID-SEC-2023-0561
+ cert-bund: WID-SEC-2023-0255
+ cert-bund: WID-SEC-2022-2043
+ dfn-cert: DFN-CERT-2025-0132
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-3141
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2024-0227
+ dfn-cert: DFN-CERT-2023-3168
+ dfn-cert: DFN-CERT-2023-2783
+ dfn-cert: DFN-CERT-2023-1656
+ dfn-cert: DFN-CERT-2023-1517
+ dfn-cert: DFN-CERT-2023-1423
+ dfn-cert: DFN-CERT-2023-1200
+ dfn-cert: DFN-CERT-2023-1109
+ dfn-cert: DFN-CERT-2023-0886
+ dfn-cert: DFN-CERT-2023-0580
+ dfn-cert: DFN-CERT-2023-0571
+ dfn-cert: DFN-CERT-2023-0552
+ dfn-cert: DFN-CERT-2023-0429
+ dfn-cert: DFN-CERT-2023-0120
+ dfn-cert: DFN-CERT-2023-0028
+ dfn-cert: DFN-CERT-2022-2793
+ dfn-cert: DFN-CERT-2022-2698
+ dfn-cert: DFN-CERT-2022-2658
+ dfn-cert: DFN-CERT-2022-2583
+
+
+Issue
+-----
+NVT:    Python < 2.7.17, 3.x < 3.5.8, 3.6.x < 3.6.10, 3.7.x < 3.7.5 Improper Input Validation Vulnerability (bpo-34155) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118214
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+The email module in Python is vulnerable due to improper
+  input validation.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 2.7.17, 3.5.8, 3.6.10, 3.7.5 or later.
+
+Affected Software/OS:
+Python prior to version 2.7.17, versions 3.x prior to 3.5.8,
+  3.6.x prior to 3.6.10 and 3.7.x prior to 3.7.5.
+
+Vulnerability Insight:
+The email module wrongly parses email addresses that contain
+  multiple '@' characters. An application that uses the email module and impleme!
+nts some kind of
+  checks on the 'From/To' headers of a message could be tricked into accepting a!
+n email address
+  that should be denied.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.17, 3.x < 3.5.8, 3.6.x < 3.6.10, 3.7.x < 3.7.5 Improper Input V...
+(OID: 1.3.6.1.4.1.25623.1.0.118214)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2019-16056
+ url: https://python-security.readthedocs.io/vuln/email-parseaddr-domain.html
+ advisory-id: bpo-34155
+ cert-bund: WID-SEC-2024-1596
+ cert-bund: CB-K20/1049
+ cert-bund: CB-K20/0710
+ cert-bund: CB-K20/0324
+ cert-bund: CB-K20/0109
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2020-2621
+ dfn-cert: DFN-CERT-2020-2045
+ dfn-cert: DFN-CERT-2020-1839
+ dfn-cert: DFN-CERT-2020-1540
+ dfn-cert: DFN-CERT-2020-1537
+ dfn-cert: DFN-CERT-2020-0896
+ dfn-cert: DFN-CERT-2020-0550
+ dfn-cert: DFN-CERT-2020-0231
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2020-0111
+ dfn-cert: DFN-CERT-2019-2560
+ dfn-cert: DFN-CERT-2019-2327
+ dfn-cert: DFN-CERT-2019-2252
+ dfn-cert: DFN-CERT-2019-2238
+ dfn-cert: DFN-CERT-2019-2210
+ dfn-cert: DFN-CERT-2019-2198
+ dfn-cert: DFN-CERT-2019-2113
+ dfn-cert: DFN-CERT-2019-2078
+ dfn-cert: DFN-CERT-2019-1883
+ dfn-cert: DFN-CERT-2019-1876
+
+
+Issue
+-----
+NVT:    Python < 3.7.17, 3.8.x < 3.8.17, 3.9.x < 3.9.17, 3.10.x < 3.10.12, 3.11.x < 3.11.4 RCE Vulnerability - Linux
+OID:    1.3.6.1.4.1.25623.1.0.124283
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a remote code execution (RCE) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.7.17
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.7.17, 3.8.17, 3.9.17, 3.10.12, 3.11.4,
+  3.12.0 or later.
+
+Affected Software/OS:
+Python versions prior to 3.7.17, 3.8.x prior to 3.8.17, 3.9.x
+  prior to 3.9.17, 3.10.x prior to 3.10.12 and 3.11.x prior to 3.11.4.
+
+Vulnerability Insight:
+An issue in the urllib.parse component allows attackers to
+  bypass blocklisting methods by supplying a URL that starts with blank characte!
+rs.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.7.17, 3.8.x < 3.8.17, 3.9.x < 3.9.17, 3.10.x < 3.10.12, 3.11.x < ...
+(OID: 1.3.6.1.4.1.25623.1.0.124283)
+Version used: 2023-11-17T16:10:13Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2023-24329
+ url: https://github.com/python/cpython/issues/102153#issuecomment-1554965447
+ url: https://python-security.readthedocs.io/vuln/urlparse-scheme.html
+ url: https://github.com/advisories/GHSA-r32r-rqw2-wv5m
+ url: https://pointernull.com/security/python-url-parse-problem.html
+ url: https://github.com/python/cpython/issues/102153
+ cert-bund: WID-SEC-2024-1591
+ cert-bund: WID-SEC-2024-0794
+ cert-bund: WID-SEC-2024-0064
+ cert-bund: WID-SEC-2023-2964
+ cert-bund: WID-SEC-2023-2917
+ cert-bund: WID-SEC-2023-1542
+ cert-bund: WID-SEC-2023-0513
+ dfn-cert: DFN-CERT-2025-0046
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-2962
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2023-2783
+ dfn-cert: DFN-CERT-2023-2542
+ dfn-cert: DFN-CERT-2023-2237
+ dfn-cert: DFN-CERT-2023-2227
+ dfn-cert: DFN-CERT-2023-1728
+ dfn-cert: DFN-CERT-2023-1667
+ dfn-cert: DFN-CERT-2023-1472
+ dfn-cert: DFN-CERT-2023-0571
+ dfn-cert: DFN-CERT-2023-0552
+ dfn-cert: DFN-CERT-2023-0527
+ dfn-cert: DFN-CERT-2023-0525
+
+
+Issue
+-----
+NVT:    Python <= 3.12.1 'RecursionError' Vulnerability - Linux
+OID:    1.3.6.1.4.1.25623.1.0.104814
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a 'RecursionError' vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     None
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: WillNotFix
+No known solution was made available for at least one year
+  since the disclosure of this vulnerability. Likely none will be provided anymo!
+re. General solution
+  options are to upgrade to a newer release, disable respective features, remove!
+ the product or
+  replace the product by another one.
+  NOTE: email.utils.parseaddr is categorized as a Legacy API in the documentatio!
+n of the Python
+  email package. Applications should instead use the email.parser.BytesParser or
+  email.parser.Parser class.
+
+Affected Software/OS:
+The legacy email.utils.parseaddr function in Python through
+  3.12.1.
+
+Vulnerability Insight:
+The legacy email.utils.parseaddr function allows attackers to
+  trigger 'RecursionError: maximum recursion depth exceeded while calling a Pyth!
+on object' via a
+  crafted argument. This argument is plausibly an untrusted value from an applic!
+ation's input data
+  that was supposed to contain a name and an e-mail address.
+  NOTE: The vendor's perspective is that this is neither a vulnerability nor a b!
+ug. The email
+  package is intended to have size limits and to throw an exception when limits !
+are exceeded.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python <= 3.12.1 'RecursionError' Vulnerability - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.104814)
+Version used: 2024-02-05T14:36:57Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2023-36632
+ url: https://github.com/psf/advisory-database/blob/main/advisories/python/PSF-2023-4.json
+ url: https://osv.dev/list?ecosystem=&q=CVE-2023-36632
+ url: https://github.com/github/advisory-database/pull/2722
+ url: https://github.com/python/cpython/issues/103800
+ cert-bund: WID-SEC-2025-0225
+ cert-bund: WID-SEC-2024-0885
+ cert-bund: WID-SEC-2023-1561
+ dfn-cert: DFN-CERT-2024-1003
+
+
+Issue
+-----
+NVT:    Python DoS Vulnerability (Mar 2024) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.170816
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability in
+  libexpat.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.8.19
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.8.19, 3.9.19, 3.10.14, 3.11.9, 3.12.3
+  or later.
+
+Affected Software/OS:
+Python prior to version 3.8.19, 3.9.x prior to 3.9.19, 3.10.x
+  prior to 3.10.14, 3.11.x prior to 3.11.9 and 3.12.x prior to 3.12.3.
+
+Vulnerability Insight:
+libexpat allows a denial of service (resource consumption)
+  because many full reparsings are required in the case of a large token for whi!
+ch multiple buffer
+  fills are needed.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Mar 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.170816)
+Version used: 2024-10-11T15:39:44Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2023-52425
+ url: https://discuss.python.org/t/python-3-10-14-3-9-19-and-3-8-19-is-now-available/48993
+ url: https://pythoninsider.blogspot.com/2024/03/python-31014-3919-and-3819-is-now.html
+ url: https://osv.dev/vulnerability/CVE-2023-52425
+ url: https://docs.python.org/3.11/whatsnew/changelog.html#python-3-11-9-final
+ url: https://docs.python.org/3.12/whatsnew/changelog.html#python-3-12-3-final
+ cert-bund: WID-SEC-2025-0225
+ cert-bund: WID-SEC-2024-3377
+ cert-bund: WID-SEC-2024-2100
+ cert-bund: WID-SEC-2024-1656
+ cert-bund: WID-SEC-2024-1642
+ cert-bund: WID-SEC-2024-1638
+ cert-bund: WID-SEC-2024-1637
+ cert-bund: WID-SEC-2024-1474
+ cert-bund: WID-SEC-2024-1226
+ cert-bund: WID-SEC-2024-1086
+ cert-bund: WID-SEC-2024-0687
+ cert-bund: WID-SEC-2024-0278
+ dfn-cert: DFN-CERT-2025-3426
+ dfn-cert: DFN-CERT-2025-3403
+ dfn-cert: DFN-CERT-2025-3295
+ dfn-cert: DFN-CERT-2025-1477
+ dfn-cert: DFN-CERT-2025-1464
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2025-1433
+ dfn-cert: DFN-CERT-2025-0854
+ dfn-cert: DFN-CERT-2024-2463
+ dfn-cert: DFN-CERT-2024-2179
+ dfn-cert: DFN-CERT-2024-1865
+ dfn-cert: DFN-CERT-2024-1846
+ dfn-cert: DFN-CERT-2024-1833
+ dfn-cert: DFN-CERT-2024-1432
+ dfn-cert: DFN-CERT-2024-1415
+ dfn-cert: DFN-CERT-2024-1413
+ dfn-cert: DFN-CERT-2024-1325
+ dfn-cert: DFN-CERT-2024-1313
+ dfn-cert: DFN-CERT-2024-1092
+ dfn-cert: DFN-CERT-2024-0974
+ dfn-cert: DFN-CERT-2024-0871
+ dfn-cert: DFN-CERT-2024-0828
+ dfn-cert: DFN-CERT-2024-0702
+ dfn-cert: DFN-CERT-2024-0588
+ dfn-cert: DFN-CERT-2024-0339
+
+
+Issue
+-----
+NVT:    Python urllib.parse Vulnerability (bpo-43882) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.147630
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a vulnerability urllib.parse.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.6.14
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.6.14, 3.7.11, 3.8.11, 3.9.5 or later.
+
+Affected Software/OS:
+Python prior to version 3.6.14, version 3.7.x through 3.7.10,
+  3.8.x through 3.8.10 and 3.9.x through 3.9.4.
+
+Vulnerability Insight:
+A flaw was found in Python, specifically within the
+  urllib.parse module. This module helps break Uniform Resource Locator (URL) st!
+rings into
+  components. The issue involves how the urlparse method does not sanitize input!
+ and allows
+  characters like '\r' and '\n' in the URL path. This flaw allows an attacker to!
+ input a crafted
+  URL, leading to injection attacks.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python urllib.parse Vulnerability (bpo-43882) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.147630)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2022-0391
+ url: https://python-security.readthedocs.io/vuln/urllib_parse_newline_tabs.html
+ advisory-id: bpo-43882
+ cert-bund: WID-SEC-2023-0831
+ cert-bund: WID-SEC-2023-0426
+ cert-bund: WID-SEC-2022-1335
+ cert-bund: WID-SEC-2022-1228
+ cert-bund: WID-SEC-2022-0432
+ cert-bund: WID-SEC-2022-0302
+ cert-bund: WID-SEC-2022-0146
+ cert-bund: CB-K22/0310
+ dfn-cert: DFN-CERT-2025-0717
+ dfn-cert: DFN-CERT-2024-3141
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2023-2237
+ dfn-cert: DFN-CERT-2023-2227
+ dfn-cert: DFN-CERT-2023-1472
+ dfn-cert: DFN-CERT-2022-2020
+ dfn-cert: DFN-CERT-2022-1053
+ dfn-cert: DFN-CERT-2022-0968
+ dfn-cert: DFN-CERT-2022-0865
+ dfn-cert: DFN-CERT-2022-0742
+ dfn-cert: DFN-CERT-2022-0690
+ dfn-cert: DFN-CERT-2022-0618
+ dfn-cert: DFN-CERT-2022-0577
+ dfn-cert: DFN-CERT-2022-0576
+ dfn-cert: DFN-CERT-2022-0223
+
+
+Issue
+-----
+NVT:    Python DoS Vulnerability (bpo-44022) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.147771
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.6.14
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.6.14, 3.7.11, 3.8.11, 3.9.6 or later.
+
+Affected Software/OS:
+Python prior to version 3.6.14, version 3.7.x through 3.7.10,
+  3.8.x through 3.8.10 and 3.9.x through 3.9.5.
+
+Vulnerability Insight:
+If a client request a HTTP/HTTPS/FTP service which is
+  controlled by attacker, attacker can make this client hang forever, even if th!
+e client has set a
+  timeout argument.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (bpo-44022) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.147771)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2021-3737
+ url: https://python-security.readthedocs.io/vuln/urllib-100-continue-loop.html
+ advisory-id: bpo-44022
+ cert-bund: WID-SEC-2023-1524
+ cert-bund: WID-SEC-2023-0141
+ cert-bund: WID-SEC-2022-0432
+ cert-bund: WID-SEC-2022-0302
+ cert-bund: WID-SEC-2022-0011
+ cert-bund: CB-K22/0129
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-3141
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2023-1517
+ dfn-cert: DFN-CERT-2023-1423
+ dfn-cert: DFN-CERT-2023-1200
+ dfn-cert: DFN-CERT-2023-0121
+ dfn-cert: DFN-CERT-2022-1304
+ dfn-cert: DFN-CERT-2022-1294
+ dfn-cert: DFN-CERT-2022-1056
+ dfn-cert: DFN-CERT-2022-1053
+ dfn-cert: DFN-CERT-2022-0972
+ dfn-cert: DFN-CERT-2022-0968
+ dfn-cert: DFN-CERT-2022-0235
+ dfn-cert: DFN-CERT-2021-2649
+ dfn-cert: DFN-CERT-2021-2648
+ dfn-cert: DFN-CERT-2021-2353
+ dfn-cert: DFN-CERT-2021-2207
+ dfn-cert: DFN-CERT-2021-1956
+
+
+Issue
+-----
+NVT:    Python 2.7.x < 2.7.16, 3.4.x < 3.4.10, 3.5.x < 3.5.7, 3.6.x < 3.6.7, 3.7.0 Python Issue (bpo-34623) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118243
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.16
+Installation
+path / port:       8000/tcp
+
+Impact:
+Successful exploitation allows denial of service attacks
+  against Expat by constructing an XML document that would cause pathological ha!
+sh collisions
+  in Expat's internal data structures, consuming large amounts CPU and RAM.
+
+Solution:
+Solution type: VendorFix
+Update to version 2.7.16, 3.4.10, 3.5.7, 3.6.7, 3.7.1 or later.
+
+Affected Software/OS:
+Python versions 2.7.0 through 2.7.15, 3.4.0 through 3.4.9,
+  3.5.0 through 3.5.6, 3.6.0 through 3.6.6 and 3.7.0.
+
+Vulnerability Insight:
+The flaw exists because Python's elementtree C accelerator
+  fails to initialise Expat's hash salt during initialization
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.7.x < 2.7.16, 3.4.x < 3.4.10, 3.5.x < 3.5.7, 3.6.x < 3.6.7, 3.7.0 P...
+(OID: 1.3.6.1.4.1.25623.1.0.118243)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2018-14647
+ url: https://python-security.readthedocs.io/vuln/elementree_salt.html
+ url: http://www.securityfocus.com/bid/105396
+ url: https://bugs.python.org/issue34623
+ url: https://bugzilla.redhat.com/show_bug.cgi?id=CVE-2018-14647
+ advisory-id: bpo-34623
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2020-2045
+ dfn-cert: DFN-CERT-2020-0783
+ dfn-cert: DFN-CERT-2020-0668
+ dfn-cert: DFN-CERT-2020-0200
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2020-0111
+ dfn-cert: DFN-CERT-2019-2327
+ dfn-cert: DFN-CERT-2019-1610
+ dfn-cert: DFN-CERT-2019-1288
+ dfn-cert: DFN-CERT-2019-1053
+ dfn-cert: DFN-CERT-2019-0841
+ dfn-cert: DFN-CERT-2019-0565
+ dfn-cert: DFN-CERT-2019-0402
+ dfn-cert: DFN-CERT-2018-2332
+ dfn-cert: DFN-CERT-2018-2030
+ dfn-cert: DFN-CERT-2018-1994
+ dfn-cert: DFN-CERT-2018-1969
+
+
+Issue
+-----
+NVT:    Python < 2.7.15, 3.x < 3.4.9, 3.5.x < 3.5.6, 3.6.x < 3.6.5, 3.7.x < 3.7.0.beta3 Python Issue (Issue32981) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118244
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to multiple denial of service (DoS) vulnerabilities.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.15
+Installation
+path / port:       8000/tcp
+
+Impact:
+Successful exploitation will allow an attacker to conduct
+  a denial of service attack on the affected user.
+
+Solution:
+Solution type: VendorFix
+Update to version 2.7.15, 3.4.9, 3.5.6, 3.6.5,
+  3.7.0.beta3 or later.
+
+Affected Software/OS:
+Python before versions 2.7.15, 3.4.9, 3.5.6, 3.6.5
+  and 3.7.0.beta3.
+
+Vulnerability Insight:
+Python is failing to sanitize against backtracking in:
+  - CVE-2018-1060: pop3lib's apop method
+  - CVE-2018-1061: 'difflib.IS_LINE_JUNK' method
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.15, 3.x < 3.4.9, 3.5.x < 3.5.6, 3.6.x < 3.6.5, 3.7.x < 3.7.0.be...
+(OID: 1.3.6.1.4.1.25623.1.0.118244)
+Version used: 2023-10-20T16:09:12Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2018-1060
+ cve: CVE-2018-1061
+ url: https://bugs.python.org/issue32981
+ advisory-id: Issue32981
+ cert-bund: WID-SEC-2024-1602
+ cert-bund: CB-K20/0041
+ cert-bund: CB-K18/1075
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2020-0668
+ dfn-cert: DFN-CERT-2020-0231
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2020-0111
+ dfn-cert: DFN-CERT-2019-2327
+ dfn-cert: DFN-CERT-2019-1053
+ dfn-cert: DFN-CERT-2019-0565
+ dfn-cert: DFN-CERT-2019-0563
+ dfn-cert: DFN-CERT-2019-0362
+ dfn-cert: DFN-CERT-2018-2332
+ dfn-cert: DFN-CERT-2018-2030
+ dfn-cert: DFN-CERT-2018-1969
+ dfn-cert: DFN-CERT-2018-1942
+ dfn-cert: DFN-CERT-2018-1676
+ dfn-cert: DFN-CERT-2018-1531
+ dfn-cert: DFN-CERT-2018-0644
+
+
+Issue
+-----
+NVT:    Python <= 3.7.2 DoS Vulnerability (bpo-36260) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118211
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     None
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: WillNotFix
+No known solution was made available for at least one year since
+  the disclosure of this vulnerability. Likely none will be provided anymore. Ge!
+neral solution options
+  are to upgrade to a newer release, disable respective features, remove the pro!
+duct or replace the
+  product by another one.
+
+Affected Software/OS:
+Python through version 3.7.2.
+
+Vulnerability Insight:
+'Lib/zipfile.py' in Python allows remote attackers to cause
+  a DOS (resource consumption) via a ZIP bomb.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python <= 3.7.2 DoS Vulnerability (bpo-36260) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.118211)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2019-9674
+ url: https://python-security.readthedocs.io/security.html#archives-and-zip-bomb
+ advisory-id: bpo-36260
+ dfn-cert: DFN-CERT-2025-0132
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2021-0533
+ dfn-cert: DFN-CERT-2020-1613
+ dfn-cert: DFN-CERT-2020-1168
+ dfn-cert: DFN-CERT-2020-0694
+ dfn-cert: DFN-CERT-2020-0395
+
+
+Issue
+-----
+NVT:    Python <= 3.8.3 DoS Vulnerability - Linux
+OID:    1.3.6.1.4.1.25623.1.0.113722
+Threat: High (CVSS: 7.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     See references
+Installation
+path / port:       8000/tcp
+
+Impact:
+Successful exploitation would allow an attacker
+  to deny legitimate users access to the application or exhaust a system's resou!
+rces.
+
+Solution:
+Solution type: VendorFix
+Updates are available. Please see the references for more information.
+
+Affected Software/OS:
+Python through version 3.8.3.
+
+Vulnerability Insight:
+An attacker is able to craft a TAR archive leading to an infinite loop
+  when opened by tarfile.open, because _proc_pax lacks header validation.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python <= 3.8.3 DoS Vulnerability - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.113722)
+Version used: 2024-02-15T05:05:40Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2019-20907
+ url: https://bugs.python.org/issue39017
+ cert-bund: WID-SEC-2025-0227
+ cert-bund: WID-SEC-2023-1298
+ dfn-cert: DFN-CERT-2025-2047
+ dfn-cert: DFN-CERT-2025-1464
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2023-1200
+ dfn-cert: DFN-CERT-2021-1070
+ dfn-cert: DFN-CERT-2021-0715
+ dfn-cert: DFN-CERT-2021-0533
+ dfn-cert: DFN-CERT-2020-2805
+ dfn-cert: DFN-CERT-2020-2770
+ dfn-cert: DFN-CERT-2020-2621
+ dfn-cert: DFN-CERT-2020-2588
+ dfn-cert: DFN-CERT-2020-2543
+ dfn-cert: DFN-CERT-2020-2393
+ dfn-cert: DFN-CERT-2020-2392
+ dfn-cert: DFN-CERT-2020-2386
+ dfn-cert: DFN-CERT-2020-2300
+ dfn-cert: DFN-CERT-2020-2278
+ dfn-cert: DFN-CERT-2020-2207
+ dfn-cert: DFN-CERT-2020-2045
+ dfn-cert: DFN-CERT-2020-2006
+ dfn-cert: DFN-CERT-2020-1839
+ dfn-cert: DFN-CERT-2020-1832
+ dfn-cert: DFN-CERT-2020-1613
+ dfn-cert: DFN-CERT-2020-1545
+ dfn-cert: DFN-CERT-2020-1513
+
+
+Issue
+-----
+NVT:    Python < 3.10.6 Information Disclosure Vulnerability (bpo-43223) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.127156
+Threat: High (CVSS: 7.4)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an information disclosure vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.10.6
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.10.6 or later.
+
+Affected Software/OS:
+Python prior to version 3.10.6.
+
+Vulnerability Insight:
+An open redirection vulnerability in the HTTP server when an
+  URI path starts with '//'.This may lead to information disclosure.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.10.6 Information Disclosure Vulnerability (bpo-43223) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.127156)
+Version used: 2023-10-19T05:05:21Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2021-28861
+ url: https://bugs.python.org/issue43223
+ advisory-id: bpo-43223
+ cert-bund: WID-SEC-2024-0794
+ cert-bund: WID-SEC-2023-1542
+ cert-bund: WID-SEC-2022-1150
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-3141
+ dfn-cert: DFN-CERT-2023-1109
+ dfn-cert: DFN-CERT-2023-0429
+ dfn-cert: DFN-CERT-2022-2572
+ dfn-cert: DFN-CERT-2022-2232
+ dfn-cert: DFN-CERT-2022-2184
+ dfn-cert: DFN-CERT-2022-1983
+
+
+Issue
+-----
+NVT:    Python < 3.5.10, 3.6.x < 3.6.12, 3.7.x < 3.7.9, 3.8.x < 3.8.5 Python Issue (bpo-39603) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118188
+Threat: High (CVSS: 7.2)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+http.client in Python is prone to CRLF injection.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.5.10
+Installation
+path / port:       8000/tcp
+
+Impact:
+If the attacker controls the HTTP request method, the http.client
+  in Python allows CRLF injection.
+
+Solution:
+Solution type: VendorFix
+Update to version 3.5.10, 3.6.12, 3.7.9, 3.8.5 or later.
+
+Affected Software/OS:
+Python prior to version 3.5.10, versions 3.6.x prior to 3.6.12,
+  3.7.x prior to 3.7.9 and 3.8.x prior to 3.8.5.
+
+Vulnerability Insight:
+It is possible to inject HTTP headers via the HTTP method which
+  doesn't reject newline characters.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.5.10, 3.6.x < 3.6.12, 3.7.x < 3.7.9, 3.8.x < 3.8.5 Python Issue (...
+(OID: 1.3.6.1.4.1.25623.1.0.118188)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2020-26116
+ url: https://python-security.readthedocs.io/vuln/http-header-injection-method.html
+ advisory-id: bpo-39603
+ cert-bund: WID-SEC-2025-0227
+ cert-bund: WID-SEC-2024-0794
+ cert-bund: WID-SEC-2022-0492
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2023-2421
+ dfn-cert: DFN-CERT-2023-1200
+ dfn-cert: DFN-CERT-2023-0082
+ dfn-cert: DFN-CERT-2022-1438
+ dfn-cert: DFN-CERT-2021-1825
+ dfn-cert: DFN-CERT-2021-1330
+ dfn-cert: DFN-CERT-2021-1080
+ dfn-cert: DFN-CERT-2021-1079
+ dfn-cert: DFN-CERT-2021-1071
+ dfn-cert: DFN-CERT-2021-0533
+ dfn-cert: DFN-CERT-2021-0002
+ dfn-cert: DFN-CERT-2020-2805
+ dfn-cert: DFN-CERT-2020-2621
+ dfn-cert: DFN-CERT-2020-2543
+ dfn-cert: DFN-CERT-2020-2300
+ dfn-cert: DFN-CERT-2020-2278
+ dfn-cert: DFN-CERT-2020-2207
+ dfn-cert: DFN-CERT-2020-1940
+
+
+Issue
+-----
+NVT:    Python 2.7.x <= 2.7.17, 3.5 <= 3.5.9, 3.6.x <= 3.6.10, 3.7.x <= 3.7.6, 3.8.x <= 3.8.1 Regular Expression Denial of Service (ReDoS) Vulnerability - Linux
+OID:    1.3.6.1.4.1.25623.1.0.113637
+Threat: Medium (CVSS: 6.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a Regular Expression Denial of Service
+  (ReDoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.5.10
+Installation
+path / port:       8000/tcp
+
+Impact:
+Successful exploitation would allow an attacker to crash
+  the application.
+
+Solution:
+Solution type: VendorFix
+Update to version 3.5.10, 3.6.11, 3.7.8, 3.8.3 or 3.9.0
+  respectively.
+
+Affected Software/OS:
+Python 2.7 through 2.7.17, 3.5 through 3.5.9, 3.6 through
+  3.6.10, 3.7 through 3.7.6, and 3.8 through 3.8.1.
+
+Vulnerability Insight:
+The AbstractBasicAuthHandler class of the urllib.request
+  module uses an inefficient regular expression (catastrophic backtracking) whic!
+h can be
+  exploited by an attacker to cause a denial of service.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target
+  host.
+Details:
+Python 2.7.x <= 2.7.17, 3.5 <= 3.5.9, 3.6.x <= 3.6.10, 3.7.x <= 3.7.6, 3.8.x...
+(OID: 1.3.6.1.4.1.25623.1.0.113637)
+Version used: 2024-06-26T05:05:39Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2020-8492
+ url: https://bugs.python.org/issue39503
+ url: https://python-security.readthedocs.io/vuln/urllib-basic-auth-Nregex.html
+ cert-bund: WID-SEC-2025-0227
+ cert-bund: WID-SEC-2022-2190
+ cert-bund: CB-K22/0130
+ cert-bund: CB-K20/1030
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2023-1200
+ dfn-cert: DFN-CERT-2022-2715
+ dfn-cert: DFN-CERT-2022-0224
+ dfn-cert: DFN-CERT-2021-2648
+ dfn-cert: DFN-CERT-2021-1070
+ dfn-cert: DFN-CERT-2021-0533
+ dfn-cert: DFN-CERT-2020-2805
+ dfn-cert: DFN-CERT-2020-2757
+ dfn-cert: DFN-CERT-2020-2621
+ dfn-cert: DFN-CERT-2020-2392
+ dfn-cert: DFN-CERT-2020-2386
+ dfn-cert: DFN-CERT-2020-2299
+ dfn-cert: DFN-CERT-2020-2278
+ dfn-cert: DFN-CERT-2020-2117
+ dfn-cert: DFN-CERT-2020-1812
+ dfn-cert: DFN-CERT-2020-1540
+ dfn-cert: DFN-CERT-2020-1405
+ dfn-cert: DFN-CERT-2020-1168
+ dfn-cert: DFN-CERT-2020-0694
+ dfn-cert: DFN-CERT-2020-0438
+ dfn-cert: DFN-CERT-2020-0395
+
+
+Issue
+-----
+NVT:    Python < 3.7.0 DoS Vulnerability (Mar 2018) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118271
+Threat: Medium (CVSS: 6.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.7.0
+Installation
+path / port:       8000/tcp
+
+Impact:
+This vulnerability allows attackers to cause a DoS (divide-by-zero
+  and exception) via a crafted wav format audio file.
+  Note: CVE is disputed by vendor, although fixes have been applied.
+
+Solution:
+Solution type: VendorFix
+Update to Python version 3.7.0 or later.
+
+Affected Software/OS:
+Python through version 3.6.4.
+
+Vulnerability Insight:
+The Wave_read._read_fmt_chunk function in Lib/wave.py does
+  not ensure a nonzero channel value.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.7.0 DoS Vulnerability (Mar 2018) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.118271)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2017-18207
+ url: https://bugs.python.org/issue32056
+ dfn-cert: DFN-CERT-2020-0231
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2020-0111
+ dfn-cert: DFN-CERT-2018-0707
+
+
+Issue
+-----
+NVT:    Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 DoS Vulnerability (bpo-42103) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.170575
+Threat: Medium (CVSS: 6.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.6.13
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.6.13, 3.7.10, 3.8.7, 3.9.1 or later.
+
+Affected Software/OS:
+Python prior to version 3.6.13, versions 3.7.x prior to 3.7.10,
+  3.8.x prior to 3.8.7 and 3.9.x prior to 3.9.1.
+
+Vulnerability Insight:
+read_ints in plistlib.py is vulnerable to a potential DoS attack
+  via CPU and RAM exhaustion when processing malformed Apple Property List files!
+ in binary format.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 DoS Vulnerabil...
+(OID: 1.3.6.1.4.1.25623.1.0.170575)
+Version used: 2023-10-13T05:06:10Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2022-48564
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/K2T3WIJM6OCTVTPW5TVW62EMAULA2426/
+ url: https://bugs.python.org/issue42103
+ advisory-id: bpo-42103
+ cert-bund: WID-SEC-2024-1086
+ cert-bund: WID-SEC-2023-2119
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2024-0278
+ dfn-cert: DFN-CERT-2024-0227
+ dfn-cert: DFN-CERT-2024-0074
+ dfn-cert: DFN-CERT-2023-2954
+ dfn-cert: DFN-CERT-2023-2485
+
+
+Issue
+-----
+NVT:    Python < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.10, 3.7.x < 3.7.5 XSS Vulnerability (bpo-38243) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118199
+Threat: Medium (CVSS: 6.1)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a reflected cross-site scripting (XSS)
+  vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+The vendor has released updates. Please see the references for
+  more information.
+
+Affected Software/OS:
+Python prior to version 2.7.17, versions 3.x prior to 3.5.8,
+  3.6.x prior to 3.6.10 and 3.7.x prior to 3.7.5.
+
+Vulnerability Insight:
+The documentation XML-RPC server has XSS via the 'server_title'
+  field. This occurs in 'Lib/DocXMLRPCServer.py' in Python 2.x, and in 'Lib/xmlr!
+pc/server.py' in
+  Python 3.x. If 'set_server_title' is called with untrusted input, arbitrary Ja!
+vaScript can be
+  delivered to clients that visit the http URL for this server.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.10, 3.7.x < 3.7.5 XSS Vulnerabil...
+(OID: 1.3.6.1.4.1.25623.1.0.118199)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2019-16935
+ url: https://python-security.readthedocs.io/vuln/docxmlrpcserver-xss.html
+ advisory-id: bpo-38243
+ cert-bund: WID-SEC-2025-0227
+ cert-bund: WID-SEC-2024-1595
+ cert-bund: CB-K20/1030
+ cert-bund: CB-K20/0710
+ cert-bund: CB-K20/0109
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2021-1070
+ dfn-cert: DFN-CERT-2021-0790
+ dfn-cert: DFN-CERT-2020-2805
+ dfn-cert: DFN-CERT-2020-2386
+ dfn-cert: DFN-CERT-2020-2299
+ dfn-cert: DFN-CERT-2020-2278
+ dfn-cert: DFN-CERT-2020-2127
+ dfn-cert: DFN-CERT-2020-2117
+ dfn-cert: DFN-CERT-2020-2045
+ dfn-cert: DFN-CERT-2020-1540
+ dfn-cert: DFN-CERT-2020-0550
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2020-0111
+ dfn-cert: DFN-CERT-2019-2560
+ dfn-cert: DFN-CERT-2019-2252
+ dfn-cert: DFN-CERT-2019-2210
+ dfn-cert: DFN-CERT-2019-2198
+ dfn-cert: DFN-CERT-2019-2113
+
+
+Issue
+-----
+NVT:    Python 2.x < 2.7.18, 3.x < 3.5.10, 3.6.x < 3.6.11, 3.7.x < 3.7.8, 3.8.x < 3.8.3 CRLF Injection Vulnerability (bpo-38576) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118196
+Threat: Medium (CVSS: 6.1)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a CRLF injection vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.18
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+The vendor has released updates. Please see the references for
+  more information.
+
+Affected Software/OS:
+Python 2.x prior to version 2.7.18, versions 3.x prior to 3.5.10,
+  3.6.x prior to 3.6.11, 3.7.x prior to 3.7.8 and 3.8.x prior to 3.8.3.
+
+Vulnerability Insight:
+http.client allows to pass control characters like CRLF newlines
+  which can be abused to inject HTTP headers.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.x < 2.7.18, 3.x < 3.5.10, 3.6.x < 3.6.11, 3.7.x < 3.7.8, 3.8.x < 3....
+(OID: 1.3.6.1.4.1.25623.1.0.118196)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2019-18348
+ url: https://python-security.readthedocs.io/vuln/urlopen-host-http-header-injection.html
+ advisory-id: bpo-38576
+ cert-bund: WID-SEC-2022-2191
+ cert-bund: CB-K20/1028
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2022-2715
+ dfn-cert: DFN-CERT-2021-0553
+ dfn-cert: DFN-CERT-2020-2805
+ dfn-cert: DFN-CERT-2020-2757
+ dfn-cert: DFN-CERT-2020-2621
+ dfn-cert: DFN-CERT-2020-2278
+ dfn-cert: DFN-CERT-2020-1812
+ dfn-cert: DFN-CERT-2020-1540
+ dfn-cert: DFN-CERT-2020-1405
+ dfn-cert: DFN-CERT-2020-1168
+ dfn-cert: DFN-CERT-2020-0694
+ dfn-cert: DFN-CERT-2020-0597
+ dfn-cert: DFN-CERT-2019-2252
+
+
+Issue
+-----
+NVT:    Python 2.x < 2.7.17, 3.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 HTTP Header Injection Vulnerability (bpo-30458) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118208
+Threat: Medium (CVSS: 6.1)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a HTTP header injection vulnerability
+  (follow-up of CVE-2016-5699).
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+The vendor has released updates. Please see the references for
+  more information.
+
+Affected Software/OS:
+Python versions 2.x prior to 2.7.17, 3.x prior to 3.5.8, 3.6.x
+  prior to 3.6.9 and 3.7.x prior to 3.7.4.
+
+Vulnerability Insight:
+The following vulnerabilities exist:
+  - CVE-2019-9740: An issue was discovered in urllib2 in Python 2.x and urllib i!
+n Python 3.x.
+  CRLF injection is possible if the attacker controls a url parameter, as demons!
+trated by the first
+  argument to 'urllib.request.urlopen' with 'rn' (specifically in the query stri!
+ng after a '?'
+  character) followed by an HTTP header or a Redis command.
+  - CVE-2019-9947: An issue was discovered in urllib2 in Python 2.x and urllib i!
+n Python 3.x.
+  CRLF injection is possible if the attacker controls a url parameter, as demons!
+trated by the first
+  argument to 'urllib.request.urlopen' with 'rn' (specifically in the path compo!
+nent of a URL that
+  lacks a '?' character) followed by an HTTP header or a Redis command.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.x < 2.7.17, 3.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 HTTP Header I...
+(OID: 1.3.6.1.4.1.25623.1.0.118208)
+Version used: 2025-07-18T15:43:33Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2019-9740
+ cve: CVE-2019-9947
+ url: https://python-security.readthedocs.io/vuln/http-header-injection2.html
+ advisory-id: bpo-30458
+ cert-bund: WID-SEC-2024-1599
+ cert-bund: WID-SEC-2023-1280
+ cert-bund: CB-K20/0109
+ dfn-cert: DFN-CERT-2025-2047
+ dfn-cert: DFN-CERT-2025-1464
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2023-2421
+ dfn-cert: DFN-CERT-2020-2653
+ dfn-cert: DFN-CERT-2020-2502
+ dfn-cert: DFN-CERT-2020-2045
+ dfn-cert: DFN-CERT-2020-1839
+ dfn-cert: DFN-CERT-2020-1540
+ dfn-cert: DFN-CERT-2020-0783
+ dfn-cert: DFN-CERT-2020-0668
+ dfn-cert: DFN-CERT-2020-0231
+ dfn-cert: DFN-CERT-2020-0200
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2020-0111
+ dfn-cert: DFN-CERT-2019-2560
+ dfn-cert: DFN-CERT-2019-2327
+ dfn-cert: DFN-CERT-2019-2312
+ dfn-cert: DFN-CERT-2019-2302
+ dfn-cert: DFN-CERT-2019-2252
+ dfn-cert: DFN-CERT-2019-2210
+ dfn-cert: DFN-CERT-2019-2078
+ dfn-cert: DFN-CERT-2019-1877
+ dfn-cert: DFN-CERT-2019-1854
+ dfn-cert: DFN-CERT-2019-1831
+ dfn-cert: DFN-CERT-2019-1755
+ dfn-cert: DFN-CERT-2019-1339
+ dfn-cert: DFN-CERT-2019-1288
+ dfn-cert: DFN-CERT-2019-1084
+ dfn-cert: DFN-CERT-2019-1076
+ dfn-cert: DFN-CERT-2019-1053
+ dfn-cert: DFN-CERT-2019-0941
+
+
+Issue
+-----
+NVT:    Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.8, 3.9.x < 3.9.2 Web Cache Poisoning Vulnerability - Linux
+OID:    1.3.6.1.4.1.25623.1.0.145429
+Threat: Medium (CVSS: 5.9)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a web cache poisoning vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.6.13
+Installation
+path / port:       8000/tcp
+
+Impact:
+Successful exploitation can result in malicious requests being cached as
+  completely safe ones, as the proxy would usually not see the semicolon as a se!
+parator, and therefore would
+  not include it in a cache key of an unkeyed parameter.
+
+Solution:
+Solution type: VendorFix
+Update to version 3.6.13, 3.7.10, 3.8.8, 3.9.2 or later.
+
+Affected Software/OS:
+Python prior to version 3.6.13, versions 3.7.x prior to 3.7.10, 3.8.x prior
+  to 3.8.8 and 3.9.x prior to 3.9.2.
+
+Vulnerability Insight:
+The package python is vulnerable to Web Cache Poisoning via
+  urllib.parse.parse_qsl and urllib.parse.parse_qs by using a vector called para!
+meter cloaking. When the
+  attacker can separate query parameters using a semicolon, they can cause a dif!
+ference in the
+  interpretation of the request between the proxy (running with default configur!
+ation) and the server.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.8, 3.9.x < 3.9.2 Web Cache Pois...
+(OID: 1.3.6.1.4.1.25623.1.0.145429)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2021-23336
+ url: https://snyk.io/vuln/SNYK-UPSTREAM-PYTHONCPYTHON-1074933
+ cert-bund: WID-SEC-2025-0227
+ cert-bund: WID-SEC-2022-0184
+ cert-bund: WID-SEC-2022-0141
+ dfn-cert: DFN-CERT-2023-2227
+ dfn-cert: DFN-CERT-2022-2419
+ dfn-cert: DFN-CERT-2022-1271
+ dfn-cert: DFN-CERT-2021-2354
+ dfn-cert: DFN-CERT-2021-2350
+ dfn-cert: DFN-CERT-2021-1801
+ dfn-cert: DFN-CERT-2021-1622
+ dfn-cert: DFN-CERT-2021-1414
+ dfn-cert: DFN-CERT-2021-1330
+ dfn-cert: DFN-CERT-2021-1282
+ dfn-cert: DFN-CERT-2021-1110
+ dfn-cert: DFN-CERT-2021-1080
+ dfn-cert: DFN-CERT-2021-0810
+ dfn-cert: DFN-CERT-2021-0790
+ dfn-cert: DFN-CERT-2021-0675
+ dfn-cert: DFN-CERT-2021-0553
+ dfn-cert: DFN-CERT-2021-0387
+ dfn-cert: DFN-CERT-2021-0367
+
+
+Issue
+-----
+NVT:    Python < 3.5.10, 3.6.x < 3.6.12, 3.7.x < 3.7.9, 3.8.x < 3.8.4 Python Issue (bpo-41004) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118192
+Threat: Medium (CVSS: 5.9)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.5.10
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+The vendor has released updates. Please see the references for
+  more information.
+
+Affected Software/OS:
+Python prior to version 3.5.10, versions 3.6.x prior to 3.6.12,
+  3.7.x prior to 3.7.9 and 3.8.x prior to 3.8.4.
+
+Vulnerability Insight:
+Lib/ipaddress.py improperly computes hash values in the IPv4Interface
+  and IPv6Interface classes, which might allow a remote attacker to cause a deni!
+al of service if an
+  application is affected by the performance of a dictionary containing IPv4Inte!
+rface or IPv6Interface
+  objects, and this attacker can cause many dictionary entries to be created.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.5.10, 3.6.x < 3.6.12, 3.7.x < 3.7.9, 3.8.x < 3.8.4 Python Issue (...
+(OID: 1.3.6.1.4.1.25623.1.0.118192)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2020-14422
+ url: https://python-security.readthedocs.io/vuln/ipaddress-hash-collisions.html
+ advisory-id: bpo-41004
+ cert-bund: WID-SEC-2025-0227
+ cert-bund: WID-SEC-2023-1220
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2021-1070
+ dfn-cert: DFN-CERT-2020-2805
+ dfn-cert: DFN-CERT-2020-2621
+ dfn-cert: DFN-CERT-2020-2588
+ dfn-cert: DFN-CERT-2020-2550
+ dfn-cert: DFN-CERT-2020-2392
+ dfn-cert: DFN-CERT-2020-2386
+ dfn-cert: DFN-CERT-2020-2300
+ dfn-cert: DFN-CERT-2020-2278
+ dfn-cert: DFN-CERT-2020-2207
+ dfn-cert: DFN-CERT-2020-2045
+ dfn-cert: DFN-CERT-2020-1613
+ dfn-cert: DFN-CERT-2020-1545
+ dfn-cert: DFN-CERT-2020-1540
+ dfn-cert: DFN-CERT-2020-1513
+ dfn-cert: DFN-CERT-2020-1427
+
+
+Issue
+-----
+NVT:    Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 Race Condition Vulnerability (bpo-40791) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.170572
+Threat: Medium (CVSS: 5.9)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a race condition vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.6.13
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.6.13, 3.7.10, 3.8.7, 3.9.1 or later.
+
+Affected Software/OS:
+Python prior to version 3.6.13, versions 3.7.x prior to 3.7.10,
+  3.8.x prior to 3.8.7 and 3.9.x prior to 3.9.1.
+
+Vulnerability Insight:
+An issue was discovered in compare_digest in Lib/hmac.py.
+  Constant-time-defeating optimisations were possible in the accumulator variabl!
+e in
+  hmac.compare_digest.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 Race Condition...
+(OID: 1.3.6.1.4.1.25623.1.0.170572)
+Version used: 2023-10-17T05:05:34Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2022-48566
+ url: https://bugs.python.org/issue40791
+ advisory-id: bpo-40791
+ cert-bund: WID-SEC-2025-0225
+ cert-bund: WID-SEC-2023-2119
+ dfn-cert: DFN-CERT-2025-0046
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2024-1432
+ dfn-cert: DFN-CERT-2024-0709
+ dfn-cert: DFN-CERT-2024-0408
+ dfn-cert: DFN-CERT-2023-2651
+ dfn-cert: DFN-CERT-2023-2485
+ dfn-cert: DFN-CERT-2023-2427
+ dfn-cert: DFN-CERT-2023-2309
+ dfn-cert: DFN-CERT-2023-2227
+
+
+Issue
+-----
+NVT:    Python < 3.6.14, 3.7.x < 3.7.11, 3.8.x < 3.8.9, 3.9.x < 3.9.3 Python Issue (bpo-42988) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118175
+Threat: Medium (CVSS: 5.7)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an information disclosure vulnerability via
+  pydoc getfile.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.6.14
+Installation
+path / port:       8000/tcp
+
+Impact:
+A local or adjacent attacker who discovers or is able to convince
+  another local or adjacent user to start a pydoc server could access the server!
+ and use it to disclose
+  sensitive information belonging to the other user that they would not normally!
+ be able to access.
+
+Solution:
+Solution type: VendorFix
+Update to version 3.6.14, 3.7.11, 3.8.9, 3.9.3 or later.
+
+Affected Software/OS:
+Python prior to version 3.6.14, versions 3.7.x prior to 3.7.11,
+  3.8.x prior to 3.8.9 and 3.9.x prior to 3.9.3.
+
+Vulnerability Insight:
+Running 'pydoc -p' allows other local users to extract arbitrary
+  files.
+  The '/getfile?key=path' URL allows to read arbitrary file on the filesystem.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.14, 3.7.x < 3.7.11, 3.8.x < 3.8.9, 3.9.x < 3.9.3 Python Issue (...
+(OID: 1.3.6.1.4.1.25623.1.0.118175)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2021-3426
+ url: https://python-security.readthedocs.io/vuln/pydoc-getfile.html
+ advisory-id: bpo-42988
+ cert-bund: WID-SEC-2023-1418
+ cert-bund: WID-SEC-2022-1767
+ cert-bund: WID-SEC-2022-1308
+ cert-bund: WID-SEC-2022-0624
+ cert-bund: CB-K21/1268
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2023-1517
+ dfn-cert: DFN-CERT-2022-0690
+ dfn-cert: DFN-CERT-2021-2527
+ dfn-cert: DFN-CERT-2021-2354
+ dfn-cert: DFN-CERT-2021-2353
+ dfn-cert: DFN-CERT-2021-2207
+ dfn-cert: DFN-CERT-2021-1825
+ dfn-cert: DFN-CERT-2021-1801
+ dfn-cert: DFN-CERT-2021-1407
+ dfn-cert: DFN-CERT-2021-0943
+ dfn-cert: DFN-CERT-2021-0682
+ dfn-cert: DFN-CERT-2021-0675
+
+
+Issue
+-----
+NVT:    Python Symlink Dereference Vulnerability (Mar 2024) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.170811
+Threat: Medium (CVSS: 5.6)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a symlink dereference vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.8.19
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.8.19, 3.9.19, 3.10.14, 3.11.8, 3.12.1
+  or later.
+
+Affected Software/OS:
+Python prior to version 3.8.19, 3.9.x prior to 3.9.19, 3.10.x
+  prior to 3.10.14, 3.11.x prior to 3.11.8 and 3.12.x prior to 3.12.1.
+
+Vulnerability Insight:
+The tempfile.TemporaryDirectory class would dereference symlinks
+  during cleanup of permissions-related errors. This means users which can run p!
+rivileged programs
+  are potentially able to modify permissions of files referenced by symlinks in !
+some
+  circumstances.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python Symlink Dereference Vulnerability (Mar 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.170811)
+Version used: 2024-10-11T15:39:44Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2023-6597
+ url: https://discuss.python.org/t/python-3-10-14-3-9-19-and-3-8-19-is-now-available/48993
+ url: https://pythoninsider.blogspot.com/2024/03/python-31014-3919-and-3819-is-now.html
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/Q5C6ATFC67K53XFV4KE45325S7NS62LD/
+ url: https://github.com/python/cpython/issues/91133
+ url: https://osv.dev/vulnerability/PSF-2024-1
+ cert-bund: WID-SEC-2025-0794
+ cert-bund: WID-SEC-2025-0225
+ cert-bund: WID-SEC-2025-0001
+ cert-bund: WID-SEC-2024-3377
+ cert-bund: WID-SEC-2024-3195
+ cert-bund: WID-SEC-2024-1307
+ cert-bund: WID-SEC-2024-0687
+ dfn-cert: DFN-CERT-2025-1477
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2025-0933
+ dfn-cert: DFN-CERT-2025-0688
+ dfn-cert: DFN-CERT-2025-0378
+ dfn-cert: DFN-CERT-2025-0375
+ dfn-cert: DFN-CERT-2025-0318
+ dfn-cert: DFN-CERT-2025-0274
+ dfn-cert: DFN-CERT-2025-0255
+ dfn-cert: DFN-CERT-2025-0184
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-2962
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2024-1433
+ dfn-cert: DFN-CERT-2024-1432
+ dfn-cert: DFN-CERT-2024-0974
+ dfn-cert: DFN-CERT-2024-0828
+ dfn-cert: DFN-CERT-2024-0785
+ dfn-cert: DFN-CERT-2024-0709
+ dfn-cert: DFN-CERT-2024-0641
+ dfn-cert: DFN-CERT-2024-0610
+ dfn-cert: DFN-CERT-2024-0609
+ dfn-cert: DFN-CERT-2024-0605
+
+
+Issue
+-----
+NVT:    Python DoS Vulnerability (Dec 2025) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.125553
+Threat: Medium (CVSS: 5.5)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.13.10
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.13.10, 3.14.1 or later, or to the latest
+  maintenance release of your Python version series (3.10.x, 3.12.x) once patche!
+s
+  are available. Please see the references for more information.
+
+Affected Software/OS:
+Python prior to version 3.13.10 and 3.14.x prior to 3.14.1.
+  Note: Fixes have been backported to maintenance branches (3.10, 3.12) but spec!
+ific
+  patch versions are not yet available.
+
+Vulnerability Insight:
+When loading a plist file, the plistlib module reads data in
+  size specified by the file itself, meaning a malicious file can cause out-of-m!
+emory (OOM) and
+  DoS issues.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Dec 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.125553)
+Version used: 2026-01-16T05:47:38Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2025-13837
+ url: https://github.com/python/cpython/issues/119342
+ url: https://github.com/python/cpython/pull/119343
+ url: https://github.com/python/cpython/commit/694922cf40aa3a28f898b5f5ee08b71b4922df70
+ url: https://github.com/python/cpython/commit/71fa8eb8233b37f16c88b6e3e583b461b205d1ba
+ url: https://github.com/python/cpython/commit/b64441e4852383645af5b435411a6f849dd1b4cb
+ url: https://www.cve.org/CVERecord?id=CVE-2025-13837
+ cert-bund: WID-SEC-2025-2706
+ dfn-cert: DFN-CERT-2026-0215
+ dfn-cert: DFN-CERT-2025-3621
+
+
+Issue
+-----
+NVT:    Python < 2.7.17, 3.x < 3.4.10, 3.5.x < 3.5.7, 3.6.x < 3.6.9, 3.7.x < 3.7.3 Cookie domain check returns incorrect results (bpo-35121) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118273
+Threat: Medium (CVSS: 5.3)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an improper input validation vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+Impact:
+When a program uses http.cookiejar.DefaultPolicy and tries to
+  do an HTTP connection to an attacker-controlled server, existing cookies can b!
+e leaked to the
+  attacker.
+
+Solution:
+Solution type: VendorFix
+Update to version 2.7.17, 3.4.10, 3.5.7, 3.6.9, 3.7.3
+  or later.
+
+Affected Software/OS:
+Python prior to version 2.7.17, versions 3.x prior to 3.4.10,
+  3.5.x prior to 3.5.7, 3.6.x prior to 3.6.9 and 3.7.x prior to 3.7.3.
+
+Vulnerability Insight:
+http.cookiejar.DefaultPolicy.domain_return_ok in Lib/http/cookiejar.py
+  does not correctly validate the domain: it can be tricked into sending existin!
+g cookies to the wrong
+  server.
+  An attacker may abuse this flaw by using a server with a hostname that has ano!
+ther valid hostname as
+  a suffix (e.g., pythonicexample.com to steal cookies for example.com).
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.17, 3.x < 3.4.10, 3.5.x < 3.5.7, 3.6.x < 3.6.9, 3.7.x < 3.7.3 C...
+(OID: 1.3.6.1.4.1.25623.1.0.118273)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2018-20852
+ url: https://bugs.python.org/issue35121
+ cert-bund: WID-SEC-2024-1597
+ cert-bund: CB-K20/1049
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2020-2259
+ dfn-cert: DFN-CERT-2020-2045
+ dfn-cert: DFN-CERT-2020-1839
+ dfn-cert: DFN-CERT-2020-1540
+ dfn-cert: DFN-CERT-2020-0896
+ dfn-cert: DFN-CERT-2020-0231
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2020-0111
+ dfn-cert: DFN-CERT-2019-2560
+ dfn-cert: DFN-CERT-2019-2327
+ dfn-cert: DFN-CERT-2019-2238
+ dfn-cert: DFN-CERT-2019-2198
+ dfn-cert: DFN-CERT-2019-2169
+ dfn-cert: DFN-CERT-2019-1877
+ dfn-cert: DFN-CERT-2019-1682
+ dfn-cert: DFN-CERT-2019-1596
+
+
+Issue
+-----
+NVT:    Python < 3.6.14, 3.7.x < 3.7.11, 3.8.x < 3.8.9, 3.9.x < 3.9.3 (bpo-43285) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.126132
+Threat: Medium (CVSS: 5.3)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a remote code execution (RCE)
+  vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.6.14
+Installation
+path / port:       8000/tcp
+
+Impact:
+This flaw allows an attacker to set up a malicious FTP server,
+  that can trick FTP clients into connecting back to a given IP address and port!
+.
+
+Solution:
+Solution type: VendorFix
+Update to version 3.6.14, 3.7.11, 3.8.9, 3.9.3 or later.
+
+Affected Software/OS:
+Python prior to version 3.6.14, versions 3.7.x prior to 3.7.11,
+  3.8.x prior to 3.8.9 and 3.9.x prior to 3.9.3.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.14, 3.7.x < 3.7.11, 3.8.x < 3.8.9, 3.9.x < 3.9.3 (bpo-43285) - ...
+(OID: 1.3.6.1.4.1.25623.1.0.126132)
+Version used: 2023-10-19T05:05:21Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2021-4189
+ url: https://python-security.readthedocs.io/vuln/ftplib-pasv.html
+ advisory-id: bpo-43285
+ cert-bund: WID-SEC-2022-0011
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2023-1517
+ dfn-cert: DFN-CERT-2023-1200
+ dfn-cert: DFN-CERT-2022-1304
+ dfn-cert: DFN-CERT-2022-1294
+ dfn-cert: DFN-CERT-2022-1056
+ dfn-cert: DFN-CERT-2022-1053
+ dfn-cert: DFN-CERT-2022-0968
+ dfn-cert: DFN-CERT-2022-0742
+ dfn-cert: DFN-CERT-2022-0690
+ dfn-cert: DFN-CERT-2022-0618
+ dfn-cert: DFN-CERT-2022-0351
+
+
+Issue
+-----
+NVT:    Python DoS Vulnerability (Dec 2025) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.133141
+Threat: Medium (CVSS: 5.3)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.13.11
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.13.11, 3.14.2 or later.
+
+Affected Software/OS:
+Python prior to version 3.13.11 and 3.14.0 prior to 3.14.2.
+
+Vulnerability Insight:
+When building nested elements using xml.dom.minidom methods such
+  as appendChild() that have a dependency on _clear_id_cache() the algorithm is !
+quadratic.
+  Availability can be impacted when building excessively nested documents.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Dec 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.133141)
+Version used: 2025-12-17T05:46:28Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2025-12084
+ url: https://github.com/python/cpython/issues/142145
+ url: https://github.com/python/cpython/pull/142146
+ url: https://github.com/python/cpython/commit/08d8e18ad81cd45bc4a27d6da478b51ea49486e4
+ url: https://www.cve.org/CVERecord?id=CVE-2025-12084
+ cert-bund: WID-SEC-2025-2741
+ dfn-cert: DFN-CERT-2026-0215
+ dfn-cert: DFN-CERT-2026-0174
+ dfn-cert: DFN-CERT-2026-0167
+ dfn-cert: DFN-CERT-2026-0038
+ dfn-cert: DFN-CERT-2025-3621
+ dfn-cert: DFN-CERT-2025-3496
+
+
+Issue
+-----
+NVT:    Python <= 2.7.18, 3.x <= 3.12.3 Security Bypass Vulnerability - Linux
+OID:    1.3.6.1.4.1.25623.1.0.104739
+Threat: Medium (CVSS: 5.3)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a security bypass vulnerability in the e-mail
+  module.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     None
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: WillNotFix
+No known solution was made available for at least one year since
+  the disclosure of this vulnerability. Likely none will be provided anymore. Ge!
+neral solution options
+  are to upgrade to a newer release, disable respective features, remove the pro!
+duct or replace the
+  product by another one.
+  Note: The vendor mentions, that a patch was included in main branch 3.13. This!
+ version is expected
+  to release in October 2024. The patch might be included in the release of vers!
+ion 3.13 or later.
+
+Affected Software/OS:
+Python versions through 2.7.18 and 3.x through 3.12.3.
+
+Vulnerability Insight:
+The e-mail module incorrectly parses e-mail addresses which
+  contain a special character. This vulnerability allows attackers to send messa!
+ges from e-mail
+  addresses that would otherwise be rejected.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python <= 2.7.18, 3.x <= 3.12.3 Security Bypass Vulnerability - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.104739)
+Version used: 2024-05-14T05:05:26Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2023-27043
+ url: https://github.com/psf/advisory-database/blob/main/advisories/python/PSF-2023-2.json
+ url: https://osv.dev/list?ecosystem=&q=CVE-2023-27043
+ url: https://github.com/python/cpython/issues/102988
+ url: https://github.com/python/cpython/issues/102988#issuecomment-1983087271
+ url: https://peps.python.org/pep-0719
+ url: https://python-security.readthedocs.io/vuln/email-parseaddr-realname.html
+ cert-bund: WID-SEC-2025-0668
+ cert-bund: WID-SEC-2025-0225
+ cert-bund: WID-SEC-2024-3377
+ cert-bund: WID-SEC-2024-1086
+ cert-bund: WID-SEC-2024-0423
+ cert-bund: WID-SEC-2023-1097
+ dfn-cert: DFN-CERT-2025-1477
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2025-0809
+ dfn-cert: DFN-CERT-2025-0179
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-3141
+ dfn-cert: DFN-CERT-2024-2425
+ dfn-cert: DFN-CERT-2024-2340
+ dfn-cert: DFN-CERT-2024-2186
+ dfn-cert: DFN-CERT-2024-2179
+ dfn-cert: DFN-CERT-2024-1391
+ dfn-cert: DFN-CERT-2024-1325
+ dfn-cert: DFN-CERT-2024-0744
+ dfn-cert: DFN-CERT-2024-0609
+ dfn-cert: DFN-CERT-2024-0605
+ dfn-cert: DFN-CERT-2024-0408
+ dfn-cert: DFN-CERT-2024-0278
+ dfn-cert: DFN-CERT-2024-0227
+ dfn-cert: DFN-CERT-2023-3186
+ dfn-cert: DFN-CERT-2023-2651
+
+
+Issue
+-----
+NVT:    Python < 3.8.18, 3.9.x < 3.9.18, 3.10.x < 3.10.13, 3.11.x < 3.11.5 Security Bypass Vulnerability - Linux
+OID:    1.3.6.1.4.1.25623.1.0.124416
+Threat: Medium (CVSS: 5.3)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a security bypass vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.8.18
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.8.18, 3.9.18, 3.10.13, 3.11.5 or later.
+
+Affected Software/OS:
+Python version prior to 3.8.18, 3.9.x prior to 3.9.18, 3.10.x
+  prior to 3.10.13 and 3.11.x prior to 3.11.5.
+
+Vulnerability Insight:
+Instances of ssl.SSLSocket are vulnerable to a bypass of the
+  TLS handshake and included protections (like certificate verification) and tre!
+ating sent
+  unencrypted data as if it were post-handshake TLS encrypted data if the socket!
+ is closed before
+  initiating its own handshake.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.8.18, 3.9.x < 3.9.18, 3.10.x < 3.10.13, 3.11.x < 3.11.5 Security ...
+(OID: 1.3.6.1.4.1.25623.1.0.124416)
+Version used: 2023-12-20T05:05:58Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2023-40217
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/PEPLII27KYHLF4AK3ZQGKYNCRERG4YXY/
+ cert-bund: WID-SEC-2024-3377
+ cert-bund: WID-SEC-2024-0794
+ cert-bund: WID-SEC-2023-2850
+ cert-bund: WID-SEC-2023-2173
+ dfn-cert: DFN-CERT-2025-0046
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-2962
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2024-0610
+ dfn-cert: DFN-CERT-2024-0609
+ dfn-cert: DFN-CERT-2023-3168
+ dfn-cert: DFN-CERT-2023-2954
+ dfn-cert: DFN-CERT-2023-2941
+ dfn-cert: DFN-CERT-2023-2783
+ dfn-cert: DFN-CERT-2023-2768
+ dfn-cert: DFN-CERT-2023-2714
+ dfn-cert: DFN-CERT-2023-2485
+ dfn-cert: DFN-CERT-2023-2370
+ dfn-cert: DFN-CERT-2023-2227
+ dfn-cert: DFN-CERT-2023-2226
+
+
+Issue
+-----
+NVT:    Python Email Header Injection Vulnerability (Aug 2024) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.114731
+Threat: Medium (CVSS: 5.0)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an email header injection vulnerability in
+  the email module.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.8.20
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.5 or
+  later.
+
+Affected Software/OS:
+Python prior to version 3.8.20, 3.9.x prior to 3.9.20, 3.10.x
+  prior to 3.10.15, 3.11.x prior to 3.11.10 and 3.12.x prior to 3.12.5.
+
+Vulnerability Insight:
+The email module didn't properly quote newlines for email
+  headers when serializing an email message allowing for header injection when a!
+n email is
+  serialized.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python Email Header Injection Vulnerability (Aug 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.114731)
+Version used: 2024-10-11T15:39:44Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2024-6923
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/QH3BUOE2DYQBWP7NAQ7UNHPPOELKISRW/
+ url: https://github.com/python/cpython/issues/121650
+ url: https://github.com/python/cpython/pull/122233
+ url: https://osv.dev/vulnerability/PSF-2024-8
+ url: https://docs.python.org/release/3.12.5/whatsnew/changelog.html#library
+ url: https://docs.python.org/3.11/whatsnew/changelog.html#python-3-11-10-final
+ url: https://docs.python.org/3.10/whatsnew/changelog.html#python-3-10-15-final
+ url: https://docs.python.org/3.9/whatsnew/changelog.html#python-3-9-20-final
+ url: https://docs.python.org/3.8/whatsnew/changelog.html#python-3-8-20-final
+ cert-bund: WID-SEC-2025-0647
+ cert-bund: WID-SEC-2024-2033
+ dfn-cert: DFN-CERT-2025-3045
+ dfn-cert: DFN-CERT-2025-1693
+ dfn-cert: DFN-CERT-2025-1477
+ dfn-cert: DFN-CERT-2025-1464
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2025-0179
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-3083
+ dfn-cert: DFN-CERT-2024-2937
+ dfn-cert: DFN-CERT-2024-2571
+ dfn-cert: DFN-CERT-2024-2525
+ dfn-cert: DFN-CERT-2024-2512
+ dfn-cert: DFN-CERT-2024-2497
+ dfn-cert: DFN-CERT-2024-2496
+ dfn-cert: DFN-CERT-2024-2466
+ dfn-cert: DFN-CERT-2024-2456
+ dfn-cert: DFN-CERT-2024-2425
+ dfn-cert: DFN-CERT-2024-2340
+ dfn-cert: DFN-CERT-2024-2271
+ dfn-cert: DFN-CERT-2024-2251
+ dfn-cert: DFN-CERT-2024-2245
+ dfn-cert: DFN-CERT-2024-2186
+ dfn-cert: DFN-CERT-2024-2152
+ dfn-cert: DFN-CERT-2024-2049
+
+
+Issue
+-----
+NVT:    Python SSL Vulnerability (Jun 2024) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.152433
+Threat: Medium (CVSS: 5.0)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a vulnerability in the ssl module.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.8.20
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.8.20, 3.9.20, 3.10.14, 3.11.9, 3.12.3
+  or later.
+
+Affected Software/OS:
+Python prior to version 3.8.20, 3.9.x prior to 3.9.20, 3.10.x
+  prior to 3.10.14, 3.11.x prior to 3.11.9 and 3.12.x prior to 3.12.3.
+
+Vulnerability Insight:
+A defect was discovered in the Python 'ssl' module where there
+  is a memory race condition with the ssl.SSLContext methods 'cert_store_stats()!
+' and
+  'get_ca_certs()'. The race condition can be triggered if the methods are calle!
+d at the same time
+  as certificates are loaded into the SSLContext, such as during the TLS handsha!
+ke with a
+  certificate directory configured.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python SSL Vulnerability (Jun 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.152433)
+Version used: 2024-10-11T15:39:44Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2024-0397
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/BMAK5BCGKYWNJOACVUSLUF6SFGBIM4VP/
+ url: https://github.com/python/cpython/issues/114572
+ url: https://github.com/python/cpython/pull/114573
+ url: https://osv.dev/vulnerability/PSF-2024-4
+ url: https://docs.python.org/3/whatsnew/changelog.html#python-3-12-3-final
+ url: https://docs.python.org/3.11/whatsnew/changelog.html#python-3-11-9-final
+ url: https://docs.python.org/3.10/whatsnew/changelog.html#python-3-10-14-final
+ url: https://docs.python.org/3.9/whatsnew/changelog.html#python-3-9-20-final
+ url: https://docs.python.org/3.8/whatsnew/changelog.html#python-3-8-20-final
+ cert-bund: WID-SEC-2025-0225
+ cert-bund: WID-SEC-2024-1645
+ cert-bund: WID-SEC-2024-1396
+ dfn-cert: DFN-CERT-2025-1693
+ dfn-cert: DFN-CERT-2025-1477
+ dfn-cert: DFN-CERT-2025-1464
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-3083
+ dfn-cert: DFN-CERT-2024-2448
+ dfn-cert: DFN-CERT-2024-2245
+ dfn-cert: DFN-CERT-2024-2227
+ dfn-cert: DFN-CERT-2024-2186
+ dfn-cert: DFN-CERT-2024-1908
+ dfn-cert: DFN-CERT-2024-1851
+ dfn-cert: DFN-CERT-2024-1833
+ dfn-cert: DFN-CERT-2024-1702
+
+
+Issue
+-----
+NVT:    Python 'zipfile' Module Vulnerability (Oct 2025) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.119138
+Threat: Medium (CVSS: 5.0)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a vulnerability in the 'zipfile' module.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.9.24
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.9.24, 3.10.19, 3.11.14, 3.12.12, 3.13.10,
+  3.14.1 or later.
+
+Affected Software/OS:
+Python prior to version 3.9.24, 3.10.x prior to 3.10.19, 3.11.x
+  prior to 3.11.14, 3.12.x prior to 3.12.12, 3.13.x prior to 3.13.10 and 3.14.x !
+prior to 3.14.1.
+
+Vulnerability Insight:
+The 'zipfile' module would not check the validity of the ZIP64
+  End of Central Directory (EOCD) Locator record offset value would not be used !
+to locate the ZIP64
+  EOCD record, instead the ZIP64 EOCD record would be assumed to be the previous!
+ record in the ZIP
+  archive. This could be abused to create ZIP archives that are handled differen!
+tly by the 'zipfile'
+  module compared to other ZIP implementations. Remediation maintains this behav!
+ior, but checks that
+  the offset specified in the ZIP64 EOCD Locator record matches the expected val!
+ue.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python 'zipfile' Module Vulnerability (Oct 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.119138)
+Version used: 2025-12-18T05:46:55Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2025-8291
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/QECOPWMTH4VPPJAXAH2BGTA4XADOP62G/
+ url: https://github.com/python/cpython/issues/139700
+ url: https://github.com/python/cpython/pull/139702
+ url: https://github.com/python/cpython/pull/139706
+ url: https://github.com/python/cpython/pull/139708
+ url: https://github.com/python/cpython/pull/139712
+ url: https://github.com/python/cpython/pull/139713
+ url: https://github.com/python/cpython/pull/139714
+ url: https://github.com/python/cpython/pull/139715
+ url: https://osv.dev/vulnerability/PSF-2025-12
+ url: https://www.cve.org/CVERecord?id=CVE-2025-8291
+ cert-bund: WID-SEC-2025-2230
+ dfn-cert: DFN-CERT-2026-0215
+ dfn-cert: DFN-CERT-2026-0167
+ dfn-cert: DFN-CERT-2026-0038
+ dfn-cert: DFN-CERT-2025-3563
+ dfn-cert: DFN-CERT-2025-3555
+ dfn-cert: DFN-CERT-2025-3298
+ dfn-cert: DFN-CERT-2025-3045
+ dfn-cert: DFN-CERT-2025-2812
+
+
+Issue
+-----
+NVT:    Python Buffer Over-Read Vulnerability (Jul 2024) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.114744
+Threat: Medium (CVSS: 5.0)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a buffer over-read vulnerability in
+  SSLContext.set_npn_protocols().
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.10.0
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Suggested mitigation by the vendor is one of the following:
+  - Update to Python 3.10 or later where NPN isn't supported
+  - Avoid using NPN via SSLContext.set_npn_protocols()
+  - Avoid providing an empty list as a parameter to SSLContext.set_npn_protocols!
+()
+
+Affected Software/OS:
+Python versions prior to 3.10.
+
+Vulnerability Insight:
+The product doesn't disallow configuring an empty list ('[]')
+  for SSLContext.set_npn_protocols() which is an invalid value for the underlyin!
+g OpenSSL API. This
+  results in a buffer over-read when NPN is used (see CVE-2024-5535 for OpenSSL)!
+. This vulnerability
+  is of low severity due to NPN being not widely used and specifying an empty li!
+st likely being
+  uncommon in-practice (typically a protocol name would be configured).
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python Buffer Over-Read Vulnerability (Jul 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.114744)
+Version used: 2024-08-14T05:05:52Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2024-5642
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/PLP2JI3PJY33YG6P5BZYSSNU66HASXBQ/
+ url: https://github.com/python/cpython/pull/23014
+ url: https://github.com/python/cpython/issues/121227
+ url: https://osv.dev/vulnerability/PSF-2024-6
+ cert-bund: WID-SEC-2025-2648
+ dfn-cert: DFN-CERT-2025-3563
+ dfn-cert: DFN-CERT-2025-3555
+ dfn-cert: DFN-CERT-2025-3248
+ dfn-cert: DFN-CERT-2025-2826
+ dfn-cert: DFN-CERT-2024-2571
+ dfn-cert: DFN-CERT-2024-2491
+ dfn-cert: DFN-CERT-2024-2271
+ dfn-cert: DFN-CERT-2024-2186
+
+
+Issue
+-----
+NVT:    Python IP Ranges Vulnerability (Jun 2024) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.152430
+Threat: Medium (CVSS: 5.0)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a vulnerability in the ipaddress module.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.8.20
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.4 or
+  later.
+
+Affected Software/OS:
+Python prior to version 3.8.20, 3.9.x prior to 3.9.20, 3.10.x
+  prior to 3.10.15, 3.11.x prior to 3.11.10 and 3.12.x prior to 3.12.4.
+
+Vulnerability Insight:
+The 'ipaddress' module contained incorrect information about
+  whether certain IPv4 and IPv6 addresses were designated as 'globally reachable!
+' or 'private'.
+  This affected the 'is_private' and 'is_global' properties of the ipaddress.IPv!
+4Address,
+  ipaddress.IPv4Network, ipaddress.IPv6Address, and ipaddress.IPv6Network classe!
+s, where values
+  wouldn't be returned in accordance with the latest information from the IANA S!
+pecial-Purpose
+  Address Registries.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python IP Ranges Vulnerability (Jun 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.152430)
+Version used: 2024-10-11T15:39:44Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2024-4032
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/NRUHDUS2IV2USIZM2CVMSFL6SCKU3RZA/
+ url: https://github.com/python/cpython/issues/113171
+ url: https://github.com/python/cpython/pull/113179
+ url: https://osv.dev/vulnerability/PSF-2024-5
+ url: https://docs.python.org/3/whatsnew/changelog.html#python-3-12-4-final
+ url: https://docs.python.org/3.11/whatsnew/changelog.html#python-3-11-10-final
+ url: https://docs.python.org/3.10/whatsnew/changelog.html#python-3-10-15-final
+ url: https://docs.python.org/3.9/whatsnew/changelog.html#python-3-9-20-final
+ url: https://docs.python.org/3.8/whatsnew/changelog.html#python-3-8-20-final
+ cert-bund: WID-SEC-2025-0225
+ cert-bund: WID-SEC-2024-1396
+ dfn-cert: DFN-CERT-2025-1693
+ dfn-cert: DFN-CERT-2025-1477
+ dfn-cert: DFN-CERT-2025-1464
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2025-0655
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-3083
+ dfn-cert: DFN-CERT-2024-2993
+ dfn-cert: DFN-CERT-2024-2525
+ dfn-cert: DFN-CERT-2024-2512
+ dfn-cert: DFN-CERT-2024-2448
+ dfn-cert: DFN-CERT-2024-2340
+ dfn-cert: DFN-CERT-2024-2251
+ dfn-cert: DFN-CERT-2024-2227
+ dfn-cert: DFN-CERT-2024-2186
+ dfn-cert: DFN-CERT-2024-2152
+ dfn-cert: DFN-CERT-2024-1908
+ dfn-cert: DFN-CERT-2024-1833
+ dfn-cert: DFN-CERT-2024-1702
+ dfn-cert: DFN-CERT-2024-1615
+
+
+Issue
+-----
+NVT:    Python DoS Vulnerability (Oct 2025) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.125434
+Threat: Medium (CVSS: 5.0)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.9.25
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to Python 3.9.25, 3.15.0 or later, or to the latest
+  maintenance release of your Python version series (3.10.x, 3.12.x, 3.13.x, 3.1!
+4.x) once patches
+  are available. Please see the references for more information.
+
+Affected Software/OS:
+Python versions prior to 3.9.25 and 3.10.x prior to 3.15.0.
+  Note: Fixes have been backported to maintenance branches (3.10, 3.12, 3.13, 3.!
+14) but specific
+  patch versions are not yet available.
+
+Vulnerability Insight:
+If the value passed to os.path.expandvars() is user-controlled
+  a performance degradation is possible when expanding environment variables. Th!
+is vulnerability
+  exhibits quadratic complexity behavior that could be exploited for denial of s!
+ervice attacks.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Oct 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.125434)
+Version used: 2025-11-05T05:40:07Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2025-6075
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/IUP5QJ6D4KK6ULHOMPC7DPNKRYQTQNLA/
+ url: https://github.com/python/cpython/issues/136065
+ url: https://github.com/python/cpython/commit/2e6150adccaaf5bd95d4c19dfd04a36e0b325d8c
+ url: https://github.com/python/cpython/commit/631ba3407e3348ccd56ce5160c4fb2c5dc5f4d84
+ url: https://github.com/python/cpython/commit/892747b4cf0f95ba8beb51c0d0658bfaa381ebca
+ url: https://github.com/python/cpython/commit/9ab89c026aa9611c4b0b67c288b8303a480fe742
+ url: https://github.com/python/cpython/commit/c8a5f3435c342964e0a432cc9fb448b7dbecd1ba
+ url: https://github.com/python/cpython/commit/f029e8db626ddc6e3a3beea4eff511a71aaceb5c
+ url: https://docs.python.org/release/3.9.25/whatsnew/changelog.html
+ cert-bund: WID-SEC-2025-2468
+ dfn-cert: DFN-CERT-2026-0215
+ dfn-cert: DFN-CERT-2025-3563
+ dfn-cert: DFN-CERT-2025-3555
+ dfn-cert: DFN-CERT-2025-3298
+ dfn-cert: DFN-CERT-2025-3267
+
+
+Issue
+-----
+NVT:    Python Multiple Vulnerabilities (Mar 2024) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.151951
+Threat: Medium (CVSS: 4.9)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to multiple vulnerabilities.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.8.19
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.8.19, 3.9.19, 3.10.14, 3.11.8, 3.12.2
+  or later.
+
+Affected Software/OS:
+Python prior to version 3.8.19, 3.9.x prior to 3.9.19, 3.10.x
+  prior to 3.10.14, 3.11.x prior to 3.11.8 and 3.12.x prior to 3.12.2.
+
+Vulnerability Insight:
+The following vulnerabilities exist:
+  - CVE-2024-0450: Quoted zip-bomb protection for zipfile
+  - No CVE: crash in socket.if_indextoname() with a specific value (UINT_MAX).
+  - No CVE: .pth files with names starting with a dot or containing the hidden f!
+ile attribute are
+  not skipped
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python Multiple Vulnerabilities (Mar 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.151951)
+Version used: 2024-10-11T15:39:44Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2024-0450
+ url: https://discuss.python.org/t/python-3-10-14-3-9-19-and-3-8-19-is-now-available/48993
+ url: https://pythoninsider.blogspot.com/2024/03/python-31014-3919-and-3819-is-now.html
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/XELNUX2L3IOHBTFU7RQHCY6OUVEWZ2FG/
+ url: https://github.com/python/cpython/issues/109858
+ url: https://osv.dev/vulnerability/PSF-2024-2
+ url: https://docs.python.org/3.12/whatsnew/changelog.html#python-3-12-2-final
+ url: https://docs.python.org/3.11/whatsnew/changelog.html#python-3-11-8-final
+ cert-bund: WID-SEC-2025-0794
+ cert-bund: WID-SEC-2025-0225
+ cert-bund: WID-SEC-2025-0148
+ cert-bund: WID-SEC-2024-3377
+ cert-bund: WID-SEC-2024-3222
+ cert-bund: WID-SEC-2024-3195
+ cert-bund: WID-SEC-2024-1656
+ cert-bund: WID-SEC-2024-1642
+ cert-bund: WID-SEC-2024-1307
+ cert-bund: WID-SEC-2024-0687
+ dfn-cert: DFN-CERT-2025-1477
+ dfn-cert: DFN-CERT-2025-1464
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2025-0933
+ dfn-cert: DFN-CERT-2025-0132
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-2994
+ dfn-cert: DFN-CERT-2024-2993
+ dfn-cert: DFN-CERT-2024-2962
+ dfn-cert: DFN-CERT-2024-2745
+ dfn-cert: DFN-CERT-2024-2179
+ dfn-cert: DFN-CERT-2024-1846
+ dfn-cert: DFN-CERT-2024-1833
+ dfn-cert: DFN-CERT-2024-1805
+ dfn-cert: DFN-CERT-2024-1645
+ dfn-cert: DFN-CERT-2024-1433
+ dfn-cert: DFN-CERT-2024-1432
+ dfn-cert: DFN-CERT-2024-1415
+ dfn-cert: DFN-CERT-2024-0828
+ dfn-cert: DFN-CERT-2024-0785
+ dfn-cert: DFN-CERT-2024-0782
+
+
+Issue
+-----
+NVT:    Python 2.7 < 3.4 DoS Vulnerability (bpo-14621) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.112995
+Threat: Medium (CVSS: 4.3)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.4
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+The vendor has released updates. Please see the references for
+  more information.
+
+Affected Software/OS:
+Python 2.7 before 3.4.
+
+Vulnerability Insight:
+Python only uses the last eight bits of the prefix to randomize
+  hash values, which causes it to compute hash values without restricting the ab!
+ility to trigger
+  hash collisions predictably and makes it easier for context-dependent attacker!
+s to cause a denial
+  of service (CPU consumption) via crafted input to an application that maintain!
+s a hash table.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.7 < 3.4 DoS Vulnerability (bpo-14621) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.112995)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2013-7040
+ url: https://python-security.readthedocs.io/vuln/hash-function-not-randomized-properly.html
+ advisory-id: bpo-14621
+ cert-bund: CB-K15/1188
+ dfn-cert: DFN-CERT-2015-1252
+
+
+Issue
+-----
+NVT:    Python < 3.2.6, 3.3.x < 3.3.3 Wildcard DoS Vulnerability (bpo-17980) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.112996
+Threat: Medium (CVSS: 4.3)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python's ssl.match_hostname() trips over crafted wildcard names.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.2.6
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+The vendor has released updates. Please see the references for
+  more information.
+
+Affected Software/OS:
+Python before 3.2.6 and 3.3 before 3.3.3.
+
+Vulnerability Insight:
+If the name in the certificate contains many * characters
+  (wildcard), matching the compiled regular expression against the host name can!
+ take a very
+  long time.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.2.6, 3.3.x < 3.3.3 Wildcard DoS Vulnerability (bpo-17980) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.112996)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2013-2099
+ url: https://python-security.readthedocs.io/vuln/ssl-match_hostname-wildcard-dos.html
+ advisory-id: bpo-17980
+ cert-bund: CB-K15/1462
+ cert-bund: CB-K14/1512
+ cert-bund: CB-K14/1179
+ cert-bund: CB-K14/1078
+ cert-bund: CB-K13/0654
+ dfn-cert: DFN-CERT-2016-0872
+ dfn-cert: DFN-CERT-2015-1540
+ dfn-cert: DFN-CERT-2014-1606
+ dfn-cert: DFN-CERT-2014-1235
+ dfn-cert: DFN-CERT-2014-1126
+ dfn-cert: DFN-CERT-2013-1369
+ dfn-cert: DFN-CERT-2013-1302
+
+
+Issue
+-----
+NVT:    Python Use After Free Vulnerability (May 2025) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.171522
+Threat: Medium (CVSS: 4.0)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an use after free vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.9.23
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.9.23, 3.10.18, 3.11.13, 3.12.11, 3.13.4 or
+  later.
+
+Affected Software/OS:
+Python prior to version 3.9.23, 3.10.x prior to 3.10.18, 3.11.x
+  prior to 3.11.13, 3.12.x prior to 3.12.11 and 3.13.x prior to 3.13.4.
+
+Vulnerability Insight:
+There is an issue in CPython when using bytes.decode(). If you
+  are not using the 'unicode_escape' encoding or an error handler your usage is !
+not affected. To
+  work-around this issue you may stop using the error= handler and instead wrap !
+the bytes.decode()
+  call in a try-except catching the DecodeError.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python Use After Free Vulnerability (May 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.171522)
+Version used: 2025-10-10T05:39:02Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2025-4516
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/L75IPBBTSCYEF56I2M4KIW353BB3AY74/
+ url: https://github.com/python/cpython/issues/133767
+ url: https://github.com/python/cpython/pull/129648
+ url: https://osv.dev/vulnerability/PSF-2025-4
+ url: https://www.cve.org/CVERecord?id=CVE-2025-4516
+ cert-bund: WID-SEC-2025-1850
+ cert-bund: WID-SEC-2025-1080
+ dfn-cert: DFN-CERT-2026-0215
+ dfn-cert: DFN-CERT-2025-3555
+ dfn-cert: DFN-CERT-2025-2212
+ dfn-cert: DFN-CERT-2025-2047
+ dfn-cert: DFN-CERT-2025-1905
+ dfn-cert: DFN-CERT-2025-1868
+ dfn-cert: DFN-CERT-2025-1682
+ dfn-cert: DFN-CERT-2025-1653
+ dfn-cert: DFN-CERT-2025-1589
+ dfn-cert: DFN-CERT-2025-1558
+ dfn-cert: DFN-CERT-2025-1489
+ dfn-cert: DFN-CERT-2025-1477
+
+
+Issue
+-----
+NVT:    Python DoS Vulnerability (Jun 2025) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.154798
+Threat: Medium (CVSS: 4.0)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a denial of service (DoS) vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.9.24
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.9.24, 3.10.19, 3.11.14, 3.12.12, 3.13.6 or
+  later.
+
+Affected Software/OS:
+Python prior to version 3.9.24, 3.10.x prior to 3.10.19, 3.11.x
+  prior to 3.11.14, 3.12.x prior to 3.12.12 and 3.13.x prior to 3.13.6.
+
+Vulnerability Insight:
+The html.parser.HTMLParser class had worse-case quadratic
+  complexity when processing certain crafted malformed inputs potentially leadin!
+g to amplified
+  denial of service.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Jun 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.154798)
+Version used: 2025-12-18T05:46:55Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2025-6069
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/K5PIYLR6EP3WR7ZOKKYQUWEDNQVUXOYM/
+ url: https://github.com/python/cpython/pull/135464
+ url: https://github.com/python/cpython/issues/135462
+ url: https://osv.dev/vulnerability/PSF-2025-10
+ url: https://www.cve.org/CVERecord?id=CVE-2025-6069
+ cert-bund: WID-SEC-2025-1470
+ dfn-cert: DFN-CERT-2026-0215
+ dfn-cert: DFN-CERT-2025-3563
+ dfn-cert: DFN-CERT-2025-3555
+ dfn-cert: DFN-CERT-2025-3313
+ dfn-cert: DFN-CERT-2025-3045
+ dfn-cert: DFN-CERT-2025-2304
+ dfn-cert: DFN-CERT-2025-2235
+ dfn-cert: DFN-CERT-2025-2212
+ dfn-cert: DFN-CERT-2025-2148
+ dfn-cert: DFN-CERT-2025-2047
+ dfn-cert: DFN-CERT-2025-1980
+ dfn-cert: DFN-CERT-2025-1868
+ dfn-cert: DFN-CERT-2025-1800
+
+
+Issue
+-----
+NVT:    Python 2.7.x < 2.7.15 Heap-Based Buffer Overflow Vulnerability Python Issue (bpo-31530) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.118239
+Threat: Low (CVSS: 3.6)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a heap-based buffer overflow vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     2.7.15
+Installation
+path / port:       8000/tcp
+
+Impact:
+Successful exploitation will allow an attacker
+  to cause a heap-based buffer overflow.
+
+Solution:
+Solution type: VendorFix
+Update to version 2.7.15 or later.
+
+Affected Software/OS:
+Python 2.7.x before version 2.7.15.
+
+Vulnerability Insight:
+The flaw exists due to an improper notification
+  mechanism on buffer reallocation and corruption in a file's internal readahead
+  buffer which, while processing large amounts of data with multiple threads, co!
+uld
+  create a condition where a buffer that gets allocated with one thread is
+  reallocated due to a large size of input.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present
+  on the target host.
+Details:
+Python 2.7.x < 2.7.15 Heap-Based Buffer Overflow Vulnerability Python Issue ...
+(OID: 1.3.6.1.4.1.25623.1.0.118239)
+Version used: 2023-07-05T05:06:18Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2018-1000030
+ url: https://python-security.readthedocs.io/vuln/python-2.7-readahead-not-thread-safe.html
+ url: https://bugs.python.org/issue31530
+ advisory-id: bpo-31530
+ cert-bund: CB-K20/0041
+ dfn-cert: DFN-CERT-2020-0177
+ dfn-cert: DFN-CERT-2019-0362
+ dfn-cert: DFN-CERT-2018-2332
+ dfn-cert: DFN-CERT-2018-0995
+
+
+Issue
+-----
+NVT:    TCP Timestamps Information Disclosure
+OID:    1.3.6.1.4.1.25623.1.0.80091
+Threat: Low (CVSS: 2.6)
+Port:   general/tcp
+
+Summary:
+The remote host implements TCP timestamps and therefore allows
+  to compute the uptime.
+
+Vulnerability Detection Result:
+It was detected that the host implements RFC1323/RFC7323.
+The following timestamps were retrieved with a delay of 1 seconds in-between:
+Packet 1: 3314348634
+Packet 2: 3314349788
+
+Impact:
+A side effect of this feature is that the uptime of the remote
+  host can sometimes be computed.
+
+Solution:
+Solution type: Mitigation
+To disable TCP timestamps on linux add the line
+  'net.ipv4.tcp_timestamps = 0' to /etc/sysctl.conf. Execute 'sysctl -p' to appl!
+y the settings at
+  runtime.
+  To disable TCP timestamps on Windows execute 'netsh int tcp set global timesta!
+mps=disabled'
+  Starting with Windows Server 2008 and Vista, the timestamp can not be complete!
+ly disabled.
+  The default behavior of the TCP/IP stack on this Systems is to not use the Tim!
+estamp options when
+  initiating TCP connections, but use them if the TCP peer that is initiating co!
+mmunication includes
+  them in their synchronize (SYN) segment.
+  See the references for more information.
+
+Affected Software/OS:
+TCP implementations that implement RFC1323/RFC7323.
+
+Vulnerability Insight:
+The remote host implements TCP timestamps, as defined by
+  RFC1323/RFC7323.
+
+Vulnerability Detection Method:
+Special IP packets are forged and sent with a little delay in
+  between to the target IP. The responses are searched for a timestamps. If foun!
+d, the timestamps
+  are reported.
+Details:
+TCP Timestamps Information Disclosure
+(OID: 1.3.6.1.4.1.25623.1.0.80091)
+Version used: 2023-12-15T16:10:08Z
+
+References:
+ url: https://datatracker.ietf.org/doc/html/rfc1323
+ url: https://datatracker.ietf.org/doc/html/rfc7323
+ url: https://web.archive.org/web/20151213072445/http://www.microsoft.com/en-us/download/details.aspx?id=9152
+ url: https://www.fortiguard.com/psirt/FG-IR-16-090
+
+
+Issue
+-----
+NVT:    Python Improper Input Validation Vulnerability (Jan 2025) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.171143
+Threat: Low (CVSS: 2.6)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an improper input validation vulnerability
+  in the urllib.parse.urlsplit and urlparse standard functions.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.9.22
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.9.22, 3.10.17, 3.11.12, 3.12.9, 3.13.2 or
+  later.
+
+Affected Software/OS:
+Python versions prior to 3.9.22, 3.10.x prior to 3.10.17,
+  3.11.x prior to 3.11.12, 3.12.x prior to 3.12.9 and 3.13.x prior to 3.13.2.
+
+Vulnerability Insight:
+The Python standard library functions urllib.parse.urlsplit and
+  urlparse accepted domain names that included square brackets which isn't valid!
+ according to RFC
+  3986. Square brackets are only meant to be used as delimiters for specifying I!
+Pv6 and IPvFuture
+  hosts in URLs. This could result in differential parsing across the Python URL!
+ parser and other
+  specification-compliant URL parsers.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python Improper Input Validation Vulnerability (Jan 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.171143)
+Version used: 2025-10-10T05:39:02Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2025-0938
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/K4EUG6EKV6JYFIC24BASYOZS4M5XOQIB/
+ url: https://github.com/python/cpython/issues/105704
+ url: https://github.com/python/cpython/pull/129418
+ url: https://docs.python.org/3.13/whatsnew/changelog.html#python-3-13-2-final
+ url: https://docs.python.org/3.12/whatsnew/changelog.html#python-3-12-9-final
+ url: https://docs.python.org/3.11/whatsnew/changelog.html#python-3-11-12-final
+ url: https://docs.python.org/3.10/whatsnew/changelog.html#python-3-10-17-final
+ url: https://docs.python.org/3.9/whatsnew/changelog.html#python-3-9-22-final
+ url: https://osv.dev/vulnerability/PSF-2025-1
+ url: https://www.cve.org/CVERecord?id=CVE-2025-0938
+ cert-bund: WID-SEC-2025-0233
+ dfn-cert: DFN-CERT-2025-3555
+ dfn-cert: DFN-CERT-2025-3045
+ dfn-cert: DFN-CERT-2025-1682
+ dfn-cert: DFN-CERT-2025-1477
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2025-0993
+ dfn-cert: DFN-CERT-2025-0717
+ dfn-cert: DFN-CERT-2025-0655
+ dfn-cert: DFN-CERT-2025-0409
+ dfn-cert: DFN-CERT-2025-0399
+ dfn-cert: DFN-CERT-2025-0309
+
+
+Issue
+-----
+NVT:    Python SSRF Vulnerability (Nov 2024) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.170965
+Threat: Low (CVSS: 2.6)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to a server-side request forgery (SSRF)
+  vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.9.21
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.9.21, 3.10.16, 3.11.4 or later.
+
+Affected Software/OS:
+Python versions prior to 3.9.21, 3.10.x prior to 3.10.16 and
+  3.11.x prior to 3.11.4.
+
+Vulnerability Insight:
+The urllib.parse.urlsplit() and urlparse() functions improperly
+  validated bracketed hosts ([]), allowing hosts that weren't IPv6 or IPvFuture.!
+ This behavior was
+  not conformant to RFC 3986 and potentially enabled SSRF if a URL is processed !
+by more than one
+  URL parser.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python SSRF Vulnerability (Nov 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.170965)
+Version used: 2024-12-13T15:40:54Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2024-11168
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/XPWB6XVZ5G5KGEI63M4AWLIEUF5BPH4T/
+ url: https://docs.python.org/release/3.12.0/whatsnew/changelog.html#python-3-12-0-beta-1
+ url: https://docs.python.org/release/3.11.4/whatsnew/changelog.html#python-3-11-4-final
+ url: https://docs.python.org/release/3.10.16/whatsnew/changelog.html#python-3-10-16-final
+ url: https://docs.python.org/release/3.9.21/whatsnew/changelog.html#python-3-9-21-final
+ url: https://github.com/python/cpython/issues/103848
+ url: https://github.com/python/cpython/pull/103849
+ url: https://github.com/python/cpython/commit/29f348e232e82938ba2165843c448c2b291504c5
+ url: https://github.com/python/cpython/commit/b2171a2fd41416cf68afd67460578631d755a550
+ url: https://osv.dev/vulnerability/PSF-2024-13
+ cert-bund: WID-SEC-2025-1439
+ cert-bund: WID-SEC-2024-3463
+ dfn-cert: DFN-CERT-2025-3555
+ dfn-cert: DFN-CERT-2025-3045
+ dfn-cert: DFN-CERT-2025-2235
+ dfn-cert: DFN-CERT-2025-1148
+ dfn-cert: DFN-CERT-2025-0655
+ dfn-cert: DFN-CERT-2025-0399
+ dfn-cert: DFN-CERT-2025-0179
+ dfn-cert: DFN-CERT-2024-3220
+ dfn-cert: DFN-CERT-2024-3182
+ dfn-cert: DFN-CERT-2024-3055
+
+
+Issue
+-----
+NVT:    ICMP Timestamp Reply Information Disclosure
+OID:    1.3.6.1.4.1.25623.1.0.103190
+Threat: Low (CVSS: 2.1)
+Port:   general/icmp
+
+Summary:
+The remote host responded to an ICMP timestamp request.
+
+Vulnerability Detection Result:
+The following response / ICMP packet has been received:
+- ICMP Type: 14
+- ICMP Code: 0
+
+Impact:
+This information could theoretically be used to exploit weak
+  time-based random number generators in other services.
+
+Solution:
+Solution type: Mitigation
+Various mitigations are possible:
+  - Disable the support for ICMP timestamp on the remote host completely
+  - Protect the remote host by a firewall, and block ICMP packets passing throug!
+h the firewall in
+  either direction (either completely or only for untrusted networks)
+
+Vulnerability Insight:
+The Timestamp Reply is an ICMP message which replies to a
+  Timestamp message. It consists of the originating timestamp sent by the sender!
+ of the Timestamp as
+  well as a receive timestamp and a transmit timestamp.
+
+Vulnerability Detection Method:
+Sends an ICMP Timestamp (Type 13) request and checks if a
+  Timestamp Reply (Type 14) is received.
+Details:
+ICMP Timestamp Reply Information Disclosure
+(OID: 1.3.6.1.4.1.25623.1.0.103190)
+Version used: 2025-01-21T05:37:33Z
+
+References:
+ cve: CVE-1999-0524
+ url: https://datatracker.ietf.org/doc/html/rfc792
+ url: https://datatracker.ietf.org/doc/html/rfc2780
+ cert-bund: CB-K15/1514
+ cert-bund: CB-K14/0632
+ dfn-cert: DFN-CERT-2014-0658
+
+
+Issue
+-----
+NVT:    Python Improper Encoding of Output Vulnerability (Feb 2025) - Linux
+OID:    1.3.6.1.4.1.25623.1.0.171266
+Threat: Low (CVSS: 2.1)
+Port:   8000/tcp
+
+Product detection result: cpe:/a:python:python:2.7.13
+Detected by: Python Detection Consolidation (OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+Summary:
+Python is prone to an improper encoding of output
+  vulnerability.
+
+Vulnerability Detection Result:
+Installed version: 2.7.13
+Fixed version:     3.11.10
+Installation
+path / port:       8000/tcp
+
+Solution:
+Solution type: VendorFix
+Update to version 3.11.10, 3.12.4 or later.
+
+Affected Software/OS:
+Python versions prior to 3.11.10 and 3.12.x prior to 3.12.4.
+
+Vulnerability Insight:
+During an address list folding when a separating comma ends up
+  on a folded line and that line is to be unicode-encoded then the separator its!
+elf is also
+  unicode-encoded. Expected behavior is that the separating comma remains a plan!
+ comma. This can
+  result in the address header being misinterpreted by some mail servers.
+
+Vulnerability Detection Method:
+Checks if a vulnerable version is present on the target host.
+Details:
+Python Improper Encoding of Output Vulnerability (Feb 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.171266)
+Version used: 2025-10-10T05:39:02Z
+
+Product Detection Result:
+Product:cpe:/a:python:python:2.7.13
+
+Method:Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+
+References:
+ cve: CVE-2025-1795
+ url: https://mail.python.org/archives/list/security-announce@python.org/thread/MB62IZMEC3UM6SGHP5LET5JX2Y7H4ZUR/
+ url: https://github.com/python/cpython/issues/100884
+ url: https://github.com/python/cpython/pull/100885
+ url: https://github.com/python/cpython/pull/119099
+ url: https://github.com/python/cpython/commit/09fab93c3d857496c0bd162797fab816c311ee48
+ url: https://github.com/python/cpython/commit/70754d21c288535e86070ca7a6e90dcb670b8593
+ url: https://github.com/python/cpython/commit/9148b77e0af91cdacaa7fe3dfac09635c3fe9a74
+ url: https://docs.python.org/3.12/whatsnew/changelog.html#python-3-12-4-final
+ url: https://docs.python.org/3.11/whatsnew/changelog.html#python-3-11-10-final
+ url: https://osv.dev/vulnerability/PSF-2025-3
+ url: https://www.cve.org/CVERecord?id=CVE-2025-1795
+ cert-bund: WID-SEC-2025-1850
+ cert-bund: WID-SEC-2025-1439
+ cert-bund: WID-SEC-2025-0471
+ dfn-cert: DFN-CERT-2025-3045
+ dfn-cert: DFN-CERT-2025-1905
+ dfn-cert: DFN-CERT-2025-1682
+ dfn-cert: DFN-CERT-2025-1589
+ dfn-cert: DFN-CERT-2025-1477
+ dfn-cert: DFN-CERT-2025-1461
+ dfn-cert: DFN-CERT-2025-0717
+ dfn-cert: DFN-CERT-2025-0687
+
+
+Issue
+-----
+NVT:    Services
+OID:    1.3.6.1.4.1.25623.1.0.10330
+Threat: Log (CVSS: 0.0)
+Port:   8000/tcp
+
+Summary:
+This plugin performs service detection.
+
+Vulnerability Detection Result:
+A web server is running on this port
+
+Solution:
+
+Vulnerability Insight:
+This plugin attempts to guess which service is running on the
+  remote port(s). For instance, it searches for a web server which could listen !
+on another port than
+  80 or 443 and makes this information available for other check routines.
+
+Log Method:
+Details:
+Services
+(OID: 1.3.6.1.4.1.25623.1.0.10330)
+Version used: 2025-03-05T05:38:53Z
+
+
+Issue
+-----
+NVT:    HTTP Server Banner Enumeration
+OID:    1.3.6.1.4.1.25623.1.0.108708
+Threat: Log (CVSS: 0.0)
+Port:   8000/tcp
+
+Summary:
+This script tries to detect / enumerate different HTTP server
+  banner (e.g. from a frontend, backend or proxy server) by sending various diff!
+erent HTTP requests
+  (valid and invalid ones).
+
+Vulnerability Detection Result:
+It was possible to enumerate the following HTTP server banner(s):
+Server banner                      | Enumeration technique
+--------------------------------------------------------------------------------!
+---------------------
+Server: BaseHTTP/0.3 Python/2.7.13 | Invalid HTTP 00.5 GET request (non-existent!
+ HTTP version) to '/'
+
+Solution:
+
+Log Method:
+Details:
+HTTP Server Banner Enumeration
+(OID: 1.3.6.1.4.1.25623.1.0.108708)
+Version used: 2025-01-31T15:39:24Z
+
+
+Issue
+-----
+NVT:    HTTP Server type and version
+OID:    1.3.6.1.4.1.25623.1.0.10107
+Threat: Log (CVSS: 0.0)
+Port:   8000/tcp
+
+Summary:
+This script detects and reports the HTTP Server's banner
+  which might provide the type and version of it.
+
+Vulnerability Detection Result:
+The remote HTTP Server banner is:
+Server: BaseHTTP/0.3 Python/2.7.13
+
+Solution:
+
+Log Method:
+Details:
+HTTP Server type and version
+(OID: 1.3.6.1.4.1.25623.1.0.10107)
+Version used: 2023-08-01T13:29:10Z
+
+
+Issue
+-----
+NVT:    IP Forwarding Enabled - Active Check
+OID:    1.3.6.1.4.1.25623.1.0.147205
+Threat: Log (CVSS: 0.0)
+Port:   general/tcp
+
+Summary:
+Checks if the remote host has IP forwarding enabled.
+
+Vulnerability Detection Result:
+It was possible to route a TCP packet through the target host and received an an!
+swer which means IP forwarding is enabled.
+
+Solution:
+
+Log Method:
+Sends a crafted Local Link Layer (LLL) frame and checks the
+  response.
+Details:
+IP Forwarding Enabled - Active Check
+(OID: 1.3.6.1.4.1.25623.1.0.147205)
+Version used: 2021-12-03T08:27:06Z
+
+References:
+ cve: CVE-1999-0511
+
+
+Issue
+-----
+NVT:    HTTP Security Headers Detection
+OID:    1.3.6.1.4.1.25623.1.0.112081
+Threat: Log (CVSS: 0.0)
+Port:   8000/tcp
+
+Summary:
+All known security headers are being checked on the remote web
+  server.
+  On completion a report will hand back whether a specific security header has b!
+een implemented
+  (including its value and if it is deprecated) or is missing on the target.
+
+Vulnerability Detection Result:
+Header Name      | Header Value
+-------------------------------
+X-XSS-Protection | 0
+Missing Headers                   | More Information
+--------------------------------------------------------------------------------!
+--------------------------------------------------------------------------------!
+----------------------------------------------
+Content-Security-Policy           | https://owasp.org/www-project-secure-headers!
+/#content-security-policy
+Cross-Origin-Embedder-Policy      | https://scotthelme.co.uk/coop-and-coep/, Not!
+e: This is an upcoming header
+Cross-Origin-Opener-Policy        | https://scotthelme.co.uk/coop-and-coep/, Not!
+e: This is an upcoming header
+Cross-Origin-Resource-Policy      | https://scotthelme.co.uk/coop-and-coep/, Not!
+e: This is an upcoming header
+Document-Policy                   | https://w3c.github.io/webappsec-feature-poli!
+cy/document-policy#document-policy-http-header
+Feature-Policy                    | https://owasp.org/www-project-secure-headers!
+/#feature-policy, Note: The Feature Policy header has been renamed to Permission!
+s Policy
+Permissions-Policy                | https://w3c.github.io/webappsec-feature-poli!
+cy/#permissions-policy-http-header-field
+Referrer-Policy                   | https://owasp.org/www-project-secure-headers!
+/#referrer-policy
+Sec-Fetch-Dest                    | https://developer.mozilla.org/en-US/docs/Web!
+/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header support!
+ed only in newer browsers like e.g. Firefox 90
+Sec-Fetch-Mode                    | https://developer.mozilla.org/en-US/docs/Web!
+/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header support!
+ed only in newer browsers like e.g. Firefox 90
+Sec-Fetch-Site                    | https://developer.mozilla.org/en-US/docs/Web!
+/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header support!
+ed only in newer browsers like e.g. Firefox 90
+Sec-Fetch-User                    | https://developer.mozilla.org/en-US/docs/Web!
+/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header support!
+ed only in newer browsers like e.g. Firefox 90
+X-Content-Type-Options            | https://owasp.org/www-project-secure-headers!
+/#x-content-type-options
+X-Frame-Options                   | https://owasp.org/www-project-secure-headers!
+/#x-frame-options
+X-Permitted-Cross-Domain-Policies | https://owasp.org/www-project-secure-headers!
+/#x-permitted-cross-domain-policies
+
+Solution:
+
+Log Method:
+Details:
+HTTP Security Headers Detection
+(OID: 1.3.6.1.4.1.25623.1.0.112081)
+Version used: 2025-03-21T15:40:43Z
+
+References:
+ url: https://owasp.org/www-project-secure-headers/
+ url: https://owasp.org/www-project-secure-headers/#div-headers
+ url: https://securityheaders.com/
+
+
+Issue
+-----
+NVT:    Traceroute
+OID:    1.3.6.1.4.1.25623.1.0.51662
+Threat: Log (CVSS: 0.0)
+Port:   general/tcp
+
+Summary:
+Collect information about the network route and
+  network distance between the scanner host and the target host.
+
+Vulnerability Detection Result:
+Network route from scanner (172.30.0.2) to target (172.30.40.1):
+172.30.0.2
+172.30.40.1
+Network distance between scanner and target: 2
+
+Solution:
+
+Vulnerability Insight:
+For internal networks, the distances are usually
+  small, often less than 4 hosts between scanner and target. For public targets !
+the
+  distance is greater and might be 10 hosts or more.
+
+Log Method:
+A combination of the protocols ICMP and TCP is used
+  to determine the route. This method is applicable for IPv4 only and it is also!
+ known as
+  'traceroute'.
+Details:
+Traceroute
+(OID: 1.3.6.1.4.1.25623.1.0.51662)
+Version used: 2022-10-17T11:13:19Z
+
+
+Issue
+-----
+NVT:    Web Application Scanning Consolidation / Info Reporting
+OID:    1.3.6.1.4.1.25623.1.0.111038
+Threat: Log (CVSS: 0.0)
+Port:   8000/tcp
+
+Summary:
+The script consolidates and reports various information for web
+  application (formerly called 'CGI') scanning.
+  This information is based on the following scripts / settings:
+  - HTTP-Version Detection (OID: 1.3.6.1.4.1.25623.1.0.100034)
+  - No 404 check (OID: 1.3.6.1.4.1.25623.1.0.10386)
+  - Web mirroring / webmirror.nasl (OID: 1.3.6.1.4.1.25623.1.0.10662)
+  - Directory Scanner / DDI_Directory_Scanner.nasl (OID: 1.3.6.1.4.1.25623.1.0.1!
+1032)
+  - The configured 'cgi_path' within the 'Scanner Preferences' of the scan confi!
+g in use
+  - The configured 'Enable CGI scanning', 'Enable generic web application scanni!
+ng' and
+  'Add historic /scripts and /cgi-bin to directories for CGI scanning' within th!
+e
+  'Global variable settings' of the scan config in use
+  If you think any of this information is wrong please report it to the referenc!
+ed community
+  forum.
+
+Vulnerability Detection Result:
+The Hostname/IP "dsvw.trabalho_vulnnet" was used to access the remote host.
+Generic web application scanning is disabled for this host via the "Enable gener!
+ic web application scanning" option within the "Global variable settings" of the!
+ scan config in use.
+Requests to this service are done via HTTP/1.0.
+This service seems to be able to host PHP scripts.
+This service seems to be able to host ASP scripts.
+The User-Agent "Mozilla/5.0 [en] (X11, U; OpenVAS-VT <version replaced>)" was us!
+ed to access the remote host.
+Historic /scripts and /cgi-bin are not added to the directories used for web app!
+lication scanning. You can enable this again with the "Add historic /scripts and!
+ /cgi-bin to directories for CGI scanning" option within the "Global variable se!
+ttings" of the scan config in use.
+The following directories were used for web application scanning:
+http://dsvw.trabalho_vulnnet:8000/
+While this is not, in and of itself, a bug, you should manually inspect these di!
+rectories to ensure that they are in compliance with company security standards
+The following CGIs were discovered:
+Syntax : cginame (arguments [default value])
+http://dsvw.trabalho_vulnnet:8000/ (foobar#lang [en%3Cscript%3Ealert(%22arbitrar!
+y%20javascript%22)%3C%2Fscript%3E] path [] object [%28dp0%0AS%27admin%27%0Ap1%0A!
+%28S%27admin%27%0Ap2%0AS%27admin%27%0Ap3%0Atp4%0AsS%27dricci%27%0Ap5%0A%28S%27di!
+an%27%0Ap6%0AS%27ricci%27%0Ap7%0Atp8%0AsS%27amason%27%0Ap9%0A%28S%27anthony%27%0!
+Ap10%0AS%27mason%27%0Ap11%0Atp12%0AsS%27svargas%27%0Ap13%0A%28S%27sandra%27%0Ap1!
+4%0AS%27vargas%27%0Ap15%0Atp16%0As.] size [32] include [] domain [www.google.com!
+] id [2] comment [] charset [utf8] name [dian] xml [%3Croot%3E%3C%2Froot%3E] #la!
+ng [en] redir [] cmd [ifconfig] v [0.2] )
+http://dsvw.trabalho_vulnnet:8000/login (password [] username [] )
+http://dsvw.trabalho_vulnnet:8000/users.json (callback [process] )
+
+Solution:
+
+Log Method:
+Details:
+Web Application Scanning Consolidation / Info Reporting
+(OID: 1.3.6.1.4.1.25623.1.0.111038)
+Version used: 2026-01-13T05:47:36Z
+
+References:
+ url: https://forum.greenbone.net/c/vulnerability-tests/7
+
+
+Issue
+-----
+NVT:    Allowed HTTP Methods Enumeration
+OID:    1.3.6.1.4.1.25623.1.0.153974
+Threat: Log (CVSS: 0.0)
+Port:   8000/tcp
+
+Summary:
+Enumerates which HTTP methods are allowed.
+
+Vulnerability Detection Result:
+The following list contains the URLs and corresponding supported HTTP methods.
+URL                                | HTTP Methods
+-------------------------------------------------
+http://dsvw.trabalho_vulnnet:8000/ | GET
+
+Solution:
+
+Vulnerability Insight:
+- Basic HTTP methods: GET, HEAD, POST, PUT, DELETE, CONNECT,
+  OPTIONS, TRACE
+  - Extended HTTP methods: ACL, BASELINE-CONTROL, BIND, CHECKIN, CHECKOUT, COPY,!
+ LABEL, LINK, LOCK,
+  MERGE, MKACTIVITY, MKCALENDAR, MKCOL, MKREDIRECTREF, MKWORKSPACE, MOVE, ORDERP!
+ATCH, PATCH, PRI,
+  PROPFIND, PROPPATCH, REBIND, REPORT, SEARCH, UNBIND, UNCHECKOUT, UNLINK, UNLOC!
+K, UPDATE,
+  UPDATEREDIRECTREF, VERSION-CONTROL
+
+Log Method:
+Sends multiple HTTP requests and checks the responses.
+  Disclaimer:
+  - This enumeration script is provided 'as is' (means no support is given) and !
+only providing
+  rudimentary information about the possible enabled methods
+  - This script doesn't guarantee completeness or full reliability
+  For more reliable determination of the enabled HTTP methods please inspect the!
+ configuration of
+  the web server manually and directly on the target host.
+Details:
+Allowed HTTP Methods Enumeration
+(OID: 1.3.6.1.4.1.25623.1.0.153974)
+Version used: 2025-02-28T05:38:49Z
+
+
+Issue
+-----
+NVT:    CPE Inventory
+OID:    1.3.6.1.4.1.25623.1.0.810002
+Threat: Log (CVSS: 0.0)
+Port:   general/CPE-T
+
+Summary:
+This routine uses information collected by other routines about
+  CPE identities of operating systems, services and applications detected during!
+ the scan.
+  Note: Some CPEs for specific products might show up twice or more in the outpu!
+t. Background:
+  After a product got renamed or a specific vendor was acquired by another one i!
+t might happen that
+  a product gets a new CPE within the NVD CPE Dictionary but older entries are k!
+ept with the older
+  CPE.
+
+Vulnerability Detection Result:
+172.30.40.1|cpe:/a:python:python:2.7.13
+172.30.40.1|cpe:/o:linux:kernel
+
+Solution:
+
+Log Method:
+Details:
+CPE Inventory
+(OID: 1.3.6.1.4.1.25623.1.0.810002)
+Version used: 2022-07-27T10:11:28Z
+
+References:
+ url: https://nvd.nist.gov/products/cpe
+
+
+Issue
+-----
+NVT:    OS Detection Consolidation and Reporting
+OID:    1.3.6.1.4.1.25623.1.0.105937
+Threat: Log (CVSS: 0.0)
+Port:   general/tcp
+
+Summary:
+This script consolidates the OS information detected by several
+  VTs and tries to find the best matching OS.
+  Furthermore it reports all previously collected information leading to this be!
+st matching OS. It
+  also reports possible additional information which might help to improve the O!
+S detection.
+  If any of this information is wrong or could be improved please consider to re!
+port these to the
+  referenced community forum.
+
+Vulnerability Detection Result:
+Best matching OS:
+OS:           Linux Kernel
+CPE:          cpe:/o:linux:kernel
+Found by VT:  1.3.6.1.4.1.25623.1.0.102002 (Operating System (OS) Detection (ICM!
+P))
+Concluded from ICMP based OS fingerprint
+Setting key "Host/runs_unixoide" based on this information
+
+Solution:
+
+Log Method:
+Details:
+OS Detection Consolidation and Reporting
+(OID: 1.3.6.1.4.1.25623.1.0.105937)
+Version used: 2026-01-21T05:50:46Z
+
+References:
+ url: https://forum.greenbone.net/c/vulnerability-tests/7
+
+
+Issue
+-----
+NVT:    Hostname Determination Reporting
+OID:    1.3.6.1.4.1.25623.1.0.108449
+Threat: Log (CVSS: 0.0)
+Port:   general/tcp
+
+Summary:
+The script reports information on how the hostname of the target
+  was determined.
+
+Vulnerability Detection Result:
+Hostname determination for IP 172.30.40.1:
+Hostname|Source
+dsvw.trabalho_vulnnet|Reverse-DNS
+
+Solution:
+
+Log Method:
+Details:
+Hostname Determination Reporting
+(OID: 1.3.6.1.4.1.25623.1.0.108449)
+Version used: 2022-07-27T10:11:28Z
+
+
+Issue
+-----
+NVT:    Python Detection Consolidation
+OID:    1.3.6.1.4.1.25623.1.0.112857
+Threat: Log (CVSS: 0.0)
+Port:   general/tcp
+
+Summary:
+Consolidation of Python detections.
+
+Vulnerability Detection Result:
+Detected Python
+Version:       2.7.13
+Location:      8000/tcp
+CPE:           cpe:/a:python:python:2.7.13
+Concluded from version/product identification result:
+Server: BaseHTTP/0.3 Python/2.7.13
+
+Solution:
+
+Log Method:
+Details:
+Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+Version used: 2021-07-09T08:01:09Z
+
+References:
+ url: https://www.python.org/
+
+

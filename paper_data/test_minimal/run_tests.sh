@@ -104,6 +104,32 @@ echo "  benchmark.py : $BENCHMARK"
 [[ "$CPU_ONLY" == "true" ]] && echo "  CPU ONLY   : --cpu-only passed to all benchmark invocations"
 echo "======================================================================"
 
+# ── Dataset setup — auto-populate D1 subset from full dataset ─────────────────
+# D1_openvas (full, ~88 MB) is tracked in git at paper_data/datasets/D1_openvas/.
+# Copy 3 lightweight targets into test_minimal/datasets/ if not already present.
+FULL_D1="$WORKSPACE_ROOT/paper_data/datasets/D1_openvas"
+TEST_D1="$DATASETS/D1_openvas"
+D1_TARGETS=(openvas_alpine_3.7 openvas_centos_6 openvas_centos_7)
+
+if [[ ! -d "$TEST_D1/${D1_TARGETS[0]}" ]]; then
+    echo ""
+    echo "  Setting up D1 test subset (copying 3 targets from $FULL_D1)..."
+    if [[ ! -d "$FULL_D1" ]]; then
+        echo "  ERROR: Full D1 dataset not found at $FULL_D1"
+        echo "         Make sure paper_data/datasets/D1_openvas/ is present (it is tracked in git)."
+        exit 1
+    fi
+    mkdir -p "$TEST_D1"
+    for target in "${D1_TARGETS[@]}"; do
+        cp -r "$FULL_D1/$target" "$TEST_D1/"
+        echo "  Copied: $target"
+    done
+    echo "  D1 test subset ready."
+elif [[ "$DRY_RUN" == "false" ]]; then
+    echo ""
+    echo "  D1 test subset already present — skipping copy."
+fi
+
 # ── D1 — OpenVAS (3 targets × 4 native formats) ──────────────────────────────
 if [[ "$SKIP_D1" == "false" ]]; then
     section "D1 — OpenVAS native (3 targets: alpine_3.7, centos_6, centos_7)"
@@ -130,6 +156,33 @@ if [[ "$SKIP_D1" == "false" ]]; then
         --runs 1 \
         --clean \
         --results-dir "$OUT"
+
+    # ── D1C — Generate converted formats from D1 ─────────────────────────────
+    section "D1C — Generating converted formats from D1 (convert_d1_to_d1c.py)"
+    echo "  CSV→XLSX  TXT→DOCX  XML→JSON  PDF→PDF-images  (3 targets)"
+    CONVERT_SCRIPT="$WORKSPACE_ROOT/paper_data/scripts/convert_d1_to_d1c.py"
+    D1C_DIR="$DATASETS/D1C_converted"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo ""
+        echo "  \$ python3 $CONVERT_SCRIPT \\"
+        echo "      --source $DATASETS/D1_openvas \\"
+        echo "      --output $D1C_DIR \\"
+        echo "      --workers 2"
+    else
+        echo ""
+        echo "  \$ python3 $CONVERT_SCRIPT --source $DATASETS/D1_openvas --output $D1C_DIR --workers 2"
+        if python3 "$CONVERT_SCRIPT" \
+            --source "$DATASETS/D1_openvas" \
+            --output "$D1C_DIR" \
+            --workers 2; then
+            PASS=$((PASS + 1))
+        else
+            FAIL=$((FAIL + 1))
+            FAILED_STEPS+=("convert_d1_to_d1c.py")
+            echo "  [FAILED] D1C generation failed — D1C benchmark steps will likely fail"
+        fi
+    fi
 
     # ── D1C — Converted formats ───────────────────────────────────────────────
     section "D1C — Converted formats (3 targets × xlsx, docx, json, pdf-images)"

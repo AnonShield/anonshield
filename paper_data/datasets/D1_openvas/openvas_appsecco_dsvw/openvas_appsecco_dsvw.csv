@@ -1,0 +1,1563 @@
+IP,Hostname,Port,Port Protocol,CVSS,Severity,QoD,Solution Type,NVT Name,Summary,Specific Result,NVT OID,CVEs,Task ID,Task Name,Timestamp,Result ID,Impact,Solution,Affected Software/OS,Vulnerability Insight,Vulnerability Detection Method,Product Detection Result,BIDs,CERTs,Other References
+      172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,10.0,Critical,30,"VendorFix","Python End of Life (EOL) Detection - Linux","The Python version on the remote host has reached the end of
+  life (EOL) and should not be used anymore.","The ""Python"" version on the remote host has reached the end of life.
+
+CPE:               cpe:/a:python:python:2.7.13
+Installed version: 2.7.13
+Location/URL:      8000/tcp
+EOL version:       2.7
+EOL date:          2020-01-01
+",1.3.6.1.4.1.25623.1.0.117199,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,d24cb22c-90fc-40ad-9ce4-77a0fb9c987d,"An EOL version of Python is not receiving any security updates
+  from the vendor. Unfixed security vulnerabilities might be leveraged by an attacker to compromise
+  the security of this host.","Update the Python version on the remote host to a still
+  supported version.","","","Checks if an EOL version is present on the target host.
+Details:
+Python End of Life (EOL) Detection - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.117199)
+Version used: 2025-04-15T05:54:49Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.8,Critical,30,"VendorFix","Python 2.7.x < 2.7.17, 3.5.x < 3.5.7, 3.6.x < 3.6.9, 3.7.x < 3.7.3 Information Disclosure Vulnerability (bpo-36216) - Linux","Python is prone to an information disclosure vulnerability.","Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118225,"CVE-2019-9636",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,a1b2c148-f614-4a9e-b1d3-af830fd627e3,"Information disclosure (credentials, cookies, etc. that are
+  cached against a given hostname).","The vendor has released updates. Please see the references for
+  more information.","Python 2.7.x prior to version 2.7.17, versions 3.5.x prior to 3.5.7,
+  3.6.x prior to 3.6.9 and 3.7.x prior to 3.7.3.","Python is affected by improper Handling of Unicode Encoding
+  (with an incorrect netloc) during NFKC normalization.","Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.7.x < 2.7.17, 3.5.x < 3.5.7, 3.6.x < 3.6.9, 3.7.x < 3.7.3 Informati...
+(OID: 1.3.6.1.4.1.25623.1.0.118225)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2020-1839,DFN-CERT-2020-1540,DFN-CERT-2020-1078,DFN-CERT-2020-0231,DFN-CERT-2020-0177,DFN-CERT-2020-0111,DFN-CERT-2020-0102,DFN-CERT-2020-0048,DFN-CERT-2019-2252,DFN-CERT-2019-2078,DFN-CERT-2019-1877,DFN-CERT-2019-1339,DFN-CERT-2019-1288,DFN-CERT-2019-1285,DFN-CERT-2019-1095,DFN-CERT-2019-0941,DFN-CERT-2019-0915,DFN-CERT-2019-0912,DFN-CERT-2019-0841,DFN-CERT-2019-0770,DFN-CERT-2019-0702,DFN-CERT-2019-0565,WID-SEC-2024-1600,CB-K20/0041",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.8,Critical,30,"VendorFix","Python < 3.9.5 Authentication Bypass Vulnerability - Linux","Python is prone to an authentication bypass vulnerability.","Installed version: 2.7.13
+Fixed version:     3.9.5
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.113820,"CVE-2021-29921",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,8f3ed0d1-aa4b-4ac2-afd9-fe967e751cfb,"Successful exploitation would allow an attacker to
+  gain unauthorized access to the target system.","Update to version 3.9.5 or later.","Python through version 3.9.4.","The vulnerability exists in the ipaddress library,
+  which mishandles leading zero characters in the octets of an IP address string.
+  This would allow an attacker to bypass IP-based access control.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.9.5 Authentication Bypass Vulnerability - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.113820)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-3182,DFN-CERT-2024-1805,DFN-CERT-2021-2354,DFN-CERT-2021-2353,DFN-CERT-2021-1801,DFN-CERT-2021-1534,DFN-CERT-2021-1414,DFN-CERT-2021-1303,DFN-CERT-2021-1184,DFN-CERT-2021-0956,WID-SEC-2023-2460,WID-SEC-2022-1908,WID-SEC-2022-0624,WID-SEC-2022-0464,CB-K21/0783",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.8,Critical,30,"VendorFix","Python 2.7.x < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 Information Disclosure Vulnerability (bpo-36742) - Linux","Python is prone to an information disclosure vulnerability.","Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118202,"CVE-2019-10160",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,c26d6a1b-21cf-462c-8a90-329a2d3fb6bb,"Information disclosure (credentials, cookies, etc. that are
+  cached against a given hostname).","The vendor has released updates. Please see the references for
+  more information.","Python 2.7.x  prior to version 2.7.17, versions 3.5.x prior to 3.5.8,
+  3.6.x prior to 3.6.9 and 3.7.x prior to 3.7.4.","'urlsplit' is affected by a NFKD normalization vulnerability
+  in 'user:password@'.
+
+  Note: The fix for 'CVE-2019-9636' ignored the 'user/password' before '@' whereas it still
+  allowed to exploit the vulnerability.","Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.7.x < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 Informati...
+(OID: 1.3.6.1.4.1.25623.1.0.118202)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2020-1839,DFN-CERT-2020-1540,DFN-CERT-2020-0231,DFN-CERT-2020-0177,DFN-CERT-2020-0111,DFN-CERT-2019-2560,DFN-CERT-2019-2252,DFN-CERT-2019-2078,DFN-CERT-2019-2046,DFN-CERT-2019-1883,DFN-CERT-2019-1877,DFN-CERT-2019-1678,DFN-CERT-2019-1610,DFN-CERT-2019-1596,DFN-CERT-2019-1370,DFN-CERT-2019-1339,DFN-CERT-2019-1288,DFN-CERT-2019-1263,WID-SEC-2024-1598,CB-K20/0109",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.8,Critical,30,"VendorFix","Python <= 3.10.x Buffer Overflow Vulnerability - Linux","Python is prone to a buffer overflow vulnerability in the _sha3
+  module.","Installed version: 2.7.13
+Fixed version:     3.7.16
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.148942,"CVE-2022-37454",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,5d7f2b6d-ca35-4722-b2a5-72cd06e100e8,"","Update to version 3.7.16, 3.8.16, 3.9.16, 3.10.9 or later.","Python prior to version 3.7.16, version 3.8.x through 3.8.15,
+  3.9.x through 3.9.15 and 3.10.x through 3.10.8.","The Keccak XKCP SHA-3 reference implementation has an integer
+  overflow and resultant buffer overflow that allows attackers to execute arbitrary code or
+  eliminate expected cryptographic properties. This occurs in the sponge function interface.","Checks if a vulnerable version is present on the target host.
+Details:
+Python <= 3.10.x Buffer Overflow Vulnerability - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.148942)
+Version used: 2023-10-19T05:05:21Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2026-0215,DFN-CERT-2023-0552,DFN-CERT-2023-0422,DFN-CERT-2023-0028,DFN-CERT-2022-2869,DFN-CERT-2022-2793,DFN-CERT-2022-2715,DFN-CERT-2022-2639,DFN-CERT-2022-2638,DFN-CERT-2022-2598,DFN-CERT-2022-2535,DFN-CERT-2022-2523,DFN-CERT-2022-2420,DFN-CERT-2022-2380,WID-SEC-2023-0561,WID-SEC-2023-0138,WID-SEC-2022-1816",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.8,Critical,30,"VendorFix","Python < 2.7.14, 3.3.x < 3.3.7, 3.4.x < 3.4.7, 3.5.x < 3.5.4, 3.6.x < 3.6.2 Expat 2.2 (bpo-29591) - Linux","Python is prone to various security vulnerabilities in bundled
+  expat.","Installed version: 2.7.13
+Fixed version:     2.7.14
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118255,"CVE-2016-0718,CVE-2016-4472",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,b4f101fa-f257-4f8e-a2f4-9173301220b1,"","Update to version 2.7.14, 3.3.7, 3.4.7, 3.5.4, 3.6.2 or later.","Python prior to version 2.7.14, versions 3.3.x prior to 3.3.7,
+  3.4.x prior to 3.4.7, 3.5.x prior to 3.5.3 and 3.6.x prior to 3.6.2.","The following vulnerabilities exist:
+
+  - CVE-2016-0718: Expat allows context-dependent attackers to cause a denial of service (crash) or
+  possibly execute arbitrary code via a malformed input document, which triggers a buffer overflow.
+
+  - CVE-2016-4472: The overflow protection in Expat is removed by compilers with certain optimization
+  settings, which allows remote attackers to cause a denial of service (crash) or possibly execute
+  arbitrary code via crafted XML data.
+
+  NOTE: this vulnerability exists because of an incomplete fix for CVE-2015-1283 and CVE-2015-2716.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.14, 3.3.x < 3.3.7, 3.4.x < 3.4.7, 3.5.x < 3.5.4, 3.6.x < 3.6.2 ...
+(OID: 1.3.6.1.4.1.25623.1.0.118255)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-0064,DFN-CERT-2020-0405,DFN-CERT-2018-1673,DFN-CERT-2018-1408,DFN-CERT-2017-1785,DFN-CERT-2017-1044,DFN-CERT-2017-0551,DFN-CERT-2017-0508,DFN-CERT-2017-0366,DFN-CERT-2016-1954,DFN-CERT-2016-1923,DFN-CERT-2016-1844,DFN-CERT-2016-1843,DFN-CERT-2016-1248,DFN-CERT-2016-1160,DFN-CERT-2016-1000,DFN-CERT-2016-0984,DFN-CERT-2016-0864,DFN-CERT-2016-0861,DFN-CERT-2016-0810,WID-SEC-2025-0045,WID-SEC-2025-0044,CB-K17/1709,CB-K17/1010,CB-K17/0536,CB-K17/0492,CB-K17/0356,CB-K16/1849,CB-K16/1816,CB-K16/1740,CB-K16/1739,CB-K16/1182,CB-K16/1090,CB-K16/0939,CB-K16/0931,CB-K16/0808,CB-K16/0754",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.8,Critical,30,"VendorFix","Python < 2.7.14, 3.4.x < 3.4.8, 3.5.x < 3.5.5 PyString_DecodeEscape integer overflow (bpo-30657) - Linux","CPython (aka Python) is prone to an integer overflow
+  vulnerability.","Installed version: 2.7.13
+Fixed version:     2.7.14
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118247,"CVE-2017-1000158",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,13dddd9d-4201-4a19-a61f-40e46f89ea17,"","Update to version 2.7.14, 3.4.8, 3.5.5 or later.","Python prior to version 2.7.14, versions 3.4.x prior to 3.4.8
+  and 3.5.x prior to 3.5.5.","An integer overflow in the 'PyString_DecodeEscape' function in
+  'stringobject.c' is resulting in a heap-based buffer overflow (and possible arbitrary code
+  execution).","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.14, 3.4.x < 3.4.8, 3.5.x < 3.5.5 PyString_DecodeEscape integer ...
+(OID: 1.3.6.1.4.1.25623.1.0.118247)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2020-0405,DFN-CERT-2020-0177,DFN-CERT-2018-2030,DFN-CERT-2018-1942,DFN-CERT-2018-0995,DFN-CERT-2018-0733,DFN-CERT-2018-0659,DFN-CERT-2017-2145,CB-K17/2057",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.8,Critical,30,"VendorFix","Python Multiple Vulnerabilities (Aug 2024) - Linux","Python is prone to an infinite loop vulnerability leading to a
+  denial of service (DoS).","Installed version: 2.7.13
+Fixed version:     3.8.20
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.170805,"CVE-2024-6232,CVE-2024-7592,CVE-2024-8088,CVE-2024-45490,CVE-2024-45491,CVE-2024-45492",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,348471aa-a2e6-4b01-ae46-9d8f63a8ff1d,"","Update to version 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.6 or
+  later.","Python prior to version 3.8.20, 3.9.x prior to 3.9.20, 3.10.x
+  prior to 3.10.15, 3.11.x prior to 3.11.10 and 3.12.x prior to 3.12.6.","The following flaws exist:
+
+  - CVE-2024-6232: Regular expressions that allowed excessive backtracking during tarfile.TarFile
+  header parsing are vulnerable to ReDoS via specifically-crafted tar archives.
+
+  - CVE-2024-7592: When parsing cookies that contained backslashes for quoted characters in the
+  cookie value, the parser would use an algorithm with quadratic complexity, resulting in excess
+  CPU resources being used while parsing the value.
+
+  - CVE-2024-8088: When iterating over names of entries in a zip archive (for example, methods of
+  'zipfile.Path' like 'namelist()', 'iterdir()', etc) the process can be put into an infinite loop
+  with a maliciously crafted zip archive. This defect applies when reading only metadata or
+  extracting the contents of the zip archive.This vulnerability only affects zipfile.Path, while the
+  more common API zipfile.ZipFile class is unaffected.
+
+  - CVE-2024-45490, CVE-2024-45491, CVE-2024-45492: Vulnerabilities in libexpat prior to version
+  2.6.3","Checks if a vulnerable version is present on the target host.
+Details:
+Python Multiple Vulnerabilities (Aug 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.170805)
+Version used: 2025-10-10T05:39:02Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-3631,DFN-CERT-2025-3045,DFN-CERT-2025-2077,DFN-CERT-2025-1477,DFN-CERT-2025-1463,DFN-CERT-2025-1461,DFN-CERT-2025-1433,DFN-CERT-2025-1148,DFN-CERT-2025-0933,DFN-CERT-2025-0880,DFN-CERT-2025-0854,DFN-CERT-2025-0509,DFN-CERT-2025-0179,DFN-CERT-2025-0175,DFN-CERT-2025-0170,DFN-CERT-2025-0041,DFN-CERT-2024-3317,DFN-CERT-2024-3316,DFN-CERT-2024-3315,DFN-CERT-2024-3314,DFN-CERT-2024-3313,DFN-CERT-2024-3182,DFN-CERT-2024-3103,DFN-CERT-2024-3083,DFN-CERT-2024-2994,DFN-CERT-2024-2993,DFN-CERT-2024-2937,DFN-CERT-2024-2933,DFN-CERT-2024-2783,DFN-CERT-2024-2743,DFN-CERT-2024-2664,DFN-CERT-2024-2571,DFN-CERT-2024-2540,DFN-CERT-2024-2525,DFN-CERT-2024-2512,DFN-CERT-2024-2509,DFN-CERT-2024-2497,DFN-CERT-2024-2492,DFN-CERT-2024-2466,DFN-CERT-2024-2463,DFN-CERT-2024-2456,DFN-CERT-2024-2425,DFN-CERT-2024-2399,DFN-CERT-2024-2340,DFN-CERT-2024-2332,DFN-CERT-2024-2251,DFN-CERT-2024-2245,DFN-CERT-2024-2244,DFN-CERT-2024-2227,WID-SEC-2025-0794,WID-SEC-2025-0225,WID-SEC-2025-0166,WID-SEC-2025-0148,WID-SEC-2025-0144,WID-SEC-2025-0143,WID-SEC-2025-0135,WID-SEC-2025-0001,WID-SEC-2024-3692,WID-SEC-2024-3691,WID-SEC-2024-3684,WID-SEC-2024-3196,WID-SEC-2024-3195,WID-SEC-2024-3191,WID-SEC-2024-2047,WID-SEC-2024-1951,WID-SEC-2024-1914,WID-SEC-2024-1889",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.8,Critical,30,"VendorFix","Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 Python Issue (bpo-41944) - Linux","Python is prone to a remote code execution (RCE)
+  vulnerability.","Installed version: 2.7.13
+Fixed version:     3.6.13
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118185,"CVE-2020-27619",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,62fa3232-44ae-4930-9ecd-6a7c7fa0ce8b,"If an attacker can compromise the pythontest.net server, they gain
+  arbitrary code execution on all buildbots.
+
+  If an attacker has control over the network connection of a machine running the Python test suite,
+  they gain arbitrary code execution there.","Update to version 3.6.13, 3.7.10, 3.8.7, 3.9.1 or later.","Python prior to version 3.6.13, versions 3.7.x prior to 3.7.10,
+  3.8.x prior to 3.8.7 and 3.9.x prior to 3.9.1.","By default, the tests are not run with network resources enabled
+  and so the Python test suite is safe. But if the Python test suite is run explicitly with the
+  'network' resource enabled (-u network or -u all command line option), the CJK codecs tests of the
+  Python test suite run eval() on content received via HTTP from pythontest.net.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 Python Issue (...
+(OID: 1.3.6.1.4.1.25623.1.0.118185)
+Version used: 2024-06-28T15:38:46Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2021-2350,DFN-CERT-2021-1801,DFN-CERT-2021-1330,DFN-CERT-2021-1110,DFN-CERT-2021-1080,DFN-CERT-2021-1053,DFN-CERT-2021-0533,DFN-CERT-2021-0444,DFN-CERT-2021-0430,DFN-CERT-2020-2805,DFN-CERT-2020-2757,WID-SEC-2025-0227",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.8,Critical,30,"VendorFix","Python 2.7 Command Injection Vulnerability (Sep 2018) - Linux","Python is prone to multiple vulnerabilities.","Installed version: 2.7.13
+Fixed version:     See advisory
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118272,"CVE-2018-1000802",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,4963d84d-6a83-43b6-9f87-cee9254c2897,"This can result in Denial of service, Information gain via
+  injection of arbitrary files on the system or entire drive. This attack appear to be
+  exploitable via Passage of unfiltered user input to the function.
+
+  This vulnerability appears to have been fixed in versions after commit
+  'add531a1e55b0a739b0f42582f1c9747e5649ace'.","See the referenced vendor advisory for a solution.","Python version 2.7.","Python (CPython) version 2.7 contains a command injection
+  vulnerability in shutil module.","Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.7 Command Injection Vulnerability (Sep 2018) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.118272)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2020-0231,DFN-CERT-2020-0177,DFN-CERT-2020-0111,DFN-CERT-2019-1610,DFN-CERT-2018-2332,DFN-CERT-2018-2030,DFN-CERT-2018-1969,DFN-CERT-2018-1942,DFN-CERT-2018-1918,WID-SEC-2024-1181",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.8,Critical,30,"VendorFix","Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.8, 3.9.x < 3.9.2 Python Issue (bpo-42938) - Linux","Python is prone to a buffer overflow vulnerability in
+  'PyCArg_repr'.","Installed version: 2.7.13
+Fixed version:     3.6.13
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118178,"CVE-2021-3177",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,54db4db9-f849-4872-8a4b-2c08ba6b2479,"","Update to version 3.6.13, 3.7.10, 3.8.8, 3.9.2 or later.","Python prior to version 3.6.13, versions 3.7.x prior to
+  3.7.10, 3.8.x prior to 3.8.8 and 3.9.x prior to 3.9.2.","A buffer overflow in 'PyCArg_repr' in '_ctypes/callproc.c'
+  exists, which may lead to remote code execution in certain Python applications that accept
+  floating-point numbers as untrusted input, as demonstrated by a '1e300' argument to
+  'c_double.from_param'. This occurs because sprintf is used unsafely.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.8, 3.9.x < 3.9.2 Python Issue (...
+(OID: 1.3.6.1.4.1.25623.1.0.118178)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2023-1200,DFN-CERT-2023-0082,DFN-CERT-2022-1438,DFN-CERT-2022-0351,DFN-CERT-2021-1801,DFN-CERT-2021-1541,DFN-CERT-2021-1414,DFN-CERT-2021-1330,DFN-CERT-2021-1080,DFN-CERT-2021-1079,DFN-CERT-2021-1071,DFN-CERT-2021-0810,DFN-CERT-2021-0675,DFN-CERT-2021-0533,DFN-CERT-2021-0430,DFN-CERT-2021-0367,DFN-CERT-2021-0297,DFN-CERT-2021-0151,WID-SEC-2024-1591,WID-SEC-2022-0767,WID-SEC-2022-0495,CB-K22/0076,CB-K21/0782",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.8,Critical,30,"VendorFix","Python < 2.7.14, 3.3.x < 3.3.7, 3.4.x < 3.4.7, 3.5.x < 3.5.4, 3.6.x < 3.6.2 Expat 2.2.1 (bpo-30694) - Linux","'Expat' in Python is prone to multiple vulnerabilities.","Installed version: 2.7.13
+Fixed version:     2.7.14
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118250,"CVE-2012-0876,CVE-2016-0718,CVE-2016-9063,CVE-2017-9233",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,2bc83161-432b-4db5-89c6-be27f5607ead,"","Update to version 2.7.14, 3.3.7, 3.4.7, 3.5.4, 3.6.2 or later.","Python prior to version 2.7.14, versions 3.3.x prior to 3.3.7,
+  3.4.x prior to 3.4.7, 3.5.x prior to 3.5.4 and 3.6.x prior to 3.6.2.","The following vulnerabilities exist:
+
+  - CVE-2012-0876: The XML parser (xmlparse.c) in expat computes hash values without restricting the
+  ability to trigger hash collisions predictably, which allows context-dependent attackers to cause
+  a denial of service (CPU consumption) via an XML file with many identifiers with the same value.
+
+  - CVE-2016-0718: Expat allows context-dependent attackers to cause a denial of service (crash) or
+  possibly execute arbitrary code via a malformed input document, which triggers a buffer overflow.
+
+  - CVE-2016-9063: An integer overflow during the parsing of XML using the Expat library. This
+  vulnerability affects Firefox < 50.
+
+  - CVE-2017-9233: XML External Entity vulnerability in libexpat 2.2.0 and earlier (Expat XML Parser
+  Library) allows attackers to put the parser in an infinite loop using a malformed external entity
+  definition from an external DTD.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.14, 3.3.x < 3.3.7, 3.4.x < 3.4.7, 3.5.x < 3.5.4, 3.6.x < 3.6.2 ...
+(OID: 1.3.6.1.4.1.25623.1.0.118250)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-0064,DFN-CERT-2022-2566,DFN-CERT-2020-0405,DFN-CERT-2018-1673,DFN-CERT-2018-1408,DFN-CERT-2017-1785,DFN-CERT-2017-1692,DFN-CERT-2017-1655,DFN-CERT-2017-1630,DFN-CERT-2017-1262,DFN-CERT-2017-1101,DFN-CERT-2017-1044,DFN-CERT-2017-0551,DFN-CERT-2017-0508,DFN-CERT-2017-0366,DFN-CERT-2016-1954,DFN-CERT-2016-1923,DFN-CERT-2016-1875,DFN-CERT-2016-1844,DFN-CERT-2016-1843,DFN-CERT-2016-1248,DFN-CERT-2016-1160,DFN-CERT-2016-1000,DFN-CERT-2016-0984,DFN-CERT-2016-0864,DFN-CERT-2016-0861,DFN-CERT-2016-0810,DFN-CERT-2016-0125,DFN-CERT-2015-1898,DFN-CERT-2015-1035,DFN-CERT-2013-1847,DFN-CERT-2012-2129,DFN-CERT-2012-1530,DFN-CERT-2012-1522,DFN-CERT-2012-1513,DFN-CERT-2012-1292,DFN-CERT-2012-1214,DFN-CERT-2012-1213,DFN-CERT-2012-1133,DFN-CERT-2012-0948,DFN-CERT-2012-0835,DFN-CERT-2012-0693,DFN-CERT-2012-0567,DFN-CERT-2012-0559,WID-SEC-2025-0370,WID-SEC-2025-0045,WID-SEC-2022-2037,CB-K17/1709,CB-K17/1622,CB-K17/1585,CB-K17/1563,CB-K17/1218,CB-K17/1066,CB-K17/1010,CB-K17/0536,CB-K17/0492,CB-K17/0356,CB-K16/1849,CB-K16/1816,CB-K16/1774,CB-K16/1740,CB-K16/1739,CB-K16/1182,CB-K16/1090,CB-K16/0939,CB-K16/0931,CB-K16/0808,CB-K16/0754,CB-K16/0112,CB-K15/1792,CB-K15/0987,CB-K13/0845",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.7,Critical,30,"VendorFix","Python Multiple Vulnerabilities (Jun 2025) - Linux","Python is prone to multiple vulnerabilities.","Installed version: 2.7.13
+Fixed version:     3.9.23
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.154642,"CVE-2024-12718,CVE-2025-4138,CVE-2025-4330,CVE-2025-4435,CVE-2025-4517",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,d1a0c788-e90f-4a7f-a7e5-40850fbb4b09,"","Update to version 3.9.23, 3.10.18, 3.11.13, 3.12.11, 3.13.4 or
+  later.","Python versions prior to 3.9.23, 3.10.x prior to 3.10.18,
+  3.11.x prior to 3.11.13, 3.12.x prior to 3.12.11 and 3.13.x prior to 3.13.4.","The following flaws exist:
+
+  - CVE-2024-12718: Allows modifying some file metadata (e.g. last modified) with filter='data' or
+  file permissions (chmod) with filter='tar' of files outside the extraction directory.
+
+  - CVE-2025-4138: Allows creating arbitrary symlinks outside the extraction directory during
+  extraction with filter='data'.
+
+  - CVE-2025-4330: Allows the extraction filter to be ignored, allowing symlink targets to point
+  outside the destination directory, and the modification of some file metadata.
+
+  - CVE-2025-4435: Filtered members not skipped with TarFile.errorlevel = 0
+
+  - CVE-2025-4517: Allows arbitrary filesystem writes outside the extraction directory during
+  extraction with filter='data'.","Checks if a vulnerable version is present on the target host.
+Details:
+Python Multiple Vulnerabilities (Jun 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.154642)
+Version used: 2025-10-10T05:39:02Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2026-0247,DFN-CERT-2026-0243,DFN-CERT-2025-3555,DFN-CERT-2025-2946,DFN-CERT-2025-2945,DFN-CERT-2025-2938,DFN-CERT-2025-2295,DFN-CERT-2025-2212,DFN-CERT-2025-2148,DFN-CERT-2025-2047,DFN-CERT-2025-1980,DFN-CERT-2025-1936,DFN-CERT-2025-1905,DFN-CERT-2025-1868,DFN-CERT-2025-1682,DFN-CERT-2025-1653,DFN-CERT-2025-1640,DFN-CERT-2025-1489,WID-SEC-2025-2367,WID-SEC-2025-2363,WID-SEC-2025-2361,WID-SEC-2025-2360,WID-SEC-2025-2352,WID-SEC-2025-1850,WID-SEC-2025-1318,WID-SEC-2025-1231",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.1,Critical,30,"VendorFix","Python 2.x < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 Protection Bypass Vulnerability (bpo-35907) - Linux","Python is prone to a protection bypass vulnerability.","Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118205,"CVE-2019-9948",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,c058d78e-1041-4912-b407-aab26ff223f9,"","The vendor has released updates. Please see the references for
+  more information.","Python 2.x prior to version 2.7.17, versions 3.5.x prior to 3.5.8,
+  3.6.x prior to 3.6.9 and 3.7.x prior to 3.7.4.","urllib supports the 'local_file:' scheme, which makes it easier
+  for remote attackers to bypass protection mechanisms that blacklist 'file:' URIs, as demonstrated
+  by triggering a 'urllib.urlopen('local_file:///etc/passwd')' call.","Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.x < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 Protection ...
+(OID: 1.3.6.1.4.1.25623.1.0.118205)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2020-1839,DFN-CERT-2020-1540,DFN-CERT-2020-0783,DFN-CERT-2020-0668,DFN-CERT-2020-0200,DFN-CERT-2020-0177,DFN-CERT-2019-2312,DFN-CERT-2019-2302,DFN-CERT-2019-2078,DFN-CERT-2019-1877,DFN-CERT-2019-1418,DFN-CERT-2019-1370,DFN-CERT-2019-1288,DFN-CERT-2019-0770,WID-SEC-2024-1599,CB-K20/0109",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,9.1,Critical,30,"VendorFix","Python DoS Vulnerability (Dec 2025) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.13.11
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.125558,"CVE-2025-13836",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,2b1b5a59-bdfb-4811-9b36-a267cf3eb09c,"","Update to version 3.14.1 or later, or to the latest
+  maintenance release of your Python version series (3.10.x, 3.12.x) once patches
+  are available. Please see the references for more information.","Python prior to version 3.13.11 and 3.14.x prior to 3.14.1.
+
+  Note: Fixes have been backported to maintenance branches (3.10, 3.12) but specific
+  patch versions are not yet available.","When reading an HTTP response from a server, if no read amount
+  is specified, the default behavior will be to use Content-Length. This allows a malicious
+  server to cause the client to read large amounts of data into memory, potentially causing
+  out-of-memory (OOM) or other DoS conditions.","Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Dec 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.125558)
+Version used: 2026-01-01T05:49:19Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2026-0215,DFN-CERT-2026-0174,DFN-CERT-2026-0167,DFN-CERT-2026-0086,DFN-CERT-2025-3621,WID-SEC-2025-2706",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.8,High,30,"VendorFix","Python Command Injection Vulnerability (Oct 2024) - Linux","Python is prone to a command injection vulnerability in the venv
+  module.","Installed version: 2.7.13
+Fixed version:     3.9.21
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.114839,"CVE-2024-9287",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,e4edf23f-e7b0-4e3d-a212-2999f27a76be,"","Update to version 3.9.21, 3.10.16, 3.11.11, 3.12.8, 3.13.1
+  or later.","Python versions prior to 3.9.21, 3.10.x prior to 3.10.16,
+  3.11.x prior to 3.11.11, 3.12.x prior to 3.12.8 and 3.13.x prior to 3.13.1.","A vulnerability has been found in the venv module and CLI where
+  path names provided when creating a virtual environment were not quoted properly, allowing the
+  virtual environment creator to inject commands into virtual environment 'activation' scripts (ie
+  'source venv/bin/activate'). This means that attacker-controlled virtual environments are able to
+  run commands when the virtual environment is activated. Virtual environments which are not created
+  by an attacker or which aren't activated before being used (ie './venv/bin/python') are not
+  affected.","Checks if a vulnerable version is present on the target host.
+Details:
+Python Command Injection Vulnerability (Oct 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.114839)
+Version used: 2025-02-11T05:38:07Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-3555,DFN-CERT-2025-1902,DFN-CERT-2025-1682,DFN-CERT-2025-1477,DFN-CERT-2025-1461,DFN-CERT-2025-1148,DFN-CERT-2025-0655,DFN-CERT-2025-0179,DFN-CERT-2024-3255,DFN-CERT-2024-3220,DFN-CERT-2024-3182,DFN-CERT-2024-3141,DFN-CERT-2024-2837,WID-SEC-2025-1567,WID-SEC-2025-1560,WID-SEC-2025-1559,WID-SEC-2024-3270",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.8,High,30,"VendorFix","Python DoS Vulnerability (Jul 2025) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.9.24
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.155051,"CVE-2025-8194",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,4854582a-ba1d-4a92-9206-fe9695784a9d,"","Update to version 3.9.24, 3.10.19, 3.11.14, 3.12.12, 3.13.6 or
+  later.","Python versions prior to 3.9.24, 3.10.x prior to 3.10.19,
+  3.11.x prior to 3.11.14, 3.12.x prior to 3.12.12 and 3.13.x prior to 3.13.6.","There is a defect in the CPython 'tarfile' module affecting the
+  'TarFile' extraction and entry enumeration APIs. The tar implementation would process tar
+  archives with negative offsets without error, resulting in an infinite loop and deadlock during
+  the parsing of maliciously crafted tar archives.","Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Jul 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.155051)
+Version used: 2025-12-18T05:46:55Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2026-0215,DFN-CERT-2026-0202,DFN-CERT-2025-3313,DFN-CERT-2025-2372,DFN-CERT-2025-2304,DFN-CERT-2025-2235,DFN-CERT-2025-2212,DFN-CERT-2025-2148,DFN-CERT-2025-2063,WID-SEC-2026-0157,WID-SEC-2026-0153,WID-SEC-2025-2043,WID-SEC-2025-1664",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.6,High,30,"VendorFix","Python Shell Command Injection Vulnerability (bpo-24778) - Linux","Python is prone to a shell command injection vulnerability in
+  the mailcap module.","Installed version: 2.7.13
+Fixed version:     3.7.16
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.113930,"CVE-2015-20107",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,702be36e-16b8-42c6-9e04-ddabbb844b9a,"","Update to version 3.7.16, 3.8.16, 3.9.16, 3.10.8, 3.11
+  or later.","Python prior to version 3.7.16, 3.8.x prior to 3.8.16,
+  3.9.x prior to 3.9.16 and 3.10.x prior to 3.10.8.","In Python (aka CPython) the mailcap module does not add escape
+  characters into commands discovered in the system mailcap file. This may allow attackers to inject
+  shell commands into applications that call mailcap.findmatch with untrusted input (if they lack
+  validation of user-provided filenames or arguments).","Checks if a vulnerable version is present on the target host.
+Details:
+Python Shell Command Injection Vulnerability (bpo-24778) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.113930)
+Version used: 2025-01-21T05:37:33Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-3182,DFN-CERT-2024-1805,DFN-CERT-2023-1517,DFN-CERT-2023-1200,DFN-CERT-2023-0552,DFN-CERT-2022-2572,DFN-CERT-2022-2264,DFN-CERT-2022-2184,DFN-CERT-2022-2020,DFN-CERT-2022-1537,DFN-CERT-2022-1307,WID-SEC-2023-1542,WID-SEC-2023-0561,WID-SEC-2023-0395,WID-SEC-2022-0253",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"VendorFix","Python < 3.6.11, 3.7.x < 3.7.7, 3.8.x < 3.8.2 Use After Free Vulnerability (bpo-39421) - Linux","Python is prone to an use after free vulnerability.","Installed version: 2.7.13
+Fixed version:     3.6.11
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.170578,"CVE-2022-48560",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,2495fe1c-30ca-40f9-8b14-59193804c85a,"","Update to version 3.6.11, 3.7.7, 3.8.2, 3.9.0 or later.","Python prior to version 3.6.11, versions 3.7.x prior to 3.7.7,
+  3.8.x prior to 3.8.2 and 3.9.x prior to 3.9.0.","A use-after-free exists in Python via heappushpop in heapq.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.11, 3.7.x < 3.7.7, 3.8.x < 3.8.2 Use After Free Vulnerability (...
+(OID: 1.3.6.1.4.1.25623.1.0.170578)
+Version used: 2023-10-13T05:06:10Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-0046,DFN-CERT-2024-2179,DFN-CERT-2024-1805,DFN-CERT-2024-1392,DFN-CERT-2024-1325,DFN-CERT-2024-0278,DFN-CERT-2024-0227,DFN-CERT-2024-0074,DFN-CERT-2023-2485,DFN-CERT-2023-2243,DFN-CERT-2023-2227,WID-SEC-2024-1086,WID-SEC-2023-2119",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"VendorFix","Python DoS Vulnerability (Oct 2022) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.7.16
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.104477,"CVE-2022-45061",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,b3501c8e-5c6d-4d41-905a-2dd0260302c9,"","Update to version 3.7.16, 3.8.16, 3.9.16, 3.10.9, 3.11.1 or
+  later.","Python prior to version 3.7.16, versions 3.8.x prior to 3.8.16,
+  3.9.x prior to 3.9.16, 3.10.x prior to 3.10.9 and version 3.11.0.","An unnecessary quadratic algorithm exists in one path when
+  processing some inputs to the IDNA (RFC 3490) decoder, such that a crafted, unreasonably long name
+  being presented to the decoder could lead to a CPU denial of service. Hostnames are often supplied
+  by remote servers that could be controlled by a malicious actor. In such a scenario, they could
+  trigger excessive CPU consumption on the client attempting to make use of an attacker-supplied
+  supposed hostname. For example, the attack payload could be placed in the Location header of an
+  HTTP response with status code 302.","Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Oct 2022) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.104477)
+Version used: 2023-10-19T05:05:21Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-0132,DFN-CERT-2024-3182,DFN-CERT-2024-3141,DFN-CERT-2024-1805,DFN-CERT-2024-0227,DFN-CERT-2023-3168,DFN-CERT-2023-2783,DFN-CERT-2023-1656,DFN-CERT-2023-1517,DFN-CERT-2023-1423,DFN-CERT-2023-1200,DFN-CERT-2023-1109,DFN-CERT-2023-0886,DFN-CERT-2023-0580,DFN-CERT-2023-0571,DFN-CERT-2023-0552,DFN-CERT-2023-0429,DFN-CERT-2023-0120,DFN-CERT-2023-0028,DFN-CERT-2022-2793,DFN-CERT-2022-2698,DFN-CERT-2022-2658,DFN-CERT-2022-2583,WID-SEC-2024-0794,WID-SEC-2023-2679,WID-SEC-2023-1812,WID-SEC-2023-1793,WID-SEC-2023-1542,WID-SEC-2023-1007,WID-SEC-2023-0561,WID-SEC-2023-0255,WID-SEC-2022-2043",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"VendorFix","Python < 2.7.17, 3.x < 3.5.8, 3.6.x < 3.6.10, 3.7.x < 3.7.5 Improper Input Validation Vulnerability (bpo-34155) - Linux","The email module in Python is vulnerable due to improper
+  input validation.","Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118214,"CVE-2019-16056",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,b13bdc1e-fc81-423d-a1cf-aa0fc2fddf4d,"","Update to version 2.7.17, 3.5.8, 3.6.10, 3.7.5 or later.","Python prior to version 2.7.17, versions 3.x prior to 3.5.8,
+  3.6.x prior to 3.6.10 and 3.7.x prior to 3.7.5.","The email module wrongly parses email addresses that contain
+  multiple '@' characters. An application that uses the email module and implements some kind of
+  checks on the 'From/To' headers of a message could be tricked into accepting an email address
+  that should be denied.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.17, 3.x < 3.5.8, 3.6.x < 3.6.10, 3.7.x < 3.7.5 Improper Input V...
+(OID: 1.3.6.1.4.1.25623.1.0.118214)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2020-2621,DFN-CERT-2020-2045,DFN-CERT-2020-1839,DFN-CERT-2020-1540,DFN-CERT-2020-1537,DFN-CERT-2020-0896,DFN-CERT-2020-0550,DFN-CERT-2020-0231,DFN-CERT-2020-0177,DFN-CERT-2020-0111,DFN-CERT-2019-2560,DFN-CERT-2019-2327,DFN-CERT-2019-2252,DFN-CERT-2019-2238,DFN-CERT-2019-2210,DFN-CERT-2019-2198,DFN-CERT-2019-2113,DFN-CERT-2019-2078,DFN-CERT-2019-1883,DFN-CERT-2019-1876,WID-SEC-2024-1596,CB-K20/1049,CB-K20/0710,CB-K20/0324,CB-K20/0109",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"VendorFix","Python < 3.7.17, 3.8.x < 3.8.17, 3.9.x < 3.9.17, 3.10.x < 3.10.12, 3.11.x < 3.11.4 RCE Vulnerability - Linux","Python is prone to a remote code execution (RCE) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.7.17
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.124283,"CVE-2023-24329",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,a4cd0528-29ed-4e52-8056-e588cafc4d50,"","Update to version 3.7.17, 3.8.17, 3.9.17, 3.10.12, 3.11.4,
+  3.12.0 or later.","Python versions prior to 3.7.17, 3.8.x prior to 3.8.17, 3.9.x
+  prior to 3.9.17, 3.10.x prior to 3.10.12 and 3.11.x prior to 3.11.4.","An issue in the urllib.parse component allows attackers to
+  bypass blocklisting methods by supplying a URL that starts with blank characters.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.7.17, 3.8.x < 3.8.17, 3.9.x < 3.9.17, 3.10.x < 3.10.12, 3.11.x < ...
+(OID: 1.3.6.1.4.1.25623.1.0.124283)
+Version used: 2023-11-17T16:10:13Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-0046,DFN-CERT-2024-3182,DFN-CERT-2024-2962,DFN-CERT-2024-1805,DFN-CERT-2023-2783,DFN-CERT-2023-2542,DFN-CERT-2023-2237,DFN-CERT-2023-2227,DFN-CERT-2023-1728,DFN-CERT-2023-1667,DFN-CERT-2023-1472,DFN-CERT-2023-0571,DFN-CERT-2023-0552,DFN-CERT-2023-0527,DFN-CERT-2023-0525,WID-SEC-2024-1591,WID-SEC-2024-0794,WID-SEC-2024-0064,WID-SEC-2023-2964,WID-SEC-2023-2917,WID-SEC-2023-1542,WID-SEC-2023-0513",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"WillNotFix","Python <= 3.12.1 RecursionError Vulnerability - Linux","Python is prone to a 'RecursionError' vulnerability.","Installed version: 2.7.13
+Fixed version:     None
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.104814,"CVE-2023-36632",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,4db7ab98-63d5-47fb-b2b2-b740fc25e4df,"","No known solution was made available for at least one year
+  since the disclosure of this vulnerability. Likely none will be provided anymore. General solution
+  options are to upgrade to a newer release, disable respective features, remove the product or
+  replace the product by another one.
+
+  NOTE: email.utils.parseaddr is categorized as a Legacy API in the documentation of the Python
+  email package. Applications should instead use the email.parser.BytesParser or
+  email.parser.Parser class.","The legacy email.utils.parseaddr function in Python through
+  3.12.1.","The legacy email.utils.parseaddr function allows attackers to
+  trigger 'RecursionError: maximum recursion depth exceeded while calling a Python object' via a
+  crafted argument. This argument is plausibly an untrusted value from an application's input data
+  that was supposed to contain a name and an e-mail address.
+
+  NOTE: The vendor's perspective is that this is neither a vulnerability nor a bug. The email
+  package is intended to have size limits and to throw an exception when limits are exceeded.","Checks if a vulnerable version is present on the target host.
+Details:
+Python <= 3.12.1 'RecursionError' Vulnerability - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.104814)
+Version used: 2024-02-05T14:36:57Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1003,WID-SEC-2025-0225,WID-SEC-2024-0885,WID-SEC-2023-1561",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"VendorFix","Python DoS Vulnerability (Mar 2024) - Linux","Python is prone to a denial of service (DoS) vulnerability in
+  libexpat.","Installed version: 2.7.13
+Fixed version:     3.8.19
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.170816,"CVE-2023-52425",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,b8e7bc84-8b0b-4a44-9234-e2125ab917db,"","Update to version 3.8.19, 3.9.19, 3.10.14, 3.11.9, 3.12.3
+  or later.","Python prior to version 3.8.19, 3.9.x prior to 3.9.19, 3.10.x
+  prior to 3.10.14, 3.11.x prior to 3.11.9 and 3.12.x prior to 3.12.3.","libexpat allows a denial of service (resource consumption)
+  because many full reparsings are required in the case of a large token for which multiple buffer
+  fills are needed.","Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Mar 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.170816)
+Version used: 2024-10-11T15:39:44Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-3426,DFN-CERT-2025-3403,DFN-CERT-2025-3295,DFN-CERT-2025-1477,DFN-CERT-2025-1464,DFN-CERT-2025-1461,DFN-CERT-2025-1433,DFN-CERT-2025-0854,DFN-CERT-2024-2463,DFN-CERT-2024-2179,DFN-CERT-2024-1865,DFN-CERT-2024-1846,DFN-CERT-2024-1833,DFN-CERT-2024-1432,DFN-CERT-2024-1415,DFN-CERT-2024-1413,DFN-CERT-2024-1325,DFN-CERT-2024-1313,DFN-CERT-2024-1092,DFN-CERT-2024-0974,DFN-CERT-2024-0871,DFN-CERT-2024-0828,DFN-CERT-2024-0702,DFN-CERT-2024-0588,DFN-CERT-2024-0339,WID-SEC-2025-0225,WID-SEC-2024-3377,WID-SEC-2024-2100,WID-SEC-2024-1656,WID-SEC-2024-1642,WID-SEC-2024-1638,WID-SEC-2024-1637,WID-SEC-2024-1474,WID-SEC-2024-1226,WID-SEC-2024-1086,WID-SEC-2024-0687,WID-SEC-2024-0278",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"VendorFix","Python urllib.parse Vulnerability (bpo-43882) - Linux","Python is prone to a vulnerability urllib.parse.","Installed version: 2.7.13
+Fixed version:     3.6.14
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.147630,"CVE-2022-0391",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,e9335b8d-e579-49d0-8c2d-54b260144349,"","Update to version 3.6.14, 3.7.11, 3.8.11, 3.9.5 or later.","Python prior to version 3.6.14, version 3.7.x through 3.7.10,
+  3.8.x through 3.8.10 and 3.9.x through 3.9.4.","A flaw was found in Python, specifically within the
+  urllib.parse module. This module helps break Uniform Resource Locator (URL) strings into
+  components. The issue involves how the urlparse method does not sanitize input and allows
+  characters like '\r' and '\n' in the URL path. This flaw allows an attacker to input a crafted
+  URL, leading to injection attacks.","Checks if a vulnerable version is present on the target host.
+Details:
+Python urllib.parse Vulnerability (bpo-43882) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.147630)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-0717,DFN-CERT-2024-3141,DFN-CERT-2024-1805,DFN-CERT-2023-2237,DFN-CERT-2023-2227,DFN-CERT-2023-1472,DFN-CERT-2022-2020,DFN-CERT-2022-1053,DFN-CERT-2022-0968,DFN-CERT-2022-0865,DFN-CERT-2022-0742,DFN-CERT-2022-0690,DFN-CERT-2022-0618,DFN-CERT-2022-0577,DFN-CERT-2022-0576,DFN-CERT-2022-0223,WID-SEC-2023-0831,WID-SEC-2023-0426,WID-SEC-2022-1335,WID-SEC-2022-1228,WID-SEC-2022-0432,WID-SEC-2022-0302,WID-SEC-2022-0146,CB-K22/0310",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"VendorFix","Python DoS Vulnerability (bpo-44022) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.6.14
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.147771,"CVE-2021-3737",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,bc4bf654-0f63-47e7-bac1-79edf312ce47,"","Update to version 3.6.14, 3.7.11, 3.8.11, 3.9.6 or later.","Python prior to version 3.6.14, version 3.7.x through 3.7.10,
+  3.8.x through 3.8.10 and 3.9.x through 3.9.5.","If a client request a HTTP/HTTPS/FTP service which is
+  controlled by attacker, attacker can make this client hang forever, even if the client has set a
+  timeout argument.","Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (bpo-44022) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.147771)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-3182,DFN-CERT-2024-3141,DFN-CERT-2024-1805,DFN-CERT-2023-1517,DFN-CERT-2023-1423,DFN-CERT-2023-1200,DFN-CERT-2023-0121,DFN-CERT-2022-1304,DFN-CERT-2022-1294,DFN-CERT-2022-1056,DFN-CERT-2022-1053,DFN-CERT-2022-0972,DFN-CERT-2022-0968,DFN-CERT-2022-0235,DFN-CERT-2021-2649,DFN-CERT-2021-2648,DFN-CERT-2021-2353,DFN-CERT-2021-2207,DFN-CERT-2021-1956,WID-SEC-2023-1524,WID-SEC-2023-0141,WID-SEC-2022-0432,WID-SEC-2022-0302,WID-SEC-2022-0011,CB-K22/0129",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"VendorFix","Python 2.7.x < 2.7.16, 3.4.x < 3.4.10, 3.5.x < 3.5.7, 3.6.x < 3.6.7, 3.7.0 Python Issue (bpo-34623) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     2.7.16
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118243,"CVE-2018-14647",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,ce0cf2f7-63bb-4d70-99ab-7ed5aff29bc4,"Successful exploitation allows denial of service attacks
+  against Expat by constructing an XML document that would cause pathological hash collisions
+  in Expat's internal data structures, consuming large amounts CPU and RAM.","Update to version 2.7.16, 3.4.10, 3.5.7, 3.6.7, 3.7.1 or later.","Python versions 2.7.0 through 2.7.15, 3.4.0 through 3.4.9,
+  3.5.0 through 3.5.6, 3.6.0 through 3.6.6 and 3.7.0.","The flaw exists because Python's elementtree C accelerator
+  fails to initialise Expat's hash salt during initialization","Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.7.x < 2.7.16, 3.4.x < 3.4.10, 3.5.x < 3.5.7, 3.6.x < 3.6.7, 3.7.0 P...
+(OID: 1.3.6.1.4.1.25623.1.0.118243)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2020-2045,DFN-CERT-2020-0783,DFN-CERT-2020-0668,DFN-CERT-2020-0200,DFN-CERT-2020-0177,DFN-CERT-2020-0111,DFN-CERT-2019-2327,DFN-CERT-2019-1610,DFN-CERT-2019-1288,DFN-CERT-2019-1053,DFN-CERT-2019-0841,DFN-CERT-2019-0565,DFN-CERT-2019-0402,DFN-CERT-2018-2332,DFN-CERT-2018-2030,DFN-CERT-2018-1994,DFN-CERT-2018-1969",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"VendorFix","Python < 2.7.15, 3.x < 3.4.9, 3.5.x < 3.5.6, 3.6.x < 3.6.5, 3.7.x < 3.7.0.beta3 Python Issue (Issue32981) - Linux","Python is prone to multiple denial of service (DoS) vulnerabilities.","Installed version: 2.7.13
+Fixed version:     2.7.15
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118244,"CVE-2018-1060,CVE-2018-1061",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,d30909e5-904a-4536-8564-b041695cc1ed,"Successful exploitation will allow an attacker to conduct
+  a denial of service attack on the affected user.","Update to version 2.7.15, 3.4.9, 3.5.6, 3.6.5,
+  3.7.0.beta3 or later.","Python before versions 2.7.15, 3.4.9, 3.5.6, 3.6.5
+  and 3.7.0.beta3.","Python is failing to sanitize against backtracking in:
+
+  - CVE-2018-1060: pop3lib's apop method
+
+  - CVE-2018-1061: 'difflib.IS_LINE_JUNK' method","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.15, 3.x < 3.4.9, 3.5.x < 3.5.6, 3.6.x < 3.6.5, 3.7.x < 3.7.0.be...
+(OID: 1.3.6.1.4.1.25623.1.0.118244)
+Version used: 2023-10-20T16:09:12Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2020-0668,DFN-CERT-2020-0231,DFN-CERT-2020-0177,DFN-CERT-2020-0111,DFN-CERT-2019-2327,DFN-CERT-2019-1053,DFN-CERT-2019-0565,DFN-CERT-2019-0563,DFN-CERT-2019-0362,DFN-CERT-2018-2332,DFN-CERT-2018-2030,DFN-CERT-2018-1969,DFN-CERT-2018-1942,DFN-CERT-2018-1676,DFN-CERT-2018-1531,DFN-CERT-2018-0644,WID-SEC-2024-1602,CB-K20/0041,CB-K18/1075",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"WillNotFix","Python <= 3.7.2 DoS Vulnerability (bpo-36260) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     None
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118211,"CVE-2019-9674",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,14ca810c-437a-468f-9d0b-82d50f0cf215,"","No known solution was made available for at least one year since
+  the disclosure of this vulnerability. Likely none will be provided anymore. General solution options
+  are to upgrade to a newer release, disable respective features, remove the product or replace the
+  product by another one.","Python through version 3.7.2.","'Lib/zipfile.py' in Python allows remote attackers to cause
+  a DOS (resource consumption) via a ZIP bomb.","Checks if a vulnerable version is present on the target host.
+Details:
+Python <= 3.7.2 DoS Vulnerability (bpo-36260) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.118211)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-0132,DFN-CERT-2024-1805,DFN-CERT-2021-0533,DFN-CERT-2020-1613,DFN-CERT-2020-1168,DFN-CERT-2020-0694,DFN-CERT-2020-0395",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.5,High,30,"VendorFix","Python <= 3.8.3 DoS Vulnerability - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     See references
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.113722,"CVE-2019-20907",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,171a85fa-f094-43e9-9b55-b728f4af9a3c,"Successful exploitation would allow an attacker
+  to deny legitimate users access to the application or exhaust a system's resources.","Updates are available. Please see the references for more information.","Python through version 3.8.3.","An attacker is able to craft a TAR archive leading to an infinite loop
+  when opened by tarfile.open, because _proc_pax lacks header validation.","Checks if a vulnerable version is present on the target host.
+Details:
+Python <= 3.8.3 DoS Vulnerability - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.113722)
+Version used: 2024-02-15T05:05:40Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-2047,DFN-CERT-2025-1464,DFN-CERT-2025-1461,DFN-CERT-2024-1805,DFN-CERT-2023-1200,DFN-CERT-2021-1070,DFN-CERT-2021-0715,DFN-CERT-2021-0533,DFN-CERT-2020-2805,DFN-CERT-2020-2770,DFN-CERT-2020-2621,DFN-CERT-2020-2588,DFN-CERT-2020-2543,DFN-CERT-2020-2393,DFN-CERT-2020-2392,DFN-CERT-2020-2386,DFN-CERT-2020-2300,DFN-CERT-2020-2278,DFN-CERT-2020-2207,DFN-CERT-2020-2045,DFN-CERT-2020-2006,DFN-CERT-2020-1839,DFN-CERT-2020-1832,DFN-CERT-2020-1613,DFN-CERT-2020-1545,DFN-CERT-2020-1513,WID-SEC-2025-0227,WID-SEC-2023-1298",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.4,High,30,"VendorFix","Python < 3.10.6 Information Disclosure Vulnerability (bpo-43223) - Linux","Python is prone to an information disclosure vulnerability.","Installed version: 2.7.13
+Fixed version:     3.10.6
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.127156,"CVE-2021-28861",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,c37a5e7d-1f1f-4230-a00e-4dfcd573e555,"","Update to version 3.10.6 or later.","Python prior to version 3.10.6.","An open redirection vulnerability in the HTTP server when an
+  URI path starts with '//'.This may lead to information disclosure.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.10.6 Information Disclosure Vulnerability (bpo-43223) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.127156)
+Version used: 2023-10-19T05:05:21Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-3182,DFN-CERT-2024-3141,DFN-CERT-2023-1109,DFN-CERT-2023-0429,DFN-CERT-2022-2572,DFN-CERT-2022-2232,DFN-CERT-2022-2184,DFN-CERT-2022-1983,WID-SEC-2024-0794,WID-SEC-2023-1542,WID-SEC-2022-1150",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,7.2,High,30,"VendorFix","Python < 3.5.10, 3.6.x < 3.6.12, 3.7.x < 3.7.9, 3.8.x < 3.8.5 Python Issue (bpo-39603) - Linux","http.client in Python is prone to CRLF injection.","Installed version: 2.7.13
+Fixed version:     3.5.10
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118188,"CVE-2020-26116",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,5080253c-3209-46d8-ae02-98b2e23075d2,"If the attacker controls the HTTP request method, the http.client
+  in Python allows CRLF injection.","Update to version 3.5.10, 3.6.12, 3.7.9, 3.8.5 or later.","Python prior to version 3.5.10, versions 3.6.x prior to 3.6.12,
+  3.7.x prior to 3.7.9 and 3.8.x prior to 3.8.5.","It is possible to inject HTTP headers via the HTTP method which
+  doesn't reject newline characters.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.5.10, 3.6.x < 3.6.12, 3.7.x < 3.7.9, 3.8.x < 3.8.5 Python Issue (...
+(OID: 1.3.6.1.4.1.25623.1.0.118188)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2023-2421,DFN-CERT-2023-1200,DFN-CERT-2023-0082,DFN-CERT-2022-1438,DFN-CERT-2021-1825,DFN-CERT-2021-1330,DFN-CERT-2021-1080,DFN-CERT-2021-1079,DFN-CERT-2021-1071,DFN-CERT-2021-0533,DFN-CERT-2021-0002,DFN-CERT-2020-2805,DFN-CERT-2020-2621,DFN-CERT-2020-2543,DFN-CERT-2020-2300,DFN-CERT-2020-2278,DFN-CERT-2020-2207,DFN-CERT-2020-1940,WID-SEC-2025-0227,WID-SEC-2024-0794,WID-SEC-2022-0492",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,6.5,Medium,30,"VendorFix","Python 2.7.x <= 2.7.17, 3.5 <= 3.5.9, 3.6.x <= 3.6.10, 3.7.x <= 3.7.6, 3.8.x <= 3.8.1 Regular Expression Denial of Service (ReDoS) Vulnerability - Linux","Python is prone to a Regular Expression Denial of Service
+  (ReDoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.5.10
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.113637,"CVE-2020-8492",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,2d89f54c-acff-4f62-98eb-12210937def0,"Successful exploitation would allow an attacker to crash
+  the application.","Update to version 3.5.10, 3.6.11, 3.7.8, 3.8.3 or 3.9.0
+  respectively.","Python 2.7 through 2.7.17, 3.5 through 3.5.9, 3.6 through
+  3.6.10, 3.7 through 3.7.6, and 3.8 through 3.8.1.","The AbstractBasicAuthHandler class of the urllib.request
+  module uses an inefficient regular expression (catastrophic backtracking) which can be
+  exploited by an attacker to cause a denial of service.","Checks if a vulnerable version is present on the target
+  host.
+Details:
+Python 2.7.x <= 2.7.17, 3.5 <= 3.5.9, 3.6.x <= 3.6.10, 3.7.x <= 3.7.6, 3.8.x...
+(OID: 1.3.6.1.4.1.25623.1.0.113637)
+Version used: 2024-06-26T05:05:39Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2023-1200,DFN-CERT-2022-2715,DFN-CERT-2022-0224,DFN-CERT-2021-2648,DFN-CERT-2021-1070,DFN-CERT-2021-0533,DFN-CERT-2020-2805,DFN-CERT-2020-2757,DFN-CERT-2020-2621,DFN-CERT-2020-2392,DFN-CERT-2020-2386,DFN-CERT-2020-2299,DFN-CERT-2020-2278,DFN-CERT-2020-2117,DFN-CERT-2020-1812,DFN-CERT-2020-1540,DFN-CERT-2020-1405,DFN-CERT-2020-1168,DFN-CERT-2020-0694,DFN-CERT-2020-0438,DFN-CERT-2020-0395,WID-SEC-2025-0227,WID-SEC-2022-2190,CB-K22/0130,CB-K20/1030",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,6.5,Medium,30,"VendorFix","Python < 3.7.0 DoS Vulnerability (Mar 2018) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.7.0
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118271,"CVE-2017-18207",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,38b0d8ea-2461-461c-a204-e9b82eb3ea58,"This vulnerability allows attackers to cause a DoS (divide-by-zero
+  and exception) via a crafted wav format audio file.
+
+  Note: CVE is disputed by vendor, although fixes have been applied.","Update to Python version 3.7.0 or later.","Python through version 3.6.4.","The Wave_read._read_fmt_chunk function in Lib/wave.py does
+  not ensure a nonzero channel value.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.7.0 DoS Vulnerability (Mar 2018) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.118271)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2020-0231,DFN-CERT-2020-0177,DFN-CERT-2020-0111,DFN-CERT-2018-0707",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,6.5,Medium,30,"VendorFix","Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 DoS Vulnerability (bpo-42103) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.6.13
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.170575,"CVE-2022-48564",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,965c8953-74b3-4aaf-8fcd-ad5ba3326a1a,"","Update to version 3.6.13, 3.7.10, 3.8.7, 3.9.1 or later.","Python prior to version 3.6.13, versions 3.7.x prior to 3.7.10,
+  3.8.x prior to 3.8.7 and 3.9.x prior to 3.9.1.","read_ints in plistlib.py is vulnerable to a potential DoS attack
+  via CPU and RAM exhaustion when processing malformed Apple Property List files in binary format.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 DoS Vulnerabil...
+(OID: 1.3.6.1.4.1.25623.1.0.170575)
+Version used: 2023-10-13T05:06:10Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2024-0278,DFN-CERT-2024-0227,DFN-CERT-2024-0074,DFN-CERT-2023-2954,DFN-CERT-2023-2485,WID-SEC-2024-1086,WID-SEC-2023-2119",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,6.1,Medium,30,"VendorFix","Python < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.10, 3.7.x < 3.7.5 XSS Vulnerability (bpo-38243) - Linux","Python is prone to a reflected cross-site scripting (XSS)
+  vulnerability.","Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118199,"CVE-2019-16935",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,8757cec0-6afc-4d57-b203-9a9c28d59e7e,"","The vendor has released updates. Please see the references for
+  more information.","Python prior to version 2.7.17, versions 3.x prior to 3.5.8,
+  3.6.x prior to 3.6.10 and 3.7.x prior to 3.7.5.","The documentation XML-RPC server has XSS via the 'server_title'
+  field. This occurs in 'Lib/DocXMLRPCServer.py' in Python 2.x, and in 'Lib/xmlrpc/server.py' in
+  Python 3.x. If 'set_server_title' is called with untrusted input, arbitrary JavaScript can be
+  delivered to clients that visit the http URL for this server.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.17, 3.5.x < 3.5.8, 3.6.x < 3.6.10, 3.7.x < 3.7.5 XSS Vulnerabil...
+(OID: 1.3.6.1.4.1.25623.1.0.118199)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2021-1070,DFN-CERT-2021-0790,DFN-CERT-2020-2805,DFN-CERT-2020-2386,DFN-CERT-2020-2299,DFN-CERT-2020-2278,DFN-CERT-2020-2127,DFN-CERT-2020-2117,DFN-CERT-2020-2045,DFN-CERT-2020-1540,DFN-CERT-2020-0550,DFN-CERT-2020-0177,DFN-CERT-2020-0111,DFN-CERT-2019-2560,DFN-CERT-2019-2252,DFN-CERT-2019-2210,DFN-CERT-2019-2198,DFN-CERT-2019-2113,WID-SEC-2025-0227,WID-SEC-2024-1595,CB-K20/1030,CB-K20/0710,CB-K20/0109",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,6.1,Medium,30,"VendorFix","Python 2.x < 2.7.18, 3.x < 3.5.10, 3.6.x < 3.6.11, 3.7.x < 3.7.8, 3.8.x < 3.8.3 CRLF Injection Vulnerability (bpo-38576) - Linux","Python is prone to a CRLF injection vulnerability.","Installed version: 2.7.13
+Fixed version:     2.7.18
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118196,"CVE-2019-18348",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,a43c47f7-3daf-48f3-a947-b202c06c20ae,"","The vendor has released updates. Please see the references for
+  more information.","Python 2.x prior to version 2.7.18, versions 3.x prior to 3.5.10,
+  3.6.x prior to 3.6.11, 3.7.x prior to 3.7.8 and 3.8.x prior to 3.8.3.","http.client allows to pass control characters like CRLF newlines
+  which can be abused to inject HTTP headers.","Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.x < 2.7.18, 3.x < 3.5.10, 3.6.x < 3.6.11, 3.7.x < 3.7.8, 3.8.x < 3....
+(OID: 1.3.6.1.4.1.25623.1.0.118196)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2022-2715,DFN-CERT-2021-0553,DFN-CERT-2020-2805,DFN-CERT-2020-2757,DFN-CERT-2020-2621,DFN-CERT-2020-2278,DFN-CERT-2020-1812,DFN-CERT-2020-1540,DFN-CERT-2020-1405,DFN-CERT-2020-1168,DFN-CERT-2020-0694,DFN-CERT-2020-0597,DFN-CERT-2019-2252,WID-SEC-2022-2191,CB-K20/1028",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,6.1,Medium,30,"VendorFix","Python 2.x < 2.7.17, 3.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 HTTP Header Injection Vulnerability (bpo-30458) - Linux","Python is prone to a HTTP header injection vulnerability
+  (follow-up of CVE-2016-5699).","Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118208,"CVE-2019-9740,CVE-2019-9947",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,5d126cd6-f607-46b9-afc6-207cb6be396b,"","The vendor has released updates. Please see the references for
+  more information.","Python versions 2.x prior to 2.7.17, 3.x prior to 3.5.8, 3.6.x
+  prior to 3.6.9 and 3.7.x prior to 3.7.4.","The following vulnerabilities exist:
+
+  - CVE-2019-9740: An issue was discovered in urllib2 in Python 2.x and urllib in Python 3.x.
+  CRLF injection is possible if the attacker controls a url parameter, as demonstrated by the first
+  argument to 'urllib.request.urlopen' with 'rn' (specifically in the query string after a '?'
+  character) followed by an HTTP header or a Redis command.
+
+  - CVE-2019-9947: An issue was discovered in urllib2 in Python 2.x and urllib in Python 3.x.
+  CRLF injection is possible if the attacker controls a url parameter, as demonstrated by the first
+  argument to 'urllib.request.urlopen' with 'rn' (specifically in the path component of a URL that
+  lacks a '?' character) followed by an HTTP header or a Redis command.","Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.x < 2.7.17, 3.x < 3.5.8, 3.6.x < 3.6.9, 3.7.x < 3.7.4 HTTP Header I...
+(OID: 1.3.6.1.4.1.25623.1.0.118208)
+Version used: 2025-07-18T15:43:33Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-2047,DFN-CERT-2025-1464,DFN-CERT-2025-1461,DFN-CERT-2024-1805,DFN-CERT-2023-2421,DFN-CERT-2020-2653,DFN-CERT-2020-2502,DFN-CERT-2020-2045,DFN-CERT-2020-1839,DFN-CERT-2020-1540,DFN-CERT-2020-0783,DFN-CERT-2020-0668,DFN-CERT-2020-0231,DFN-CERT-2020-0200,DFN-CERT-2020-0177,DFN-CERT-2020-0111,DFN-CERT-2019-2560,DFN-CERT-2019-2327,DFN-CERT-2019-2312,DFN-CERT-2019-2302,DFN-CERT-2019-2252,DFN-CERT-2019-2210,DFN-CERT-2019-2078,DFN-CERT-2019-1877,DFN-CERT-2019-1854,DFN-CERT-2019-1831,DFN-CERT-2019-1755,DFN-CERT-2019-1339,DFN-CERT-2019-1288,DFN-CERT-2019-1084,DFN-CERT-2019-1076,DFN-CERT-2019-1053,DFN-CERT-2019-0941,WID-SEC-2024-1599,WID-SEC-2023-1280,CB-K20/0109",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.9,Medium,30,"VendorFix","Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.8, 3.9.x < 3.9.2 Web Cache Poisoning Vulnerability - Linux","Python is prone to a web cache poisoning vulnerability.","Installed version: 2.7.13
+Fixed version:     3.6.13
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.145429,"CVE-2021-23336",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,890e2336-fe2d-4757-b000-7e875b7245b5,"Successful exploitation can result in malicious requests being cached as
+  completely safe ones, as the proxy would usually not see the semicolon as a separator, and therefore would
+  not include it in a cache key of an unkeyed parameter.","Update to version 3.6.13, 3.7.10, 3.8.8, 3.9.2 or later.","Python prior to version 3.6.13, versions 3.7.x prior to 3.7.10, 3.8.x prior
+  to 3.8.8 and 3.9.x prior to 3.9.2.","The package python is vulnerable to Web Cache Poisoning via
+  urllib.parse.parse_qsl and urllib.parse.parse_qs by using a vector called parameter cloaking. When the
+  attacker can separate query parameters using a semicolon, they can cause a difference in the
+  interpretation of the request between the proxy (running with default configuration) and the server.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.8, 3.9.x < 3.9.2 Web Cache Pois...
+(OID: 1.3.6.1.4.1.25623.1.0.145429)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2023-2227,DFN-CERT-2022-2419,DFN-CERT-2022-1271,DFN-CERT-2021-2354,DFN-CERT-2021-2350,DFN-CERT-2021-1801,DFN-CERT-2021-1622,DFN-CERT-2021-1414,DFN-CERT-2021-1330,DFN-CERT-2021-1282,DFN-CERT-2021-1110,DFN-CERT-2021-1080,DFN-CERT-2021-0810,DFN-CERT-2021-0790,DFN-CERT-2021-0675,DFN-CERT-2021-0553,DFN-CERT-2021-0387,DFN-CERT-2021-0367,WID-SEC-2025-0227,WID-SEC-2022-0184,WID-SEC-2022-0141",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.9,Medium,30,"VendorFix","Python < 3.5.10, 3.6.x < 3.6.12, 3.7.x < 3.7.9, 3.8.x < 3.8.4 Python Issue (bpo-41004) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.5.10
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118192,"CVE-2020-14422",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,21a4b086-7d73-4a84-923d-1c9de9c0f6fb,"","The vendor has released updates. Please see the references for
+  more information.","Python prior to version 3.5.10, versions 3.6.x prior to 3.6.12,
+  3.7.x prior to 3.7.9 and 3.8.x prior to 3.8.4.","Lib/ipaddress.py improperly computes hash values in the IPv4Interface
+  and IPv6Interface classes, which might allow a remote attacker to cause a denial of service if an
+  application is affected by the performance of a dictionary containing IPv4Interface or IPv6Interface
+  objects, and this attacker can cause many dictionary entries to be created.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.5.10, 3.6.x < 3.6.12, 3.7.x < 3.7.9, 3.8.x < 3.8.4 Python Issue (...
+(OID: 1.3.6.1.4.1.25623.1.0.118192)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2021-1070,DFN-CERT-2020-2805,DFN-CERT-2020-2621,DFN-CERT-2020-2588,DFN-CERT-2020-2550,DFN-CERT-2020-2392,DFN-CERT-2020-2386,DFN-CERT-2020-2300,DFN-CERT-2020-2278,DFN-CERT-2020-2207,DFN-CERT-2020-2045,DFN-CERT-2020-1613,DFN-CERT-2020-1545,DFN-CERT-2020-1540,DFN-CERT-2020-1513,DFN-CERT-2020-1427,WID-SEC-2025-0227,WID-SEC-2023-1220",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.9,Medium,30,"VendorFix","Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 Race Condition Vulnerability (bpo-40791) - Linux","Python is prone to a race condition vulnerability.","Installed version: 2.7.13
+Fixed version:     3.6.13
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.170572,"CVE-2022-48566",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,0bd5526d-9367-4996-9fa3-897a5855a727,"","Update to version 3.6.13, 3.7.10, 3.8.7, 3.9.1 or later.","Python prior to version 3.6.13, versions 3.7.x prior to 3.7.10,
+  3.8.x prior to 3.8.7 and 3.9.x prior to 3.9.1.","An issue was discovered in compare_digest in Lib/hmac.py.
+  Constant-time-defeating optimisations were possible in the accumulator variable in
+  hmac.compare_digest.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.13, 3.7.x < 3.7.10, 3.8.x < 3.8.7, 3.9.x < 3.9.1 Race Condition...
+(OID: 1.3.6.1.4.1.25623.1.0.170572)
+Version used: 2023-10-17T05:05:34Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-0046,DFN-CERT-2024-1805,DFN-CERT-2024-1432,DFN-CERT-2024-0709,DFN-CERT-2024-0408,DFN-CERT-2023-2651,DFN-CERT-2023-2485,DFN-CERT-2023-2427,DFN-CERT-2023-2309,DFN-CERT-2023-2227,WID-SEC-2025-0225,WID-SEC-2023-2119",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.7,Medium,30,"VendorFix","Python < 3.6.14, 3.7.x < 3.7.11, 3.8.x < 3.8.9, 3.9.x < 3.9.3 Python Issue (bpo-42988) - Linux","Python is prone to an information disclosure vulnerability via
+  pydoc getfile.","Installed version: 2.7.13
+Fixed version:     3.6.14
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118175,"CVE-2021-3426",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,1270af03-cad0-42df-909a-1a5c49b370b8,"A local or adjacent attacker who discovers or is able to convince
+  another local or adjacent user to start a pydoc server could access the server and use it to disclose
+  sensitive information belonging to the other user that they would not normally be able to access.","Update to version 3.6.14, 3.7.11, 3.8.9, 3.9.3 or later.","Python prior to version 3.6.14, versions 3.7.x prior to 3.7.11,
+  3.8.x prior to 3.8.9 and 3.9.x prior to 3.9.3.","Running 'pydoc -p' allows other local users to extract arbitrary
+  files.
+
+  The '/getfile?key=path' URL allows to read arbitrary file on the filesystem.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.14, 3.7.x < 3.7.11, 3.8.x < 3.8.9, 3.9.x < 3.9.3 Python Issue (...
+(OID: 1.3.6.1.4.1.25623.1.0.118175)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-3182,DFN-CERT-2024-1805,DFN-CERT-2023-1517,DFN-CERT-2022-0690,DFN-CERT-2021-2527,DFN-CERT-2021-2354,DFN-CERT-2021-2353,DFN-CERT-2021-2207,DFN-CERT-2021-1825,DFN-CERT-2021-1801,DFN-CERT-2021-1407,DFN-CERT-2021-0943,DFN-CERT-2021-0682,DFN-CERT-2021-0675,WID-SEC-2023-1418,WID-SEC-2022-1767,WID-SEC-2022-1308,WID-SEC-2022-0624,CB-K21/1268",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.6,Medium,30,"VendorFix","Python Symlink Dereference Vulnerability (Mar 2024) - Linux","Python is prone to a symlink dereference vulnerability.","Installed version: 2.7.13
+Fixed version:     3.8.19
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.170811,"CVE-2023-6597",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,d5555ca0-1c99-42d0-8c4b-6183f27d407a,"","Update to version 3.8.19, 3.9.19, 3.10.14, 3.11.8, 3.12.1
+  or later.","Python prior to version 3.8.19, 3.9.x prior to 3.9.19, 3.10.x
+  prior to 3.10.14, 3.11.x prior to 3.11.8 and 3.12.x prior to 3.12.1.","The tempfile.TemporaryDirectory class would dereference symlinks
+  during cleanup of permissions-related errors. This means users which can run privileged programs
+  are potentially able to modify permissions of files referenced by symlinks in some
+  circumstances.","Checks if a vulnerable version is present on the target host.
+Details:
+Python Symlink Dereference Vulnerability (Mar 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.170811)
+Version used: 2024-10-11T15:39:44Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-1477,DFN-CERT-2025-1461,DFN-CERT-2025-0933,DFN-CERT-2025-0688,DFN-CERT-2025-0378,DFN-CERT-2025-0375,DFN-CERT-2025-0318,DFN-CERT-2025-0274,DFN-CERT-2025-0255,DFN-CERT-2025-0184,DFN-CERT-2024-3182,DFN-CERT-2024-2962,DFN-CERT-2024-1805,DFN-CERT-2024-1433,DFN-CERT-2024-1432,DFN-CERT-2024-0974,DFN-CERT-2024-0828,DFN-CERT-2024-0785,DFN-CERT-2024-0709,DFN-CERT-2024-0641,DFN-CERT-2024-0610,DFN-CERT-2024-0609,DFN-CERT-2024-0605,WID-SEC-2025-0794,WID-SEC-2025-0225,WID-SEC-2025-0001,WID-SEC-2024-3377,WID-SEC-2024-3195,WID-SEC-2024-1307,WID-SEC-2024-0687",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.5,Medium,30,"VendorFix","Python DoS Vulnerability (Dec 2025) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.13.10
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.125553,"CVE-2025-13837",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,a2147de4-b15d-4957-bc2e-0ab37f10c67f,"","Update to version 3.13.10, 3.14.1 or later, or to the latest
+  maintenance release of your Python version series (3.10.x, 3.12.x) once patches
+  are available. Please see the references for more information.","Python prior to version 3.13.10 and 3.14.x prior to 3.14.1.
+
+  Note: Fixes have been backported to maintenance branches (3.10, 3.12) but specific
+  patch versions are not yet available.","When loading a plist file, the plistlib module reads data in
+  size specified by the file itself, meaning a malicious file can cause out-of-memory (OOM) and
+  DoS issues.","Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Dec 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.125553)
+Version used: 2026-01-16T05:47:38Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2026-0215,DFN-CERT-2025-3621,WID-SEC-2025-2706",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.3,Medium,30,"VendorFix","Python < 2.7.17, 3.x < 3.4.10, 3.5.x < 3.5.7, 3.6.x < 3.6.9, 3.7.x < 3.7.3 Cookie domain check returns incorrect results (bpo-35121) - Linux","Python is prone to an improper input validation vulnerability.","Installed version: 2.7.13
+Fixed version:     2.7.17
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118273,"CVE-2018-20852",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,7e8f1b51-443f-4aeb-8a60-80f9c493df3a,"When a program uses http.cookiejar.DefaultPolicy and tries to
+  do an HTTP connection to an attacker-controlled server, existing cookies can be leaked to the
+  attacker.","Update to version 2.7.17, 3.4.10, 3.5.7, 3.6.9, 3.7.3
+  or later.","Python prior to version 2.7.17, versions 3.x prior to 3.4.10,
+  3.5.x prior to 3.5.7, 3.6.x prior to 3.6.9 and 3.7.x prior to 3.7.3.","http.cookiejar.DefaultPolicy.domain_return_ok in Lib/http/cookiejar.py
+  does not correctly validate the domain: it can be tricked into sending existing cookies to the wrong
+  server.
+
+  An attacker may abuse this flaw by using a server with a hostname that has another valid hostname as
+  a suffix (e.g., pythonicexample.com to steal cookies for example.com).","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 2.7.17, 3.x < 3.4.10, 3.5.x < 3.5.7, 3.6.x < 3.6.9, 3.7.x < 3.7.3 C...
+(OID: 1.3.6.1.4.1.25623.1.0.118273)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-1805,DFN-CERT-2020-2259,DFN-CERT-2020-2045,DFN-CERT-2020-1839,DFN-CERT-2020-1540,DFN-CERT-2020-0896,DFN-CERT-2020-0231,DFN-CERT-2020-0177,DFN-CERT-2020-0111,DFN-CERT-2019-2560,DFN-CERT-2019-2327,DFN-CERT-2019-2238,DFN-CERT-2019-2198,DFN-CERT-2019-2169,DFN-CERT-2019-1877,DFN-CERT-2019-1682,DFN-CERT-2019-1596,WID-SEC-2024-1597,CB-K20/1049",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.3,Medium,30,"VendorFix","Python < 3.6.14, 3.7.x < 3.7.11, 3.8.x < 3.8.9, 3.9.x < 3.9.3 (bpo-43285) - Linux","Python is prone to a remote code execution (RCE)
+  vulnerability.","Installed version: 2.7.13
+Fixed version:     3.6.14
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.126132,"CVE-2021-4189",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,29709fbd-3e7c-469b-8512-b3daea457c02,"This flaw allows an attacker to set up a malicious FTP server,
+  that can trick FTP clients into connecting back to a given IP address and port.","Update to version 3.6.14, 3.7.11, 3.8.9, 3.9.3 or later.","Python prior to version 3.6.14, versions 3.7.x prior to 3.7.11,
+  3.8.x prior to 3.8.9 and 3.9.x prior to 3.9.3.","","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.6.14, 3.7.x < 3.7.11, 3.8.x < 3.8.9, 3.9.x < 3.9.3 (bpo-43285) - ...
+(OID: 1.3.6.1.4.1.25623.1.0.126132)
+Version used: 2023-10-19T05:05:21Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2024-3182,DFN-CERT-2024-1805,DFN-CERT-2023-1517,DFN-CERT-2023-1200,DFN-CERT-2022-1304,DFN-CERT-2022-1294,DFN-CERT-2022-1056,DFN-CERT-2022-1053,DFN-CERT-2022-0968,DFN-CERT-2022-0742,DFN-CERT-2022-0690,DFN-CERT-2022-0618,DFN-CERT-2022-0351,WID-SEC-2022-0011",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.3,Medium,30,"VendorFix","Python DoS Vulnerability (Dec 2025) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.13.11
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.133141,"CVE-2025-12084",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,8b9cfd2f-56f3-4eb3-ad9e-37287d0ecde2,"","Update to version 3.13.11, 3.14.2 or later.","Python prior to version 3.13.11 and 3.14.0 prior to 3.14.2.","When building nested elements using xml.dom.minidom methods such
+  as appendChild() that have a dependency on _clear_id_cache() the algorithm is quadratic.
+  Availability can be impacted when building excessively nested documents.","Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Dec 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.133141)
+Version used: 2025-12-17T05:46:28Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2026-0215,DFN-CERT-2026-0174,DFN-CERT-2026-0167,DFN-CERT-2026-0038,DFN-CERT-2025-3621,DFN-CERT-2025-3496,WID-SEC-2025-2741",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.3,Medium,30,"WillNotFix","Python <= 2.7.18, 3.x <= 3.12.3 Security Bypass Vulnerability - Linux","Python is prone to a security bypass vulnerability in the e-mail
+  module.","Installed version: 2.7.13
+Fixed version:     None
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.104739,"CVE-2023-27043",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,5088b7b7-2bf8-4261-95cd-4d524bfa9054,"","No known solution was made available for at least one year since
+  the disclosure of this vulnerability. Likely none will be provided anymore. General solution options
+  are to upgrade to a newer release, disable respective features, remove the product or replace the
+  product by another one.
+
+  Note: The vendor mentions, that a patch was included in main branch 3.13. This version is expected
+  to release in October 2024. The patch might be included in the release of version 3.13 or later.","Python versions through 2.7.18 and 3.x through 3.12.3.","The e-mail module incorrectly parses e-mail addresses which
+  contain a special character. This vulnerability allows attackers to send messages from e-mail
+  addresses that would otherwise be rejected.","Checks if a vulnerable version is present on the target host.
+Details:
+Python <= 2.7.18, 3.x <= 3.12.3 Security Bypass Vulnerability - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.104739)
+Version used: 2024-05-14T05:05:26Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-1477,DFN-CERT-2025-1461,DFN-CERT-2025-0809,DFN-CERT-2025-0179,DFN-CERT-2024-3182,DFN-CERT-2024-3141,DFN-CERT-2024-2425,DFN-CERT-2024-2340,DFN-CERT-2024-2186,DFN-CERT-2024-2179,DFN-CERT-2024-1391,DFN-CERT-2024-1325,DFN-CERT-2024-0744,DFN-CERT-2024-0609,DFN-CERT-2024-0605,DFN-CERT-2024-0408,DFN-CERT-2024-0278,DFN-CERT-2024-0227,DFN-CERT-2023-3186,DFN-CERT-2023-2651,WID-SEC-2025-0668,WID-SEC-2025-0225,WID-SEC-2024-3377,WID-SEC-2024-1086,WID-SEC-2024-0423,WID-SEC-2023-1097",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.3,Medium,30,"VendorFix","Python < 3.8.18, 3.9.x < 3.9.18, 3.10.x < 3.10.13, 3.11.x < 3.11.5 Security Bypass Vulnerability - Linux","Python is prone to a security bypass vulnerability.","Installed version: 2.7.13
+Fixed version:     3.8.18
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.124416,"CVE-2023-40217",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,0b319ab0-49f0-4739-901d-8fb9cfa2f741,"","Update to version 3.8.18, 3.9.18, 3.10.13, 3.11.5 or later.","Python version prior to 3.8.18, 3.9.x prior to 3.9.18, 3.10.x
+  prior to 3.10.13 and 3.11.x prior to 3.11.5.","Instances of ssl.SSLSocket are vulnerable to a bypass of the
+  TLS handshake and included protections (like certificate verification) and treating sent
+  unencrypted data as if it were post-handshake TLS encrypted data if the socket is closed before
+  initiating its own handshake.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.8.18, 3.9.x < 3.9.18, 3.10.x < 3.10.13, 3.11.x < 3.11.5 Security ...
+(OID: 1.3.6.1.4.1.25623.1.0.124416)
+Version used: 2023-12-20T05:05:58Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-0046,DFN-CERT-2024-3182,DFN-CERT-2024-2962,DFN-CERT-2024-1805,DFN-CERT-2024-0610,DFN-CERT-2024-0609,DFN-CERT-2023-3168,DFN-CERT-2023-2954,DFN-CERT-2023-2941,DFN-CERT-2023-2783,DFN-CERT-2023-2768,DFN-CERT-2023-2714,DFN-CERT-2023-2485,DFN-CERT-2023-2370,DFN-CERT-2023-2227,DFN-CERT-2023-2226,WID-SEC-2024-3377,WID-SEC-2024-0794,WID-SEC-2023-2850,WID-SEC-2023-2173",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.0,Medium,30,"VendorFix","Python Email Header Injection Vulnerability (Aug 2024) - Linux","Python is prone to an email header injection vulnerability in
+  the email module.","Installed version: 2.7.13
+Fixed version:     3.8.20
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.114731,"CVE-2024-6923",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,034a9822-52d9-4509-a066-8eefb5189df6,"","Update to version 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.5 or
+  later.","Python prior to version 3.8.20, 3.9.x prior to 3.9.20, 3.10.x
+  prior to 3.10.15, 3.11.x prior to 3.11.10 and 3.12.x prior to 3.12.5.","The email module didn't properly quote newlines for email
+  headers when serializing an email message allowing for header injection when an email is
+  serialized.","Checks if a vulnerable version is present on the target host.
+Details:
+Python Email Header Injection Vulnerability (Aug 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.114731)
+Version used: 2024-10-11T15:39:44Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-3045,DFN-CERT-2025-1693,DFN-CERT-2025-1477,DFN-CERT-2025-1464,DFN-CERT-2025-1461,DFN-CERT-2025-0179,DFN-CERT-2024-3182,DFN-CERT-2024-3083,DFN-CERT-2024-2937,DFN-CERT-2024-2571,DFN-CERT-2024-2525,DFN-CERT-2024-2512,DFN-CERT-2024-2497,DFN-CERT-2024-2496,DFN-CERT-2024-2466,DFN-CERT-2024-2456,DFN-CERT-2024-2425,DFN-CERT-2024-2340,DFN-CERT-2024-2271,DFN-CERT-2024-2251,DFN-CERT-2024-2245,DFN-CERT-2024-2186,DFN-CERT-2024-2152,DFN-CERT-2024-2049,WID-SEC-2025-0647,WID-SEC-2024-2033",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.0,Medium,30,"VendorFix","Python SSL Vulnerability (Jun 2024) - Linux","Python is prone to a vulnerability in the ssl module.","Installed version: 2.7.13
+Fixed version:     3.8.20
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.152433,"CVE-2024-0397",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,078e1871-2aa3-460e-943f-f27f17651aab,"","Update to version 3.8.20, 3.9.20, 3.10.14, 3.11.9, 3.12.3
+  or later.","Python prior to version 3.8.20, 3.9.x prior to 3.9.20, 3.10.x
+  prior to 3.10.14, 3.11.x prior to 3.11.9 and 3.12.x prior to 3.12.3.","A defect was discovered in the Python 'ssl' module where there
+  is a memory race condition with the ssl.SSLContext methods 'cert_store_stats()' and
+  'get_ca_certs()'. The race condition can be triggered if the methods are called at the same time
+  as certificates are loaded into the SSLContext, such as during the TLS handshake with a
+  certificate directory configured.","Checks if a vulnerable version is present on the target host.
+Details:
+Python SSL Vulnerability (Jun 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.152433)
+Version used: 2024-10-11T15:39:44Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-1693,DFN-CERT-2025-1477,DFN-CERT-2025-1464,DFN-CERT-2025-1461,DFN-CERT-2024-3182,DFN-CERT-2024-3083,DFN-CERT-2024-2448,DFN-CERT-2024-2245,DFN-CERT-2024-2227,DFN-CERT-2024-2186,DFN-CERT-2024-1908,DFN-CERT-2024-1851,DFN-CERT-2024-1833,DFN-CERT-2024-1702,WID-SEC-2025-0225,WID-SEC-2024-1645,WID-SEC-2024-1396",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.0,Medium,30,"VendorFix","Python zipfile Module Vulnerability (Oct 2025) - Linux","Python is prone to a vulnerability in the 'zipfile' module.","Installed version: 2.7.13
+Fixed version:     3.9.24
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.119138,"CVE-2025-8291",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,62cbe624-eb93-45ed-89e2-a3ffcfa4a0aa,"","Update to version 3.9.24, 3.10.19, 3.11.14, 3.12.12, 3.13.10,
+  3.14.1 or later.","Python prior to version 3.9.24, 3.10.x prior to 3.10.19, 3.11.x
+  prior to 3.11.14, 3.12.x prior to 3.12.12, 3.13.x prior to 3.13.10 and 3.14.x prior to 3.14.1.","The 'zipfile' module would not check the validity of the ZIP64
+  End of Central Directory (EOCD) Locator record offset value would not be used to locate the ZIP64
+  EOCD record, instead the ZIP64 EOCD record would be assumed to be the previous record in the ZIP
+  archive. This could be abused to create ZIP archives that are handled differently by the 'zipfile'
+  module compared to other ZIP implementations. Remediation maintains this behavior, but checks that
+  the offset specified in the ZIP64 EOCD Locator record matches the expected value.","Checks if a vulnerable version is present on the target host.
+Details:
+Python 'zipfile' Module Vulnerability (Oct 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.119138)
+Version used: 2025-12-18T05:46:55Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2026-0215,DFN-CERT-2026-0167,DFN-CERT-2026-0038,DFN-CERT-2025-3563,DFN-CERT-2025-3555,DFN-CERT-2025-3298,DFN-CERT-2025-3045,DFN-CERT-2025-2812,WID-SEC-2025-2230",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.0,Medium,30,"VendorFix","Python Buffer Over-Read Vulnerability (Jul 2024) - Linux","Python is prone to a buffer over-read vulnerability in
+  SSLContext.set_npn_protocols().","Installed version: 2.7.13
+Fixed version:     3.10.0
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.114744,"CVE-2024-5642",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,f88626e4-2ecd-4fb7-8863-2834eb83f2ad,"","Suggested mitigation by the vendor is one of the following:
+
+  - Update to Python 3.10 or later where NPN isn't supported
+
+  - Avoid using NPN via SSLContext.set_npn_protocols()
+
+  - Avoid providing an empty list as a parameter to SSLContext.set_npn_protocols()","Python versions prior to 3.10.","The product doesn't disallow configuring an empty list ('[]')
+  for SSLContext.set_npn_protocols() which is an invalid value for the underlying OpenSSL API. This
+  results in a buffer over-read when NPN is used (see CVE-2024-5535 for OpenSSL). This vulnerability
+  is of low severity due to NPN being not widely used and specifying an empty list likely being
+  uncommon in-practice (typically a protocol name would be configured).","Checks if a vulnerable version is present on the target host.
+Details:
+Python Buffer Over-Read Vulnerability (Jul 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.114744)
+Version used: 2024-08-14T05:05:52Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-3563,DFN-CERT-2025-3555,DFN-CERT-2025-3248,DFN-CERT-2025-2826,DFN-CERT-2024-2571,DFN-CERT-2024-2491,DFN-CERT-2024-2271,DFN-CERT-2024-2186,WID-SEC-2025-2648",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.0,Medium,30,"VendorFix","Python IP Ranges Vulnerability (Jun 2024) - Linux","Python is prone to a vulnerability in the ipaddress module.","Installed version: 2.7.13
+Fixed version:     3.8.20
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.152430,"CVE-2024-4032",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,bebcdee1-8c57-4d91-924b-2c7da54669a7,"","Update to version 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.4 or
+  later.","Python prior to version 3.8.20, 3.9.x prior to 3.9.20, 3.10.x
+  prior to 3.10.15, 3.11.x prior to 3.11.10 and 3.12.x prior to 3.12.4.","The 'ipaddress' module contained incorrect information about
+  whether certain IPv4 and IPv6 addresses were designated as 'globally reachable' or 'private'.
+  This affected the 'is_private' and 'is_global' properties of the ipaddress.IPv4Address,
+  ipaddress.IPv4Network, ipaddress.IPv6Address, and ipaddress.IPv6Network classes, where values
+  wouldn't be returned in accordance with the latest information from the IANA Special-Purpose
+  Address Registries.","Checks if a vulnerable version is present on the target host.
+Details:
+Python IP Ranges Vulnerability (Jun 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.152430)
+Version used: 2024-10-11T15:39:44Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-1693,DFN-CERT-2025-1477,DFN-CERT-2025-1464,DFN-CERT-2025-1461,DFN-CERT-2025-0655,DFN-CERT-2024-3182,DFN-CERT-2024-3083,DFN-CERT-2024-2993,DFN-CERT-2024-2525,DFN-CERT-2024-2512,DFN-CERT-2024-2448,DFN-CERT-2024-2340,DFN-CERT-2024-2251,DFN-CERT-2024-2227,DFN-CERT-2024-2186,DFN-CERT-2024-2152,DFN-CERT-2024-1908,DFN-CERT-2024-1833,DFN-CERT-2024-1702,DFN-CERT-2024-1615,WID-SEC-2025-0225,WID-SEC-2024-1396",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,5.0,Medium,30,"VendorFix","Python DoS Vulnerability (Oct 2025) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.9.25
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.125434,"CVE-2025-6075",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,a7fd76d9-fc24-4c9f-9772-f093fdb1429e,"","Update to Python 3.9.25, 3.15.0 or later, or to the latest
+  maintenance release of your Python version series (3.10.x, 3.12.x, 3.13.x, 3.14.x) once patches
+  are available. Please see the references for more information.","Python versions prior to 3.9.25 and 3.10.x prior to 3.15.0.
+
+  Note: Fixes have been backported to maintenance branches (3.10, 3.12, 3.13, 3.14) but specific
+  patch versions are not yet available.","If the value passed to os.path.expandvars() is user-controlled
+  a performance degradation is possible when expanding environment variables. This vulnerability
+  exhibits quadratic complexity behavior that could be exploited for denial of service attacks.","Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Oct 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.125434)
+Version used: 2025-11-05T05:40:07Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2026-0215,DFN-CERT-2025-3563,DFN-CERT-2025-3555,DFN-CERT-2025-3298,DFN-CERT-2025-3267,WID-SEC-2025-2468",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,4.9,Medium,30,"VendorFix","Python Multiple Vulnerabilities (Mar 2024) - Linux","Python is prone to multiple vulnerabilities.","Installed version: 2.7.13
+Fixed version:     3.8.19
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.151951,"CVE-2024-0450",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,7831454c-f219-4257-b816-085e462aff85,"","Update to version 3.8.19, 3.9.19, 3.10.14, 3.11.8, 3.12.2
+  or later.","Python prior to version 3.8.19, 3.9.x prior to 3.9.19, 3.10.x
+  prior to 3.10.14, 3.11.x prior to 3.11.8 and 3.12.x prior to 3.12.2.","The following vulnerabilities exist:
+
+  - CVE-2024-0450: Quoted zip-bomb protection for zipfile
+
+  - No CVE: crash in socket.if_indextoname() with a specific value (UINT_MAX).
+
+  - No CVE: .pth files with names starting with a dot or containing the hidden file attribute are
+  not skipped","Checks if a vulnerable version is present on the target host.
+Details:
+Python Multiple Vulnerabilities (Mar 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.151951)
+Version used: 2024-10-11T15:39:44Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-1477,DFN-CERT-2025-1464,DFN-CERT-2025-1461,DFN-CERT-2025-0933,DFN-CERT-2025-0132,DFN-CERT-2024-3182,DFN-CERT-2024-2994,DFN-CERT-2024-2993,DFN-CERT-2024-2962,DFN-CERT-2024-2745,DFN-CERT-2024-2179,DFN-CERT-2024-1846,DFN-CERT-2024-1833,DFN-CERT-2024-1805,DFN-CERT-2024-1645,DFN-CERT-2024-1433,DFN-CERT-2024-1432,DFN-CERT-2024-1415,DFN-CERT-2024-0828,DFN-CERT-2024-0785,DFN-CERT-2024-0782,WID-SEC-2025-0794,WID-SEC-2025-0225,WID-SEC-2025-0148,WID-SEC-2024-3377,WID-SEC-2024-3222,WID-SEC-2024-3195,WID-SEC-2024-1656,WID-SEC-2024-1642,WID-SEC-2024-1307,WID-SEC-2024-0687",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,4.3,Medium,30,"VendorFix","Python 2.7 < 3.4 DoS Vulnerability (bpo-14621) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.4
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.112995,"CVE-2013-7040",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,e68a8f95-5360-4610-979e-881ad20ce925,"","The vendor has released updates. Please see the references for
+  more information.","Python 2.7 before 3.4.","Python only uses the last eight bits of the prefix to randomize
+  hash values, which causes it to compute hash values without restricting the ability to trigger
+  hash collisions predictably and makes it easier for context-dependent attackers to cause a denial
+  of service (CPU consumption) via crafted input to an application that maintains a hash table.","Checks if a vulnerable version is present on the target host.
+Details:
+Python 2.7 < 3.4 DoS Vulnerability (bpo-14621) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.112995)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2015-1252,CB-K15/1188",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,4.3,Medium,30,"VendorFix","Python < 3.2.6, 3.3.x < 3.3.3 Wildcard DoS Vulnerability (bpo-17980) - Linux","Python's ssl.match_hostname() trips over crafted wildcard names.","Installed version: 2.7.13
+Fixed version:     3.2.6
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.112996,"CVE-2013-2099",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,f1965535-e264-4bc8-b932-aef9a55002a3,"","The vendor has released updates. Please see the references for
+  more information.","Python before 3.2.6 and 3.3 before 3.3.3.","If the name in the certificate contains many * characters
+  (wildcard), matching the compiled regular expression against the host name can take a very
+  long time.","Checks if a vulnerable version is present on the target host.
+Details:
+Python < 3.2.6, 3.3.x < 3.3.3 Wildcard DoS Vulnerability (bpo-17980) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.112996)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2016-0872,DFN-CERT-2015-1540,DFN-CERT-2014-1606,DFN-CERT-2014-1235,DFN-CERT-2014-1126,DFN-CERT-2013-1369,DFN-CERT-2013-1302,CB-K15/1462,CB-K14/1512,CB-K14/1179,CB-K14/1078,CB-K13/0654",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,4.0,Medium,30,"VendorFix","Python Use After Free Vulnerability (May 2025) - Linux","Python is prone to an use after free vulnerability.","Installed version: 2.7.13
+Fixed version:     3.9.23
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.171522,"CVE-2025-4516",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,5d3e0caa-fb10-4b2f-876a-63897e208dc2,"","Update to version 3.9.23, 3.10.18, 3.11.13, 3.12.11, 3.13.4 or
+  later.","Python prior to version 3.9.23, 3.10.x prior to 3.10.18, 3.11.x
+  prior to 3.11.13, 3.12.x prior to 3.12.11 and 3.13.x prior to 3.13.4.","There is an issue in CPython when using bytes.decode(). If you
+  are not using the 'unicode_escape' encoding or an error handler your usage is not affected. To
+  work-around this issue you may stop using the error= handler and instead wrap the bytes.decode()
+  call in a try-except catching the DecodeError.","Checks if a vulnerable version is present on the target host.
+Details:
+Python Use After Free Vulnerability (May 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.171522)
+Version used: 2025-10-10T05:39:02Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2026-0215,DFN-CERT-2025-3555,DFN-CERT-2025-2212,DFN-CERT-2025-2047,DFN-CERT-2025-1905,DFN-CERT-2025-1868,DFN-CERT-2025-1682,DFN-CERT-2025-1653,DFN-CERT-2025-1589,DFN-CERT-2025-1558,DFN-CERT-2025-1489,DFN-CERT-2025-1477,WID-SEC-2025-1850,WID-SEC-2025-1080",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,4.0,Medium,30,"VendorFix","Python DoS Vulnerability (Jun 2025) - Linux","Python is prone to a denial of service (DoS) vulnerability.","Installed version: 2.7.13
+Fixed version:     3.9.24
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.154798,"CVE-2025-6069",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,322ea07b-138b-42e9-bc8b-1712375391e3,"","Update to version 3.9.24, 3.10.19, 3.11.14, 3.12.12, 3.13.6 or
+  later.","Python prior to version 3.9.24, 3.10.x prior to 3.10.19, 3.11.x
+  prior to 3.11.14, 3.12.x prior to 3.12.12 and 3.13.x prior to 3.13.6.","The html.parser.HTMLParser class had worse-case quadratic
+  complexity when processing certain crafted malformed inputs potentially leading to amplified
+  denial of service.","Checks if a vulnerable version is present on the target host.
+Details:
+Python DoS Vulnerability (Jun 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.154798)
+Version used: 2025-12-18T05:46:55Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2026-0215,DFN-CERT-2025-3563,DFN-CERT-2025-3555,DFN-CERT-2025-3313,DFN-CERT-2025-3045,DFN-CERT-2025-2304,DFN-CERT-2025-2235,DFN-CERT-2025-2212,DFN-CERT-2025-2148,DFN-CERT-2025-2047,DFN-CERT-2025-1980,DFN-CERT-2025-1868,DFN-CERT-2025-1800,WID-SEC-2025-1470",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,3.6,Low,30,"VendorFix","Python 2.7.x < 2.7.15 Heap-Based Buffer Overflow Vulnerability Python Issue (bpo-31530) - Linux","Python is prone to a heap-based buffer overflow vulnerability.","Installed version: 2.7.13
+Fixed version:     2.7.15
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.118239,"CVE-2018-1000030",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,f64d5cfe-fd63-4118-b1d3-f9fb87c00ae3,"Successful exploitation will allow an attacker
+  to cause a heap-based buffer overflow.","Update to version 2.7.15 or later.","Python 2.7.x before version 2.7.15.","The flaw exists due to an improper notification
+  mechanism on buffer reallocation and corruption in a file's internal readahead
+  buffer which, while processing large amounts of data with multiple threads, could
+  create a condition where a buffer that gets allocated with one thread is
+  reallocated due to a large size of input.","Checks if a vulnerable version is present
+  on the target host.
+Details:
+Python 2.7.x < 2.7.15 Heap-Based Buffer Overflow Vulnerability Python Issue ...
+(OID: 1.3.6.1.4.1.25623.1.0.118239)
+Version used: 2023-07-05T05:06:18Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2020-0177,DFN-CERT-2019-0362,DFN-CERT-2018-2332,DFN-CERT-2018-0995,CB-K20/0041",""
+172.30.40.1,dsvw.trabalho_vulnnet,,,2.6,Low,80,"Mitigation","TCP Timestamps Information Disclosure","The remote host implements TCP timestamps and therefore allows
+  to compute the uptime.","It was detected that the host implements RFC1323/RFC7323.
+
+The following timestamps were retrieved with a delay of 1 seconds in-between:
+Packet 1: 3314348634
+Packet 2: 3314349788
+",1.3.6.1.4.1.25623.1.0.80091,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,092ac31c-edc8-4637-a761-245e4e4627aa,"A side effect of this feature is that the uptime of the remote
+  host can sometimes be computed.","To disable TCP timestamps on linux add the line
+  'net.ipv4.tcp_timestamps = 0' to /etc/sysctl.conf. Execute 'sysctl -p' to apply the settings at
+  runtime.
+
+  To disable TCP timestamps on Windows execute 'netsh int tcp set global timestamps=disabled'
+
+  Starting with Windows Server 2008 and Vista, the timestamp can not be completely disabled.
+
+  The default behavior of the TCP/IP stack on this Systems is to not use the Timestamp options when
+  initiating TCP connections, but use them if the TCP peer that is initiating communication includes
+  them in their synchronize (SYN) segment.
+
+  See the references for more information.","TCP implementations that implement RFC1323/RFC7323.","The remote host implements TCP timestamps, as defined by
+  RFC1323/RFC7323.","Special IP packets are forged and sent with a little delay in
+  between to the target IP. The responses are searched for a timestamps. If found, the timestamps
+  are reported.
+Details:
+TCP Timestamps Information Disclosure
+(OID: 1.3.6.1.4.1.25623.1.0.80091)
+Version used: 2023-12-15T16:10:08Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,2.6,Low,30,"VendorFix","Python Improper Input Validation Vulnerability (Jan 2025) - Linux","Python is prone to an improper input validation vulnerability
+  in the urllib.parse.urlsplit and urlparse standard functions.","Installed version: 2.7.13
+Fixed version:     3.9.22
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.171143,"CVE-2025-0938",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,12f97b38-e991-4196-8760-53d505dce54a,"","Update to version 3.9.22, 3.10.17, 3.11.12, 3.12.9, 3.13.2 or
+  later.","Python versions prior to 3.9.22, 3.10.x prior to 3.10.17,
+  3.11.x prior to 3.11.12, 3.12.x prior to 3.12.9 and 3.13.x prior to 3.13.2.","The Python standard library functions urllib.parse.urlsplit and
+  urlparse accepted domain names that included square brackets which isn't valid according to RFC
+  3986. Square brackets are only meant to be used as delimiters for specifying IPv6 and IPvFuture
+  hosts in URLs. This could result in differential parsing across the Python URL parser and other
+  specification-compliant URL parsers.","Checks if a vulnerable version is present on the target host.
+Details:
+Python Improper Input Validation Vulnerability (Jan 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.171143)
+Version used: 2025-10-10T05:39:02Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-3555,DFN-CERT-2025-3045,DFN-CERT-2025-1682,DFN-CERT-2025-1477,DFN-CERT-2025-1461,DFN-CERT-2025-0993,DFN-CERT-2025-0717,DFN-CERT-2025-0655,DFN-CERT-2025-0409,DFN-CERT-2025-0399,DFN-CERT-2025-0309,WID-SEC-2025-0233",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,2.6,Low,30,"VendorFix","Python SSRF Vulnerability (Nov 2024) - Linux","Python is prone to a server-side request forgery (SSRF)
+  vulnerability.","Installed version: 2.7.13
+Fixed version:     3.9.21
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.170965,"CVE-2024-11168",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,de36abd4-ac43-47f9-9e3b-44f09414dc52,"","Update to version 3.9.21, 3.10.16, 3.11.4 or later.","Python versions prior to 3.9.21, 3.10.x prior to 3.10.16 and
+  3.11.x prior to 3.11.4.","The urllib.parse.urlsplit() and urlparse() functions improperly
+  validated bracketed hosts ([]), allowing hosts that weren't IPv6 or IPvFuture. This behavior was
+  not conformant to RFC 3986 and potentially enabled SSRF if a URL is processed by more than one
+  URL parser.","Checks if a vulnerable version is present on the target host.
+Details:
+Python SSRF Vulnerability (Nov 2024) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.170965)
+Version used: 2024-12-13T15:40:54Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-3555,DFN-CERT-2025-3045,DFN-CERT-2025-2235,DFN-CERT-2025-1148,DFN-CERT-2025-0655,DFN-CERT-2025-0399,DFN-CERT-2025-0179,DFN-CERT-2024-3220,DFN-CERT-2024-3182,DFN-CERT-2024-3055,WID-SEC-2025-1439,WID-SEC-2024-3463",""
+172.30.40.1,dsvw.trabalho_vulnnet,,,2.1,Low,80,"Mitigation","ICMP Timestamp Reply Information Disclosure","The remote host responded to an ICMP timestamp request.","The following response / ICMP packet has been received:
+- ICMP Type: 14
+- ICMP Code: 0
+",1.3.6.1.4.1.25623.1.0.103190,"CVE-1999-0524",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,7bbbcc77-244a-4f2c-9ea6-9bed66c03677,"This information could theoretically be used to exploit weak
+  time-based random number generators in other services.","Various mitigations are possible:
+
+  - Disable the support for ICMP timestamp on the remote host completely
+
+  - Protect the remote host by a firewall, and block ICMP packets passing through the firewall in
+  either direction (either completely or only for untrusted networks)","","The Timestamp Reply is an ICMP message which replies to a
+  Timestamp message. It consists of the originating timestamp sent by the sender of the Timestamp as
+  well as a receive timestamp and a transmit timestamp.","Sends an ICMP Timestamp (Type 13) request and checks if a
+  Timestamp Reply (Type 14) is received.
+Details:
+ICMP Timestamp Reply Information Disclosure
+(OID: 1.3.6.1.4.1.25623.1.0.103190)
+Version used: 2025-01-21T05:37:33Z
+","","","DFN-CERT-2014-0658,CB-K15/1514,CB-K14/0632",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,2.1,Low,30,"VendorFix","Python Improper Encoding of Output Vulnerability (Feb 2025) - Linux","Python is prone to an improper encoding of output
+  vulnerability.","Installed version: 2.7.13
+Fixed version:     3.11.10
+Installation
+path / port:       8000/tcp
+
+",1.3.6.1.4.1.25623.1.0.171266,"CVE-2025-1795",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,a4745036-b6a7-4442-ba39-829509063e8a,"","Update to version 3.11.10, 3.12.4 or later.","Python versions prior to 3.11.10 and 3.12.x prior to 3.12.4.","During an address list folding when a separating comma ends up
+  on a folded line and that line is to be unicode-encoded then the separator itself is also
+  unicode-encoded. Expected behavior is that the separating comma remains a plan comma. This can
+  result in the address header being misinterpreted by some mail servers.","Checks if a vulnerable version is present on the target host.
+Details:
+Python Improper Encoding of Output Vulnerability (Feb 2025) - Linux
+(OID: 1.3.6.1.4.1.25623.1.0.171266)
+Version used: 2025-10-10T05:39:02Z
+","Product: cpe:/a:python:python:2.7.13
+Method: Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+","","DFN-CERT-2025-3045,DFN-CERT-2025-1905,DFN-CERT-2025-1682,DFN-CERT-2025-1589,DFN-CERT-2025-1477,DFN-CERT-2025-1461,DFN-CERT-2025-0717,DFN-CERT-2025-0687,WID-SEC-2025-1850,WID-SEC-2025-1439,WID-SEC-2025-0471",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,0.0,Log,80,"","Services","This plugin performs service detection.","A web server is running on this port
+",1.3.6.1.4.1.25623.1.0.10330,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,75ac0636-c1e3-4cb0-9ca9-abaf8ee771b1,"","","","This plugin attempts to guess which service is running on the
+  remote port(s). For instance, it searches for a web server which could listen on another port than
+  80 or 443 and makes this information available for other check routines.","
+Details:
+Services
+(OID: 1.3.6.1.4.1.25623.1.0.10330)
+Version used: 2025-03-05T05:38:53Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,0.0,Log,80,"","HTTP Server Banner Enumeration","This script tries to detect / enumerate different HTTP server
+  banner (e.g. from a frontend, backend or proxy server) by sending various different HTTP requests
+  (valid and invalid ones).","It was possible to enumerate the following HTTP server banner(s):
+
+Server banner                      | Enumeration technique
+-----------------------------------------------------------------------------------------------------
+Server: BaseHTTP/0.3 Python/2.7.13 | Invalid HTTP 00.5 GET request (non-existent HTTP version) to '/'
+",1.3.6.1.4.1.25623.1.0.108708,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,93f65dd2-6020-418f-8703-4448692203da,"","","","","
+Details:
+HTTP Server Banner Enumeration
+(OID: 1.3.6.1.4.1.25623.1.0.108708)
+Version used: 2025-01-31T15:39:24Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,0.0,Log,80,"","HTTP Server type and version","This script detects and reports the HTTP Server's banner
+  which might provide the type and version of it.","The remote HTTP Server banner is:
+
+Server: BaseHTTP/0.3 Python/2.7.13
+",1.3.6.1.4.1.25623.1.0.10107,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,a1377202-31fb-4153-8c3b-525e0f8f088e,"","","","","
+Details:
+HTTP Server type and version
+(OID: 1.3.6.1.4.1.25623.1.0.10107)
+Version used: 2023-08-01T13:29:10Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,,,0.0,Log,70,"","IP Forwarding Enabled - Active Check","Checks if the remote host has IP forwarding enabled.","It was possible to route a TCP packet through the target host and received an answer which means IP forwarding is enabled.
+",1.3.6.1.4.1.25623.1.0.147205,"CVE-1999-0511",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,d7f86877-8697-473b-9aa6-45944b68a744,"","","","","Sends a crafted Local Link Layer (LLL) frame and checks the
+  response.
+Details:
+IP Forwarding Enabled - Active Check
+(OID: 1.3.6.1.4.1.25623.1.0.147205)
+Version used: 2021-12-03T08:27:06Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,0.0,Log,80,"","HTTP Security Headers Detection","All known security headers are being checked on the remote web
+  server.
+
+  On completion a report will hand back whether a specific security header has been implemented
+  (including its value and if it is deprecated) or is missing on the target.","Header Name      | Header Value
+-------------------------------
+X-XSS-Protection | 0
+
+Missing Headers                   | More Information
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Content-Security-Policy           | https://owasp.org/www-project-secure-headers/#content-security-policy
+Cross-Origin-Embedder-Policy      | https://scotthelme.co.uk/coop-and-coep/, Note: This is an upcoming header
+Cross-Origin-Opener-Policy        | https://scotthelme.co.uk/coop-and-coep/, Note: This is an upcoming header
+Cross-Origin-Resource-Policy      | https://scotthelme.co.uk/coop-and-coep/, Note: This is an upcoming header
+Document-Policy                   | https://w3c.github.io/webappsec-feature-policy/document-policy#document-policy-http-header
+Feature-Policy                    | https://owasp.org/www-project-secure-headers/#feature-policy, Note: The Feature Policy header has been renamed to Permissions Policy
+Permissions-Policy                | https://w3c.github.io/webappsec-feature-policy/#permissions-policy-http-header-field
+Referrer-Policy                   | https://owasp.org/www-project-secure-headers/#referrer-policy
+Sec-Fetch-Dest                    | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header supported only in newer browsers like e.g. Firefox 90
+Sec-Fetch-Mode                    | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header supported only in newer browsers like e.g. Firefox 90
+Sec-Fetch-Site                    | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header supported only in newer browsers like e.g. Firefox 90
+Sec-Fetch-User                    | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header supported only in newer browsers like e.g. Firefox 90
+X-Content-Type-Options            | https://owasp.org/www-project-secure-headers/#x-content-type-options
+X-Frame-Options                   | https://owasp.org/www-project-secure-headers/#x-frame-options
+X-Permitted-Cross-Domain-Policies | https://owasp.org/www-project-secure-headers/#x-permitted-cross-domain-policies
+",1.3.6.1.4.1.25623.1.0.112081,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,9a831b70-603c-42fc-899b-60de97dbc8f9,"","","","","
+Details:
+HTTP Security Headers Detection
+(OID: 1.3.6.1.4.1.25623.1.0.112081)
+Version used: 2025-03-21T15:40:43Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,,,0.0,Log,80,"","Traceroute","Collect information about the network route and
+  network distance between the scanner host and the target host.","Network route from scanner (172.30.0.2) to target (172.30.40.1):
+
+172.30.0.2
+172.30.40.1
+
+Network distance between scanner and target: 2
+",1.3.6.1.4.1.25623.1.0.51662,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,17f1200a-5005-4056-9015-9377da4ac7d3,"","","","For internal networks, the distances are usually
+  small, often less than 4 hosts between scanner and target. For public targets the
+  distance is greater and might be 10 hosts or more.","A combination of the protocols ICMP and TCP is used
+  to determine the route. This method is applicable for IPv4 only and it is also known as
+  'traceroute'.
+Details:
+Traceroute
+(OID: 1.3.6.1.4.1.25623.1.0.51662)
+Version used: 2022-10-17T11:13:19Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,0.0,Log,80,"","Web Application Scanning Consolidation / Info Reporting","The script consolidates and reports various information for web
+  application (formerly called 'CGI') scanning.
+
+  This information is based on the following scripts / settings:
+
+  - HTTP-Version Detection (OID: 1.3.6.1.4.1.25623.1.0.100034)
+
+  - No 404 check (OID: 1.3.6.1.4.1.25623.1.0.10386)
+
+  - Web mirroring / webmirror.nasl (OID: 1.3.6.1.4.1.25623.1.0.10662)
+
+  - Directory Scanner / DDI_Directory_Scanner.nasl (OID: 1.3.6.1.4.1.25623.1.0.11032)
+
+  - The configured 'cgi_path' within the 'Scanner Preferences' of the scan config in use
+
+  - The configured 'Enable CGI scanning', 'Enable generic web application scanning' and
+  'Add historic /scripts and /cgi-bin to directories for CGI scanning' within the
+  'Global variable settings' of the scan config in use
+
+  If you think any of this information is wrong please report it to the referenced community
+  forum.","The Hostname/IP ""dsvw.trabalho_vulnnet"" was used to access the remote host.
+
+Generic web application scanning is disabled for this host via the ""Enable generic web application scanning"" option within the ""Global variable settings"" of the scan config in use.
+
+Requests to this service are done via HTTP/1.0.
+
+This service seems to be able to host PHP scripts.
+
+This service seems to be able to host ASP scripts.
+
+The User-Agent ""Mozilla/5.0 [en] (X11, U; OpenVAS-VT <version replaced>)"" was used to access the remote host.
+
+Historic /scripts and /cgi-bin are not added to the directories used for web application scanning. You can enable this again with the ""Add historic /scripts and /cgi-bin to directories for CGI scanning"" option within the ""Global variable settings"" of the scan config in use.
+
+The following directories were used for web application scanning:
+
+http://dsvw.trabalho_vulnnet:8000/
+
+While this is not, in and of itself, a bug, you should manually inspect these directories to ensure that they are in compliance with company security standards
+
+The following CGIs were discovered:
+
+Syntax : cginame (arguments [default value])
+
+http://dsvw.trabalho_vulnnet:8000/ (foobar#lang [en%3Cscript%3Ealert(%22arbitrary%20javascript%22)%3C%2Fscript%3E] path [] object [%28dp0%0AS%27admin%27%0Ap1%0A%28S%27admin%27%0Ap2%0AS%27admin%27%0Ap3%0Atp4%0AsS%27dricci%27%0Ap5%0A%28S%27dian%27%0Ap6%0AS%27ricci%27%0Ap7%0Atp8%0AsS%27amason%27%0Ap9%0A%28S%27anthony%27%0Ap10%0AS%27mason%27%0Ap11%0Atp12%0AsS%27svargas%27%0Ap13%0A%28S%27sandra%27%0Ap14%0AS%27vargas%27%0Ap15%0Atp16%0As.] size [32] include [] domain [www.google.com] id [2] comment [] charset [utf8] name [dian] xml [%3Croot%3E%3C%2Froot%3E] #lang [en] redir [] cmd [ifconfig] v [0.2] )
+http://dsvw.trabalho_vulnnet:8000/login (password [] username [] )
+http://dsvw.trabalho_vulnnet:8000/users.json (callback [process] )
+",1.3.6.1.4.1.25623.1.0.111038,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,c66e70f2-1291-4f7d-aee3-0ed11cd10344,"","","","","
+Details:
+Web Application Scanning Consolidation / Info Reporting
+(OID: 1.3.6.1.4.1.25623.1.0.111038)
+Version used: 2026-01-13T05:47:36Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,8000,tcp,0.0,Log,70,"","Allowed HTTP Methods Enumeration","Enumerates which HTTP methods are allowed.","The following list contains the URLs and corresponding supported HTTP methods.
+
+URL                                | HTTP Methods
+-------------------------------------------------
+http://dsvw.trabalho_vulnnet:8000/ | GET
+",1.3.6.1.4.1.25623.1.0.153974,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,06a9cb85-33ef-434b-a390-c8a631beb82e,"","","","'- Basic HTTP methods: GET, HEAD, POST, PUT, DELETE, CONNECT,
+  OPTIONS, TRACE
+
+  - Extended HTTP methods: ACL, BASELINE-CONTROL, BIND, CHECKIN, CHECKOUT, COPY, LABEL, LINK, LOCK,
+  MERGE, MKACTIVITY, MKCALENDAR, MKCOL, MKREDIRECTREF, MKWORKSPACE, MOVE, ORDERPATCH, PATCH, PRI,
+  PROPFIND, PROPPATCH, REBIND, REPORT, SEARCH, UNBIND, UNCHECKOUT, UNLINK, UNLOCK, UPDATE,
+  UPDATEREDIRECTREF, VERSION-CONTROL","Sends multiple HTTP requests and checks the responses.
+
+  Disclaimer:
+
+  - This enumeration script is provided 'as is' (means no support is given) and only providing
+  rudimentary information about the possible enabled methods
+
+  - This script doesn't guarantee completeness or full reliability
+
+  For more reliable determination of the enabled HTTP methods please inspect the configuration of
+  the web server manually and directly on the target host.
+Details:
+Allowed HTTP Methods Enumeration
+(OID: 1.3.6.1.4.1.25623.1.0.153974)
+Version used: 2025-02-28T05:38:49Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,,,0.0,Log,80,"","CPE Inventory","This routine uses information collected by other routines about
+  CPE identities of operating systems, services and applications detected during the scan.
+
+  Note: Some CPEs for specific products might show up twice or more in the output. Background:
+
+  After a product got renamed or a specific vendor was acquired by another one it might happen that
+  a product gets a new CPE within the NVD CPE Dictionary but older entries are kept with the older
+  CPE.","172.30.40.1|cpe:/a:python:python:2.7.13
+172.30.40.1|cpe:/o:linux:kernel
+
+",1.3.6.1.4.1.25623.1.0.810002,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,369430b0-4be7-422f-9fd7-2f82456223cf,"","","","","
+Details:
+CPE Inventory
+(OID: 1.3.6.1.4.1.25623.1.0.810002)
+Version used: 2022-07-27T10:11:28Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,,,0.0,Log,80,"","OS Detection Consolidation and Reporting","This script consolidates the OS information detected by several
+  VTs and tries to find the best matching OS.
+
+  Furthermore it reports all previously collected information leading to this best matching OS. It
+  also reports possible additional information which might help to improve the OS detection.
+
+  If any of this information is wrong or could be improved please consider to report these to the
+  referenced community forum.","Best matching OS:
+
+OS:           Linux Kernel
+CPE:          cpe:/o:linux:kernel
+Found by VT:  1.3.6.1.4.1.25623.1.0.102002 (Operating System (OS) Detection (ICMP))
+Concluded from ICMP based OS fingerprint
+Setting key ""Host/runs_unixoide"" based on this information
+",1.3.6.1.4.1.25623.1.0.105937,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,3f864c2f-37a1-4771-bcc5-a94b63bc198e,"","","","","
+Details:
+OS Detection Consolidation and Reporting
+(OID: 1.3.6.1.4.1.25623.1.0.105937)
+Version used: 2026-01-21T05:50:46Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,,,0.0,Log,80,"","Hostname Determination Reporting","The script reports information on how the hostname of the target
+  was determined.","Hostname determination for IP 172.30.40.1:
+
+Hostname|Source
+dsvw.trabalho_vulnnet|Reverse-DNS
+",1.3.6.1.4.1.25623.1.0.108449,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,0b4c7cd2-30dc-405e-90c4-c4180e578b7f,"","","","","
+Details:
+Hostname Determination Reporting
+(OID: 1.3.6.1.4.1.25623.1.0.108449)
+Version used: 2022-07-27T10:11:28Z
+","","","",""
+172.30.40.1,dsvw.trabalho_vulnnet,,,0.0,Log,80,"","Python Detection Consolidation","Consolidation of Python detections.","Detected Python
+
+Version:       2.7.13
+Location:      8000/tcp
+CPE:           cpe:/a:python:python:2.7.13
+
+Concluded from version/product identification result:
+Server: BaseHTTP/0.3 Python/2.7.13
+",1.3.6.1.4.1.25623.1.0.112857,"",c3a5017a-43b2-42ce-9d3c-7964ffffa314,"metasploitable3 dsvw phpldapadmin-remote-dump metasploit-emulator shellshock-lab heartbleed-lab xvwa railsgoat-alt bwapp-alt metasploitable3-alt mongodb-noauth gitlab10 es56 sonar67",2026-01-26T16:36:01Z,04e821c9-c0cd-47f8-82f9-19d397b07047,"","","","","
+Details:
+Python Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.112857)
+Version used: 2021-07-09T08:01:09Z
+","","","",""

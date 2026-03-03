@@ -7,10 +7,19 @@ models/*
 output/*
 ignore*
 
-# Datasets folder (too large for git)
-paper_data/datasets/
-paper_data/test_minimal/datasets/
+# Datasets — D1_openvas is tracked (~88 MB, lightweight, public)
+# D1C is generated locally by scripts/convert_d1_to_d1c.py (~1.5 GB)
+# D2 is private (CAIS/CTCiber), D3 is large (~700 MB)
+paper_data/datasets/D1C_converted/
+paper_data/datasets/D2_cais_original/
+paper_data/datasets/D3_mock_cais/
+# test_minimal — D1 auto-copied from D1_openvas; D1C auto-generated
+# D3 test subset (500 rows, public) IS tracked; D2 test subset (private) is not
+paper_data/test_minimal/datasets/D1_openvas/
+paper_data/test_minimal/datasets/D1C_converted/
+paper_data/test_minimal/datasets/D2_cais/
 paper_data/test_minimal/results/
+paper_data/results/
 
 # Database files
 *.db
@@ -197,7 +206,7 @@ Vulnerabilidades-CAIS/
 dados_teste*
 tests/test_data/
 teste*
-scripts/
+/scripts/
 anon.py.bal
 cve*
 run
