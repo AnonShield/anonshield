@@ -2963,7 +2963,7 @@ class BenchmarkOrchestrator:
         excluded_extensions = {".anonymous", ".anon", ".bak", ".tmp"}
 
         # Directories to skip during recursive scan
-        skip_dirs = {".venv", ".venv", ".git", "node_modules",
+        skip_dirs = {".venv", ".git", "node_modules",
                      "__pycache__", ".mypy_cache", ".tox", "benchmark",
                      "anonlfi_1.0", "anonlfi_2.0", "output"}
 
