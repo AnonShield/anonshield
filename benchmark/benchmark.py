@@ -23,7 +23,6 @@ import json
 import logging
 import os
 import platform
-import psutil
 import re
 import shutil
 import subprocess
@@ -826,6 +825,7 @@ class ProcessMonitor:
     def _monitor_loop(self):
         """Background monitoring loop."""
         try:
+            import psutil  # lazy import — not needed until actual benchmarking
             process = psutil.Process(self.pid)
             while not self._stop_event.is_set():
                 try:

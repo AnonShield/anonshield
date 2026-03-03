@@ -23,8 +23,8 @@ VENV_PY="$WORKSPACE_ROOT/.venv_benchmark/bin/python3"
 
 # ── Auto-bootstrap venv if needed ────────────────────────────────────────
 if [[ ! -x "$VENV_PY" ]]; then
-    echo "  .venv_benchmark not found — running benchmark.py --force-setup..."
-    python3 "$WORKSPACE_ROOT/benchmark/benchmark.py" --force-setup
+    echo "  .venv_benchmark not found — running benchmark.py --setup --force-setup..."
+    python3 "$WORKSPACE_ROOT/benchmark/benchmark.py" --setup --force-setup
     if [[ ! -x "$VENV_PY" ]]; then
         echo "ERROR: venv setup failed."
         exit 1

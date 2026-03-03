@@ -68,8 +68,8 @@ VENV_PY="$WORKSPACE_ROOT/.venv_benchmark/bin/python3"
 bootstrap_venv() {
     if [[ ! -x "$VENV_PY" ]]; then
         echo ""
-        echo "  .venv_benchmark not found — running benchmark.py --force-setup to create it..."
-        python3 "$BENCHMARK" --force-setup $CPU_FLAG
+        echo "  .venv_benchmark not found — running benchmark.py --setup --force-setup to create it..."
+        python3 "$BENCHMARK" --setup --force-setup $CPU_FLAG
         if [[ ! -x "$VENV_PY" ]]; then
             echo "  ERROR: venv setup failed. Check benchmark.py output above."
             exit 1
