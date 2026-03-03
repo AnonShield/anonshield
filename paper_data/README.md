@@ -6,6 +6,34 @@ file formats and tool versions.
 
 ---
 
+## Quick Start (after cloning)
+
+**Only prerequisite: [`uv`](https://docs.astral.sh/uv/)**
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+> Python 3.x from the system is sufficient. No other installs needed.
+
+**Run the smoke test (~5–20 min):**
+```bash
+./paper_data/test_minimal/run_tests.sh          # GPU machine
+./paper_data/test_minimal/run_tests.sh --cpu-only   # CPU-only machine
+```
+
+The script automatically:
+1. Creates `.venv`, `anonlfi_1.0/.venv`, `anonlfi_2.0/.venv` via `uv sync`
+2. Generates the D1C dataset from D1 (CSV→XLSX, TXT→DOCX, XML→JSON, PDF→images)
+3. Runs benchmarks on all 3 datasets (D1, D1C, D3)
+4. Generates analysis charts and statistics
+
+**Full paper reproduction (~60–80 h):**
+```bash
+./paper_data/scripts/reproduce_all_runs.sh
+./paper_data/scripts/reproduce_all_runs.sh --cpu-only   # CPU-only
+```
+
+---
+
 ## Directory Structure
 
 ```
