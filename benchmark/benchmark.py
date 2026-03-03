@@ -352,8 +352,7 @@ class EnvironmentSetup:
         self._uv_path = self._find_uv()
 
     def _find_uv(self) -> str:
-        """Find the uv binary in common locations."""
-        # Check common locations
+        """Find the uv binary in common locations, installing it if absent."""
         candidates = [
             "uv",  # In PATH
             os.path.expanduser("~/.local/bin/uv"),
@@ -368,12 +367,32 @@ class EnvironmentSetup:
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 return candidate
 
-        # Try to find it
         result = subprocess.run(["which", "uv"], capture_output=True, text=True)
         if result.returncode == 0:
             return result.stdout.strip()
 
-        return "uv"  # Fallback, let it fail with a clear error
+        # uv not found — install it via pip (uv is available as a PyPI package)
+        print(f"  [INFO] 'uv' not found — installing via pip...")
+        install_result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--quiet", "uv"],
+            capture_output=True, text=True
+        )
+        if install_result.returncode == 0:
+            # Re-check common locations after install
+            for candidate in candidates:
+                if shutil.which(candidate):
+                    print(f"  [OK] 'uv' installed at: {shutil.which(candidate)}")
+                    return shutil.which(candidate)
+                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                    print(f"  [OK] 'uv' installed at: {candidate}")
+                    return candidate
+            # Last resort: run as python module
+            print(f"  [INFO] Running uv as 'python -m uv'")
+            return f"{sys.executable} -m uv"  # handled below
+        else:
+            print(f"  [WARN] Could not install uv: {install_result.stderr.strip()}")
+
+        return "uv"  # let it fail with a clear error
 
     def setup(self, force: bool = False) -> bool:
         """Setup the virtual environment for a version."""
@@ -424,7 +443,11 @@ class EnvironmentSetup:
         """Run uv sync to install dependencies."""
         print(f"  [INFO] Running 'uv sync'...")
 
-        cmd = [self._uv_path, "sync"]
+        # Support 'python -m uv' fallback (path contains spaces)
+        if " " in self._uv_path:
+            cmd = self._uv_path.split() + ["sync"]
+        else:
+            cmd = [self._uv_path, "sync"]
 
         # Show the command being run
         log.write(f"Running: {' '.join(cmd)}\n")
