@@ -24,8 +24,7 @@
 #   • D3  : v3.0, 4 strategies, 10 runs — WITH    anonymization config (~15 sec/run)
 #   • Overhead calibration: v3.0, all strategies, 10 runs
 #
-# USAGE (from workspace root):
-#   source .venv_benchmark/bin/activate
+# USAGE (from workspace root — no activation needed, venv is auto-created):
 #   ./paper_data/scripts/reproduce_all_runs.sh [--skip-d1] [--skip-d2] [--skip-d3] [--cpu-only]
 #
 # FLAGS
@@ -74,7 +73,24 @@ done
 CPU_FLAG=""
 [[ "$CPU_ONLY" == "true" ]] && CPU_FLAG="--cpu-only"
 
-# ── Helper ───────────────────────────────────────────────────────────────────
+# ── Python resolution ─────────────────────────────────────────────────────────
+# benchmark.py manages its own venvs and is called with system python3.
+# convert_d1_to_d1c.py and analyze_all.sh need packages from .venv_benchmark.
+VENV_PY="$WORKSPACE_ROOT/.venv_benchmark/bin/python3"
+
+bootstrap_venv() {
+    if [[ ! -x "$VENV_PY" ]]; then
+        echo ""
+        echo "  .venv_benchmark not found — running benchmark.py --force-setup..."
+        python3 "$BENCHMARK" --force-setup $CPU_FLAG
+        if [[ ! -x "$VENV_PY" ]]; then
+            echo "  ERROR: venv setup failed."
+            exit 1
+        fi
+    fi
+}
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 run_cmd() {
     echo ""
     echo "  \$ $*"
@@ -95,11 +111,14 @@ print_step() {
     echo "  ── $1"
 }
 
-# ── Sanity checks ────────────────────────────────────────────────────────────
+# ── Sanity checks ─────────────────────────────────────────────────────────────
 if [[ ! -f "$BENCHMARK" ]]; then
     echo "ERROR: benchmark.py not found at $BENCHMARK"
     exit 1
 fi
+
+# Bootstrap venv if not yet created (benchmark.py handles this automatically)
+[[ "$DRY_RUN" == "false" ]] && bootstrap_venv
 
 echo "======================================================================"
 echo "  AnonShield — Full Benchmark Reproduction"
@@ -166,7 +185,7 @@ if [[ "$SKIP_D1" == "false" ]]; then
     if [[ -d "$DATASETS/D1C_converted/xlsx" && -d "$DATASETS/D1C_converted/pdf_images" ]]; then
         echo "  D1C_converted/ already exists — skipping conversion (use --force to re-run)"
     else
-        run_cmd python3 "$CONVERT_SCRIPT" \
+        run_cmd "$VENV_PY" "$CONVERT_SCRIPT" \
             --source "$DATASETS/D1_openvas" \
             --output "$DATASETS/D1C_converted" \
             --workers 4

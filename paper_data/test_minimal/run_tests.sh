@@ -14,8 +14,7 @@
 #
 # Expected runtime: ~5–20 min total (D1/D1C dominate due to PDF-OCR)
 #
-# USAGE (from workspace root):
-#   source .venv_benchmark/bin/activate
+# USAGE (from workspace root — no activation needed, venv is auto-created):
 #   ./paper_data/test_minimal/run_tests.sh
 #
 # FLAGS:
@@ -59,6 +58,25 @@ done
 # Derive CPU_FLAG — forwarded to every benchmark.py invocation
 CPU_FLAG=""
 [[ "$CPU_ONLY" == "true" ]] && CPU_FLAG="--cpu-only"
+
+# ── Python resolution ─────────────────────────────────────────────────────────
+# benchmark.py creates .venv_benchmark automatically on first run.
+# convert_d1_to_d1c.py and analyze_benchmark_scientific.py need venv packages,
+# so we use .venv_benchmark/bin/python3 once it exists.
+VENV_PY="$WORKSPACE_ROOT/.venv_benchmark/bin/python3"
+
+bootstrap_venv() {
+    if [[ ! -x "$VENV_PY" ]]; then
+        echo ""
+        echo "  .venv_benchmark not found — running benchmark.py --force-setup to create it..."
+        python3 "$BENCHMARK" --force-setup $CPU_FLAG
+        if [[ ! -x "$VENV_PY" ]]; then
+            echo "  ERROR: venv setup failed. Check benchmark.py output above."
+            exit 1
+        fi
+        echo "  venv ready: $VENV_PY"
+    fi
+}
 # ── Helpers ──────────────────────────────────────────────────────────────────
 PASS=0
 FAIL=0
@@ -103,6 +121,9 @@ echo "  benchmark.py : $BENCHMARK"
 [[ "$DRY_RUN" == "true" ]] && echo "  DRY RUN enabled"
 [[ "$CPU_ONLY" == "true" ]] && echo "  CPU ONLY   : --cpu-only passed to all benchmark invocations"
 echo "======================================================================"
+
+# Bootstrap venv if needed (benchmark.py handles this automatically)
+[[ "$DRY_RUN" == "false" ]] && bootstrap_venv
 
 # ── Dataset setup — auto-populate D1 subset from full dataset ─────────────────
 # D1_openvas (full, ~88 MB) is tracked in git at paper_data/datasets/D1_openvas/.
@@ -171,8 +192,8 @@ if [[ "$SKIP_D1" == "false" ]]; then
         echo "      --workers 2"
     else
         echo ""
-        echo "  \$ python3 $CONVERT_SCRIPT --source $DATASETS/D1_openvas --output $D1C_DIR --workers 2"
-        if python3 "$CONVERT_SCRIPT" \
+        echo "  \$ $VENV_PY $CONVERT_SCRIPT --source $DATASETS/D1_openvas --output $D1C_DIR --workers 2"
+        if "$VENV_PY" "$CONVERT_SCRIPT" \
             --source "$DATASETS/D1_openvas" \
             --output "$D1C_DIR" \
             --workers 2; then
@@ -337,7 +358,7 @@ else
         echo "  ── $RUN_NAME"
         if [[ "$DRY_RUN" == "false" ]]; then
             mkdir -p "$ANA_OUT"
-            if python3 "$ANALYZER" "$CSV" -o "$ANA_OUT" --pdf; then
+            if "$VENV_PY" "$ANALYZER" "$CSV" -o "$ANA_OUT" --pdf; then
                 echo "  [OK] analysis written to $ANA_OUT"
                 ANA_PASS=$((ANA_PASS + 1))
             else
@@ -347,7 +368,7 @@ else
                 FAIL=$((FAIL + 1))
             fi
         else
-            echo "  \$ python3 $ANALYZER $CSV -o $ANA_OUT --pdf"
+            echo "  \$ $VENV_PY $ANALYZER $CSV -o $ANA_OUT --pdf"
         fi
     done
 

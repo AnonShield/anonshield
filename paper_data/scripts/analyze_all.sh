@@ -6,13 +6,9 @@
 # generates analysis charts, statistics, and PDFs inside an analysis/ subfolder
 # adjacent to the benchmark_results.csv file.
 #
-# Usage (from workspace root):
+# Usage (from workspace root — no activation needed):
 #   ./paper_data/scripts/analyze_all.sh              # standard analyses (1-14)
 #   ./paper_data/scripts/analyze_all.sh --extended   # include extended (15-17)
-#
-# Requirements:
-#   - .venv_benchmark activated (source .venv_benchmark/bin/activate)
-#   - benchmark/analyze_benchmark_scientific.py present
 # =============================================================================
 
 set -euo pipefail
@@ -23,6 +19,17 @@ PAPER_DATA="$WORKSPACE_ROOT/paper_data"
 RESULTS_DIR="$PAPER_DATA/results"
 ANALYZER="$WORKSPACE_ROOT/benchmark/analyze_benchmark_scientific.py"
 OVERHEAD_CSV="$RESULTS_DIR/overhead_calibration__v3__all_strategies__10runs/benchmark_results.csv"
+VENV_PY="$WORKSPACE_ROOT/.venv_benchmark/bin/python3"
+
+# ── Auto-bootstrap venv if needed ────────────────────────────────────────
+if [[ ! -x "$VENV_PY" ]]; then
+    echo "  .venv_benchmark not found — running benchmark.py --force-setup..."
+    python3 "$WORKSPACE_ROOT/benchmark/benchmark.py" --force-setup
+    if [[ ! -x "$VENV_PY" ]]; then
+        echo "ERROR: venv setup failed."
+        exit 1
+    fi
+fi
 
 # Extended flag
 EXTENDED_FLAG=""
@@ -79,7 +86,7 @@ for RUN_DIR in "$RESULTS_DIR"/*/; do
     mkdir -p "$OUTPUT_DIR"
 
     # shellcheck disable=SC2086
-    if python3 "$ANALYZER" \
+    if "$VENV_PY" "$ANALYZER" \
             "$CSV" \
             -o "$OUTPUT_DIR" \
             $OVERHEAD_ARG \

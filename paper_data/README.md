@@ -272,30 +272,26 @@ benchmark results from the paper. Read it fully before running anything.
 ### Step 1 — First-time environment setup
 
 `benchmark.py` automatically creates and manages its own virtual environment
-(`.venv_benchmark/`). The first time you run any script, the setup happens
-automatically. To force a reinstall:
+(`.venv_benchmark/`) the first time any script is run. **No manual setup needed.**
 
-**With GPU (NVIDIA CUDA — recommended if available):**
+All scripts (`run_tests.sh`, `reproduce_all_runs.sh`, `analyze_all.sh`) detect
+whether `.venv_benchmark` exists and run `benchmark.py --force-setup` automatically
+if it's missing.
+
+To manually trigger setup (e.g., to switch GPU/CPU mode):
+
 ```bash
+# With GPU (NVIDIA CUDA)
 python3 benchmark/benchmark.py --force-setup --gpu
-source .venv_benchmark/bin/activate
-```
 
-**CPU-only (no NVIDIA GPU):**
-```bash
+# CPU-only (no NVIDIA GPU)
 python3 benchmark/benchmark.py --force-setup --cpu-only
-source .venv_benchmark/bin/activate
 ```
 
-After setup, always activate the environment before running any script:
-```bash
-source .venv_benchmark/bin/activate
-```
-
-> **GPU vs CPU:** AnonShield v3.0 uses neural NER models (spaCy `en_core_web_lg`)
-> that benefit from a GPU but work correctly on CPU. With `--cpu-only`, runs will
-> be slower (roughly 2–5× for NER-heavy workloads) but results are identical.
-> v1.0 and v2.0 are CPU-only regardless of this flag.
+> **GPU vs CPU:** v3.0 uses neural NER models (spaCy `en_core_web_lg`) that
+> benefit from a GPU but work correctly on CPU. With `--cpu-only`, runs will be
+> slower (~2–5× for NER-heavy workloads) but results are identical.
+> v1.0 and v2.0 are CPU-only regardless.
 
 ---
 
@@ -307,11 +303,9 @@ correctly configured. The script automatically sets up its own test datasets
 
 ```bash
 # GPU machine (default)
-source .venv_benchmark/bin/activate
 ./paper_data/test_minimal/run_tests.sh
 
 # CPU-only machine
-source .venv_benchmark/bin/activate
 ./paper_data/test_minimal/run_tests.sh --cpu-only
 
 # Skip D2 (if you don't have the private CAIS dataset)
@@ -341,8 +335,6 @@ D1C (~1.5 GB, dominated by PDF-images) is **not** stored in git. Only D1 is
 tracked (~88 MB). Run this script once to generate D1C before benchmarking:
 
 ```bash
-source .venv_benchmark/bin/activate
-
 # Generate all 4 formats (XLSX, DOCX, JSON, PDF-images) — ~20–60 min
 python3 paper_data/scripts/convert_d1_to_d1c.py
 
@@ -373,8 +365,6 @@ written to `paper_data/results/`, matching the archived structure exactly.
 > D3 (synthetic mock CVE) is public and fully reproducible.
 
 ```bash
-source .venv_benchmark/bin/activate
-
 # Full reproduction (~60–80 hours — all datasets)
 ./paper_data/scripts/reproduce_all_runs.sh
 
@@ -401,8 +391,6 @@ source .venv_benchmark/bin/activate
 After benchmarks complete, generate charts, statistical tables, and PDFs:
 
 ```bash
-source .venv_benchmark/bin/activate
-
 # Standard analyses (1–14, covers all paper figures and tables)
 ./paper_data/scripts/analyze_all.sh
 
