@@ -157,22 +157,10 @@ if [[ "$SKIP_D1" == "false" ]]; then
     echo "  v1.0+v2.0 default, v3.0 filtered | 1 run"
     OUT="$RESULTS/D1_test"
 
-    step "D1 — v1.0 + v2.0 (default strategy — no --strategies flag)"
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
-        --directory-mode \
         --data-dir "$DATASETS/D1_openvas" \
-        --versions 1.0 2.0 \
-        --runs 1 \
-        --clean \
-        --results-dir "$OUT"
-
-    step "D1 — v3.0 (filtered)"
-    run_cmd python3 "$BENCHMARK" \
-        --benchmark \
-        --directory-mode \
-        --data-dir "$DATASETS/D1_openvas" \
-        --versions 3.0 \
+        --versions 1.0 2.0 3.0 \
         --strategies filtered \
         --runs 1 \
         --clean \
@@ -210,22 +198,10 @@ if [[ "$SKIP_D1" == "false" ]]; then
     echo "  v1.0+v2.0 default, v3.0 filtered | 1 run"
     OUT_D1C="$RESULTS/D1C_test"
 
-    step "D1C — v1.0 + v2.0 (default strategy — no --strategies flag)"
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
-        --directory-mode \
         --data-dir "$DATASETS/D1C_converted" \
-        --versions 1.0 2.0 \
-        --runs 1 \
-        --clean \
-        --results-dir "$OUT_D1C"
-
-    step "D1C — v3.0 (filtered)"
-    run_cmd python3 "$BENCHMARK" \
-        --benchmark \
-        --directory-mode \
-        --data-dir "$DATASETS/D1C_converted" \
-        --versions 3.0 \
+        --versions 1.0 2.0 3.0 \
         --strategies filtered \
         --runs 1 \
         --clean \
@@ -269,6 +245,7 @@ if [[ "$SKIP_D2" == "false" ]]; then
         --runs 1 \
         --clean \
         --anonymization-config "$D2_CFG" \
+        --max-cache-size 200000 \
         --results-dir "$RESULTS/D2_csv_with_config_test"
 
     step "D2 JSON — WITH anonymization config"
@@ -280,6 +257,7 @@ if [[ "$SKIP_D2" == "false" ]]; then
         --runs 1 \
         --clean \
         --anonymization-config "$D2_CFG" \
+        --max-cache-size 200000 \
         --results-dir "$RESULTS/D2_json_with_config_test"
 fi
 

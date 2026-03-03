@@ -154,24 +154,11 @@ if [[ "$SKIP_D1" == "false" ]]; then
     OUT="$RESULTS/D1_openvas__v1_v2_v3__all_strategies__1run"
     mkdir -p "$OUT"
 
-    # v1.0 + v2.0 — Strategy.DEFAULT is used internally; no --strategies flag accepted
-    print_step "D1 — v1.0 and v2.0 (built-in default strategy)"
+    # v1.0+v2.0 ignore --strategies (use DEFAULT internally); v3.0 uses the four listed
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
-        --directory-mode \
         --data-dir "$DATASETS/D1_openvas" \
-        --versions 1.0 2.0 \
-        --runs 2 \
-        $CPU_FLAG \
-        --results-dir "$OUT"
-
-    # v3.0 — four strategies
-    print_step "D1 — v3.0 (filtered, hybrid, standalone, presidio)"
-    run_cmd python3 "$BENCHMARK" \
-        --benchmark \
-        --directory-mode \
-        --data-dir "$DATASETS/D1_openvas" \
-        --versions 3.0 \
+        --versions 1.0 2.0 3.0 \
         --strategies filtered hybrid standalone presidio \
         --runs 2 \
         $CPU_FLAG \
@@ -199,22 +186,10 @@ if [[ "$SKIP_D1" == "false" ]]; then
     OUT_D1C="$RESULTS/D1C_converted__v1_v2_v3__all_strategies__1run"
     mkdir -p "$OUT_D1C"
 
-    print_step "D1C — v1.0 and v2.0 (built-in default strategy)"
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
-        --directory-mode \
         --data-dir "$DATASETS/D1C_converted" \
-        --versions 1.0 2.0 \
-        --runs 2 \
-        $CPU_FLAG \
-        --results-dir "$OUT_D1C"
-
-    print_step "D1C — v3.0 (filtered, hybrid, standalone, presidio)"
-    run_cmd python3 "$BENCHMARK" \
-        --benchmark \
-        --directory-mode \
-        --data-dir "$DATASETS/D1C_converted" \
-        --versions 3.0 \
+        --versions 1.0 2.0 3.0 \
         --strategies filtered hybrid standalone presidio \
         --runs 2 \
         $CPU_FLAG \
@@ -271,6 +246,7 @@ if [[ "$SKIP_D2" == "false" ]]; then
         --strategies filtered hybrid standalone presidio \
         --runs 10 \
         --anonymization-config "$CONFIGS/anonymization_config.json" \
+        --max-cache-size 200000 \
         $CPU_FLAG \
         --results-dir "$OUT"
 
@@ -288,6 +264,7 @@ if [[ "$SKIP_D2" == "false" ]]; then
         --strategies filtered hybrid standalone presidio \
         --runs 10 \
         --anonymization-config "$CONFIGS/anonymization_config.json" \
+        --max-cache-size 200000 \
         $CPU_FLAG \
         --results-dir "$OUT"
 fi
