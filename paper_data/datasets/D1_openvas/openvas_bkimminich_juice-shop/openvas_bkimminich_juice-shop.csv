@@ -1,0 +1,423 @@
+IP,Hostname,Port,Port Protocol,CVSS,Severity,QoD,Solution Type,NVT Name,Summary,Specific Result,NVT OID,CVEs,Task ID,Task Name,Timestamp,Result ID,Impact,Solution,Affected Software/OS,Vulnerability Insight,Vulnerability Detection Method,Product Detection Result,BIDs,CERTs,Other References
+      172.30.7.1,juice-shop.trabalho_vulnnet,3000,tcp,5.0,Medium,50,"VendorFix","TCP Sequence Number Approximation Reset DoS Vulnerability (Apr 2004)","Various TCP services of different vendors are prone to a denial
+  of service (DoS) vulnerability.","Vulnerability was detected according to the Vulnerability Detection Method.",1.3.6.1.4.1.25623.1.0.902815,"CVE-2004-0230",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,f1d4c40c-9af4-427d-be91-facce251ddbd,"Successful exploitation will allow remote attackers to guess
+  sequence numbers and cause a denial of service to persistent TCP connections by repeatedly
+  injecting a TCP RST packet.","'- Please see the referenced advisories for more information on
+  obtaining and applying fixes
+
+  - Please contact the relevant vendor for more background information","The TCP/IP v4 stack of various products / vendors including:
+
+  - Microsoft Windows
+
+  - Cisco
+
+  - Juniper Networks Junos OS
+
+  - IBM AIX
+
+  are known to be affected. Other products or vendors might be affected as well.","The flaw is triggered when spoofed TCP Reset packets are
+  received by the targeted TCP stack and will result in loss of availability for the attacked TCP
+  services.","A TCP Reset packet with a different sequence number is sent to
+  the target. A previously open connection is then checked to see if the target closed it or not.
+
+  Note: At least one open TCP port needs to be available and detected at the target host for this
+  vulnerability check.
+Details:
+TCP Sequence Number Approximation Reset DoS Vulnerability (Apr 2004)
+(OID: 1.3.6.1.4.1.25623.1.0.902815)
+Version used: 2025-07-29T05:44:59Z
+","","","DFN-CERT-2021-2481,DFN-CERT-2020-1087,DFN-CERT-2017-0719,DFN-CERT-2017-0305,DFN-CERT-2017-0249,DFN-CERT-2017-0171,DFN-CERT-2015-0082,DFN-CERT-2014-1217,DFN-CERT-2014-0890,CB-K17/0697,CB-K17/0297,CB-K17/0238,CB-K17/0168,CB-K15/0080,CB-K14/1162,CB-K14/0852",""
+172.30.7.1,juice-shop.trabalho_vulnnet,3000,tcp,5.0,Medium,30,"Mitigation","Backup File Scanner (HTTP) - Unreliable Detection Reporting","The script reports backup files left on the web server.","The following backup files were identified (<URL>:<Matching pattern>):
+
+http://juice-shop.trabalho_vulnnet:3000/.styles.css.backup:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/.styles.css.bak:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/.styles.css.bkp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/.styles.css.copy:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/.styles.css.old:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/.styles.css.orig:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/.styles.css.save:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/.styles.css.swp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/.styles.css.temp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/.styles.css.tmp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/.styles.css~:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/.favicon_js.ico.backup:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/.favicon_js.ico.bak:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/.favicon_js.ico.bkp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/.favicon_js.ico.copy:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/.favicon_js.ico.old:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/.favicon_js.ico.orig:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/.favicon_js.ico.save:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/.favicon_js.ico.swp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/.favicon_js.ico.temp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/.favicon_js.ico.tmp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/.favicon_js.ico~:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/favicon_js.ico.backup:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/favicon_js.ico.bak:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/favicon_js.ico.bkp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/favicon_js.ico.copy:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/favicon_js.ico.old:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/favicon_js.ico.orig:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/favicon_js.ico.save:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/favicon_js.ico.swp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/favicon_js.ico.temp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/favicon_js.ico.tmp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/assets/public/favicon_js.ico~:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/styles.css.backup:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/styles.css.bak:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/styles.css.bkp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/styles.css.copy:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/styles.css.old:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/styles.css.orig:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/styles.css.save:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/styles.css.swp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/styles.css.temp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/styles.css.tmp:^HTTP/1\.[01] 200
+http://juice-shop.trabalho_vulnnet:3000/styles.css~:^HTTP/1\.[01] 200
+",1.3.6.1.4.1.25623.1.0.108975,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,edc3c58f-e1b2-4be2-adfd-379573377279,"Based on the information provided in these files an attacker might
+  be able to gather sensitive information stored in these files.","Delete the backup files.","","Notes:
+
+  - 'Unreliable Detection' means that a file was detected only based on a HTTP 200 (Found) status
+  code reported by the remote web server when a file was requested.
+
+  - As the VT 'Backup File Scanner (HTTP)' (OID: 1.3.6.1.4.1.25623.1.0.140853) might run into a
+  timeout the actual reporting of this vulnerability takes place in this VT instead.","Reports previous enumerated backup files accessible on the
+  remote web server.
+Details:
+Backup File Scanner (HTTP) - Unreliable Detection Reporting
+(OID: 1.3.6.1.4.1.25623.1.0.108975)
+Version used: 2022-09-13T10:15:09Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,,,2.6,Low,80,"Mitigation","TCP Timestamps Information Disclosure","The remote host implements TCP timestamps and therefore allows
+  to compute the uptime.","It was detected that the host implements RFC1323/RFC7323.
+
+The following timestamps were retrieved with a delay of 1 seconds in-between:
+Packet 1: 3356253919
+Packet 2: 3356255029
+",1.3.6.1.4.1.25623.1.0.80091,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,11ad118b-11db-4a31-85ce-5586ef973818,"A side effect of this feature is that the uptime of the remote
+  host can sometimes be computed.","To disable TCP timestamps on linux add the line
+  'net.ipv4.tcp_timestamps = 0' to /etc/sysctl.conf. Execute 'sysctl -p' to apply the settings at
+  runtime.
+
+  To disable TCP timestamps on Windows execute 'netsh int tcp set global timestamps=disabled'
+
+  Starting with Windows Server 2008 and Vista, the timestamp can not be completely disabled.
+
+  The default behavior of the TCP/IP stack on this Systems is to not use the Timestamp options when
+  initiating TCP connections, but use them if the TCP peer that is initiating communication includes
+  them in their synchronize (SYN) segment.
+
+  See the references for more information.","TCP implementations that implement RFC1323/RFC7323.","The remote host implements TCP timestamps, as defined by
+  RFC1323/RFC7323.","Special IP packets are forged and sent with a little delay in
+  between to the target IP. The responses are searched for a timestamps. If found, the timestamps
+  are reported.
+Details:
+TCP Timestamps Information Disclosure
+(OID: 1.3.6.1.4.1.25623.1.0.80091)
+Version used: 2023-12-15T16:10:08Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,,,2.1,Low,80,"Mitigation","ICMP Timestamp Reply Information Disclosure","The remote host responded to an ICMP timestamp request.","The following response / ICMP packet has been received:
+- ICMP Type: 14
+- ICMP Code: 0
+",1.3.6.1.4.1.25623.1.0.103190,"CVE-1999-0524",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,90af1b88-6b73-4ba6-8517-9ef74ed44749,"This information could theoretically be used to exploit weak
+  time-based random number generators in other services.","Various mitigations are possible:
+
+  - Disable the support for ICMP timestamp on the remote host completely
+
+  - Protect the remote host by a firewall, and block ICMP packets passing through the firewall in
+  either direction (either completely or only for untrusted networks)","","The Timestamp Reply is an ICMP message which replies to a
+  Timestamp message. It consists of the originating timestamp sent by the sender of the Timestamp as
+  well as a receive timestamp and a transmit timestamp.","Sends an ICMP Timestamp (Type 13) request and checks if a
+  Timestamp Reply (Type 14) is received.
+Details:
+ICMP Timestamp Reply Information Disclosure
+(OID: 1.3.6.1.4.1.25623.1.0.103190)
+Version used: 2025-01-21T05:37:33Z
+","","","DFN-CERT-2014-0658,CB-K15/1514,CB-K14/0632",""
+172.30.7.1,juice-shop.trabalho_vulnnet,3000,tcp,0.0,Log,80,"","Response Time / No 404 Error Code Check","This VT tests if the remote web server does not reply with a 404
+  error code and checks if it is replying to the scanners requests in a reasonable amount of time.","The service is responding with a 200 HTTP status code to non-existent files/urls. The following pattern is used to work around possible false detections:
+-----
+OWASP Juice Shop
+-----
+",1.3.6.1.4.1.25623.1.0.10386,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,55d7de90-faf6-4113-89c6-3375d8c9af17,"","","","This web server might show the following issues:
+
+  - it is [mis]configured in that it does not return '404 Not Found' error codes when a non-existent
+  file is requested, perhaps returning a site map, search page, authentication page or redirect instead.
+
+  The Scanner might enabled some counter measures for that, however they might be insufficient. If a
+  great number of security issues are reported for this port, they might not all be accurate.
+
+  - it doesn't response in a reasonable amount of time to various HTTP requests sent by this VT.
+
+  In order to keep the scan total time to a reasonable amount, the remote web server might not be
+  tested. If the remote server should be tested it has to be fixed to have it reply to the scanners
+  requests in a reasonable amount of time.
+
+  Alternatively the 'Maximum response time (in seconds)' preference could be raised to a higher
+  value if longer scan times are accepted.","
+Details:
+Response Time / No 404 Error Code Check
+(OID: 1.3.6.1.4.1.25623.1.0.10386)
+Version used: 2025-04-11T15:45:04Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,,,0.0,Log,80,"","OS Detection Consolidation and Reporting","This script consolidates the OS information detected by several
+  VTs and tries to find the best matching OS.
+
+  Furthermore it reports all previously collected information leading to this best matching OS. It
+  also reports possible additional information which might help to improve the OS detection.
+
+  If any of this information is wrong or could be improved please consider to report these to the
+  referenced community forum.","Best matching OS:
+
+OS:           Linux Kernel
+CPE:          cpe:/o:linux:kernel
+Found by VT:  1.3.6.1.4.1.25623.1.0.102002 (Operating System (OS) Detection (ICMP))
+Concluded from ICMP based OS fingerprint
+Setting key ""Host/runs_unixoide"" based on this information
+",1.3.6.1.4.1.25623.1.0.105937,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,80820676-1b71-4aea-9683-dfa7e6bd7f9c,"","","","","
+Details:
+OS Detection Consolidation and Reporting
+(OID: 1.3.6.1.4.1.25623.1.0.105937)
+Version used: 2026-01-21T05:50:46Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,,,0.0,Log,70,"","IP Forwarding Enabled - Active Check","Checks if the remote host has IP forwarding enabled.","It was possible to route a TCP packet through the target host and received an answer which means IP forwarding is enabled.
+",1.3.6.1.4.1.25623.1.0.147205,"CVE-1999-0511",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,d27efbc6-344d-4e12-86cc-20ee836f3e94,"","","","","Sends a crafted Local Link Layer (LLL) frame and checks the
+  response.
+Details:
+IP Forwarding Enabled - Active Check
+(OID: 1.3.6.1.4.1.25623.1.0.147205)
+Version used: 2021-12-03T08:27:06Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,,,0.0,Log,80,"","Traceroute","Collect information about the network route and
+  network distance between the scanner host and the target host.","Network route from scanner (172.30.0.2) to target (172.30.7.1):
+
+172.30.0.2
+172.30.7.1
+
+Network distance between scanner and target: 2
+",1.3.6.1.4.1.25623.1.0.51662,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,7a3e9f68-e963-48b6-9591-5d0722d3b45b,"","","","For internal networks, the distances are usually
+  small, often less than 4 hosts between scanner and target. For public targets the
+  distance is greater and might be 10 hosts or more.","A combination of the protocols ICMP and TCP is used
+  to determine the route. This method is applicable for IPv4 only and it is also known as
+  'traceroute'.
+Details:
+Traceroute
+(OID: 1.3.6.1.4.1.25623.1.0.51662)
+Version used: 2022-10-17T11:13:19Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,3000,tcp,0.0,Log,80,"","security.txt Detection (HTTP)","Web Servers can use a file called security.txt to provide
+  contact information for security researchers and other security related content.","The file 'http://juice-shop.trabalho_vulnnet:3000/.well-known/security.txt' contains the following:
+
+Contact: mailto:donotreply@owasp-juice.shop
+Encryption: https://keybase.io/bkimminich/pgp_keys.asc?fingerprint=19c01cb7157e4645e9e2c863062a85a8cbfbdcda
+Acknowledgements: /#/score-board
+Preferred-languages: en, ar, az, bg, bn, ca, cs, da, de, ga, el, es, et, fi, fr, ka, he, hi, hu, id, it, ja, ko, lv, my, nl, no, pl, pt, ro, ru, si, sv, th, tr, uk, zh
+Hiring: /#/jobs
+Csaf: http://localhost:3000/.well-known/csaf/provider-metadata.json
+Expires: Tue, 26 Jan 2027 01:34:15 GMT
+",1.3.6.1.4.1.25623.1.0.102093,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,a565ed9c-ca3c-489d-b837-070c555ac72f,"","Check the content of the security.txt file and update its
+  content, such as the expiration date, to provide up-to-date information that can be trusted.","","Security researchers can use the security.txt file to retrieve
+  contact information for security issues related to the URI used to retrieve it. The file may also
+  apply to products and services that are offered. The content of the file should be checked
+  regularly to ensure that it is up-to-date and that security researchers can trust its content.","Checks if a security.txt is present at the following
+  locations:
+
+  /.well-known/security.txt
+
+  /security.txt (Legacy compatibility)
+
+  Note: The file found under well-known is used / reported if both are present.
+Details:
+security.txt Detection (HTTP)
+(OID: 1.3.6.1.4.1.25623.1.0.102093)
+Version used: 2024-01-16T05:05:27Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,3000,tcp,0.0,Log,70,"","Allowed HTTP Methods Enumeration","Enumerates which HTTP methods are allowed.","The following list contains the URLs and corresponding supported HTTP methods.
+
+URL                                      | HTTP Methods
+---------------------------------------------------------------------------------
+http://juice-shop.trabalho_vulnnet:3000/ | GET,HEAD,POST,PUT,DELETE,OPTIONS,TRACE
+",1.3.6.1.4.1.25623.1.0.153974,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,28d1f7d0-d673-4b26-b3c0-80715c006fdf,"","","","'- Basic HTTP methods: GET, HEAD, POST, PUT, DELETE, CONNECT,
+  OPTIONS, TRACE
+
+  - Extended HTTP methods: ACL, BASELINE-CONTROL, BIND, CHECKIN, CHECKOUT, COPY, LABEL, LINK, LOCK,
+  MERGE, MKACTIVITY, MKCALENDAR, MKCOL, MKREDIRECTREF, MKWORKSPACE, MOVE, ORDERPATCH, PATCH, PRI,
+  PROPFIND, PROPPATCH, REBIND, REPORT, SEARCH, UNBIND, UNCHECKOUT, UNLINK, UNLOCK, UPDATE,
+  UPDATEREDIRECTREF, VERSION-CONTROL","Sends multiple HTTP requests and checks the responses.
+
+  Disclaimer:
+
+  - This enumeration script is provided 'as is' (means no support is given) and only providing
+  rudimentary information about the possible enabled methods
+
+  - This script doesn't guarantee completeness or full reliability
+
+  For more reliable determination of the enabled HTTP methods please inspect the configuration of
+  the web server manually and directly on the target host.
+Details:
+Allowed HTTP Methods Enumeration
+(OID: 1.3.6.1.4.1.25623.1.0.153974)
+Version used: 2025-02-28T05:38:49Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,3000,tcp,0.0,Log,80,"","HTTP Security Headers Detection","All known security headers are being checked on the remote web
+  server.
+
+  On completion a report will hand back whether a specific security header has been implemented
+  (including its value and if it is deprecated) or is missing on the target.","Header Name            | Header Value
+---------------------------------------
+Feature-Policy         | payment 'self'
+X-Content-Type-Options | nosniff
+X-Frame-Options        | SAMEORIGIN
+
+Missing Headers                   | More Information
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Content-Security-Policy           | https://owasp.org/www-project-secure-headers/#content-security-policy
+Cross-Origin-Embedder-Policy      | https://scotthelme.co.uk/coop-and-coep/, Note: This is an upcoming header
+Cross-Origin-Opener-Policy        | https://scotthelme.co.uk/coop-and-coep/, Note: This is an upcoming header
+Cross-Origin-Resource-Policy      | https://scotthelme.co.uk/coop-and-coep/, Note: This is an upcoming header
+Document-Policy                   | https://w3c.github.io/webappsec-feature-policy/document-policy#document-policy-http-header
+Permissions-Policy                | https://w3c.github.io/webappsec-feature-policy/#permissions-policy-http-header-field
+Referrer-Policy                   | https://owasp.org/www-project-secure-headers/#referrer-policy
+Sec-Fetch-Dest                    | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header supported only in newer browsers like e.g. Firefox 90
+Sec-Fetch-Mode                    | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header supported only in newer browsers like e.g. Firefox 90
+Sec-Fetch-Site                    | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header supported only in newer browsers like e.g. Firefox 90
+Sec-Fetch-User                    | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers#fetch_metadata_request_headers, Note: This is a new header supported only in newer browsers like e.g. Firefox 90
+X-Permitted-Cross-Domain-Policies | https://owasp.org/www-project-secure-headers/#x-permitted-cross-domain-policies
+X-XSS-Protection                  | https://owasp.org/www-project-secure-headers/#x-xss-protection, Note: Most major browsers have dropped / deprecated support for this header in 2020.
+",1.3.6.1.4.1.25623.1.0.112081,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,ff280fb3-6edc-4a8f-9e37-6bb460117b8b,"","","","","
+Details:
+HTTP Security Headers Detection
+(OID: 1.3.6.1.4.1.25623.1.0.112081)
+Version used: 2025-03-21T15:40:43Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,3000,tcp,0.0,Log,80,"","Web Application Scanning Consolidation / Info Reporting","The script consolidates and reports various information for web
+  application (formerly called 'CGI') scanning.
+
+  This information is based on the following scripts / settings:
+
+  - HTTP-Version Detection (OID: 1.3.6.1.4.1.25623.1.0.100034)
+
+  - No 404 check (OID: 1.3.6.1.4.1.25623.1.0.10386)
+
+  - Web mirroring / webmirror.nasl (OID: 1.3.6.1.4.1.25623.1.0.10662)
+
+  - Directory Scanner / DDI_Directory_Scanner.nasl (OID: 1.3.6.1.4.1.25623.1.0.11032)
+
+  - The configured 'cgi_path' within the 'Scanner Preferences' of the scan config in use
+
+  - The configured 'Enable CGI scanning', 'Enable generic web application scanning' and
+  'Add historic /scripts and /cgi-bin to directories for CGI scanning' within the
+  'Global variable settings' of the scan config in use
+
+  If you think any of this information is wrong please report it to the referenced community
+  forum.","The Hostname/IP ""juice-shop.trabalho_vulnnet"" was used to access the remote host.
+
+Generic web application scanning is disabled for this host via the ""Enable generic web application scanning"" option within the ""Global variable settings"" of the scan config in use.
+
+The service is responding with a 200 HTTP status code to non-existent files/urls. The following pattern is used to work around possible false detections:
+-----
+OWASP Juice Shop
+-----
+
+Requests to this service are done via HTTP/1.1.
+
+This service seems to be able to host PHP scripts.
+
+This service seems to be able to host ASP scripts.
+
+The User-Agent ""Mozilla/5.0 [en] (X11, U; OpenVAS-VT <version replaced>)"" was used to access the remote host.
+
+Historic /scripts and /cgi-bin are not added to the directories used for web application scanning. You can enable this again with the ""Add historic /scripts and /cgi-bin to directories for CGI scanning"" option within the ""Global variable settings"" of the scan config in use.
+
+The following directories were used for web application scanning:
+
+http://juice-shop.trabalho_vulnnet:3000/
+
+While this is not, in and of itself, a bug, you should manually inspect these directories to ensure that they are in compliance with company security standards
+",1.3.6.1.4.1.25623.1.0.111038,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,0762a321-b9f6-4252-8dce-9c986dee32b5,"","","","","
+Details:
+Web Application Scanning Consolidation / Info Reporting
+(OID: 1.3.6.1.4.1.25623.1.0.111038)
+Version used: 2026-01-13T05:47:36Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,,,0.0,Log,80,"","jQuery Detection Consolidation","Consolidation of jQuery detections.","Detected jQuery
+
+Version:       unknown
+Location:      Externally hosted
+CPE:           cpe:/a:jquery:jquery
+
+Concluded from version/product identification result:
+src=""//cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js
+
+Concluded from version/product identification location:
+- Identified file: src=""//cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js
+- Referenced at:   http://juice-shop.trabalho_vulnnet:3000/
+
+Extra information:
+The jQuery library is hosted on a different server. Because of this it is not possible to gather the version by a direct file access. Please manually inspect the version which gets included on this web page.
+",1.3.6.1.4.1.25623.1.0.150658,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,7bea094a-e0fb-4748-a9e4-b03ee39ff491,"","","","","
+Details:
+jQuery Detection Consolidation
+(OID: 1.3.6.1.4.1.25623.1.0.150658)
+Version used: 2023-07-14T05:06:08Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,,,0.0,Log,80,"","CPE Inventory","This routine uses information collected by other routines about
+  CPE identities of operating systems, services and applications detected during the scan.
+
+  Note: Some CPEs for specific products might show up twice or more in the output. Background:
+
+  After a product got renamed or a specific vendor was acquired by another one it might happen that
+  a product gets a new CPE within the NVD CPE Dictionary but older entries are kept with the older
+  CPE.","172.30.7.1|cpe:/a:jquery:jquery
+172.30.7.1|cpe:/o:linux:kernel
+
+",1.3.6.1.4.1.25623.1.0.810002,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,d193ad1e-989c-45b5-a69a-024fcf65f514,"","","","","
+Details:
+CPE Inventory
+(OID: 1.3.6.1.4.1.25623.1.0.810002)
+Version used: 2022-07-27T10:11:28Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,3000,tcp,0.0,Log,80,"Mitigation","robot.txt / robots.txt exists on the Web Server (HTTP)","Web Servers can use a file called /robot(s).txt to ask search engines
+  to ignore certain files and directories. By nature this file can not be used to protect private files
+  from public read access.","The file 'http://juice-shop.trabalho_vulnnet:3000/robots.txt' contains the following:
+
+User-agent: *
+Disallow: /ftp
+",1.3.6.1.4.1.25623.1.0.10302,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,64f218e6-623a-4484-b96d-e116f36bf1f9,"","Review the content of the /robot(s).txt file and consider removing the
+  files from the server or protect them in other ways in case you actually intended non-public availability.","","Any serious web search engine will honor the /robot(s).txt file
+  and not scan the files and directories listed there.
+
+  Any entries listed in this file are not even hidden anymore.","
+Details:
+robot.txt / robots.txt exists on the Web Server (HTTP)
+(OID: 1.3.6.1.4.1.25623.1.0.10302)
+Version used: 2024-02-26T14:36:40Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,,,0.0,Log,80,"","Hostname Determination Reporting","The script reports information on how the hostname of the target
+  was determined.","Hostname determination for IP 172.30.7.1:
+
+Hostname|Source
+juice-shop.trabalho_vulnnet|Reverse-DNS
+",1.3.6.1.4.1.25623.1.0.108449,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,d7b077c3-dd0b-4d1f-bae6-58b90ef9fbe4,"","","","","
+Details:
+Hostname Determination Reporting
+(OID: 1.3.6.1.4.1.25623.1.0.108449)
+Version used: 2022-07-27T10:11:28Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,3000,tcp,0.0,Log,80,"","Check open ports","This plugin checks if the port scanners did not kill a service.","This port was detected as being open by a port scanner but is now closed.
+This service might have been crashed by a port scanner or by a plugin
+
+",1.3.6.1.4.1.25623.1.0.10919,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,2409b1e3-d960-4929-9369-60c669cb0770,"","","","","
+Details:
+Check open ports
+(OID: 1.3.6.1.4.1.25623.1.0.10919)
+Version used: 2023-08-03T05:05:16Z
+","","","",""
+172.30.7.1,juice-shop.trabalho_vulnnet,3000,tcp,0.0,Log,80,"","Services","This plugin performs service detection.","A web server is running on this port
+",1.3.6.1.4.1.25623.1.0.10330,"",df0632e3-a4eb-4954-8781-6af14a1a4240," hgdfdghgdgd",2026-01-26T03:31:42Z,98039371-6866-428d-aaa6-bb698e5cb99a,"","","","This plugin attempts to guess which service is running on the
+  remote port(s). For instance, it searches for a web server which could listen on another port than
+  80 or 443 and makes this information available for other check routines.","
+Details:
+Services
+(OID: 1.3.6.1.4.1.25623.1.0.10330)
+Version used: 2025-03-05T05:38:53Z
+","","","",""

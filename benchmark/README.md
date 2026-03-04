@@ -170,7 +170,7 @@ For each version:
 
 1. **`uv sync`**: Creates a virtual environment and installs all dependencies
    from the version's `pyproject.toml`. The `UV_PROJECT_ENVIRONMENT` variable
-   controls the venv location (`.venv` for v1.0/v2.0, `.venv_benchmark` for v3.0
+   controls the venv location (`.venv` for v1.0/v2.0, `.venv` for v3.0
    to avoid conflicting with the development venv).
 
 2. **PyTorch configuration** (v3.0 only): Installs GPU-enabled PyTorch from
@@ -189,7 +189,7 @@ For each version:
 |---------|-----------|-------------------|
 | v1.0 | `anonlfi_1.0/.venv/` | `anonlfi_1.0/` |
 | v2.0 | `anonlfi_2.0/.venv/` | `anonlfi_2.0/` |
-| v3.0 | `.venv_benchmark/` | `.` (project root) |
+| v3.0 | `.venv/` | `.` (project root) |
 
 ---
 

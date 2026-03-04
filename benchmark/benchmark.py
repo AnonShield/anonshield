@@ -23,7 +23,6 @@ import json
 import logging
 import os
 import platform
-import psutil
 import re
 import shutil
 import subprocess
@@ -122,7 +121,7 @@ VERSION_CONFIGS = {
     AnonVersion.V3_0: VersionConfig(
         version=AnonVersion.V3_0,
         relative_path=".",
-        venv_name=".venv_benchmark",
+        venv_name=".venv",
         # v3.0: All v2.0 formats + .log, .jsonl, .tif, .webp, .jp2, .pnm (19 formats)
         supported_extensions=(
             ".txt", ".log", ".pdf", ".docx", ".csv", ".xlsx", ".xml",
@@ -351,10 +350,19 @@ class EnvironmentSetup:
         self.gpu_mode = gpu_mode
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self._uv_path = self._find_uv()
+        if self._uv_path is None:
+            print("")
+            print("  [ERROR] 'uv' is required but was not found.")
+            print("  Install it with one of:")
+            print("    curl -LsSf https://astral.sh/uv/install.sh | sh")
+            print("    pip install uv       # if pip is available")
+            print("    brew install uv      # macOS / Linuxbrew")
+            print("  Then re-run the script.")
+            print("")
+            sys.exit(1)
 
-    def _find_uv(self) -> str:
-        """Find the uv binary in common locations."""
-        # Check common locations
+    def _find_uv(self) -> Optional[str]:
+        """Find the uv binary in common locations. Returns None if not found."""
         candidates = [
             "uv",  # In PATH
             os.path.expanduser("~/.local/bin/uv"),
@@ -365,16 +373,15 @@ class EnvironmentSetup:
 
         for candidate in candidates:
             if shutil.which(candidate):
-                return candidate
+                return shutil.which(candidate)
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 return candidate
 
-        # Try to find it
         result = subprocess.run(["which", "uv"], capture_output=True, text=True)
         if result.returncode == 0:
             return result.stdout.strip()
 
-        return "uv"  # Fallback, let it fail with a clear error
+        return None
 
     def setup(self, force: bool = False) -> bool:
         """Setup the virtual environment for a version."""
@@ -826,6 +833,7 @@ class ProcessMonitor:
     def _monitor_loop(self):
         """Background monitoring loop."""
         try:
+            import psutil  # lazy import — not needed until actual benchmarking
             process = psutil.Process(self.pid)
             while not self._stop_event.is_set():
                 try:
@@ -2955,7 +2963,7 @@ class BenchmarkOrchestrator:
         excluded_extensions = {".anonymous", ".anon", ".bak", ".tmp"}
 
         # Directories to skip during recursive scan
-        skip_dirs = {".venv", ".venv_benchmark", ".git", "node_modules",
+        skip_dirs = {".venv", ".git", "node_modules",
                      "__pycache__", ".mypy_cache", ".tox", "benchmark",
                      "anonlfi_1.0", "anonlfi_2.0", "output"}
 
@@ -3254,7 +3262,7 @@ def main():
             VERSION_CONFIGS[AnonVersion.V3_0] = VersionConfig(
                 version=AnonVersion.V3_0,
                 relative_path=".",
-                venv_name=".venv_benchmark",
+                venv_name=".venv",
                 supported_extensions=(
                     ".txt", ".log", ".pdf", ".docx", ".csv", ".xlsx", ".xml",
                     ".json", ".jsonl",
