@@ -138,7 +138,7 @@ if [[ "$SKIP_OVERHEAD" == "false" ]]; then
     mkdir -p "$OUT"
     run_cmd python3 "$BENCHMARK" \
         --calibrate-overhead \
-        --versions 3.0 \
+        --versions 1.0 2.0 3.0 \
         --strategies filtered hybrid standalone presidio \
         --runs 10 \
         $CPU_FLAG \
