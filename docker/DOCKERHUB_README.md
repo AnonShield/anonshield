@@ -1,375 +1,294 @@
-# AnonLFI 3.0: Professional PII Pseudonymization Framework for CSIRTs
+# AnonLFI 3.0 — PII Pseudonymization for CSIRTs
 
-**Enterprise-grade pseudonymization framework designed for Cybersecurity Incident Response Teams (CSIRTs).** Resolves the conflict between data confidentiality (GDPR/LGPD compliance) and analytical utility using HMAC-SHA256 reversible pseudonyms. Features OCR pipeline, 24-language support, and Small Language Model (SLM) integration for context-aware anonymization.
+Modular pseudonymization framework for Cybersecurity Incident Response Teams. Anonymizes PII and cybersecurity indicators using HMAC-SHA256, preserving structure in JSON, XML, CSV, and more. Supports 24 languages, OCR, and custom cybersecurity recognizers (IP, CVE, hash, URL, etc.).
 
-## Container Architecture
+**GitHub:** [github.com/AnonShield/AnonLFI3.0](https://github.com/AnonShield/AnonLFI3.0)
 
-| Tag | Base Image | Target Use Case | Size | Features |
-|-----|------------|-----------------|------|----------|
-| `latest` | `python:3.12-slim` | **CPU processing** - Works on any x86_64 machine | ~1.5GB | Full feature set, universal compatibility |
-| `gpu` | `nvidia/cuda:12.8.0` | **GPU acceleration** - NVIDIA hardware only | ~6GB+ | GPU acceleration, CUDA 12.8 support |
+---
 
-## Hardware Requirements
+## Available Tags
 
-### CPU Version (`latest` tag)
-- **Any x86_64 processor**
-- **4GB RAM minimum** (8GB+ recommended for large files)
-- No GPU required
+| Tag | Base | Use Case | Approx. Size |
+|-----|------|----------|-------------|
+| `latest` | `python:3.12-slim` | CPU — works on any x86_64 machine | ~2 GB |
+| `gpu` | `nvidia/cuda:12.8.0` | GPU — requires NVIDIA hardware + CUDA 12.8 | ~6 GB |
 
-### GPU Version (`gpu` tag) 
-- **NVIDIA GPU with Compute Capability ≥ 6.1** (Pascal architecture+)
-- **8GB VRAM minimum** (16GB+ recommended for optimal performance)
-- **8GB+ System RAM** (container + models require substantial memory)
-- **NVIDIA Driver ≥ 525.60.11** (for CUDA 12.8 support)
-- **NVIDIA Container Toolkit** (installation guide below)
+---
 
-**⚠️ GPU Compatibility:** Tested and verified only on RTX 5060 Ti (16GB VRAM) with Driver 590.48.01 on Ubuntu 24.04. Other modern NVIDIA GPUs should work but compatibility is not guaranteed.
+## Requirements
+
+**CPU (`latest`):** Any x86_64 machine with 4 GB+ RAM.
+
+**GPU (`gpu`):**
+- NVIDIA GPU, driver ≥ 525 (CUDA 12.8)
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed and configured
+
+---
 
 ## Quick Start
 
-### CPU Mode (Universal)
-```bash
-# Basic anonymization
-docker run --rm \
-  -e ANON_SECRET_KEY="your-secure-key" \
-  -v $(pwd):/data \
-  kapelinsky/anon /data/document.txt
+> **Tip:** download [`run-docker.sh`](https://github.com/AnonShield/AnonLFI3.0/raw/main/docker/run-docker.sh) to avoid typing the full `docker run` command every time:
+> ```bash
+> curl -fsSL https://github.com/AnonShield/AnonLFI3.0/raw/main/docker/run-docker.sh -o run-docker.sh
+> chmod +x run-docker.sh
+> ./run-docker.sh /data/input/YOUR_FILE.csv        # CPU
+> ./run-docker.sh --gpu /data/input/YOUR_FILE.csv  # GPU
+> ```
 
-# Process entire directory
-docker run --rm \
-  -e ANON_SECRET_KEY="your-secure-key" \
-  -v $(pwd)/documents:/data \
-  kapelinsky/anon /data/
+---
+
+### 1. Set the secret key
+
+The secret key is required for anonymization. It is also needed to de-anonymize results later — keep it safe.
+
+Generate a random key:
+```bash
+export ANON_SECRET_KEY=$(openssl rand -hex 32)
+# or: python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-### GPU Mode (NVIDIA Only)
+To reuse the same key across sessions, save it to a file:
 ```bash
-# GPU acceleration for transformer models
-# ⚠️ CRITICAL: --gpus all flag is MANDATORY
-docker run --rm --gpus all \
-  -e ANON_SECRET_KEY="your-secure-key" \
-  -v $(pwd):/data \
-  kapelinsky/anon:gpu /data/document.txt
-
-# For systems with Docker runtime issues:
-docker run --rm --runtime=nvidia --gpus all \
-  -e ANON_SECRET_KEY="your-secure-key" \
-  -v $(pwd):/data \
-  kapelinsky/anon:gpu /data/document.txt
-
-# RECOMMENDED: With model persistence (avoids redownloading 2-4GB every time)
-docker run --rm --gpus all \
-  -e ANON_SECRET_KEY="your-secure-key" \
-  -v $(pwd):/data \
-  -v anon-models:/app/models \
-  kapelinsky/anon:gpu /data/document.txt
+echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
 ```
 
-Output files are saved to `/data/output/` by default.
+### 2. Anonymize a file
+
+Keep your files in `./data/input/` — separate from the model cache and output:
+
+```
+./data/
+├── input/           ← put your files here (replace YOUR_FILE below with the actual name)
+│   └── YOUR_FILE.csv
+├── models/          ← NER model cached here on first run (~1 GB)
+└── output/          ← anonymized files written here
+```
+
+```bash
+mkdir -p ./data/input ./data/output ./data/models
+cp /path/to/YOUR_FILE.csv ./data/input/
+```
+
+**CPU:**
+```bash
+docker run --rm \                          # remove the container after it finishes
+  -e ANON_SECRET_KEY="$ANON_SECRET_KEY" \  # HMAC-SHA256 key used to generate pseudonyms — keep it safe
+  -v $(pwd)/data:/data \                   # ./data/ on your machine → /data/ inside the container
+  -v $(pwd)/data/models:/app/models \      # NER model stored in ./data/models/ — reused between runs
+  anonshield/anon \                        # the Docker image (CPU build)
+  /data/input/YOUR_FILE.csv \              # ← replace with your actual filename
+  --output-dir /data/output/              # output goes to ./data/output/ on your machine
+```
+
+**GPU:**
+```bash
+docker run --rm \                          # remove the container after it finishes
+  --gpus all \                             # expose all NVIDIA GPUs to the container
+  -e ANON_SECRET_KEY="$ANON_SECRET_KEY" \  # HMAC-SHA256 key used to generate pseudonyms
+  -v $(pwd)/data:/data \                   # ./data/ on your machine → /data/ inside the container
+  -v $(pwd)/data/models:/app/models \      # NER model stored in ./data/models/ — reused between runs
+  anonshield/anon:gpu \                    # the Docker image (GPU / CUDA build)
+  /data/input/YOUR_FILE.csv \              # ← replace with your actual filename
+  --output-dir /data/output/              # output goes to ./data/output/ on your machine
+```
+
+The anonymized file is written to `./data/output/anon_YOUR_FILE.csv`.
+
+> **On first run:** the NER transformer model (~1 GB) is downloaded to `./data/models/`. All subsequent runs load it from there instantly. The spaCy model is already baked into the image — no download needed.
+
+### 3. Anonymize an entire directory
+
+Pass the `input/` directory to process all files inside it recursively. This avoids accidentally scanning the `models/` and `output/` folders:
+
+```bash
+docker run --rm \
+  -e ANON_SECRET_KEY="$ANON_SECRET_KEY" \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/data/models:/app/models \
+  anonshield/anon \
+  /data/input/ --output-dir /data/output/
+```
+
+Output files are named `anon_<original_name>.<ext>` and written to `./data/output/`.
+
+---
+
+## Common Options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--lang <code>` | Document language (`en`, `pt`, `es`, ...) | `en` |
+| `--output-dir <path>` | Where to save output inside the container (use a path inside `/data/` to get it on the host) | `/app/output` |
+| `--preserve-entities <types>` | Comma-separated entity types to skip (e.g. `LOCATION,IP_ADDRESS`) | — |
+| `--allow-list <terms>` | Comma-separated terms to never anonymize | — |
+| `--slug-length <n>` | Hash length in the anonymized slug (0–64) | `64` |
+| `--anonymization-strategy <s>` | Detection strategy — see below | `filtered` |
+| `--optimize` | Enable all performance optimizations | off |
+
+Run `docker run --rm anonshield/anon --help` for the full options list.
+
+---
+
+## Anonymization Strategies
+
+Choose with `--anonymization-strategy <name>`.
+
+**Throughput — GPU** (NVIDIA RTX 5060 Ti 16 GB · 420 MB CSV / 551 MB JSON, 70,951 vulnerability records):
+
+| Strategy | CSV (KB/s) | JSON (KB/s) | vs. slowest |
+|----------|-----------|------------|-------------|
+| `standalone` | **732** | **1,250** | **4.3×** faster |
+| `hybrid` | 248 | 632 | 1.5× faster |
+| `filtered` *(default)* | 240 | 627 | 1.4× faster |
+| `presidio` | 171 | 575 | baseline |
+
+**Throughput — CPU** (Intel Xeon E5-2650 · 136 OpenVAS vulnerability reports, median KB/s):
+
+| Strategy | CSV (KB/s) | XML (KB/s) | PDF (KB/s) | vs. slowest |
+|----------|-----------|-----------|-----------|------------|
+| `standalone` | **0.94** | **2.05** | **4.26** | **~15 %** faster |
+| `hybrid` | 0.85 | 1.83 | 3.57 | similar |
+| `presidio` | 0.85 | 1.85 | 3.56 | similar |
+| `filtered` *(default)* | 0.81 | 1.82 | 3.83 | baseline |
+
+> On GPU, `standalone` is **4× faster** than `presidio` on CSV. On CPU, the gap shrinks to ~15 % — choose based on your hardware.
+
+**Accuracy** (67 annotated vulnerability records · GPU · `attack-vector/SecureModernBERT-NER` model · annotated by 3 security specialists):
+
+| Strategy | Precision | Recall | F1 | Notes |
+|----------|-----------|--------|----|-------|
+| `filtered` *(default)* | 91.9 % | 96.7 % | **94.2 %** | Best accuracy. Curated recognizer set; handles overlapping entity merges correctly. |
+| `hybrid` | 91.9 % | 96.7 % | **94.2 %** | Same accuracy as `filtered`. Uses manual text replacement instead of Presidio's anonymizer. |
+| `standalone` | 87.9 % | 94.5 % | 91.1 % | Slightly lower precision. Fastest on GPU. Experimental. |
+| `presidio` | 71.6 % | 96.7 % | 82.3 % | Many false positives. Rarely the best choice. |
+
+**Recommendation:** `filtered` (default) gives the best accuracy at a small throughput cost. Use `standalone` on GPU for maximum throughput.
+
+---
+
+## Anonymization Config (`--anonymization-config`)
+
+For structured files (JSON, CSV, XML), you can pass a JSON config file to control exactly which fields get anonymized. Without it, the tool runs NER inference on every field — accurate but slow on large datasets. The config lets you:
+
+- **`fields_to_exclude`** — fields that are never anonymized (e.g. severity scores, timestamps)
+- **`fields_to_anonymize`** — explicit list of fields to run NER on; everything else is skipped
+- **`force_anonymize`** — map a field directly to an entity type, bypassing NER entirely (useful for fields like `Port` or `Hostname` that don't have obvious syntactic patterns)
+
+**Example — Tenable JSON scan (`config.json`):**
+```json
+{
+  "fields_to_exclude": ["severity", "port", "protocol", "age_in_days"],
+  "force_anonymize": {
+    "asset.ipv4_addresses": { "entity_type": "IP_ADDRESS" },
+    "asset.display_fqdn":   { "entity_type": "HOSTNAME" },
+    "asset.display_mac_address": { "entity_type": "MAC_ADDRESS" },
+    "scan.target":          { "entity_type": "HOSTNAME" }
+  },
+  "fields_to_anonymize": ["asset.name", "output"]
+}
+```
+
+With this config: `severity`, `port`, etc. are preserved; `asset.ipv4_addresses` is always pseudonymized as `IP_ADDRESS` regardless of its format; only `asset.name` and `output` go through NER inference.
+
+Place the config file in `./data/` (not in `input/`) and run:
+
+```bash
+docker run --rm \
+  -e ANON_SECRET_KEY="$ANON_SECRET_KEY" \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/data/models:/app/models \
+  anonshield/anon \
+  /data/input/YOUR_FILE.json \             # ← your structured file to anonymize
+  --anonymization-config /data/anon_config.json \  # ← the config file (saved in ./data/)
+  --output-dir /data/output/
+```
+
+**Performance impact (GPU · NVIDIA RTX 5060 Ti · 70,951 vulnerability records):**
+
+| Strategy | CSV without | CSV with | CSV gain | JSON without | JSON with | JSON gain |
+|----------|------------|---------|---------|-------------|----------|----------|
+| `standalone` | 732 KB/s | **34,341 KB/s** | **47×** | 1,250 KB/s | **31,272 KB/s** | **25×** |
+| `filtered` | 240 KB/s | 32,115 KB/s | 134× | 627 KB/s | 29,937 KB/s | 48× |
+| `hybrid` | 248 KB/s | 31,902 KB/s | 129× | 632 KB/s | 29,924 KB/s | 47× |
+| `presidio` | 171 KB/s | 32,034 KB/s | 188× | 575 KB/s | 29,855 KB/s | 52× |
+
+The config gain is larger for Presidio-based strategies because they have a higher per-record baseline cost to eliminate. `standalone` remains the fastest even with config (34,341 KB/s vs ~32,000 KB/s for others). When using only `force_anonymize` and `fields_to_exclude` — with no `fields_to_anonymize` — NER inference is completely bypassed and strategy choice no longer affects throughput.
+
+---
+
+## Examples
+
+**Portuguese document:**
+```bash
+docker run --rm \
+  -e ANON_SECRET_KEY="$ANON_SECRET_KEY" \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/data/models:/app/models \
+  anonshield/anon \
+  /data/input/YOUR_FILE.pdf --lang pt --output-dir /data/output/
+```
+
+**Preserve hostnames and IPs (don't anonymize them):**
+```bash
+docker run --rm \
+  -e ANON_SECRET_KEY="$ANON_SECRET_KEY" \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/data/models:/app/models \
+  anonshield/anon \
+  /data/input/YOUR_FILE.txt --preserve-entities "HOSTNAME,IP_ADDRESS" --output-dir /data/output/
+```
+
+**Structured file with field-level config:**
+```bash
+docker run --rm \
+  -e ANON_SECRET_KEY="$ANON_SECRET_KEY" \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/data/models:/app/models \
+  anonshield/anon \
+  /data/input/YOUR_FILE.json --anonymization-config /data/anon_config.json --output-dir /data/output/
+```
+
+**GPU with cybersecurity-focused NER model:**
+```bash
+docker run --rm --gpus all \
+  -e ANON_SECRET_KEY="$ANON_SECRET_KEY" \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/data/models:/app/models \
+  anonshield/anon:gpu \
+  /data/input/YOUR_FILE.txt \
+  --transformer-model attack-vector/SecureModernBERT-NER \
+  --output-dir /data/output/
+```
+
+---
 
 ## GPU Setup (NVIDIA Container Toolkit)
 
-**Ubuntu/Debian Installation:**
 ```bash
-# Add NVIDIA Container Toolkit repository
+# Install toolkit
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-
-# Install and configure
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
 sudo apt update && sudo apt install -y nvidia-container-toolkit
 sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
 sudo systemctl restart docker
 
-# Test GPU access
+# Verify
 docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi
 ```
 
-**Troubleshooting GPU Issues:**
-- **Error: "libnvidia-ml.so.1 not found"** → Install proprietary NVIDIA drivers (`sudo apt install nvidia-driver-xxx`)
-- **Error: "--gpus all not supported"** → Use `--runtime=nvidia --gpus all` explicitly
-- **Driver compatibility** → Run `nvidia-smi` and verify CUDA Version ≥ 12.8
-
-## SLM Integration (Fully Automatic)
-
-**AnonLFI automatically manages Ollama - no manual setup required!**
-
-### Automatic LLM Management Features
-- ✅ **Zero Configuration**: Just add `--slm-detector` flag
-- ✅ **Auto-Start**: Automatically starts Ollama Docker container if not running
-- ✅ **Auto-Download**: Downloads required models (llama3) on first use
-- ✅ **Docker Integration**: Requires Docker socket access for container management
-- ✅ **Model Persistence**: Downloaded models persist in Docker volumes
-- ✅ **GPU Support**: Automatically uses GPU if available for Ollama
-
-### SLM Usage Examples
+If you get `--gpus all not supported`, try adding `--runtime=nvidia`:
 ```bash
-# Auto-managed SLM detection (CPU mode)
-docker run --rm \
-  -e ANON_SECRET_KEY="your-key" \
-  -v $(pwd):/data \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  kapelinsky/anon /data/report.txt --slm-detector
-
-# Auto-managed SLM detection (GPU mode - fastest)
-docker run --rm --gpus all \
-  -e ANON_SECRET_KEY="your-key" \
-  -v $(pwd):/data \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  kapelinsky/anon:gpu /data/report.txt --slm-detector
-
-# SLM entity analysis (generates detailed reports)
-docker run --rm \
-  -e ANON_SECRET_KEY="your-key" \
-  -v $(pwd):/data \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  kapelinsky/anon /data/document.txt --slm-map-entities
-
-# Full SLM anonymization (end-to-end AI processing)
-docker run --rm \
-  -e ANON_SECRET_KEY="your-key" \
-  -v $(pwd):/data \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  kapelinsky/anon /data/complex.txt --anonymization-strategy slm
+docker run --rm --runtime=nvidia --gpus all anonshield/anon:gpu /data/file.txt ...
 ```
 
-**How Auto-Management Works:**
-1. **Detection**: System checks if Ollama is running on localhost:11434
-2. **Auto-Start**: If not found, starts `ollama/ollama:latest` container with GPU support
-3. **Model Download**: Downloads `llama3` model automatically (5-10 minutes first time)
-4. **Ready**: SLM features become available immediately
-5. **Persistence**: Models and container persist for subsequent runs
+---
 
-**Docker Socket Requirement:** SLM auto-management requires Docker socket access (`-v /var/run/docker.sock:/var/run/docker.sock`) to manage the Ollama container.
+## Detected Entity Types
 
-## Core Features
+**Standard PII:** `PERSON`, `LOCATION`, `ORGANIZATION`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `USERNAME`, `PASSWORD`
 
-### File Format Support
-**Preserves original structure for:**
-- `.json`, `.jsonl` - JSON structure preserved
-- `.xml` - XML hierarchy maintained
-- `.csv`, `.xlsx` - Tabular data formatting
-- `.pdf`, `.docx` - Document layout preserved
-- `.txt` - Plain text processing
+**Cybersecurity (custom recognizers):** `IP_ADDRESS`, `URL`, `HOSTNAME`, `MAC_ADDRESS`, `FILE_PATH`, `HASH`, `AUTH_TOKEN`, `CVE_ID`, `CPE_STRING`, `CERT_SERIAL`, `CERTIFICATE`, `CRYPTOGRAPHIC_KEY`, `UUID`, `PGP_BLOCK`, `PORT`, `OID`
 
-**OCR Image Processing:**
-- Extracts text from images in PDF/DOCX files
-- Supports standalone images: `.png`, `.jpeg`, `.gif`, `.bmp`, `.tiff`, `.webp`
-- Uses Tesseract OCR with multilingual support
-
-### Entity Detection (25+ Types)
-**Personal Information:**
-- `PERSON` - Names, `EMAIL_ADDRESS` - Emails, `PHONE_NUMBER` - Phone numbers
-- `CREDIT_CARD` - Card numbers, `LOCATION` - Geographic locations
-
-**Cybersecurity Indicators:**
-- `IP_ADDRESS` - IPv4/IPv6 addresses, `URL` - Web addresses, `HOSTNAME` - Domain names
-- `HASH` - MD5/SHA1/SHA256/SHA512, `MAC_ADDRESS` - Network MAC addresses
-- `CVE_ID` - Vulnerability identifiers, `CPE_STRING` - Platform enumeration
-- `UUID` - Unique identifiers, `CERT_SERIAL` - Certificate serials
-
-**Technical Patterns:**
-- `AUTH_TOKEN` - API keys/session tokens, `PGP_BLOCK` - PGP signatures
-- `FILE_PATH` - System paths, `PASSWORD`/`USERNAME` - Contextual credentials
-
-### Advanced Processing
-**Anonymization Strategies:**
-- `presidio` (default) - Full Microsoft Presidio pipeline with all recognizers
-- `filtered` - Filtered scope Presidio pipeline (focused entity types)
-- `hybrid` - Hybrid approach with custom replacement logic
-- `standalone` - Zero Presidio dependencies, regex-based (fastest)
-- `slm` - End-to-end LLM-based anonymization (experimental)
-
-**Language Support (24 languages):**
-English, Portuguese, Spanish, French, German, Italian, Chinese, Japanese, Korean, Russian, Polish, Dutch, Swedish, Norwegian, Danish, Finnish, Greek, Croatian, Lithuanian, Slovenian, Macedonian, Romanian, Ukrainian, Catalan
-
-**Security & Consistency:**
-- **HMAC-SHA256** pseudonym generation with secret key
-- **Reversible anonymization** - same entity = same pseudonym
-- **Controlled de-anonymization** with secret key protection
-- **Configurable slug length** (1-64 characters)
-
-## Environment Variables
-
-| Variable | Required | Description | Default |
-|----------|----------|-------------|---------|
-| `ANON_SECRET_KEY` | **YES** | HMAC-SHA256 secret key for pseudonym generation | - |
-| `ANON_LAZY_LOADING` | No | Download models on first use (automatic) | `1` |
-| `ANON_PRELOAD` | No | Pre-download specific models on startup | - |
-| `OLLAMA_BASE_URL` | No | Ollama service URL (for manual Ollama) | `http://ollama:11434` |
-
-## Model Persistence (CRITICAL for Production)
-
-**⚠️ WITHOUT PERSISTENT VOLUMES, MODELS REDOWNLOAD EVERY TIME (2-4GB each run)**
-
-### Essential Volumes
-| Mount Path | Purpose | Size Impact | Required |
-|------------|---------|-------------|----------|
-| `/app/models` | **AI Model Cache** - spaCy + Transformer models | 2-4GB | ✅ **CRITICAL** |
-| `/app/db` | **Entity Database** - Anonymization mappings | <100MB | ✅ **For de-anonymization** |
-| `/app/output` | **Results** - Anonymized files | Variable | ✅ **Recommended** |
-| `/var/run/docker.sock` | **Docker Socket** - SLM container management | - | Only for SLM |
-
-### Model Download Process
-**First Run (without volumes):**
-1. Downloads spaCy model (400MB+)
-2. Downloads transformer model (1-2GB)
-3. Caches in `/app/models`
-4. **Total: 5-10 minutes download time**
-
-**Subsequent Runs (with persistent volumes):**
-1. Uses cached models instantly
-2. **Total: 0 seconds download time**
-
-## Complete Usage Examples
-
-### File Processing
-```bash
-# Single file with language selection
-docker run --rm \
-  -e ANON_SECRET_KEY="production-key" \
-  -v $(pwd):/data \
-  kapelinsky/anon /data/incident.pdf --lang pt
-
-# Directory processing with custom output
-docker run --rm \
-  -e ANON_SECRET_KEY="production-key" \
-  -v $(pwd)/input:/data \
-  -v $(pwd)/anonymized:/output \
-  kapelinsky/anon /data/ --output-dir /output
-
-# Preserve specific entity types
-docker run --rm \
-  -e ANON_SECRET_KEY="production-key" \
-  -v $(pwd):/data \
-  kapelinsky/anon /data/logs.json --preserve-entities "HOSTNAME,IP_ADDRESS"
-```
-
-### Performance Optimization
-```bash
-# Fast processing with optimization
-docker run --rm \
-  -e ANON_SECRET_KEY="production-key" \
-  -v $(pwd):/data \
-  kapelinsky/anon /data/large_dataset/ --optimize
-
-# Custom slug length for readability
-docker run --rm \
-  -e ANON_SECRET_KEY="production-key" \
-  -v $(pwd):/data \
-  kapelinsky/anon /data/report.txt --slug-length 8
-
-# GPU with persistent storage
-docker run --rm --gpus all \
-  -e ANON_SECRET_KEY="production-key" \
-  -v $(pwd):/data \
-  -v anon-models:/app/models \
-  -v anon-db:/app/db \
-  kapelinsky/anon:gpu /data/documents/
-```
-
-### Advanced Configuration
-```bash
-# Custom anonymization config for JSON/XML
-docker run --rm \
-  -e ANON_SECRET_KEY="production-key" \
-  -v $(pwd):/data \
-  -v $(pwd)/config.json:/app/config.json \
-  kapelinsky/anon /data/structured.json --anonymization-config /app/config.json
-
-# Generate NER training data (no secret key needed)
-docker run --rm \
-  -v $(pwd):/data \
-  kapelinsky/anon /data/corpus/ --generate-ner-data --output-dir /data/ner_output/
-
-# Cybersecurity-focused model with hybrid strategy
-docker run --rm --gpus all \
-  -e ANON_SECRET_KEY="production-key" \
-  -v $(pwd):/data \
-  kapelinsky/anon:gpu /data/threat_intel.json \
-  --transformer-model attack-vector/SecureModernBERT-NER \
-  --anonymization-strategy hybrid
-```
-
-## Resource Requirements
-
-**Memory Usage:**
-```
-CPU Mode:  4-8GB RAM (base container + models)
-GPU Mode:  8-16GB RAM + 4-8GB VRAM (container + CUDA libraries + models)
-SLM Mode:  Additional 4-32GB depending on Ollama model size
-```
-
-**When to Use GPU:**
-- ✅ Processing transformer-based NER models
-- ✅ Large document batches
-- ✅ High-volume processing pipelines
-- ❌ Single small files
-- ❌ Regex-only anonymization (no transformers)
-
-## Common CLI Flags
-
-| Flag | Description | Example |
-|------|-------------|---------|
-| `--lang LANG` | Document language (24 supported) | `--lang pt` |
-| `--output-dir DIR` | Output directory path | `--output-dir /data/results` |
-| `--preserve-entities TYPES` | Skip anonymizing specific types | `--preserve-entities "HOSTNAME,URL"` |
-| `--allow-list TERMS` | Never anonymize specific terms | `--allow-list "CompanyName,ProductX"` |
-| `--slug-length N` | Pseudonym length (1-64 chars) | `--slug-length 12` |
-| `--anonymization-strategy S` | Processing strategy | `--anonymization-strategy filtered` |
-| `--transformer-model MODEL` | NER model selection | `--transformer-model attack-vector/SecureModernBERT-NER` |
-| `--optimize` | Enable all performance optimizations | `--optimize` |
-| `--slm-detector` | Use SLM for enhanced entity detection | `--slm-detector` |
-| `--slm-map-entities` | Generate entity analysis reports | `--slm-map-entities` |
-| `--generate-ner-data` | Create NER training data | `--generate-ner-data` |
-| `--list-entities` | Show all supported entity types | `--list-entities` |
-| `--list-languages` | Show all supported languages | `--list-languages` |
-
-Full documentation: `docker run --rm kapelinsky/anon --help`
-
-## Production Deployment
-
-### Recommended Production Setup
-```bash
-# STEP 1: Create persistent volumes (MANDATORY to avoid redownloads)
-docker volume create anon-models     # Stores 2-4GB of AI models
-docker volume create anon-db         # Stores anonymization mappings  
-docker volume create anon-output     # Stores processed files
-
-# STEP 2: Production deployment with persistent storage
-docker run -d \
-  --name anon-production \
-  --gpus all \
-  --restart unless-stopped \
-  -e ANON_SECRET_KEY="$(cat /secure/anon.key)" \
-  -v anon-models:/app/models \
-  -v anon-db:/app/db \
-  -v anon-output:/app/output \
-  -v /data/input:/app/input:ro \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  kapelinsky/anon:gpu \
-  /app/input/ --optimize --slm-detector
-
-# STEP 3: Monitor first run (downloads models, takes 5-10 minutes)
-docker logs -f anon-production
-
-# Subsequent runs will be instant (uses cached models)
-```
-
-**⚠️ Production Warning:** Without persistent volumes (`-v anon-models:/app/models`), the container will redownload 2-4GB of AI models on every restart, causing significant delays and bandwidth usage.
-
-### Security Best Practices
-- **Never hardcode** `ANON_SECRET_KEY` in commands
-- **Use Docker secrets** or external key management
-- **Mount input data read-only** (`-v /data:/app/input:ro`)
-- **Regular backups** of `/app/db` volume for de-anonymization capability
-- **Network isolation** in production environments
-
-## Source Code & Support
-
-- **GitHub Repository:** [github.com/AnonShield/AnonLFI3.0](https://github.com/AnonShield/AnonLFI3.0)
-- **License:** Open source (see repository for details)
-- **Docker Hub:** [hub.docker.com/r/kapelinsky/anon](https://hub.docker.com/r/kapelinsky/anon)
-
-**Supported Entity Types:** 25+ including PERSON, ORGANIZATION, EMAIL_ADDRESS, IP_ADDRESS, CVE_ID, HASH, UUID, and more cybersecurity-focused patterns.
-
-**Supported Languages:** English, Portuguese, Spanish, French, German, Italian, Chinese, Japanese, Korean, Russian, Polish, Dutch, Swedish, Norwegian, Danish, Finnish, Greek, Croatian, Lithuanian, Slovenian, Macedonian, Romanian, Ukrainian, Catalan.
+Run `docker run --rm anonshield/anon --list-entities` for the full list.

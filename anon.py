@@ -267,11 +267,11 @@ def _parse_arguments():
     parser.add_argument("--min-word-length", type=int, default=DefaultSizes.DEFAULT_MIN_WORD_LENGTH, help=f"Minimum character length for a word to be processed. Default: {DefaultSizes.DEFAULT_MIN_WORD_LENGTH} (no limit).")
     parser.add_argument("--technical-stoplist", type=str, default="", help="Comma-separated list of custom words to add to the technical stoplist.")
     parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized. Default is to anonymize them if other rules permit.")
-    parser.add_argument("--anonymization-strategy", type=str, default="presidio",
+    parser.add_argument("--anonymization-strategy", type=str, default="filtered",
                        choices=["presidio", "filtered", "hybrid", "standalone", "slm"],
                        help="Anonymization strategy. "
-                            "'presidio': Full Presidio pipeline (default). "
-                            "'filtered': Presidio pipeline with filtered scope. "
+                            "'filtered': Presidio pipeline with filtered scope (default). "
+                            "'presidio': Full Presidio pipeline. "
                             "'hybrid': Presidio detection + custom replacement. "
                             "'standalone': Zero Presidio dependencies (experimental). "
                             "'slm': End-to-end SLM anonymization.")

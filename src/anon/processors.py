@@ -54,56 +54,20 @@ class NERTextItem:
 
 
 def get_output_path(original_path: str, new_ext: str, prefix: str = "anon_", output_dir: str = "output") -> str:
-    """Constructs a secure output file path, preventing path traversal."""
-    
-    # 1. Resolve and validate the output directory path
-    project_root = Path(os.getcwd()).resolve()
+    """Constructs the output file path for a processed file."""
     output_path_obj = Path(output_dir).resolve()
-    
-    # Ensure the resolved output directory is inside the project root
-    if not output_path_obj.is_relative_to(project_root):
-        logging.error(f"Path traversal attempt detected: Output directory '{output_dir}' is outside the project boundary '{project_root}'.")
-        raise ValueError(f"Path traversal attempt detected: Output directory '{output_dir}' is outside the project boundary.")
-
     output_path_obj.mkdir(parents=True, exist_ok=True)
-    
-    # 2. Sanitize filename from original_path to prevent it from being used for traversal
-    original_base_name = Path(original_path).name # Get only the filename from the path
-    
-    # Normalize Unicode (NFD) and remove dangerous characters for robust sanitization
-    # Allow only alphanumeric, hyphen, underscore, and a single dot for extension
+
+    original_base_name = Path(original_path).name
     sanitized_base_name = unicodedata.normalize('NFKD', original_base_name).encode('ascii', 'ignore').decode('utf-8')
-    
-    # Separate base name and extension to sanitize them individually
-    name_part, ext_part = os.path.splitext(sanitized_base_name)
-    
-    # Sanitize the name part: remove any character that is not alphanumeric or hyphen/underscore
+    name_part, _ = os.path.splitext(sanitized_base_name)
     name_part = re.sub(r'[^\w\-]', '', name_part)
-    
-    # Sanitize the extension part (optional, as new_ext will overwrite it anyway)
-    # For extra safety, ensure ext_part does not contain path separators or dangerous chars
-    ext_part = re.sub(r'[^\w\.]', '', ext_part) # Keep only alphanumeric and dot for extension
 
-    # Reconstruct a safe base name; new_ext will be the final extension
-    safe_base_name = f"{name_part}{ext_part}" 
-
-    if not safe_base_name or safe_base_name in (".", ".."):
-        logging.error(f"Invalid or sanitized-away filename from original path: '{original_path}' resulted in an empty or invalid name.")
+    if not name_part or name_part in (".", ".."):
         raise ValueError(f"Invalid filename derived from original path: '{original_path}'")
 
-    # Construct the final filename: prefix + sanitized_name + new_ext
     final_filename = f"{prefix}{name_part}{new_ext}"
-    
-    # 3. Construct the full candidate path and perform the final check
-    candidate_file_path = output_path_obj / final_filename
-    resolved_candidate_file_path = candidate_file_path.resolve()
-    
-    # Final check to ensure the candidate path is within the resolved output directory.
-    if not resolved_candidate_file_path.is_relative_to(output_path_obj):
-        logging.error(f"Path traversal attempt detected for final file path: '{resolved_candidate_file_path}' is outside output directory '{output_path_obj}'.")
-        raise ValueError(f"Path traversal attempt detected for final file path: '{resolved_candidate_file_path}'.")
-        
-    return str(resolved_candidate_file_path)
+    return str(output_path_obj / final_filename)
 
 
 def extract_text_from_image(image_bytes: bytes) -> str:

@@ -381,7 +381,7 @@ analyzer.analyze(text, entities=entities_to_use)
 # Explicit strategy selection
 python anon.py data.txt --anonymization-strategy filtered
 
-# Or using default (presidio is the default strategy)
+# Or using default (filtered is the default strategy)
 python anon.py data.txt
 ```
 
@@ -1579,8 +1579,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = ''
 python anon.py file.txt --anonymization-strategy <strategy>
 
 # Available strategies
---anonymization-strategy presidio      # FullPresidio (default, maximum coverage)
---anonymization-strategy filtered      # FilteredPresidio (filtered scope)
+--anonymization-strategy filtered      # FilteredPresidio (default, filtered scope)
+--anonymization-strategy presidio      # FullPresidio (maximum coverage)
 --anonymization-strategy hybrid        # HybridPresidio (custom logic)
 --anonymization-strategy standalone    # Standalone (maximum speed)
 --anonymization-strategy slm           # SLM (experimental)
@@ -1600,7 +1600,7 @@ python anon.py file.txt --anonymization-strategy <strategy>
 
 ```yaml
 v3.0 (Current):
-  - Strategy names: presidio (default), filtered, hybrid, standalone, slm
+  - Strategy names: filtered (default), presidio, hybrid, standalone, slm
   - Centralized RegexPatterns class (DRY principle)
   - Standalone strategy implementation (no Presidio dependencies)
   - Automatic GPU detection via torch.cuda.is_available()

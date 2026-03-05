@@ -44,7 +44,10 @@ RUN uv sync --no-cache --no-dev \
     && find .venv -type d -name tests -exec rm -rf {} + 2>/dev/null || true \
     && find .venv -name "*.pyc" -delete 2>/dev/null || true
 
-# ----------------------------------------------------------------------------- 
+# Download spaCy models into the venv so they persist in the image
+RUN .venv/bin/python -m spacy download en_core_web_lg
+
+# -----------------------------------------------------------------------------
 # Stage 2: CPU Runtime (minimal, no build tools)
 # ----------------------------------------------------------------------------- 
 FROM python:3.12-slim AS production
@@ -114,6 +117,9 @@ RUN uv sync --no-cache --no-dev \
     && find .venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find .venv -type d -name tests -exec rm -rf {} + 2>/dev/null || true \
     && find .venv -name "*.pyc" -delete 2>/dev/null || true
+
+# Download spaCy models into the venv so they persist in the image
+RUN .venv/bin/python -m spacy download en_core_web_lg
 
 # -----------------------------------------------------------------------------
 # Stage 4: GPU Runtime (no build tools, no uv)
