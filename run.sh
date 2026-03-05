@@ -210,7 +210,7 @@ main() {
             docker_args=("--runtime=nvidia" "${docker_args[@]}")
         fi
         
-        local image="kapelinsky/anon:gpu"
+        local image="anonshield/anon:gpu"
         docker run "${docker_args[@]}" "$image" "${anon_args[@]}"
     else
         docker compose -f "$COMPOSE_FILE" --profile "$profile" run --rm "$service" "${anon_args[@]}"

@@ -29,7 +29,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: production
-    image: anon:latest
+    image: anonshield/anon:latest
     container_name: anon-cpu
     environment:
       - ANON_SECRET_KEY=${ANON_SECRET_KEY:-change-me-in-production}
@@ -55,7 +55,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: gpu
-    image: anon:gpu
+    image: anonshield/anon:gpu
     container_name: anon-gpu
     environment:
       - ANON_SECRET_KEY=${ANON_SECRET_KEY:-change-me-in-production}
