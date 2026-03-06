@@ -483,7 +483,8 @@ def main():
         logging.info("CUDA not detected by PyTorch. Running on CPU.")
 
     # --- SECRET_KEY Validation (Early Exit) ---
-    if not args.generate_ner_data and not SECRET_KEY:
+    # slug_length=0 means entity type only (no HMAC), so no key needed
+    if not args.generate_ner_data and not SECRET_KEY and args.slug_length != 0:
         logging.error("ANON_SECRET_KEY or ANON_SECRET_KEY_FILE not set for anonymization.")
         sys.exit(1)
 
