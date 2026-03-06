@@ -30,8 +30,8 @@ Modular pseudonymization framework for Cybersecurity Incident Response Teams. An
 ### Step 1 — Download the wrapper script
 
 ```bash
-curl -fsSL https://github.com/AnonShield/tool/raw/main/docker/run-docker.sh -o run-docker.sh
-chmod +x run-docker.sh
+curl -fsSL https://raw.githubusercontent.com/AnonShield/runshanondocker/main/run.sh -o run.sh
+chmod +x run.sh
 ```
 
 ### Step 2 — Generate a secret key
@@ -47,41 +47,38 @@ To keep it across terminal sessions:
 echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
 ```
 
-### Step 3 — Put your files in `./anon/input/`
+### Step 3 — Anonymize
 
-The script creates an `./anon/` folder in your current directory to keep everything in one place:
-
-```
-./anon/
-├── input/    ← put your files here
-├── output/   ← anonymized files appear here
-└── models/   ← NER model cached here on first run (~1 GB, automatic)
-```
-
-```bash
-cp /path/to/YOUR_FILE.csv ./anon/input/
-```
-
-### Step 4 — Anonymize
+Pass any file or folder — relative or absolute path:
 
 **Single file (CPU):**
 ```bash
-./run-docker.sh ./anon/input/YOUR_FILE.csv
+./run.sh ./YOUR_FILE.csv
 ```
 
 **Single file (GPU):**
 ```bash
-./run-docker.sh --gpu ./anon/input/YOUR_FILE.csv
+./run.sh --gpu ./YOUR_FILE.csv
 ```
 
-**Entire input folder:**
+**Entire folder:**
 ```bash
-./run-docker.sh ./anon/input/
+./run.sh ./your/folder/
 ```
 
-Output is written to `./anon/output/anon_YOUR_FILE.csv`.
+Output is written to `./anon/output/anon_YOUR_FILE.csv`. The script automatically creates an `./anon/` folder in your current directory:
+
+```
+./anon/
+├── input/    ← optional: put files here if you prefer
+├── output/   ← anonymized files appear here
+├── db/       ← entity mapping database (keep this to de-anonymize later)
+└── models/   ← NER model cached here on first run (~1 GB, automatic)
+```
 
 > **On first run:** the NER transformer model (~1 GB) is downloaded automatically to `./anon/models/` and reused on all subsequent runs.
+
+> **Note:** If you don't need to de-anonymize later, use `--slug-length 0` — entities are replaced with their type only (e.g. `[IP_ADDRESS]`) and no secret key is required.
 
 ---
 
@@ -97,7 +94,7 @@ Output is written to `./anon/output/anon_YOUR_FILE.csv`.
 | `--anonymization-strategy <s>` | Detection strategy — see below | `filtered` |
 | `--optimize` | Enable all performance optimizations | off |
 
-Run `./run-docker.sh --help` for the full options list.
+Run `./run.sh --help` for the full options list.
 
 ---
 
@@ -165,7 +162,7 @@ With this config: `severity`, `port`, etc. are preserved; `asset.ipv4_addresses`
 Save the config anywhere and pass its path:
 
 ```bash
-./run-docker.sh ./YOUR_FILE.json --anonymization-config ./anon_config.json
+./run.sh ./YOUR_FILE.json --anonymization-config ./anon_config.json
 ```
 
 **Performance impact (GPU · NVIDIA RTX 5060 Ti · 70,951 vulnerability records):**
@@ -185,32 +182,32 @@ The config gain is larger for Presidio-based strategies because they have a high
 
 **Portuguese document:**
 ```bash
-./run-docker.sh ./YOUR_FILE.pdf --lang pt
+./run.sh ./YOUR_FILE.pdf --lang pt
 ```
 
 **Preserve hostnames and IPs (don't anonymize them):**
 ```bash
-./run-docker.sh ./YOUR_FILE.txt --preserve-entities "HOSTNAME,IP_ADDRESS"
+./run.sh ./YOUR_FILE.txt --preserve-entities "HOSTNAME,IP_ADDRESS"
 ```
 
 **Structured file with field-level config:**
 ```bash
-./run-docker.sh ./YOUR_FILE.json --anonymization-config ./anon_config.json
+./run.sh ./YOUR_FILE.json --anonymization-config ./anon_config.json
 ```
 
 **GPU with cybersecurity-focused NER model:**
 ```bash
-./run-docker.sh --gpu ./YOUR_FILE.txt --transformer-model attack-vector/SecureModernBERT-NER
+./run.sh --gpu ./YOUR_FILE.txt --transformer-model attack-vector/SecureModernBERT-NER
 ```
 
 **Entire folder, output to a separate directory:**
 ```bash
-./run-docker.sh ./reports/ --output-dir ./results/
+./run.sh ./reports/ --output-dir ./results/
 ```
 
 **List all supported entity types:**
 ```bash
-./run-docker.sh --list-entities
+./run.sh --list-entities
 ```
 
 ---
@@ -244,4 +241,4 @@ docker run --rm --runtime=nvidia --gpus all anonshield/anon:gpu /data/file.txt .
 
 **Cybersecurity (custom recognizers):** `IP_ADDRESS`, `URL`, `HOSTNAME`, `MAC_ADDRESS`, `FILE_PATH`, `HASH`, `AUTH_TOKEN`, `CVE_ID`, `CPE_STRING`, `CERT_SERIAL`, `CERTIFICATE`, `CRYPTOGRAPHIC_KEY`, `UUID`, `PGP_BLOCK`, `PORT`, `OID`
 
-Run `./run-docker.sh --list-entities` for the full list.
+Run `./run.sh --list-entities` for the full list.
