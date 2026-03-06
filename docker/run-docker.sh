@@ -170,8 +170,29 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
             NEW_ARGS+=(--anonymization-config=/anon_config/"$(basename "$host")")
             ;;
 
+        --word-list)
+            i=$((i+1))
+            val="${ARGS[$i]}"
+            host=$(abs_path "$val")
+            VOLUMES+=(-v "$(dirname "$host")":/anon_wordlist:ro)
+            NEW_ARGS+=(--word-list /anon_wordlist/"$(basename "$host")")
+            ;;
+
+        --word-list=*)
+            val="${arg#--word-list=}"
+            host=$(abs_path "$val")
+            VOLUMES+=(-v "$(dirname "$host")":/anon_wordlist:ro)
+            NEW_ARGS+=(--word-list=/anon_wordlist/"$(basename "$host")")
+            ;;
+
         --*)
             NEW_ARGS+=("$arg")
+            # If next arg exists and doesn't start with --, it's the flag's value
+            next_i=$((i+1))
+            if [[ $next_i -lt ${#ARGS[@]} && "${ARGS[$next_i]}" != --* ]]; then
+                i=$next_i
+                NEW_ARGS+=("${ARGS[$i]}")
+            fi
             ;;
 
         *)
