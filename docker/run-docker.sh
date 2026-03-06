@@ -6,18 +6,19 @@
 # together: input files, output, and the NER model cache.
 #
 #   ./anon/
-#   ├── input/    ← put your files here
+#   ├── input/    ← optional: put files here if you prefer
 #   ├── output/   ← anonymized files appear here
+#   ├── db/       ← entity mapping database (needed for de-anonymization)
 #   └── models/   ← NER model cached here on first run (~1 GB, automatic)
 #
 # Usage:
 #   export ANON_SECRET_KEY=$(openssl rand -hex 32)
 #
-#   ./run-docker.sh ./anon/input/YOUR_FILE.csv
-#   ./run-docker.sh ./anon/input/                     # entire input folder
-#   ./run-docker.sh --gpu ./anon/input/YOUR_FILE.csv  # GPU
-#   ./run-docker.sh --help
-#   ./run-docker.sh --list-entities
+#   ./run.sh ./YOUR_FILE.csv
+#   ./run.sh ./your/folder/                     # entire folder
+#   ./run.sh --gpu ./YOUR_FILE.csv              # GPU
+#   ./run.sh --help
+#   ./run.sh --list-entities
 #
 # Override the base folder:
 #   ANON_DIR=./my-project/ ./run-docker.sh ./my-project/input/file.csv
@@ -50,6 +51,7 @@ abs_path() {
 ANON_DIR="${ANON_DIR:-$(pwd)/anon}"
 MODELS_DIR="$ANON_DIR/models"
 DEFAULT_OUTPUT="$ANON_DIR/output"
+DB_DIR="$ANON_DIR/db"
 
 # ---------------------------------------------------------------------------
 # Parse --gpu (consumed here, not forwarded)
@@ -85,7 +87,7 @@ fi
 # ---------------------------------------------------------------------------
 # Create folder structure
 # ---------------------------------------------------------------------------
-mkdir -p "$MODELS_DIR" "$DEFAULT_OUTPUT" "$ANON_DIR/input"
+mkdir -p "$MODELS_DIR" "$DEFAULT_OUTPUT" "$ANON_DIR/input" "$DB_DIR"
 
 # ---------------------------------------------------------------------------
 # Select image
@@ -120,7 +122,7 @@ fi
 #   --output-dir    → /anon_output
 #   --anonymization-config → /anon_config/filename
 # ---------------------------------------------------------------------------
-VOLUMES=(-v "$MODELS_DIR":/app/models)
+VOLUMES=(-v "$MODELS_DIR":/app/models -v "$DB_DIR":/app/db)
 NEW_ARGS=()
 INPUT_SET=0
 OUTPUT_SET=0
@@ -177,6 +179,10 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
             if [[ $INPUT_SET -eq 0 ]]; then
                 INPUT_SET=1
                 host=$(abs_path "$arg")
+                if [[ ! -e "$host" ]]; then
+                    log_error "Input not found: $arg"
+                    exit 1
+                fi
                 if [[ -d "$host" ]]; then
                     VOLUMES+=(-v "$host":/anon_input:ro)
                     NEW_ARGS+=(/anon_input)
