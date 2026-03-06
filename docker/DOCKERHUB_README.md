@@ -27,25 +27,44 @@ Modular pseudonymization framework for Cybersecurity Incident Response Teams. An
 
 ## Quick Start
 
+> **The only prerequisite is Docker.** Install it for your OS: [Linux](https://docs.docker.com/engine/install/) · [macOS](https://docs.docker.com/desktop/setup/install/mac-install/) · [Windows](https://docs.docker.com/desktop/setup/install/windows-install/). Everything else is already included in your operating system.
+
 ### Step 1 — Download the wrapper script
 
+**Linux / macOS** — open a terminal:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/AnonShield/runshanondocker/main/run.sh -o run.sh
 chmod +x run.sh
 ```
 
+**Windows** — open **PowerShell**:
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/runshanondocker/main/run.sh -OutFile run.sh
+```
+
+> `curl` is built into Linux and macOS. `Invoke-WebRequest` is built into Windows 10/11. No extra installation needed.
+
 ### Step 2 — Generate a secret key
 
-The key is used to generate pseudonyms. You'll need it again to de-anonymize — keep it safe.
+The key is used to generate pseudonyms. Keep it safe — you will need it again to de-anonymize.
 
+**Linux / macOS:**
 ```bash
 export ANON_SECRET_KEY=$(openssl rand -hex 32)
 ```
 
 To keep it across terminal sessions:
 ```bash
-echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
+echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc   # Linux
+echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.zshrc    # macOS
 ```
+
+**Windows (PowerShell):**
+```powershell
+$env:ANON_SECRET_KEY = [System.BitConverter]::ToString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).Replace("-","").ToLower()
+```
+
+To keep it across sessions, go to **Settings → System → Environment Variables**, add a new variable named `ANON_SECRET_KEY` with that value.
 
 ### Step 3 — Anonymize
 
