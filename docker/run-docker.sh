@@ -2,18 +2,25 @@
 # =============================================================================
 # AnonLFI — Docker wrapper
 #
+# Creates an ./anon/ folder in your current directory to keep everything
+# together: input files, output, and the NER model cache.
+#
+#   ./anon/
+#   ├── input/    ← put your files here
+#   ├── output/   ← anonymized files appear here
+#   └── models/   ← NER model cached here on first run (~1 GB, automatic)
+#
 # Usage:
 #   export ANON_SECRET_KEY=$(openssl rand -hex 32)
 #
-#   ./run-docker.sh /path/to/file.csv
-#   ./run-docker.sh /path/to/file.csv --output-dir /path/to/results/
-#   ./run-docker.sh /path/to/scans/                   # entire directory
-#   ./run-docker.sh --gpu /path/to/file.csv           # GPU
+#   ./run-docker.sh ./anon/input/YOUR_FILE.csv
+#   ./run-docker.sh ./anon/input/                     # entire input folder
+#   ./run-docker.sh --gpu ./anon/input/YOUR_FILE.csv  # GPU
 #   ./run-docker.sh --help
 #   ./run-docker.sh --list-entities
 #
-# Models are cached in ~/.cache/anonshield/models/ (shared across runs).
-# Override with: export ANON_MODELS_DIR=/your/path
+# Override the base folder:
+#   ANON_DIR=./my-project/ ./run-docker.sh ./my-project/input/file.csv
 # =============================================================================
 
 set -euo pipefail
@@ -27,7 +34,7 @@ log_info()  { echo -e "${BLUE}[anon]${NC} $1"; }
 log_ok()    { echo -e "${GREEN}[anon]${NC} $1"; }
 log_error() { echo -e "${RED}[anon]${NC} $1"; }
 
-# Resolve a path to absolute (works on Linux and macOS, no realpath required)
+# Portable absolute path resolver (works on Linux and macOS)
 abs_path() {
     local p="$1"
     if [[ -d "$p" ]]; then
@@ -36,6 +43,13 @@ abs_path() {
         echo "$(cd "$(dirname "$p")" 2>/dev/null && pwd || pwd)/$(basename "$p")"
     fi
 }
+
+# ---------------------------------------------------------------------------
+# Base directory — everything lives here
+# ---------------------------------------------------------------------------
+ANON_DIR="${ANON_DIR:-$(pwd)/anon}"
+MODELS_DIR="$ANON_DIR/models"
+DEFAULT_OUTPUT="$ANON_DIR/output"
 
 # ---------------------------------------------------------------------------
 # Parse --gpu (consumed here, not forwarded)
@@ -69,10 +83,9 @@ if [[ -z "${ANON_SECRET_KEY:-}" && $IS_INFO_CMD -eq 0 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Models cache (shared across all projects)
+# Create folder structure
 # ---------------------------------------------------------------------------
-MODELS_DIR="${ANON_MODELS_DIR:-$HOME/.cache/anonshield/models}"
-mkdir -p "$MODELS_DIR"
+mkdir -p "$MODELS_DIR" "$DEFAULT_OUTPUT" "$ANON_DIR/input"
 
 # ---------------------------------------------------------------------------
 # Select image
@@ -156,7 +169,6 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
             ;;
 
         --*)
-            # Any other flag: pass through unchanged
             NEW_ARGS+=("$arg")
             ;;
 
@@ -181,10 +193,9 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
     i=$((i+1))
 done
 
-# Default output: ./output/ next to where the script is run
+# Default output: ./anon/output/
 if [[ $OUTPUT_SET -eq 0 ]]; then
-    OUTPUT_HOST="$(pwd)/output"
-    mkdir -p "$OUTPUT_HOST"
+    OUTPUT_HOST="$DEFAULT_OUTPUT"
     VOLUMES+=(-v "$OUTPUT_HOST":/anon_output)
     NEW_ARGS+=(--output-dir /anon_output)
 fi
