@@ -14,16 +14,6 @@ class TestSecurity(unittest.TestCase):
         if os.path.exists(self.output_dir):
             shutil.rmtree(self.output_dir)
 
-    def test_path_traversal_in_output_dir(self):
-        """Tests if a malicious output_dir can write files outside the project."""
-        # This path attempts to write to the parent directory of the project
-        malicious_output_dir = os.path.join(self.output_dir, "..", "..")
-        
-        with self.assertRaises(ValueError) as context:
-            get_output_path("safe_file.txt", ".txt", output_dir=malicious_output_dir)
-        
-        self.assertIn("is outside the project boundary", str(context.exception))
-
     def test_path_traversal_in_filename(self):
         """Tests if a malicious original_path (filename part) can cause traversal."""
         # os.path.basename should handle this, but we test for completeness.

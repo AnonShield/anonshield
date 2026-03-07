@@ -46,7 +46,7 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/runshanondoc
 
 ### Step 2 — Generate a secret key
 
-The key is used to generate pseudonyms. Keep it safe — you will need it again to de-anonymize.
+The key is used to generate pseudonyms. To de-anonymize later, you only need the `db/` database folder — not the key itself.
 
 **Linux / macOS:**
 ```bash
@@ -110,8 +110,11 @@ Output is written to `./anon/output/anon_YOUR_FILE.csv`. The script automaticall
 | `--preserve-entities <types>` | Comma-separated entity types to skip (e.g. `LOCATION,IP_ADDRESS`) | — |
 | `--allow-list <terms>` | Comma-separated terms to never anonymize | — |
 | `--slug-length <n>` | Hash length in the anonymized slug (0–64) | `64` |
+| `--word-list <path>` | JSON file of known terms to always anonymize (internal names, acronyms, etc.) | — |
 | `--anonymization-strategy <s>` | Detection strategy — see below | `filtered` |
 | `--optimize` | Enable all performance optimizations | off |
+
+For the complete reference with examples for every option, see the **[CLI Reference on GitHub](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md)**.
 
 Run `./run.sh --help` for the full options list.
 
@@ -151,6 +154,30 @@ Choose with `--anonymization-strategy <name>`.
 | `presidio` | 71.6 % | 96.7 % | 82.3 % | Many false positives. Rarely the best choice. |
 
 **Recommendation:** `filtered` (default) gives the best accuracy at a small throughput cost. Use `standalone` on GPU for maximum throughput.
+
+---
+
+## Word List (`--word-list`)
+
+If your organization uses internal names, system names, acronyms, or codenames that a general NER model might not recognize, you can supply a JSON file listing them. Every term in the list is always anonymized, regardless of context.
+
+**Format:** a JSON object where each key is a category and the value is a list of terms.
+
+```json
+{
+  "organizations": ["AcmeCorp", "CSIRT-BR", "ProjectPhoenix"],
+  "sistemas": ["SIEM-Alpha", "FW-CORE-01", "PROXY-DMZ"],
+  "persons": ["Jane Doe", "Carlos Souza"],
+  "hostnames": ["fw-edge.internal", "siem.corp.local"],
+  "ips": ["10.0.0.1", "192.168.100.254"]
+}
+```
+
+```bash
+./run.sh ./incident_report.txt --word-list ./my_terms.json
+```
+
+Supported category keys: `organizations`, `organization`, `sistemas`, `systems`, `acronyms`, `acronimos`, `persons`, `pessoas`, `emails`, `hostnames`, `ips`.
 
 ---
 
@@ -209,6 +236,11 @@ The config gain is larger for Presidio-based strategies because they have a high
 ./run.sh ./YOUR_FILE.txt --preserve-entities "HOSTNAME,IP_ADDRESS"
 ```
 
+**Always anonymize known internal terms:**
+```bash
+./run.sh ./YOUR_FILE.txt --word-list ./internal_terms.json
+```
+
 **Structured file with field-level config:**
 ```bash
 ./run.sh ./YOUR_FILE.json --anonymization-config ./anon_config.json
@@ -261,3 +293,9 @@ docker run --rm --runtime=nvidia --gpus all anonshield/anon:gpu /data/file.txt .
 **Cybersecurity (custom recognizers):** `IP_ADDRESS`, `URL`, `HOSTNAME`, `MAC_ADDRESS`, `FILE_PATH`, `HASH`, `AUTH_TOKEN`, `CVE_ID`, `CPE_STRING`, `CERT_SERIAL`, `CERTIFICATE`, `CRYPTOGRAPHIC_KEY`, `UUID`, `PGP_BLOCK`, `PORT`, `OID`
 
 Run `./run.sh --list-entities` for the full list.
+
+---
+
+## Full CLI Reference
+
+Every option explained in plain language with examples: **[docs/users/CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md)**

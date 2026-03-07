@@ -21,7 +21,7 @@
 #   ./run.sh --list-entities
 #
 # Override the base folder:
-#   ANON_DIR=./my-project/ ./run-docker.sh ./my-project/input/file.csv
+#   ANON_DIR=./my-project/ ./docker/run.sh ./my-project/input/file.csv
 # =============================================================================
 
 set -euo pipefail
@@ -63,11 +63,16 @@ for arg in "$@"; do
 done
 
 # ---------------------------------------------------------------------------
-# Detect info-only commands (no key needed, no path remapping)
+# Detect info-only commands and slug-length 0 (no key needed)
 # ---------------------------------------------------------------------------
 IS_INFO_CMD=0
+SLUG_ZERO=0
+prev=""
 for arg in "${ARGS[@]:-}"; do
     [[ "$arg" == "--help" || "$arg" == --list-* ]] && IS_INFO_CMD=1
+    [[ "$prev" == "--slug-length" && "$arg" == "0" ]] && SLUG_ZERO=1
+    [[ "$arg" == "--slug-length=0" ]] && SLUG_ZERO=1
+    prev="$arg"
 done
 
 # ---------------------------------------------------------------------------
@@ -78,7 +83,7 @@ if ! docker info &>/dev/null; then
     exit 1
 fi
 
-if [[ -z "${ANON_SECRET_KEY:-}" && $IS_INFO_CMD -eq 0 ]]; then
+if [[ -z "${ANON_SECRET_KEY:-}" && $IS_INFO_CMD -eq 0 && $SLUG_ZERO -eq 0 ]]; then
     log_error "ANON_SECRET_KEY is not set."
     log_error "Generate one:  export ANON_SECRET_KEY=\$(openssl rand -hex 32)"
     exit 1

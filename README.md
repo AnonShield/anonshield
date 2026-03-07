@@ -1,6 +1,8 @@
-# AnonLFI 3.0: PII Pseudonymization Framework for CSIRTs
+# AnonLFI 3.0 — PII Pseudonymization for CSIRTs
 
-AnonLFI 3.0 is a modular pseudonymization framework for CSIRTs that resolves the conflict between data confidentiality (GDPR/LGPD) and analytical utility. It uses HMAC-SHA256 to generate stable, reversible pseudonyms, natively preserves XML and JSON structures, and integrates OCR and specialized cybersecurity recognizers to handle PII in complex security artifacts.
+AnonLFI 3.0 is a modular pseudonymization framework for Cybersecurity Incident Response Teams (CSIRTs). It anonymizes personally identifiable information (PII) and cybersecurity indicators using HMAC-SHA256, generating stable and reversible pseudonyms. It natively preserves the structure of JSON, XML, and CSV files, integrates OCR for PDFs and images, and ships with specialized recognizers for cybersecurity artifacts (IP addresses, CVE IDs, hashes, URLs, and more).
+
+Designed to help teams share incident data, comply with GDPR/LGPD, and feed anonymized datasets into security tools — without sacrificing analytical utility.
 
 ---
 
@@ -8,18 +10,17 @@ AnonLFI 3.0 is a modular pseudonymization framework for CSIRTs that resolves the
 
 ### Docker (Recommended)
 
-- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
-- **GPU only:** NVIDIA GPU + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+The only prerequisite is [Docker](https://docs.docker.com/get-docker/). All other dependencies — Python, Tesseract, spaCy, and transformer models — are bundled inside the container and managed automatically.
 
-All other dependencies (Python, Tesseract, spaCy, transformer models) are handled automatically inside the container. Models are downloaded on first use and cached in Docker volumes for subsequent runs.
+- **GPU:** Also requires an NVIDIA GPU and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 
-### Local
+### Local Installation
 
 - Python 3.12 with [`uv`](https://astral.sh/uv):
   ```bash
   curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
-- Tesseract OCR (for PDF/image/DOCX files):
+- Tesseract OCR (required for PDF, image, and DOCX files):
   - Ubuntu/Debian: `sudo apt update && sudo apt install tesseract-ocr`
   - macOS: `brew install tesseract`
   - Windows: [Tesseract documentation](https://github.com/tesseract-ocr/tesseract#installing-tesseract)
@@ -36,7 +37,7 @@ cd AnonLFI3.0
 
 **Docker:**
 ```bash
-chmod +x run.sh
+chmod +x docker/run.sh
 ```
 
 **Local (CPU):**
@@ -44,7 +45,7 @@ chmod +x run.sh
 uv sync
 ```
 
-**Local (GPU):** after `uv sync`, replace torch with the CUDA 12.8 build and install CuPy:
+**Local (GPU):** after `uv sync`, install the CUDA 12.8 PyTorch build and CuPy:
 ```bash
 uv sync
 .venv/bin/pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128
@@ -55,13 +56,19 @@ uv sync
 
 ## Setting the Secret Key
 
-The secret key is **required** for anonymization and de-anonymization. The tool will not run without it.
+The secret key is **required** for anonymization (except when using `--slug-length 0`). It is used to generate pseudonyms and must be kept safe — you will need it again to de-anonymize output later.
 
+**Linux / macOS:**
 ```bash
-export ANON_SECRET_KEY='your-super-secret-key-here'
+export ANON_SECRET_KEY=$(openssl rand -hex 32)
+# To persist across sessions:
+echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
 ```
 
-Keep this key safe — it is needed to de-anonymize output later.
+**Windows (PowerShell):**
+```powershell
+$env:ANON_SECRET_KEY = [System.BitConverter]::ToString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).Replace("-","").ToLower()
+```
 
 ---
 
@@ -70,7 +77,7 @@ Keep this key safe — it is needed to de-anonymize output later.
 ### Local
 
 ```bash
-# Single file → output saved to output/anon_<filename>.<ext>
+# Single file — output saved to output/anon_<filename>.<ext>
 uv run anon.py path/to/your/file.txt
 
 # Entire directory (recursive)
@@ -79,37 +86,26 @@ uv run anon.py path/to/your/directory/
 
 ### Docker
 
-The `run.sh` script mounts `../data` (relative to the project root) as `/data` inside the container. Place your input files there:
+> The pre-built image is available on [Docker Hub](https://hub.docker.com/repository/docker/anonshield/anon/general). For end-users installing via Docker Hub, follow the quick-start steps there (download wrapper script → set key → anonymize).
 
+Pass any local file or folder path directly — the script handles volume mounting automatically:
+
+**CPU:**
 ```bash
-# From the project root (AnonLFI3.0/)
-mkdir -p ../data
-cp /path/to/your/file.txt ../data/
-
-# Or point to a custom directory
-export DATA_DIR=/absolute/path/to/your/data
+./docker/run.sh ./your_file.csv
 ```
 
-**CPU (builds the image locally on first run):**
+**GPU:**
 ```bash
-./run.sh /data/file.txt
+./docker/run.sh --gpu ./your_file.csv
 ```
 
-**GPU (pulls the pre-built image `kapelinsky/anon:gpu` from Docker Hub):**
+**Entire folder:**
 ```bash
-./run.sh --gpu /data/file.txt
+./docker/run.sh ./reports/
 ```
 
-> On first run, spaCy and transformer models (~1–2 GB) are downloaded automatically and cached in Docker volumes. GPU runs also pull the CUDA-enabled image (~5 GB) on first use.
-
-**Retrieving the output** (output is stored in a Docker volume):
-```bash
-# After a CPU run
-docker cp anon-cpu:/app/output ./output
-
-# After a GPU run
-docker cp anon-gpu:/app/output ./output
-```
+Output lands in `./anon/output/` (created automatically). On first run, NER models (~1–2 GB) are downloaded and cached in `./anon/models/` for all subsequent runs.
 
 Output files are named `anon_<original_filename>.<ext>`.
 
@@ -117,11 +113,13 @@ Output files are named `anon_<original_filename>.<ext>`.
 
 ## De-anonymization
 
-To recover an original entity from a slug, use the same `ANON_SECRET_KEY`:
+To recover the original value for a pseudonymized slug, you need the **database** (`db/entities.db`) that was created during the anonymization run. No secret key is required for lookup — the mapping is stored directly in the database.
 
 ```bash
 uv run scripts/deanonymize.py "[PERSON_a1b2c3d4]"
 ```
+
+> Keep the `db/` folder safe — it is the only way to reverse the anonymization.
 
 ---
 
@@ -129,22 +127,25 @@ uv run scripts/deanonymize.py "[PERSON_a1b2c3d4]"
 
 | Option | Description | Default |
 |:-------|:------------|:--------|
-| `--lang <code>` | Document language (e.g., `en`, `pt`) | `en` |
-| `--output-dir <PATH>` | Output directory | `output/` |
-| `--preserve-entities <TYPES>` | Entity types to skip (e.g., `LOCATION,HOSTNAME`) | — |
-| `--allow-list <TERMS>` | Terms to ignore during anonymization | — |
-| `--slug-length <NUM>` | Hash length in slug (0–64) | `64` |
-| `--anonymization-strategy <s>` | `filtered` (default), `presidio`, `hybrid`, `standalone` | `filtered` |
-| `--anonymization-config <PATH>` | JSON config for field-level control in structured files | — |
-| `--optimize` | Enable all performance optimizations | off |
+| `--lang <code>` | Document language (e.g., `en`, `pt`, `es`) | `en` |
+| `--output-dir <path>` | Output directory for anonymized files | `output/` |
+| `--preserve-entities <types>` | Comma-separated entity types to skip (e.g., `LOCATION,IP_ADDRESS`) | — |
+| `--allow-list <terms>` | Comma-separated terms to never anonymize | — |
+| `--slug-length <n>` | Hash length in the pseudonym (0–64). `0` = type label only, no key needed. | `64` |
+| `--word-list <path>` | Path to a JSON file of known terms to always anonymize | — |
+| `--anonymization-strategy <s>` | Detection engine: `filtered` (default), `presidio`, `hybrid`, `standalone` | `filtered` |
+| `--anonymization-config <path>` | JSON config for field-level control in structured files | — |
+| `--optimize` | Enable all performance optimizations at once | off |
 
-For the full options reference, performance tuning, and advanced configuration for structured files (JSON/XML/CSV), see [docs/ADVANCED_OPTIONS.md](docs/ADVANCED_OPTIONS.md).
+For the complete argument reference with examples for every option, see **[docs/users/CLI_REFERENCE.md](docs/users/CLI_REFERENCE.md)**.
 
 ---
 
 ## Supported File Formats
 
 `.txt` `.log` `.csv` `.xlsx` `.json` `.jsonl` `.xml` `.pdf` `.docx` `.png` `.jpg` `.gif` `.bmp` `.tiff` `.webp`
+
+---
 
 ## Detected Entity Types
 
@@ -158,6 +159,23 @@ Run `uv run anon.py --list-entities` for the full list, or `--list-languages` fo
 
 ---
 
+## Anonymization Strategies
+
+Choose with `--anonymization-strategy <name>`:
+
+| Strategy | F1 (accuracy) | GPU throughput | Description |
+|----------|:-------------:|:--------------:|-------------|
+| `filtered` (default) | **94.2 %** | 627 KB/s | Best accuracy. Curated Presidio recognizer set. |
+| `hybrid` | **94.2 %** | 632 KB/s | Same accuracy, manual text replacement. |
+| `standalone` | 91.1 % | **1,250 KB/s** | Fastest on GPU. Bypasses Presidio entirely. |
+| `presidio` | 82.3 % | 575 KB/s | Full Presidio pipeline, more false positives. |
+
+> On GPU, `standalone` is **~4× faster** than `presidio`. On CPU the gap is ~15 %. Use `filtered` for accuracy, `standalone` for maximum GPU throughput.
+
+See [docs/developers/ANONYMIZATION_STRATEGIES.md](docs/developers/ANONYMIZATION_STRATEGIES.md) for full benchmarks.
+
+---
+
 ## Running Tests
 
 ```bash
@@ -168,11 +186,21 @@ uv run python -m unittest discover tests/
 
 ## Documentation
 
-- [docs/ADVANCED_OPTIONS.md](docs/ADVANCED_OPTIONS.md) — Full CLI reference, performance tuning, and advanced configuration for structured files
-- [docs/ANONYMIZATION_STRATEGIES.md](docs/ANONYMIZATION_STRATEGIES.md) — Strategy selection, regex patterns, and benchmark comparisons
-- [docs/EVALUATION_GUIDE.md](docs/EVALUATION_GUIDE.md) — Evaluation workflow with ground truth annotation and metrics
-- [docs/UTILITY_SCRIPTS_GUIDE.md](docs/UTILITY_SCRIPTS_GUIDE.md) — Helper scripts (de-anonymization, evaluation, dataset generation)
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System architecture, components, DB schema, and design patterns
-- [benchmark/README.md](benchmark/README.md) — Benchmarking suite documentation
+**For users:**
+
+| Document | Description |
+|----------|-------------|
+| [docs/users/CLI_REFERENCE.md](docs/users/CLI_REFERENCE.md) | **Complete CLI reference** — every argument explained with examples |
+
+**For developers:**
+
+| Document | Description |
+|----------|-------------|
+| [docs/developers/ARCHITECTURE.md](docs/developers/ARCHITECTURE.md) | System architecture, components, DB schema, and design patterns |
+| [docs/developers/ANONYMIZATION_STRATEGIES.md](docs/developers/ANONYMIZATION_STRATEGIES.md) | Strategy internals, regex patterns, and benchmark comparisons |
+| [docs/developers/UTILITY_SCRIPTS_GUIDE.md](docs/developers/UTILITY_SCRIPTS_GUIDE.md) | Helper scripts (de-anonymization, DB export, metrics) |
+| [docs/developers/EVALUATION_GUIDE.md](docs/developers/EVALUATION_GUIDE.md) | Evaluation workflow with ground truth annotation and metrics |
+| [docs/developers/SLM_INTEGRATION_GUIDE.md](docs/developers/SLM_INTEGRATION_GUIDE.md) | SLM/Ollama integration and experimental features |
+| [benchmark/README.md](benchmark/README.md) | Benchmarking suite documentation |
 
 ## License

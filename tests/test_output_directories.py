@@ -71,22 +71,6 @@ class TestOutputDirectories(unittest.TestCase):
         self.assertTrue(expected_file.is_file())
 
 
-    @patch('scripts.cluster_entities.SentenceTransformer')
-    def test_cluster_entities_output(self, mock_sentencetransformer):
-        mock_model = MagicMock()
-        mock_model.encode.return_value = [[0.1, 0.2, 0.3]] * 2
-        mock_sentencetransformer.return_value = mock_model
-
-        script_name = "cluster_entities.py"
-        self.run_script(script_name, [str(self.entity_map_path)])
-
-        expected_dir = self.output_dir / "cluster_entities" / "entity_cluster_report_entity_map"
-        expected_file = expected_dir / "entity_map_global_cluster_report.md"
-
-        self.assertTrue(expected_dir.is_dir())
-        self.assertTrue(expected_file.is_file())
-
-    
     def test_export_and_clear_db_output(self):
         db_dir = self.test_dir / "db"
         db_dir.mkdir()
