@@ -178,8 +178,12 @@ After batch processing, the orchestrator verifies input count == output count. O
 ├── pyproject.toml                   # Project metadata and dependencies
 ├── uv.lock                          # Dependency lock file
 ├── run.sh                           # Docker orchestration script
-├── anonymization_config.json        # Default anonymization config
-├── anonymization_config_cve.json    # CVE-specific config
+│
+├── examples/
+│   ├── anonymization_config.json    # Default anonymization config
+│   ├── anonymization_config_cve.json # CVE-specific config example
+│   ├── word_list.example.json       # Word list format example
+│   └── exemplo.docx / exemplo.xlsx  # Sample documents
 │
 ├── docker/
 │   ├── Dockerfile                   # Multi-stage build (CPU + GPU)

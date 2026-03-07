@@ -6,14 +6,14 @@ import orjson
 import shutil
 
 class TestNewConfigLogic(unittest.TestCase):
-    CONFIG_FILE = "anonymization_config.json"
+    CONFIG_FILE = "examples/anonymization_config.json"
     OUTPUT_DIR = "test_output_new_config"
     TEST_ARRAY_FILE = "tests/test_data_pytest/test_array.json"
     TEST_SHORT_WORD_FILE = "tests/test_data_pytest/test_short_words.json"
     TEST_AUTODETECT_FILE = "tests/test_data_pytest/test_autodetect.json"
 
     def setUp(self):
-        self.assertTrue(os.path.exists(self.CONFIG_FILE), "Main anonymization_config.json not found")
+        self.assertTrue(os.path.exists(self.CONFIG_FILE), "Main examples/anonymization_config.json not found")
         if os.path.exists(self.OUTPUT_DIR):
             shutil.rmtree(self.OUTPUT_DIR)
         os.makedirs(self.OUTPUT_DIR)

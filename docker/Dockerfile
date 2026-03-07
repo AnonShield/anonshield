@@ -72,7 +72,6 @@ COPY prompts/ /app/prompts/
 COPY tests/ /app/tests/
 COPY anon.py /app/
 COPY scripts/ /app/scripts/
-COPY anonymization_config.json /app/
 COPY docker/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && mkdir -p /app/models /app/output /app/logs /app/db
@@ -159,7 +158,6 @@ COPY prompts/ /app/prompts/
 COPY tests/ /app/tests/
 COPY anon.py /app/
 COPY scripts/ /app/scripts/
-COPY anonymization_config.json /app/
 COPY docker/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && mkdir -p /app/models /app/output /app/logs /app/db
