@@ -44,9 +44,6 @@ from src.anon.tqdm_handler import TqdmLoggingHandler
 warnings.filterwarnings("ignore")
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
-# Import standalone script functions for backward compatibility
-from scripts.sample import sample_data
-from scripts.generate_cve_dataset import generate_cve_dataset
 
 
 
@@ -220,11 +217,6 @@ def _parse_arguments():
     """Parses command-line arguments."""
     parser = argparse.ArgumentParser(description="Anonymize sensitive information or generate NER training data.")
     parser.add_argument("file_path", nargs='?', help="Path to the file or directory to be processed.")
-    
-    # Mode selection
-    parser.add_argument("--generate-ner-data", action="store_true", help="Enable NER data generation mode instead of anonymizing.")
-    parser.add_argument("--ner-include-all", action="store_true", help="Include all texts in NER output, even those without detected entities. Useful for training models to recognize non-PII text.")
-    parser.add_argument("--ner-aggregate-record", action="store_true", help="For JSON/JSONL files, aggregate each record into a single text line instead of extracting fields separately. Produces more contextual NER training data.")
 
     # General options
     parser.add_argument("--list-entities", action="store_true", help="List all supported entity types and exit.")
@@ -233,51 +225,33 @@ def _parse_arguments():
     parser.add_argument("--output-dir", type=str, default="output", help="Directory to save output files. Default is 'output'.")
     parser.add_argument("--overwrite", action="store_true", help="Allow overwriting of existing output files.")
     parser.add_argument("--no-report", action="store_true", help="Disable the creation of a performance report in the 'logs' directory.")
-    
+
     # Anonymization options
     parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve.")
-    parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to allow.")
-    parser.add_argument("--slug-length", type=int, default=DefaultSizes.DEFAULT_SLUG_LENGTH, help=f"Specify the length of the anonymized slug (0-64). If 0, only the entity type is used. Default: {DefaultSizes.DEFAULT_SLUG_LENGTH}.")
-    parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a JSON file with advanced anonymization rules for structured files.")
-    
-    # Sampling Options
-    sample_group = parser.add_argument_group('Sampling Options')
-    sample_group.add_argument("--sample", action="store_true", help="Enable sampling mode to generate a random sample from a file or directory.")
-    sample_group.add_argument("--sample-fraction", type=float, help="Fraction of items to sample (e.g., 0.1 for 10%%).")
-    sample_group.add_argument("--sample-size", type=int, help="Fixed number of items to sample.")
-    sample_group.add_argument("--stratify-by", type=str, help="Column or key to use for stratified sampling.")
-    sample_group.add_argument("--random-seed", type=int, help="Random seed for reproducible sampling.")
-
-    # CVE Dataset Generation Options
-    cve_group = parser.add_argument_group('CVE Dataset Generation Options')
-    cve_group.add_argument("--generate-cve-dataset", action="store_true", help="Generate a CVE dataset following CAIS vulnerability distribution (stratified sampling).")
-    cve_group.add_argument("--cais-file-path", type=str, help="Path to CAIS anonymized CSV or JSON file containing vulnerability data and frequencies.")
-    cve_group.add_argument("--cve-directory", type=str, default="/home/kapelinski/Downloads/cvelistV5-main/cves", 
-                           help="Path to cvelistV5 cves directory containing CVE JSON files organized by year. Default: cvelistV5-main/cves")
-    cve_group.add_argument("--output-format", type=str, default="jsonl", choices=["json", "jsonl", "csv"],
-                           help="Output format for generated CVE dataset. Default: jsonl")
+    parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to never anonymize.")
+    parser.add_argument("--slug-length", type=int, default=DefaultSizes.DEFAULT_SLUG_LENGTH, help=f"Length of the anonymized slug (0-64). If 0, only the entity type label is used and no secret key is required. Default: {DefaultSizes.DEFAULT_SLUG_LENGTH}.")
+    parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a .json file with field-level anonymization rules for structured files (JSON, CSV, XML). See documentation for format.")
+    parser.add_argument("--word-list", type=str, default=None, help="Path to a .json file mapping category names to lists of known terms that must always be anonymized (e.g. organization names, internal system names, acronyms).")
 
     # Performance & Filtering options
-    parser.add_argument("--preserve-row-context", action="store_true", help="For CSV/XLSX, process all values to preserve context instead of only unique values. Slower but more accurate.")
+    parser.add_argument("--preserve-row-context", action="store_true", help="For CSV/XLSX, process all values to preserve context instead of only unique values.")
     parser.add_argument("--json-stream-threshold-mb", type=int, default=ProcessingLimits.JSON_STREAM_THRESHOLD_MB, help=f"JSON streaming threshold in MB. Files larger than this will be streamed from disk. Default: {ProcessingLimits.JSON_STREAM_THRESHOLD_MB}")
-    parser.add_argument("--optimize", action="store_true", help="Enable all optimizations (filtered strategy, cache, min-word-length=3, in-memory DB).")
+    parser.add_argument("--optimize", action="store_true", help="Enable all optimizations (standalone strategy, cache, min-word-length=3, in-memory DB).")
     parser.add_argument("--use-cache", action="store_true", default=True, help="Enable in-memory caching for the run. Enabled by default. Use --no-use-cache to disable.")
     parser.add_argument("--no-use-cache", action="store_false", dest="use_cache", help="Disable in-memory caching for the run.")
     parser.add_argument("--max-cache-size", type=int, default=ProcessingLimits.MAX_CACHE_SIZE, help=f"Maximum number of items to store in the in-memory cache. Default: {ProcessingLimits.MAX_CACHE_SIZE}")
     parser.add_argument("--min-word-length", type=int, default=DefaultSizes.DEFAULT_MIN_WORD_LENGTH, help=f"Minimum character length for a word to be processed. Default: {DefaultSizes.DEFAULT_MIN_WORD_LENGTH} (no limit).")
-    parser.add_argument("--technical-stoplist", type=str, default="", help="Comma-separated list of custom words to add to the technical stoplist.")
-    parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized. Default is to anonymize them if other rules permit.")
+    parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized.")
     parser.add_argument("--anonymization-strategy", type=str, default="filtered",
                        choices=["presidio", "filtered", "hybrid", "standalone", "slm"],
                        help="Anonymization strategy. "
-                            "'filtered': Presidio pipeline with filtered scope (default). "
+                            "'filtered': Presidio pipeline with curated recognizer scope (default, best accuracy). "
                             "'presidio': Full Presidio pipeline. "
                             "'hybrid': Presidio detection + custom replacement. "
-                            "'standalone': Zero Presidio dependencies (experimental). "
-                            "'slm': End-to-end SLM anonymization.")
+                            "'standalone': Zero Presidio dependencies, fastest on GPU. "
+                            "'slm': End-to-end SLM anonymization (experimental).")
     parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
-    parser.add_argument("--transformer-model", type=str, default=TRANSFORMER_MODEL, help=f"Transformer model for NER detection. Options: 'Davlan/xlm-roberta-base-ner-hrl' (default, multilingual), 'attack-vector/SecureModernBERT-NER' (cybersecurity-focused), 'dslim/bert-base-NER' (English-only, fast). Default: {TRANSFORMER_MODEL}.")
-    parser.add_argument("--parallel-workers", type=int, default=1, help="Number of parallel workers for processing. Default: 1 (sequential processing).")
+    parser.add_argument("--transformer-model", type=str, default=TRANSFORMER_MODEL, help=f"Transformer model for NER detection. Options: 'Davlan/xlm-roberta-base-ner-hrl' (default, multilingual), 'attack-vector/SecureModernBERT-NER' (cybersecurity-focused). Default: {TRANSFORMER_MODEL}.")
     parser.add_argument("--db-mode", type=str, default="persistent", choices=["persistent", "in-memory"], help="Database mode ('persistent' to save to disk, 'in-memory' for a temporary DB).")
     parser.add_argument("--db-dir", type=str, default="db", help="Directory for the database file.")
     parser.add_argument("--disable-gc", action="store_true", help="Disable automatic garbage collection during processing. May boost speed for single large files but increases memory usage.")
@@ -285,24 +259,30 @@ def _parse_arguments():
     parser.add_argument("--log-level", type=str, default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level (default: WARNING).")
     parser.add_argument("--force-large-xml", action="store_true", help="Force processing of XML files exceeding memory safety thresholds. Use with caution as it may lead to Out-of-Memory errors.")
 
-    # SLM Options
-    slm_group = parser.add_argument_group('SLM Options')
-    slm_group.add_argument("--slm-map-entities", action="store_true", help="Use SLM to map potential entities for analysis (Task 1). Does not anonymize.")
-    slm_group.add_argument("--slm-detector", action="store_true", help="Use SLM as an entity detector alongside traditional methods (Task 2).")
-    slm_group.add_argument("--slm-detector-mode", type=str, default="hybrid", choices=["hybrid", "exclusive"], help="Mode for the SLM detector: 'hybrid' (default) merges with traditional NER, 'exclusive' uses only SLM results.")
-    slm_group.add_argument("--slm-prompt-version", type=str, default="v1", help="Specify the prompt version to use for SLM tasks.")
-    slm_group.add_argument("--slm-chunk-size", type=int, default=DefaultSizes.SLM_MAPPER_CHUNK_SIZE, help=f"Max character size for chunks sent to the SLM mapper. Default: {DefaultSizes.SLM_MAPPER_CHUNK_SIZE}.")
-    slm_group.add_argument("--slm-anonymizer-chunk-size", type=int, default=DefaultSizes.SLM_ANONYMIZER_CHUNK_SIZE, help=f"Max character size for chunks sent to the SLM anonymizer (--anonymization-strategy slm). Default: {DefaultSizes.SLM_ANONYMIZER_CHUNK_SIZE}.")
-    slm_group.add_argument("--slm-confidence-threshold", type=float, default=DefaultSizes.DEFAULT_SLM_CONFIDENCE_THRESHOLD, help=f"Minimum confidence score for entities from the SLM mapper. Default: {DefaultSizes.DEFAULT_SLM_CONFIDENCE_THRESHOLD}.")
-    slm_group.add_argument("--slm-context-window", type=int, default=DefaultSizes.DEFAULT_SLM_CONTEXT_WINDOW, help=f"Character window size for context extraction in SLM mapper. Default: {DefaultSizes.DEFAULT_SLM_CONTEXT_WINDOW}.")
-    slm_group.add_argument("--slm-temperature", type=float, default=LLM_CONFIG['ollama']['temperature'], help=f"Temperature for the SLM model. Default: {LLM_CONFIG['ollama']['temperature']}.")
+    # SLM Options (experimental - under development)
+    slm_group = parser.add_argument_group('SLM Options (experimental - under development)')
+    slm_group.add_argument("--slm-map-entities", action="store_true", help="[experimental] Use SLM to map potential entities for analysis. Does not anonymize.")
+    slm_group.add_argument("--slm-detector", action="store_true", help="[experimental] Use SLM as an entity detector alongside traditional NER methods.")
+    slm_group.add_argument("--slm-detector-mode", type=str, default="hybrid", choices=["hybrid", "exclusive"], help="[experimental] Mode for the SLM detector: 'hybrid' merges with traditional NER, 'exclusive' uses only SLM results.")
+    slm_group.add_argument("--slm-prompt-version", type=str, default="v1", help="[experimental] Prompt version to use for SLM tasks.")
+    slm_group.add_argument("--slm-chunk-size", type=int, default=DefaultSizes.SLM_MAPPER_CHUNK_SIZE, help=f"[experimental] Max character size for chunks sent to the SLM mapper. Default: {DefaultSizes.SLM_MAPPER_CHUNK_SIZE}.")
+    slm_group.add_argument("--slm-anonymizer-chunk-size", type=int, default=DefaultSizes.SLM_ANONYMIZER_CHUNK_SIZE, help=f"[experimental] Max character size for chunks sent to the SLM anonymizer. Default: {DefaultSizes.SLM_ANONYMIZER_CHUNK_SIZE}.")
+    slm_group.add_argument("--slm-confidence-threshold", type=float, default=DefaultSizes.DEFAULT_SLM_CONFIDENCE_THRESHOLD, help=f"[experimental] Minimum confidence score for entities from the SLM mapper. Default: {DefaultSizes.DEFAULT_SLM_CONFIDENCE_THRESHOLD}.")
+    slm_group.add_argument("--slm-context-window", type=int, default=DefaultSizes.DEFAULT_SLM_CONTEXT_WINDOW, help=f"[experimental] Character window size for context extraction in SLM mapper. Default: {DefaultSizes.DEFAULT_SLM_CONTEXT_WINDOW}.")
+    slm_group.add_argument("--slm-temperature", type=float, default=LLM_CONFIG['ollama']['temperature'], help=f"[experimental] Temperature for the SLM model. Default: {LLM_CONFIG['ollama']['temperature']}.")
 
-    # Ollama Service Management Options
-    ollama_group = parser.add_argument_group('Ollama Service Options')
-    ollama_group.add_argument("--no-auto-ollama", action="store_true", help="Disable automatic Ollama Docker management. By default, the script will start/manage Ollama automatically.")
-    ollama_group.add_argument("--ollama-docker-image", type=str, default="ollama/ollama:latest", help="Docker image for Ollama. Default: ollama/ollama:latest")
-    ollama_group.add_argument("--ollama-container-name", type=str, default="ollama-anon", help="Docker container name for Ollama. Default: ollama-anon")
-    ollama_group.add_argument("--ollama-no-gpu", action="store_true", help="Disable GPU support when starting Ollama Docker container.")
+    # Ollama Service Options (experimental - under development)
+    ollama_group = parser.add_argument_group('Ollama Service Options (experimental - under development)')
+    ollama_group.add_argument("--no-auto-ollama", action="store_true", help="[experimental] Disable automatic Ollama Docker management.")
+    ollama_group.add_argument("--ollama-docker-image", type=str, default="ollama/ollama:latest", help="[experimental] Docker image for Ollama. Default: ollama/ollama:latest")
+    ollama_group.add_argument("--ollama-container-name", type=str, default="ollama-anon", help="[experimental] Docker container name for Ollama. Default: ollama-anon")
+    ollama_group.add_argument("--ollama-no-gpu", action="store_true", help="[experimental] Disable GPU support when starting Ollama Docker container.")
+
+    # NER Data Generation Options
+    ner_group = parser.add_argument_group('NER Data Generation Options')
+    ner_group.add_argument("--generate-ner-data", action="store_true", help="Enable NER data generation mode instead of anonymizing.")
+    ner_group.add_argument("--ner-include-all", action="store_true", help="Include all texts in NER output, even those without detected entities.")
+    ner_group.add_argument("--ner-aggregate-record", action="store_true", help="For JSON/JSONL files, aggregate each record into a single text line instead of extracting fields separately.")
 
     # Chunking & Batching Options
     chunk_group = parser.add_argument_group('Chunking and Batching')
@@ -325,13 +305,13 @@ def _parse_arguments():
     if args.slug_length is not None and not (0 <= args.slug_length <= 64):
         parser.error("--slug-length must be between 0 and 64.")
 
-    if not args.file_path and not (args.list_entities or args.list_languages or args.slm_map_entities or args.sample or args.generate_cve_dataset):
+    if not args.file_path and not (args.list_entities or args.list_languages or args.slm_map_entities):
         parser.error("A file path must be provided.")
 
     # Handle the --optimize flag
     if args.optimize:
-        logging.info("Optimization mode enabled: setting filtered strategy, in-memory DB, cache, and min-word-length=3.")
-        args.anonymization_strategy = "filtered"
+        logging.info("Optimization mode enabled: setting standalone strategy, in-memory DB, cache, and min-word-length=3.")
+        args.anonymization_strategy = "standalone"
         args.db_mode = "in-memory"
         args.use_cache = True
         if args.min_word_length == 0:
@@ -380,19 +360,6 @@ def main():
                          "transformers", "sentence_transformers"):
         logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
-    # --- Task: Sampling ---
-    if args.sample:
-        _handle_sampling(args)
-        sys.exit(0)
-    
-    # --- Task: CVE Dataset Generation ---
-    if args.generate_cve_dataset:
-        if not args.cais_file_path:
-            logging.error("--cais-file-path is required when using --generate-cve-dataset")
-            sys.exit(1)
-        _generate_cve_dataset_with_distribution(args)
-        sys.exit(0)
-        
     # --- Task 1: SLM Entity Mapping ---
     if args.slm_map_entities:
         _handle_slm_entity_mapping(args)
@@ -496,13 +463,6 @@ def main():
         db_context.initialize(synchronous=args.db_synchronous_mode)
         logging.info(f"Database initialized in '{args.db_mode}' mode with synchronous PRAGMA set to '{args.db_synchronous_mode or 'NORMAL'}'.")
 
-    # Update stoplist from CLI
-    if args.technical_stoplist:
-        new_stopwords = {term.strip().lower() for term in args.technical_stoplist.split(',') if term.strip()}
-        if new_stopwords:
-            Global.TECHNICAL_STOPLIST.update(new_stopwords)
-            logging.info(f"Updated TECHNICAL_STOPLIST with {len(new_stopwords)} custom words.")
-
     models_check(args.lang, args.transformer_model)
 
     allow_list = [term.strip() for term in args.allow_list.split(',') if term]
@@ -552,7 +512,49 @@ def main():
                     })
                 except re.error:
                     logging.warning(f"Invalid regex pattern skipped: {pattern.regex}")
-        
+
+        # --- Word List: inject known terms as high-confidence exact-match patterns ---
+        # Maps category names to entity types; unknown categories default to ORGANIZATION.
+        _WORD_LIST_CATEGORY_MAP = {
+            "organizations": "ORGANIZATION",
+            "organization":  "ORGANIZATION",
+            "sistemas":      "ORGANIZATION",
+            "systems":       "ORGANIZATION",
+            "acronyms":      "ORGANIZATION",
+            "acronimos":     "ORGANIZATION",
+            "persons":       "PERSON",
+            "pessoas":       "PERSON",
+            "emails":        "EMAIL_ADDRESS",
+            "hostnames":     "HOSTNAME",
+            "ips":           "IP_ADDRESS",
+        }
+        if args.word_list:
+            if not os.path.exists(args.word_list):
+                logging.error(f"Word list file not found: '{args.word_list}'")
+                sys.exit(1)
+            try:
+                with open(args.word_list, 'r', encoding='utf-8') as _f:
+                    _word_list_data: dict = json.load(_f)
+                total_terms = 0
+                for category, terms in _word_list_data.items():
+                    entity_type = _WORD_LIST_CATEGORY_MAP.get(category.lower(), "ORGANIZATION")
+                    if entity_type in entities_to_preserve:
+                        continue
+                    for term in terms:
+                        term = term.strip()
+                        if not term:
+                            continue
+                        compiled_patterns.append({
+                            "label": entity_type,
+                            "regex": re.compile(r'(?<!\w)' + re.escape(term) + r'(?!\w)', flags=re.IGNORECASE),
+                            "score": 1.0,
+                        })
+                        total_terms += 1
+                logging.info(f"Word list loaded: {total_terms} terms from {len(_word_list_data)} categories.")
+            except json.JSONDecodeError:
+                logging.error(f"Could not parse word list JSON: '{args.word_list}'")
+                sys.exit(1)
+
         entity_detector = EntityDetector(
             compiled_patterns=compiled_patterns,
             entities_to_preserve=set(entities_to_preserve),
@@ -631,8 +633,7 @@ def main():
             slm_detector=slm_detector_instance,
             slm_detector_mode=args.slm_detector_mode,
             ner_data_generation=args.generate_ner_data,
-            transformer_model=args.transformer_model,
-            parallel_workers=args.parallel_workers
+            transformer_model=args.transformer_model
         )
         
         # --- Processing ---

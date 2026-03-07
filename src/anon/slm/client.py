@@ -245,7 +245,7 @@ class OllamaClient:
                     current_system_prompt = None  # The fixer prompt is self-contained
                     current_prompt = (
                         "The following text is not valid JSON. Please fix it and return ONLY the corrected JSON object. "
-                        "Ensure that any backslashes within regex patterns are double-escaped (e.g., `\\d` instead of `\d`, `\\\\s` instead of `\\s`). "
+                        r"Ensure that any backslashes within regex patterns are double-escaped (e.g., `\\d` instead of `\d`, `\\\\s` instead of `\\s`). "
                         "Do not add any explanations, apologies, or markdown formatting.\n\n"
                         f"Invalid JSON:\n---\n{content}\n---\nCorrected JSON:"
                     )
