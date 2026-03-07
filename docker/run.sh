@@ -6,21 +6,22 @@
 # together: input files, output, and the NER model cache.
 #
 #   ./anon/
-#   ├── input/    ← put your files here
+#   ├── input/    ← optional: put files here if you prefer
 #   ├── output/   ← anonymized files appear here
+#   ├── db/       ← entity mapping database (needed for de-anonymization)
 #   └── models/   ← NER model cached here on first run (~1 GB, automatic)
 #
 # Usage:
 #   export ANON_SECRET_KEY=$(openssl rand -hex 32)
 #
-#   ./run-docker.sh ./anon/input/YOUR_FILE.csv
-#   ./run-docker.sh ./anon/input/                     # entire input folder
-#   ./run-docker.sh --gpu ./anon/input/YOUR_FILE.csv  # GPU
-#   ./run-docker.sh --help
-#   ./run-docker.sh --list-entities
+#   ./run.sh ./YOUR_FILE.csv
+#   ./run.sh ./your/folder/                     # entire folder
+#   ./run.sh --gpu ./YOUR_FILE.csv              # GPU
+#   ./run.sh --help
+#   ./run.sh --list-entities
 #
 # Override the base folder:
-#   ANON_DIR=./my-project/ ./run-docker.sh ./my-project/input/file.csv
+#   ANON_DIR=./my-project/ ./docker/run.sh ./my-project/input/file.csv
 # =============================================================================
 
 set -euo pipefail
@@ -50,6 +51,7 @@ abs_path() {
 ANON_DIR="${ANON_DIR:-$(pwd)/anon}"
 MODELS_DIR="$ANON_DIR/models"
 DEFAULT_OUTPUT="$ANON_DIR/output"
+DB_DIR="$ANON_DIR/db"
 
 # ---------------------------------------------------------------------------
 # Parse --gpu (consumed here, not forwarded)
@@ -61,11 +63,16 @@ for arg in "$@"; do
 done
 
 # ---------------------------------------------------------------------------
-# Detect info-only commands (no key needed, no path remapping)
+# Detect info-only commands and slug-length 0 (no key needed)
 # ---------------------------------------------------------------------------
 IS_INFO_CMD=0
+SLUG_ZERO=0
+prev=""
 for arg in "${ARGS[@]:-}"; do
     [[ "$arg" == "--help" || "$arg" == --list-* ]] && IS_INFO_CMD=1
+    [[ "$prev" == "--slug-length" && "$arg" == "0" ]] && SLUG_ZERO=1
+    [[ "$arg" == "--slug-length=0" ]] && SLUG_ZERO=1
+    prev="$arg"
 done
 
 # ---------------------------------------------------------------------------
@@ -76,7 +83,7 @@ if ! docker info &>/dev/null; then
     exit 1
 fi
 
-if [[ -z "${ANON_SECRET_KEY:-}" && $IS_INFO_CMD -eq 0 ]]; then
+if [[ -z "${ANON_SECRET_KEY:-}" && $IS_INFO_CMD -eq 0 && $SLUG_ZERO -eq 0 ]]; then
     log_error "ANON_SECRET_KEY is not set."
     log_error "Generate one:  export ANON_SECRET_KEY=\$(openssl rand -hex 32)"
     exit 1
@@ -85,7 +92,7 @@ fi
 # ---------------------------------------------------------------------------
 # Create folder structure
 # ---------------------------------------------------------------------------
-mkdir -p "$MODELS_DIR" "$DEFAULT_OUTPUT" "$ANON_DIR/input"
+mkdir -p "$MODELS_DIR" "$DEFAULT_OUTPUT" "$ANON_DIR/input" "$DB_DIR"
 
 # ---------------------------------------------------------------------------
 # Select image
@@ -120,7 +127,7 @@ fi
 #   --output-dir    → /anon_output
 #   --anonymization-config → /anon_config/filename
 # ---------------------------------------------------------------------------
-VOLUMES=(-v "$MODELS_DIR":/app/models)
+VOLUMES=(-v "$MODELS_DIR":/app/models -v "$DB_DIR":/app/db)
 NEW_ARGS=()
 INPUT_SET=0
 OUTPUT_SET=0
@@ -168,8 +175,29 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
             NEW_ARGS+=(--anonymization-config=/anon_config/"$(basename "$host")")
             ;;
 
+        --word-list)
+            i=$((i+1))
+            val="${ARGS[$i]}"
+            host=$(abs_path "$val")
+            VOLUMES+=(-v "$(dirname "$host")":/anon_wordlist:ro)
+            NEW_ARGS+=(--word-list /anon_wordlist/"$(basename "$host")")
+            ;;
+
+        --word-list=*)
+            val="${arg#--word-list=}"
+            host=$(abs_path "$val")
+            VOLUMES+=(-v "$(dirname "$host")":/anon_wordlist:ro)
+            NEW_ARGS+=(--word-list=/anon_wordlist/"$(basename "$host")")
+            ;;
+
         --*)
             NEW_ARGS+=("$arg")
+            # If next arg exists and doesn't start with --, it's the flag's value
+            next_i=$((i+1))
+            if [[ $next_i -lt ${#ARGS[@]} && "${ARGS[$next_i]}" != --* ]]; then
+                i=$next_i
+                NEW_ARGS+=("${ARGS[$i]}")
+            fi
             ;;
 
         *)
@@ -177,6 +205,10 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
             if [[ $INPUT_SET -eq 0 ]]; then
                 INPUT_SET=1
                 host=$(abs_path "$arg")
+                if [[ ! -e "$host" ]]; then
+                    log_error "Input not found: $arg"
+                    exit 1
+                fi
                 if [[ -d "$host" ]]; then
                     VOLUMES+=(-v "$host":/anon_input:ro)
                     NEW_ARGS+=(/anon_input)

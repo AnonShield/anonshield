@@ -1,0 +1,21 @@
+{
+  "_comment": "Word list for AnonLFI. Edit this file to add known terms that must always be anonymized. Supported categories: organizations, systems, acronyms, persons, emails, hostnames, ips. Unknown categories default to ORGANIZATION.",
+  "organizations": [
+    "PROCERGS",
+    "SSP RS",
+    "SENASP",
+    "ACME",
+    "Empresa Alfa"
+  ],
+  "systems": [
+    "SIEM Central",
+    "SOC Monitor",
+    "Portal do Cliente",
+    "Sistema Financeiro"
+  ],
+  "acronyms": [
+    "DCCI",
+    "CICC",
+    "CIOPS"
+  ]
+}

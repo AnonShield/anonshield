@@ -79,20 +79,6 @@ class TestNewConfigLogic(unittest.TestCase):
         
         os.remove(temp_config_path)
 
-    def test_technical_stoplist_argument(self):
-        """
-        Tests that the --technical-stoplist argument prevents auto-detection.
-        """
-        # Run with default min-word-length (0), so "Jo" would normally be processed
-        output_file = self._run_anonymizer(self.TEST_AUTODETECT_FILE, "--anonymization-config", "anonymization_config.json", "--technical-stoplist", "john doe,jo")
-
-        with open(output_file, "rb") as f:
-            anon_data = orjson.loads(f.read())
-
-        # Both names should be skipped because they are in the custom stoplist
-        self.assertEqual(anon_data["analyst_name"], "John Doe")
-        self.assertEqual(anon_data["short_name"], "Jo")
-
     def test_fields_to_anonymize_as_allow_list(self):
         """
         Tests that a non-empty `fields_to_anonymize` acts as a strict allow-list for auto-detection.

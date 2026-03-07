@@ -150,16 +150,17 @@ class CustomSlugAnonymizer(Operator):
         # Try to get the slug length from our custom parameter first.
         slug_length = params.get("custom_slug_length", 8)
         logging.debug(f"CustomSlugAnonymizer.operate, received slug_length = {slug_length}")
-        
+
+        if slug_length == 0:
+            if "entity_collector" in params:
+                params["entity_collector"].append((entity_type, clean_text, "", "", False))
+            return f"[{entity_type}]"
+
         display_hash, full_hash = hash_generator.generate_slug(clean_text, slug_length)
 
         if "entity_collector" in params:
-            # Sempre adiciona para contagem, mas marca se deve persistir
-            should_persist = slug_length > 0
-            params["entity_collector"].append((entity_type, clean_text, display_hash, full_hash, should_persist))
+            params["entity_collector"].append((entity_type, clean_text, display_hash, full_hash, True))
 
-        if slug_length == 0:
-            return f"[{entity_type}]"
         return f"[{entity_type}_{display_hash}]"
 
     def validate(self, params: dict | None = None) -> None: pass
@@ -659,13 +660,12 @@ class AnonymizationOrchestrator:
                 # No entities collected if from cache
                 continue
 
-            display_hash, full_hash = self.hash_generator.generate_slug(clean_text, self.slug_length)
-
-            collected_entities_from_forced.append((entity_type, clean_text, display_hash, full_hash))
-
             if self.slug_length == 0:
+                collected_entities_from_forced.append((entity_type, clean_text, "", ""))
                 anonymized_text = f"[{entity_type}]"
             else:
+                display_hash, full_hash = self.hash_generator.generate_slug(clean_text, self.slug_length)
+                collected_entities_from_forced.append((entity_type, clean_text, display_hash, full_hash))
                 anonymized_text = f"[{entity_type}_{display_hash}]"
 
             self.cache_manager.add(cache_key, anonymized_text) # Use CacheManager
