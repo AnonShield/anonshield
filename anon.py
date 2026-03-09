@@ -191,24 +191,59 @@ def write_report(file_path, start_time):
     logging.info(f"Report saved at: {report_file}")
 
 
-def get_supported_entities() -> list[str]:
-    """Return a sorted list of supported entity names."""
+def get_supported_entities(
+    strategy_name: str = "filtered",
+    transformer_model: str = TRANSFORMER_MODEL,
+) -> list[str]:
+    """Return a sorted list of entity types detectable for a given strategy + model combination.
+
+    Args:
+        strategy_name: One of presidio / filtered / hybrid / standalone / slm.
+        transformer_model: HuggingFace model ID used for NER.
+
+    Entity sources per strategy:
+        presidio / filtered / hybrid  → custom regex + Presidio built-ins + NER model labels
+        standalone                    → custom regex + NER model labels  (no Presidio engine)
+        slm                           → custom regex + NER model labels  (SLM output is open-ended)
+    """
     from src.anon.config import SECURE_MODERNBERT_ENTITY_MAPPING
-    
-    # Include entities from both default and SecureModernBERT mappings
-    supported = set(ENTITY_MAPPING.values()) | set(SECURE_MODERNBERT_ENTITY_MAPPING.values())
+    from presidio_analyzer import RecognizerRegistry  # type: ignore
+
+    supported: set[str] = set()
+
+    # 1. Custom regex recognizers — shared by all strategies
     try:
         for r in load_custom_recognizers(langs=['en']):
             supported.update(r.supported_entities)
     except Exception as exc:
-        logging.warning(f"Failed to read custom recognizers: {exc}")
-    return sorted(list(supported))
+        logging.warning(f"Failed to load custom recognizers: {exc}")
+
+    # 2. Presidio built-in recognizers — only for the full Presidio strategy.
+    #    filtered/hybrid/standalone all use _get_core_entities() which limits scope to
+    #    NER model labels + custom regex only (same entity set as standalone).
+    #    RecognizerRegistry loads the full predefined set without instantiating NLP engines.
+    if strategy_name == "presidio":
+        try:
+            registry = RecognizerRegistry()
+            registry.load_predefined_recognizers()
+            for r in registry.recognizers:
+                supported.update(r.supported_entities)
+        except Exception as exc:
+            logging.warning(f"Failed to load Presidio built-in recognizers: {exc}")
+
+    # 3. NER model entity labels (transformer model → Presidio entity mapping values)
+    if "SecureModernBERT-NER" in transformer_model:
+        supported.update(SECURE_MODERNBERT_ENTITY_MAPPING.values())
+    else:
+        supported.update(ENTITY_MAPPING.values())
+
+    return sorted(supported)
 
 
-def _handle_list_entities():
-    """Prints the list of supported entities and exits."""
-    print("Supported entity types:")
-    for entity in get_supported_entities():
+def _handle_list_entities(strategy_name: str = "filtered", transformer_model: str = TRANSFORMER_MODEL):
+    """Prints the list of supported entities for the given strategy + model and exits."""
+    print(f"Supported entity types (strategy={strategy_name}, model={transformer_model}):")
+    for entity in get_supported_entities(strategy_name, transformer_model):
         print(f" - {entity}")
     sys.exit(0)
 
@@ -297,7 +332,7 @@ def _parse_arguments():
     logging.debug(f"Parsed arguments: {args}")
 
     if args.list_entities:
-        _handle_list_entities()
+        _handle_list_entities(args.anonymization_strategy, args.transformer_model)
 
     if args.list_languages:
         _handle_list_languages()
@@ -325,6 +360,49 @@ def _handle_list_languages():
     for lang_code, lang_name in SUPPORTED_LANGUAGES.items():
         print(f" - {lang_code}: {lang_name}")
     sys.exit(0)
+
+
+def _load_word_list_patterns(word_list_path: str, entities_to_preserve: set) -> list:
+    """Loads a word list JSON and returns compiled exact-match regex patterns.
+
+    The JSON key is used directly as the entity type label (uppercased).
+    Any string key is valid — no preset mapping is required.
+
+    Example:
+        {
+          "ORGANIZATION": ["AcmeCorp", "CSIRT-BR"],
+          "HOSTNAME":     ["fw-edge.internal"],
+          "MY_CUSTOM_TYPE": ["codename-x"]
+        }
+    """
+    if not os.path.exists(word_list_path):
+        logging.error(f"Word list file not found: '{word_list_path}'")
+        sys.exit(1)
+    try:
+        with open(word_list_path, 'r', encoding='utf-8') as f:
+            word_list_data: dict = json.load(f)
+    except json.JSONDecodeError:
+        logging.error(f"Could not parse word list JSON: '{word_list_path}'")
+        sys.exit(1)
+
+    patterns = []
+    total_terms = 0
+    for category, terms in word_list_data.items():
+        entity_type = category.upper()
+        if entity_type in entities_to_preserve:
+            continue
+        for term in terms:
+            term = term.strip()
+            if not term:
+                continue
+            patterns.append({
+                "label": entity_type,
+                "regex": re.compile(r'(?<!\w)' + re.escape(term) + r'(?!\w)', flags=re.IGNORECASE),
+                "score": 1.0,
+            })
+            total_terms += 1
+    logging.info(f"Word list loaded: {total_terms} terms from {len(word_list_data)} categories.")
+    return patterns
 
 
 def main():
@@ -514,46 +592,10 @@ def main():
                     logging.warning(f"Invalid regex pattern skipped: {pattern.regex}")
 
         # --- Word List: inject known terms as high-confidence exact-match patterns ---
-        # Maps category names to entity types; unknown categories default to ORGANIZATION.
-        _WORD_LIST_CATEGORY_MAP = {
-            "organizations": "ORGANIZATION",
-            "organization":  "ORGANIZATION",
-            "sistemas":      "ORGANIZATION",
-            "systems":       "ORGANIZATION",
-            "acronyms":      "ORGANIZATION",
-            "acronimos":     "ORGANIZATION",
-            "persons":       "PERSON",
-            "pessoas":       "PERSON",
-            "emails":        "EMAIL_ADDRESS",
-            "hostnames":     "HOSTNAME",
-            "ips":           "IP_ADDRESS",
-        }
         if args.word_list:
-            if not os.path.exists(args.word_list):
-                logging.error(f"Word list file not found: '{args.word_list}'")
-                sys.exit(1)
-            try:
-                with open(args.word_list, 'r', encoding='utf-8') as _f:
-                    _word_list_data: dict = json.load(_f)
-                total_terms = 0
-                for category, terms in _word_list_data.items():
-                    entity_type = _WORD_LIST_CATEGORY_MAP.get(category.lower(), "ORGANIZATION")
-                    if entity_type in entities_to_preserve:
-                        continue
-                    for term in terms:
-                        term = term.strip()
-                        if not term:
-                            continue
-                        compiled_patterns.append({
-                            "label": entity_type,
-                            "regex": re.compile(r'(?<!\w)' + re.escape(term) + r'(?!\w)', flags=re.IGNORECASE),
-                            "score": 1.0,
-                        })
-                        total_terms += 1
-                logging.info(f"Word list loaded: {total_terms} terms from {len(_word_list_data)} categories.")
-            except json.JSONDecodeError:
-                logging.error(f"Could not parse word list JSON: '{args.word_list}'")
-                sys.exit(1)
+            compiled_patterns.extend(
+                _load_word_list_patterns(args.word_list, set(entities_to_preserve))
+            )
 
         entity_detector = EntityDetector(
             compiled_patterns=compiled_patterns,
