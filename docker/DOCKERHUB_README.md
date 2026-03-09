@@ -39,7 +39,7 @@ chmod +x run.sh
 
 **Windows** — open **PowerShell**:
 ```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/runshanondocker/main/run.sh -OutFile run.sh
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/runshanondocker/main/run.ps1 -OutFile run.ps1
 ```
 
 > `curl` is built into Linux and macOS. `Invoke-WebRequest` is built into Windows 10/11. No extra installation needed.
@@ -54,9 +54,15 @@ export ANON_SECRET_KEY=$(openssl rand -hex 32)
 ```
 
 To keep it across terminal sessions:
+
+**Linux:**
 ```bash
-echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc   # Linux
-echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.zshrc    # macOS
+echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
+```
+
+**macOS:**
+```bash
+echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.zshrc
 ```
 
 **Windows (PowerShell):**
@@ -72,17 +78,32 @@ Pass any file or folder — relative or absolute path:
 
 **Single file (CPU):**
 ```bash
+# Linux / macOS
 ./run.sh ./YOUR_FILE.csv
+```
+```powershell
+# Windows
+.\run.ps1 .\YOUR_FILE.csv
 ```
 
 **Single file (GPU):**
 ```bash
+# Linux / macOS
 ./run.sh --gpu ./YOUR_FILE.csv
+```
+```powershell
+# Windows
+.\run.ps1 --gpu .\YOUR_FILE.csv
 ```
 
 **Entire folder:**
 ```bash
+# Linux / macOS
 ./run.sh ./your/folder/
+```
+```powershell
+# Windows
+.\run.ps1 .\your\folder\
 ```
 
 Output is written to `./anon/output/anon_YOUR_FILE.csv`. The script automatically creates an `./anon/` folder in your current directory:
@@ -106,7 +127,7 @@ Output is written to `./anon/output/anon_YOUR_FILE.csv`. The script automaticall
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--lang <code>` | Document language (`en`, `pt`, `es`, ...) | `en` |
-| `--output-dir <path>` | Local path where anonymized files are saved | `./output/` |
+| `--output-dir <path>` | Local path where anonymized files are saved | `./anon/output/` |
 | `--preserve-entities <types>` | Comma-separated entity types to skip (e.g. `LOCATION,IP_ADDRESS`) | — |
 | `--allow-list <terms>` | Comma-separated terms to never anonymize | — |
 | `--slug-length <n>` | Hash length in the anonymized slug (0–64) | `64` |
@@ -116,7 +137,7 @@ Output is written to `./anon/output/anon_YOUR_FILE.csv`. The script automaticall
 
 For the complete reference with examples for every option, see the **[CLI Reference on GitHub](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md)**.
 
-Run `./run.sh --help` for the full options list.
+Run `./run.sh --help` (Linux/macOS) or `.\run.ps1 --help` (Windows) for the full options list.
 
 ---
 
@@ -161,23 +182,21 @@ Choose with `--anonymization-strategy <name>`.
 
 If your organization uses internal names, system names, acronyms, or codenames that a general NER model might not recognize, you can supply a JSON file listing them. Every term in the list is always anonymized, regardless of context.
 
-**Format:** a JSON object where each key is a category and the value is a list of terms.
+**Format:** a JSON object where each key is the entity type label and the value is a list of terms. The key is used directly as the entity type — any label is valid, including custom ones.
 
 ```json
 {
-  "organizations": ["AcmeCorp", "CSIRT-BR", "ProjectPhoenix"],
-  "sistemas": ["SIEM-Alpha", "FW-CORE-01", "PROXY-DMZ"],
-  "persons": ["Jane Doe", "Carlos Souza"],
-  "hostnames": ["fw-edge.internal", "siem.corp.local"],
-  "ips": ["10.0.0.1", "192.168.100.254"]
+  "ORGANIZATION": ["AcmeCorp", "CSIRT-BR", "ProjectPhoenix"],
+  "PERSON":       ["Jane Doe", "Carlos Souza"],
+  "HOSTNAME":     ["fw-edge.internal", "siem.corp.local"],
+  "IP_ADDRESS":   ["10.0.0.1", "192.168.100.254"],
+  "MY_SYSTEM":    ["SIEM-Alpha", "FW-CORE-01", "PROXY-DMZ"]
 }
 ```
 
 ```bash
 ./run.sh ./incident_report.txt --word-list ./my_terms.json
 ```
-
-Supported category keys: `organizations`, `organization`, `sistemas`, `systems`, `acronyms`, `acronimos`, `persons`, `pessoas`, `emails`, `hostnames`, `ips`.
 
 ---
 
@@ -225,6 +244,8 @@ The config gain is larger for Presidio-based strategies because they have a high
 ---
 
 ## Examples
+
+> All examples use `./run.sh` (Linux/macOS). On **Windows** substitute `.\run.ps1` and use backslashes for paths.
 
 **Portuguese document:**
 ```bash
@@ -292,7 +313,7 @@ docker run --rm --runtime=nvidia --gpus all anonshield/anon:gpu /data/file.txt .
 
 **Cybersecurity (custom recognizers):** `IP_ADDRESS`, `URL`, `HOSTNAME`, `MAC_ADDRESS`, `FILE_PATH`, `HASH`, `AUTH_TOKEN`, `CVE_ID`, `CPE_STRING`, `CERT_SERIAL`, `CERTIFICATE`, `CRYPTOGRAPHIC_KEY`, `UUID`, `PGP_BLOCK`, `PORT`, `OID`
 
-Run `./run.sh --list-entities` for the full list.
+Run `./run.sh --list-entities` (Linux/macOS) or `.\run.ps1 --list-entities` (Windows) for the full list.
 
 ---
 
