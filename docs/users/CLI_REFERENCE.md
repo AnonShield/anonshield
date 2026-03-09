@@ -72,21 +72,30 @@ These flags print information and exit immediately — they do not process any f
 
 ### `--list-entities`
 
-**What it does:** Prints all entity types the tool can detect and anonymize, then exits.
+**What it does:** Prints all entity types detectable for the given strategy and model combination, then exits. The output varies by `--anonymization-strategy` and `--transformer-model` — different combinations produce different entity sets.
 
 **When to use:** Before running on a file, to know which entity names to use with `--preserve-entities`.
 
 ```bash
+# Default (filtered strategy, xlm-roberta model)
 ./docker/run.sh --list-entities
+
+# See entities available with the presidio strategy (includes AU_ABN, US_SSN, IBAN, etc.)
+./docker/run.sh --list-entities --anonymization-strategy presidio
+
+# See entities for the cybersecurity-focused model
+./docker/run.sh --list-entities --transformer-model attack-vector/SecureModernBERT-NER
 ```
 
-Sample output:
+Sample output (`filtered` + default model):
 ```
-Supported entity types:
+Supported entity types (strategy=filtered, model=Davlan/xlm-roberta-base-ner-hrl):
  - AUTH_TOKEN
  - CERTIFICATE
+ - CERT_SERIAL
  - CPE_STRING
  - CREDIT_CARD
+ - CRYPTOGRAPHIC_KEY
  - CVE_ID
  - EMAIL_ADDRESS
  - FILE_PATH
@@ -95,14 +104,19 @@ Supported entity types:
  - IP_ADDRESS
  - LOCATION
  - MAC_ADDRESS
+ - OID
  - ORGANIZATION
+ - PASSWORD
  - PERSON
+ - PGP_BLOCK
  - PHONE_NUMBER
  - PORT
  - URL
  - USERNAME
- - ...
+ - UUID
 ```
+
+> **Strategy differences:** `presidio` includes all Presidio built-in recognizers (~46 entities, including `AU_ABN`, `US_SSN`, `IBAN_CODE`, `UK_NHS`, etc.). All other strategies (`filtered`, `hybrid`, `standalone`) use only the curated cybersecurity recognizer set shown above.
 
 ---
 
@@ -342,31 +356,21 @@ With this config:
 
 This is ideal for internal terminology: internal system names, internal organization names, project codenames, or employee names that a general NER model might not recognize.
 
-**Format:** A JSON object where each key is a category name and each value is a list of terms.
-
-**Supported category names:**
-
-| Category key | Maps to entity type |
-|-------------|-------------------|
-| `organizations`, `organization`, `sistemas`, `systems`, `acronyms`, `acronimos` | `ORGANIZATION` |
-| `persons`, `pessoas` | `PERSON` |
-| `emails` | `EMAIL_ADDRESS` |
-| `hostnames` | `HOSTNAME` |
-| `ips` | `IP_ADDRESS` |
-
-Unknown category names default to `ORGANIZATION`.
+**Format:** A JSON object where each key is the **entity type label** (uppercased automatically) and each value is a list of terms. Any string key is valid — no preset mapping is required. Use the same type labels you would use in `--preserve-entities` or `force_anonymize`.
 
 **Example word list file (`my_terms.json`):**
 
 ```json
 {
-  "organizations": ["AcmeCorp", "CSIRT-BR", "IntelTeam", "ProjectPhoenix"],
-  "sistemas": ["SIEM-Alpha", "FW-CORE-01", "PROXY-DMZ"],
-  "persons": ["Jane Doe", "Carlos Souza"],
-  "hostnames": ["fw-edge.internal", "siem.corp.local"],
-  "ips": ["10.0.0.1", "192.168.100.254"]
+  "ORGANIZATION": ["AcmeCorp", "CSIRT-BR", "ProjectPhoenix"],
+  "PERSON":       ["Jane Doe", "Carlos Souza"],
+  "HOSTNAME":     ["fw-edge.internal", "siem.corp.local"],
+  "IP_ADDRESS":   ["10.0.0.1", "192.168.100.254"],
+  "MY_SYSTEM":    ["SIEM-Alpha", "FW-CORE-01", "PROXY-DMZ"]
 }
 ```
+
+You can use any entity type label, including custom ones (`MY_SYSTEM`, `THREAT_ACTOR`, `CAMPAIGN`, etc.). The label becomes the entity type recorded in the anonymization database.
 
 ```bash
 ./docker/run.sh ./incident_report.txt --word-list ./my_terms.json
