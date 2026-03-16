@@ -5,6 +5,7 @@ Base Operating Systems,centos7,centos:7,-,172.31.1.6,Outdated/Misconfigured
 Base Operating Systems,debian8,debian:jessie,-,172.31.1.3,Outdated/Misconfigured
 Base Operating Systems,debian9,debian:stretch,-,172.31.1.4,Outdated/Misconfigured
 Base Operating Systems,fedora28,fedora:28,-,172.31.1.8,Outdated/Misconfigured
+Base Operating Systems,ubuntu14,ubuntu:14.04,-,172.31.1.1,Outdated/Misconfigured
 Base Operating Systems,ubuntu16,ubuntu:16.04,-,172.31.1.2,Outdated/Misconfigured
 CMS and Web Platforms,dokuwiki,mprasil/dokuwiki,127.0.0.1:8034:80,172.30.32.2,Outdated/Misconfigured
 CMS and Web Platforms,drupal7,drupal:7,127.0.0.1:8097:80,172.31.1.84,Outdated/Misconfigured
@@ -94,7 +95,6 @@ Vulnerable Web Applications,bwapp,raesene/bwapp,127.0.0.1:8006:80,172.30.9.2,Int
 Vulnerable Web Applications,bwapp-alt,hackersploit/bwapp-docker,127.0.0.1:8111:80,172.30.9.4,Intentionally Vulnerable
 Vulnerable Web Applications,damn-vulnerable-graphql,dolevf/dvga,127.0.0.1:5013:5013,172.30.10.4,Intentionally Vulnerable
 Vulnerable Web Applications,dsvw,appsecco/dsvw,127.0.0.1:8008:8000,172.30.40.1,Intentionally Vulnerable
-Vulnerable Web Applications,dvna,appsecco/dvna,127.0.0.1:9094:9090,172.31.1.104,Intentionally Vulnerable
 Vulnerable Web Applications,dvwa,vulnerables/web-dvwa,127.0.0.1:8005:80,172.30.9.1,Intentionally Vulnerable
 Vulnerable Web Applications,echo-server,jmalloc/echo-server,127.0.0.1:8050:8080,172.30.50.3,Intentionally Vulnerable
 Vulnerable Web Applications,hackazon,ianwijaya/hackazon,127.0.0.1:8001:80,172.30.7.2,Intentionally Vulnerable
@@ -112,6 +112,7 @@ Vulnerable Web Applications,ssrflab,youyouorz/ssrf-vulnerable-lab,127.0.0.1:8109
 Vulnerable Web Applications,vampi,erev0s/vampi,127.0.0.1:5002:5000,172.30.10.2,Intentionally Vulnerable
 Vulnerable Web Applications,wackopicko,adamdoupe/wackopicko,127.0.0.1:8040:80,172.30.39.1,Intentionally Vulnerable
 Vulnerable Web Applications,webgoat-legacy,webgoat/webgoat,127.0.0.1:8011:8080,172.30.9.7,Intentionally Vulnerable
+Web and Application Servers,apache22,httpd:2.2,127.0.0.1:8150:80,172.31.1.9,Outdated/Misconfigured
 Web and Application Servers,apache246,httpd:2.4.25,127.0.0.1:8051:80,172.31.1.10,Outdated/Misconfigured
 Web and Application Servers,caddy20,caddy:2.0.0,127.0.0.1:8155:80,172.31.1.15,Outdated/Misconfigured
 Web and Application Servers,glassfish41,glassfish:4.1,"127.0.0.1:8067:8080, 127.0.0.1:4848:4848",172.31.1.24,Outdated/Misconfigured
