@@ -179,12 +179,17 @@ Analysis output is written to `paper_data/results/<run_folder>/analysis/` and re
 
 **Dataset:** `paper_data/evaluation/vulnnet_scans_openvas_compilado.csv` (9.2 MB, 6,472 records compiled from all 130 D1 OpenVAS scan targets).
 
-**Step 1 — Reproduce the 67-record sample** (deterministic, fixed seed):
+**Step 1 — Reproduce the 67-record sample** (drawn in two batches; deterministic with fixed seed):
 ```bash
-python scripts/sortear.py   # enter 67 when prompted
-# SEED = 30, row range 2–6473
-# Output: scripts/numeros_sorteados.json  (same indices every run)
+# First draw: 50 records (SEED = 30)
+uv run python scripts/sortear.py   # enter 50 when prompted
+
+# Second draw: 17 more from the remaining pool (SEED = 30 + 50 = 80)
+uv run python scripts/sortear.py   # enter 17 when prompted
+
+# Output: numeros_sorteados.json in the current directory
 ```
+The final list of 67 row indices is also recorded in `paper_data/evaluation/numeros_sorteados.docx`.
 
 **Step 2 — Run all versions and strategies:**
 ```bash
@@ -253,4 +258,4 @@ This project is licensed under the **GNU General Public License v3.0**. See [LIC
 
 ---
 
-*[CLI Reference](docs/users/CLI_REFERENCE.md) · [Architecture](docs/developers/ARCHITECTURE.md) · [Anonymization Strategies](docs/developers/ANONYMIZATION_STRATEGIES.md) · [Benchmark Suite](benchmark/README.md) · [Experiments & Datasets](paper_data/EXPERIMENTS.md) · [Evaluation Data](paper_data/evaluation/EVALUATION_DATA.md)*
+*[CLI Reference](docs/users/CLI_REFERENCE.md) · [Architecture](docs/developers/ARCHITECTURE.md) · [Anonymization Strategies](docs/developers/ANONYMIZATION_STRATEGIES.md) · [Benchmark Suite](benchmark/BENCHMARK.md) · [Experiments & Datasets](paper_data/EXPERIMENTS.md) · [Evaluation Data](paper_data/evaluation/EVALUATION_DATA.md)*

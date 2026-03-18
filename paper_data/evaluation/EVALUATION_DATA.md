@@ -69,15 +69,20 @@ n = (Z² × p × (1 − p)) / E²  =  (1.645² × 0.5 × 0.5) / 0.1²  ≈ 67
 
 Parameters: 90% confidence level, Z = 1.645, p = 0.50, margin of error E = 10%.
 
-**To reproduce the exact same 67 row indices** (reproducible via fixed seed):
+**To reproduce the exact same 67 row indices** (drawn in two batches, deterministic with fixed seed):
 
 ```bash
-python scripts/sortear.py  # enter 67 when prompted
-# SEED = 30, range = rows 2–6473
-# Output: scripts/numeros_sorteados.json
+# Run from the project root
+# First draw: 50 records (seed = 30 + 0 = 30)
+uv run python scripts/sortear.py   # enter 50 when prompted
+
+# Second draw: 17 more from remaining pool (seed = 30 + 50 = 80)
+uv run python scripts/sortear.py   # enter 17 when prompted
+
+# Output: numeros_sorteados.json (written to current directory)
 ```
 
-The sampled row indices are also recorded in `numeros_sorteados.docx`.
+The final list of 67 row indices is also recorded in `numeros_sorteados.docx` in this folder.
 
 ---
 
