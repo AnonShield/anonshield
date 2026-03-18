@@ -1,206 +1,256 @@
-# AnonLFI 3.0 — PII Pseudonymization for CSIRTs
+# AnonLFI: Comparative Evaluation of Pseudonymization Strategies for Large-Scale Vulnerability Datasets in CSIRTs
 
-AnonLFI 3.0 is a modular pseudonymization framework for Cybersecurity Incident Response Teams (CSIRTs). It anonymizes personally identifiable information (PII) and cybersecurity indicators using HMAC-SHA256, generating stable and reversible pseudonyms. It natively preserves the structure of JSON, XML, and CSV files, integrates OCR for PDFs and images, and ships with specialized recognizers for cybersecurity artifacts (IP addresses, CVE IDs, hashes, URLs, and more).
+AnonLFI is a pseudonymization framework designed for Computer Security Incident Response Teams (CSIRTs). It replaces Personally Identifiable Information (PII) and cybersecurity indicators with cryptographically secure, deterministic pseudonyms (HMAC-SHA256), preserving referential integrity across documents while enabling GDPR/LGPD-compliant data sharing. Version 3.0 introduces four modular anonymization strategies, GPU acceleration, streaming processors for large files, and a schema-aware configuration mechanism. Evaluated on 70,951+ vulnerability records, it achieves more than 743× speedup over v2.0 and F1 = 94.2% with the `filtered`/`hybrid` strategies.
 
-Designed to help teams share incident data, comply with GDPR/LGPD, and feed anonymized datasets into security tools — without sacrificing analytical utility.
+> **Paper:** *AnonLFI: Comparative Evaluation of Pseudonymization Strategies for Large-Scale Vulnerability Datasets in CSIRTs* — SBRC 2026 Salão de Ferramentas.
 
 ---
 
-## Requirements
+## README Structure
 
-### Docker (Recommended)
+| Section | Description |
+|---|---|
+| [Considered Seals](#considered-seals) | SBRC quality seals targeted by this artifact |
+| [Basic Information](#basic-information) | Hardware, OS, and software environment |
+| [Dependencies](#dependencies) | Required packages and external tools |
+| [Security Concerns](#security-concerns) | Risks and mitigations for evaluators |
+| [Installation](#installation) | Step-by-step setup (local and Docker) |
+| [Minimal Test](#minimal-test) | Quick functional verification (~2–5 min) |
+| [Experiments](#experiments) | Reproduction of the three main paper claims |
+| [License](#license) | Licensing information |
 
-The only prerequisite is [Docker](https://docs.docker.com/get-docker/). All other dependencies — Python, Tesseract, spaCy, and transformer models — are bundled inside the container and managed automatically.
+---
 
-- **GPU:** Also requires an NVIDIA GPU and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+## Considered Seals
 
-### Local Installation
+The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Sustainable (SeloS)**, and **Reproducible Experiments (SeloR)**.
 
-- Python 3.12 with [`uv`](https://astral.sh/uv):
+---
+
+## Basic Information
+
+| | |
+|---|---|
+| **Hardware (paper experiments)** | NVIDIA RTX 5060 Ti 16 GB VRAM · AMD Ryzen 5 8600G (6c/12t) · 32 GB DDR5 6000 MHz |
+| **Minimum for smoke test** | 4 GB RAM · x86\_64 · Python 3.12 + uv |
+| **Software** | Python 3.12 + [`uv`](https://astral.sh/uv) for all experiments; Docker optional (tool use only) |
+| **GPU (optional)** | NVIDIA driver ≥ 525 (CUDA 12.8) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) |
+| **OS** | Linux (tested and recommended); macOS/Windows supported via Docker only |
+| **Disk** | ~2–3 GB (Python env + NER models); D1 dataset ~88 MB (in git); D3 dataset ~700 MB (public, in git) |
+
+---
+
+## Dependencies
+
+**Python environment (all experiments):**
+- Python 3.12 + [`uv`](https://astral.sh/uv) — all packages pinned in `pyproject.toml` / `uv.lock`
+- Key packages: `presidio-analyzer`, `presidio-anonymizer`, `transformers`, `spacy`, `torch`, `pandas`, `pymupdf`, `pytesseract`, `lxml`, `orjson`, `scipy`, `statsmodels`
+- NER models downloaded automatically on first run and cached in `anon/models/` (~1–2 GB)
+
+**Optional:**
+- Tesseract OCR — required only for OCR-mode tests (PDF/image files):
   ```bash
-  curl -LsSf https://astral.sh/uv/install.sh | sh
+  sudo apt install tesseract-ocr  # Ubuntu/Debian
   ```
-- Tesseract OCR (required for PDF, image, and DOCX files):
-  - Ubuntu/Debian: `sudo apt update && sudo apt install tesseract-ocr`
-  - macOS: `brew install tesseract`
-  - Windows: [Tesseract documentation](https://github.com/tesseract-ocr/tesseract#installing-tesseract)
-- **GPU only:** NVIDIA drivers compatible with CUDA 12.8+
+- Docker — for tool use only (not needed for experiments): `anonshield/anon:latest` (~2 GB CPU) or `anonshield/anon:gpu` (~6 GB GPU)
 
 ---
 
-## Setup
+## Security Concerns
+
+- AnonLFI processes sensitive cybersecurity data entirely **locally** — no data is transmitted to external services
+- `db/entities.db` stores the PII entity mapping table — keep it secure; losing it makes de-anonymization impossible
+- The HMAC secret key (`ANON_SECRET_KEY`) must be protected — it is required to correlate pseudonyms across separate runs
+- The Docker `--gpu` flag passes `--gpus all` to the container; review this before use in shared environments
+
+---
+
+## Installation
+
+### Local (recommended for experiments)
 
 ```bash
+# 1. Clone the repository
 git clone https://github.com/AnonShield/AnonLFI3.0.git
 cd AnonLFI3.0
-```
 
-**Docker:**
-```bash
-chmod +x docker/run.sh
-```
+# 2. Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-**Local (CPU):**
-```bash
+# 3. Install Python dependencies
 uv sync
-```
 
-**Local (GPU):** after `uv sync`, install the CUDA 12.8 PyTorch build and CuPy:
-```bash
-uv sync
-.venv/bin/pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128
-.venv/bin/pip install cupy-cuda12x==12.3.0
-```
-
----
-
-## Setting the Secret Key
-
-The secret key is **required** for anonymization (except when using `--slug-length 0`). It is used to generate pseudonyms and must be kept safe — you will need it again to de-anonymize output later.
-
-**Linux / macOS:**
-```bash
+# 4. Set the HMAC secret key (required for pseudonymization)
 export ANON_SECRET_KEY=$(openssl rand -hex 32)
 # To persist across sessions:
 echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
 ```
 
-**Windows (PowerShell):**
-```powershell
-$env:ANON_SECRET_KEY = [System.BitConverter]::ToString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).Replace("-","").ToLower()
+**GPU only** — after `uv sync`, install CUDA-enabled PyTorch and CuPy:
+```bash
+.venv/bin/pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128
+.venv/bin/pip install cupy-cuda12x==12.3.0
 ```
 
----
-
-## Anonymizing a File
-
-### Local
+### Docker (tool use only — not required for experiments)
 
 ```bash
-# Single file — output saved to output/anon_<filename>.<ext>
-uv run anon.py path/to/your/file.txt
-
-# Entire directory (recursive)
-uv run anon.py path/to/your/directory/
+curl -fsSL https://raw.githubusercontent.com/AnonShield/runshanondocker/main/run.sh -o run.sh
+chmod +x run.sh
+export ANON_SECRET_KEY=$(openssl rand -hex 32)
+docker pull anonshield/anon:latest       # CPU
+# docker pull anonshield/anon:gpu        # GPU
+./run.sh ./your_file.csv                 # anonymize a file
 ```
-
-### Docker
-
-> The pre-built image is available on [Docker Hub](https://hub.docker.com/repository/docker/anonshield/anon/general). For end-users installing via Docker Hub, follow the quick-start steps there (download wrapper script → set key → anonymize).
-
-Pass any local file or folder path directly — the script handles volume mounting automatically:
-
-**CPU:**
-```bash
-./docker/run.sh ./your_file.csv
-```
-
-**GPU:**
-```bash
-./docker/run.sh --gpu ./your_file.csv
-```
-
-**Entire folder:**
-```bash
-./docker/run.sh ./reports/
-```
-
-Output lands in `./anon/output/` (created automatically). On first run, NER models (~1–2 GB) are downloaded and cached in `./anon/models/` for all subsequent runs.
-
-Output files are named `anon_<original_filename>.<ext>`.
 
 ---
 
-## De-anonymization
+## Minimal Test
 
-To recover the original value for a pseudonymized slug, you need the **database** (`db/entities.db`) that was created during the anonymization run. No secret key is required for lookup — the mapping is stored directly in the database.
+~2–5 minutes. No datasets beyond what is already in the repository.
 
 ```bash
-uv run scripts/deanonymize.py "[PERSON_a1b2c3d4]"
+# Set a secret key
+export ANON_SECRET_KEY=$(openssl rand -hex 32)
+
+# Anonymize the included example file
+uv run anon.py examples/teste-exemplo-artigo.txt
+
+# Expected: output/anon_teste-exemplo-artigo.txt is created
+# PII tokens replaced with [TYPE_<slug>] pseudonyms — verify with:
+cat output/anon_teste-exemplo-artigo.txt
 ```
 
-> Keep the `db/` folder safe — it is the only way to reverse the anonymization.
-
----
-
-## Common Options
-
-| Option | Description | Default |
-|:-------|:------------|:--------|
-| `--lang <code>` | Document language (e.g., `en`, `pt`, `es`) | `en` |
-| `--output-dir <path>` | Output directory for anonymized files | `output/` |
-| `--preserve-entities <types>` | Comma-separated entity types to skip (e.g., `LOCATION,IP_ADDRESS`) | — |
-| `--allow-list <terms>` | Comma-separated terms to never anonymize | — |
-| `--slug-length <n>` | Hash length in the pseudonym (0–64). `0` = type label only, no key needed. | `64` |
-| `--word-list <path>` | Path to a JSON file of known terms to always anonymize | — |
-| `--anonymization-strategy <s>` | Detection engine: `filtered` (default), `presidio`, `hybrid`, `standalone` | `filtered` |
-| `--anonymization-config <path>` | JSON config for field-level control in structured files | — |
-| `--optimize` | Enable all performance optimizations at once | off |
-
-For the complete argument reference with examples for every option, see **[docs/users/CLI_REFERENCE.md](docs/users/CLI_REFERENCE.md)**.
-
----
-
-## Supported File Formats
-
-`.txt` `.log` `.csv` `.xlsx` `.json` `.jsonl` `.xml` `.pdf` `.docx` `.png` `.jpg` `.gif` `.bmp` `.tiff` `.webp`
-
----
-
-## Detected Entity Types
-
-**Standard PII:**
-`PERSON`, `LOCATION`, `ORGANIZATION`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `USERNAME`, `PASSWORD`
-
-**Cybersecurity (custom recognizers):**
-`IP_ADDRESS`, `URL`, `HOSTNAME`, `MAC_ADDRESS`, `FILE_PATH`, `HASH`, `AUTH_TOKEN`, `CVE_ID`, `CPE_STRING`, `CERT_SERIAL`, `CERTIFICATE`, `CRYPTOGRAPHIC_KEY`, `UUID`, `PGP_BLOCK`, `PORT`, `OID`
-
-Run `uv run anon.py --list-entities` for the full list, or `--list-languages` for the 24 supported languages.
-
----
-
-## Anonymization Strategies
-
-Choose with `--anonymization-strategy <name>`:
-
-| Strategy | F1 (accuracy) | GPU throughput | Description |
-|----------|:-------------:|:--------------:|-------------|
-| `filtered` (default) | **94.2 %** | 627 KB/s | Best accuracy. Curated Presidio recognizer set. |
-| `hybrid` | **94.2 %** | 632 KB/s | Same accuracy, manual text replacement. |
-| `standalone` | 91.1 % | **1,250 KB/s** | Fastest on GPU. Bypasses Presidio entirely. |
-| `presidio` | 82.3 % | 575 KB/s | Full Presidio pipeline, more false positives. |
-
-> On GPU, `standalone` is **~4× faster** than `presidio`. On CPU the gap is ~15 %. Use `filtered` for accuracy, `standalone` for maximum GPU throughput.
-
-See [docs/developers/ANONYMIZATION_STRATEGIES.md](docs/developers/ANONYMIZATION_STRATEGIES.md) for full benchmarks.
-
----
-
-## Running Tests
-
+Run the unit test suite:
 ```bash
 uv run python -m unittest discover tests/
 ```
 
+Expected: all tests pass with no errors.
+
 ---
 
-## Documentation
+## Experiments
 
-**For users:**
+### Claim #1 — v3.0 achieves ≥743× speedup over v2.0 on operational-scale datasets
 
-| Document | Description |
-|----------|-------------|
-| [docs/users/CLI_REFERENCE.md](docs/users/CLI_REFERENCE.md) | **Complete CLI reference** — every argument explained with examples |
+**Paper reference:** Tables 6, 7, and 8.
 
-**For developers:**
+**Dataset:** D3 — public synthetic mock-CAIS dataset (247 MB CSV / 445 MB JSON, 70,951 records) at `paper_data/datasets/D3_mock_cais/`. D2 (CAIS/RNP real Tenable scans, 420 MB CSV / 551 MB JSON) is private and cannot be redistributed; skip it with `--skip-d2`.
 
-| Document | Description |
-|----------|-------------|
-| [docs/developers/ARCHITECTURE.md](docs/developers/ARCHITECTURE.md) | System architecture, components, DB schema, and design patterns |
-| [docs/developers/ANONYMIZATION_STRATEGIES.md](docs/developers/ANONYMIZATION_STRATEGIES.md) | Strategy internals, regex patterns, and benchmark comparisons |
-| [docs/developers/UTILITY_SCRIPTS_GUIDE.md](docs/developers/UTILITY_SCRIPTS_GUIDE.md) | Helper scripts (de-anonymization, DB export, metrics) |
-| [docs/developers/EVALUATION_GUIDE.md](docs/developers/EVALUATION_GUIDE.md) | Evaluation workflow with ground truth annotation and metrics |
-| [docs/developers/SLM_INTEGRATION_GUIDE.md](docs/developers/SLM_INTEGRATION_GUIDE.md) | SLM/Ollama integration and experimental features |
-| [benchmark/README.md](benchmark/README.md) | Benchmarking suite documentation |
+**Smoke test (~5–20 min on GPU, ~15–45 min on CPU):**
+```bash
+./paper_data/test_minimal/run_tests.sh            # GPU
+./paper_data/test_minimal/run_tests.sh --cpu-only  # CPU-only
+```
+
+Expected: `13/13` steps pass, CSV files created under `paper_data/test_minimal/results/`.
+
+**D3-only full reproduction (~6–7 h on GPU, ~20–35 h on CPU):**
+```bash
+./paper_data/scripts/reproduce_all_runs.sh --skip-d1 --skip-d2
+./paper_data/scripts/analyze_all.sh
+```
+
+**All public datasets (~200–400 h):**
+```bash
+./paper_data/scripts/reproduce_all_runs.sh --skip-d2
+./paper_data/scripts/analyze_all.sh
+```
+
+**Expected results:**
+
+| Dataset / Format | v2.0 time (est.) | v3.0 standalone | Speedup |
+|---|---|---|---|
+| D3 CSV (247 MB) | ≥71.6 h | ~73 s | **≥3,532×** |
+| D3 JSON (445 MB) | ~75.0 h | ~172 s | **~1,569×** |
+| D2 CSV (420 MB) | ≥121.5 h | ~589 s | **≥743×** |
+| D2 JSON (551 MB) | ~92.9 h | ~453 s | **~738×** |
+
+Analysis output is written to `paper_data/results/<run_folder>/analysis/` and reproduces the figures and tables in the paper.
+
+> Full dataset details and step-by-step instructions: [`paper_data/EXPERIMENTS.md`](paper_data/EXPERIMENTS.md)
+
+---
+
+### Claim #2 — `filtered` and `hybrid` strategies achieve F1 = 94.2%, Recall = 96.7%
+
+**Paper reference:** Table 5.
+
+**Dataset:** `paper_data/evaluation/vulnnet_scans_openvas_compilado.csv` (9.2 MB, 6,472 records compiled from all 130 D1 OpenVAS scan targets).
+
+**Step 1 — Reproduce the 67-record sample** (deterministic, fixed seed):
+```bash
+python scripts/sortear.py   # enter 67 when prompted
+# SEED = 30, row range 2–6473
+# Output: scripts/numeros_sorteados.json  (same indices every run)
+```
+
+**Step 2 — Run all versions and strategies:**
+```bash
+python benchmark/benchmark.py \
+  --benchmark \
+  --file paper_data/evaluation/vulnnet_scans_openvas_compilado.csv \
+  --versions 1.0 2.0 3.0 \
+  --strategies filtered hybrid standalone presidio \
+  --transformer-model attack-vector/SecureModernBERT-NER
+```
+
+Annotated outputs (anonymized CSV + XLSX with TP/FP/FN counts per entity type) are pre-computed and available in:
+- `paper_data/evaluation/1.0/`
+- `paper_data/evaluation/2.0/`
+- `paper_data/evaluation/3.0-filtered/filtered/`
+- `paper_data/evaluation/3.0-hybrid/hybrid/`
+- `paper_data/evaluation/3.0-presidio/presidio/`
+- `paper_data/evaluation/3.0-standalone/standalone/`
+
+**Expected results:**
+
+| Strategy | TP | FP | FN | Precision | Recall | F1 |
+|---|---|---|---|---|---|---|
+| `filtered` | 724 | 64 | 25 | 91.9% | **96.7%** | **94.2%** |
+| `hybrid` | 724 | 64 | 25 | 91.9% | **96.7%** | **94.2%** |
+| `standalone` | 739 | 102 | 43 | 87.9% | 94.5% | 91.1% |
+| `presidio` | 724 | 287 | 25 | 71.6% | 96.7% | 82.3% |
+
+> Annotation methodology and XLSX format details: [`paper_data/evaluation/EVALUATION_DATA.md`](paper_data/evaluation/EVALUATION_DATA.md)
+
+---
+
+### Claim #3 — `anonymization_config` yields up to 47× additional throughput gain
+
+**Paper reference:** Tables 6 and 7 (config gain rows).
+
+**Dataset:** D3 with `paper_data/configs/anonymization_config_cve.json`.
+
+```bash
+# Without config (~73 s on GPU, ~240 s on CPU — D3-CSV, standalone)
+uv run anon.py paper_data/datasets/D3_mock_cais/cve_dataset_anonimizados_stratified.csv \
+  --anonymization-strategy standalone
+
+# With config (~8 s on GPU — D3-CSV, standalone)
+uv run anon.py paper_data/datasets/D3_mock_cais/cve_dataset_anonimizados_stratified.csv \
+  --anonymization-strategy standalone \
+  --anonymization-config paper_data/configs/anonymization_config_cve.json
+```
+
+**Expected gains (standalone, GPU):**
+
+| Dataset | Without config | With config | Gain |
+|---|---|---|---|
+| D3 CSV | ~73 s | ~8 s | **9.2×** |
+| D3 JSON | ~172 s | ~20 s | **8.4×** |
+| D2 CSV | ~589 s | ~13 s | **~47×** |
+| D2 JSON | ~453 s | ~18 s | **~25×** |
+
+> Full reproduction steps: [`paper_data/EXPERIMENTS.md`](paper_data/EXPERIMENTS.md)
+
+---
 
 ## License
+
+This project is licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE) for the full text.
+
+---
+
+*[CLI Reference](docs/users/CLI_REFERENCE.md) · [Architecture](docs/developers/ARCHITECTURE.md) · [Anonymization Strategies](docs/developers/ANONYMIZATION_STRATEGIES.md) · [Benchmark Suite](benchmark/README.md) · [Experiments & Datasets](paper_data/EXPERIMENTS.md) · [Evaluation Data](paper_data/evaluation/EVALUATION_DATA.md)*
