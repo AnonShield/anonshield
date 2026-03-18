@@ -2,11 +2,16 @@
 
 Modular pseudonymization framework for Cybersecurity Incident Response Teams. Anonymizes PII and cybersecurity indicators using HMAC-SHA256, preserving structure in JSON, XML, CSV, and more. Supports 24 languages, OCR, and custom cybersecurity recognizers (IP, CVE, hash, URL, etc.).
 
-**GitHub:** [github.com/AnonShield/tool](https://github.com/AnonShield/tool)
-
 ---
 
 ## Available Tags
+
+## Support & Contact
+
+We welcome feedback, questions, and contributions from the community.
+
+* **Bugs & Feature Requests:** Please [open an issue](https://github.com/AnonShield/runshanondocker/issues) on our GitHub repository. This helps us track problems and keep the community informed.
+* **Direct Contact & Inquiries:** For institutional questions, partnerships, or to report a security vulnerability privately, reach out to our team at **[anonshield@unipampa.edu.br](mailto:anonshield@unipampa.edu.br)**.
 
 | Tag | Base | Use Case | Approx. Size |
 |-----|------|----------|-------------|
@@ -65,9 +70,11 @@ echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
 echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.zshrc
 ```
 
-**Windows (PowerShell):**
+Windows (PowerShell):
 ```powershell
-$env:ANON_SECRET_KEY = [System.BitConverter]::ToString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).Replace("-","").ToLower()
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+$env:ANON_SECRET_KEY = [System.BitConverter]::ToString($bytes).Replace("-","").ToLower()
 ```
 
 To keep it across sessions, go to **Settings → System → Environment Variables**, add a new variable named `ANON_SECRET_KEY` with that value.
@@ -83,6 +90,8 @@ Pass any file or folder — relative or absolute path:
 ```
 ```powershell
 # Windows
+# Note: Windows blocks script execution by default. Bypass it for the current session only:
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 .\run.ps1 .\YOUR_FILE.csv
 ```
 
@@ -135,7 +144,7 @@ Output is written to `./anon/output/anon_YOUR_FILE.csv`. The script automaticall
 | `--anonymization-strategy <s>` | Detection strategy — see below | `filtered` |
 | `--optimize` | Enable all performance optimizations | off |
 
-For the complete reference with examples for every option, see the **[CLI Reference on GitHub](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md)**.
+For the complete reference with examples for every option, see the **[CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/runshanondocker/blob/main/CLI_REFERENCE.md)**
 
 Run `./run.sh --help` (Linux/macOS) or `.\run.ps1 --help` (Windows) for the full options list.
 
@@ -319,4 +328,13 @@ Run `./run.sh --list-entities` (Linux/macOS) or `.\run.ps1 --list-entities` (Win
 
 ## Full CLI Reference
 
-Every option explained in plain language with examples: **[docs/users/CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md)**
+Every option explained in plain language with examples: **[CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/runshanondocker/blob/main/CLI_REFERENCE.md)**
+
+---
+
+## Support & Contact
+
+We welcome feedback, questions, and contributions from the community.
+
+* **Bugs & Feature Requests:** Please [open an issue](https://github.com/AnonShield/runshanondocker/issues) on our GitHub repository. This helps us track problems and keep the community informed.
+* **Direct Contact & Inquiries:** For institutional questions, partnerships, or to report a security bug directly, reach out to our team at **[anonshield@unipampa.edu.br](mailto:anonshield@unipampa.edu.br)**.
