@@ -158,53 +158,53 @@ while ($i -lt $ScriptArgs.Count) {
     if ($arg -eq "--output-dir") {
         $i++
         $val  = $ScriptArgs[$i]
-        $host = Get-HostPath $val
-        $null = New-Item -ItemType Directory -Force -Path $host
-        $Volumes.AddRange([string[]]@("-v", "${host}:/anon_output"))
+        $hostPath = Get-HostPath $val
+        $null = New-Item -ItemType Directory -Force -Path $hostPath
+        $Volumes.AddRange([string[]]@("-v", "${hostPath}:/anon_output"))
         $NewArgs.AddRange([string[]]@("--output-dir", "/anon_output"))
         $OutputSet  = $true
-        $OutputHost = $host
+        $OutputHost = $hostPath
 
     } elseif ($arg -like "--output-dir=*") {
         $val  = $arg.Substring("--output-dir=".Length)
-        $host = Get-HostPath $val
-        $null = New-Item -ItemType Directory -Force -Path $host
-        $Volumes.AddRange([string[]]@("-v", "${host}:/anon_output"))
+        $hostPath = Get-HostPath $val
+        $null = New-Item -ItemType Directory -Force -Path $hostPath
+        $Volumes.AddRange([string[]]@("-v", "${hostPath}:/anon_output"))
         $NewArgs.AddRange([string[]]@("--output-dir", "/anon_output"))
         $OutputSet  = $true
-        $OutputHost = $host
+        $OutputHost = $hostPath
 
     } elseif ($arg -eq "--anonymization-config") {
         $i++
         $val  = $ScriptArgs[$i]
-        $host = Get-HostPath $val
-        $dir  = Split-Path $host -Parent
-        $leaf = Split-Path $host -Leaf
+        $hostPath = Get-HostPath $val
+        $dir  = Split-Path $hostPath -Parent
+        $leaf = Split-Path $hostPath -Leaf
         $Volumes.AddRange([string[]]@("-v", "${dir}:/anon_config:ro"))
         $NewArgs.AddRange([string[]]@("--anonymization-config", "/anon_config/$leaf"))
 
     } elseif ($arg -like "--anonymization-config=*") {
         $val  = $arg.Substring("--anonymization-config=".Length)
-        $host = Get-HostPath $val
-        $dir  = Split-Path $host -Parent
-        $leaf = Split-Path $host -Leaf
+        $hostPath = Get-HostPath $val
+        $dir  = Split-Path $hostPath -Parent
+        $leaf = Split-Path $hostPath -Leaf
         $Volumes.AddRange([string[]]@("-v", "${dir}:/anon_config:ro"))
         $NewArgs.Add("--anonymization-config=/anon_config/$leaf")
 
     } elseif ($arg -eq "--word-list") {
         $i++
         $val  = $ScriptArgs[$i]
-        $host = Get-HostPath $val
-        $dir  = Split-Path $host -Parent
-        $leaf = Split-Path $host -Leaf
+        $hostPath = Get-HostPath $val
+        $dir  = Split-Path $hostPath -Parent
+        $leaf = Split-Path $hostPath -Leaf
         $Volumes.AddRange([string[]]@("-v", "${dir}:/anon_wordlist:ro"))
         $NewArgs.AddRange([string[]]@("--word-list", "/anon_wordlist/$leaf"))
 
     } elseif ($arg -like "--word-list=*") {
         $val  = $arg.Substring("--word-list=".Length)
-        $host = Get-HostPath $val
-        $dir  = Split-Path $host -Parent
-        $leaf = Split-Path $host -Leaf
+        $hostPath = Get-HostPath $val
+        $dir  = Split-Path $hostPath -Parent
+        $leaf = Split-Path $hostPath -Leaf
         $Volumes.AddRange([string[]]@("-v", "${dir}:/anon_wordlist:ro"))
         $NewArgs.Add("--word-list=/anon_wordlist/$leaf")
 
@@ -221,17 +221,17 @@ while ($i -lt $ScriptArgs.Count) {
         # First positional argument = input path
         if (-not $InputSet) {
             $InputSet = $true
-            $host = Get-HostPath $arg
-            if (-not (Test-Path $host)) {
+            $hostPath = Get-HostPath $arg
+            if (-not (Test-Path $hostPath)) {
                 Write-Err "Input not found: $arg"
                 exit 1
             }
-            if (Test-Path $host -PathType Container) {
-                $Volumes.AddRange([string[]]@("-v", "${host}:/anon_input:ro"))
+            if (Test-Path $hostPath -PathType Container) {
+                $Volumes.AddRange([string[]]@("-v", "${hostPath}:/anon_input:ro"))
                 $NewArgs.Add("/anon_input")
             } else {
-                $dir  = Split-Path $host -Parent
-                $leaf = Split-Path $host -Leaf
+                $dir  = Split-Path $hostPath -Parent
+                $leaf = Split-Path $hostPath -Leaf
                 $Volumes.AddRange([string[]]@("-v", "${dir}:/anon_input:ro"))
                 $NewArgs.Add("/anon_input/$leaf")
             }
