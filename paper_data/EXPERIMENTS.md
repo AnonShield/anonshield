@@ -26,10 +26,19 @@ The script automatically:
 3. Runs benchmarks on all 3 datasets (D1, D1C, D3)
 4. Generates analysis charts and statistics
 
-**Full paper reproduction (~200–400 h):**
+**Download D3 dataset (public, ~693 MB — not in git):**
 ```bash
-./paper_data/scripts/reproduce_all_runs.sh
-./paper_data/scripts/reproduce_all_runs.sh --cpu-only   # CPU-only
+./paper_data/scripts/download_datasets.sh   # downloads D3 (~693 MB)
+```
+
+**Full paper reproduction (public datasets — D1 + D1C + D3, ~103 h GPU):**
+```bash
+./paper_data/scripts/reproduce_all_runs.sh --skip-d2
+```
+
+**D3-only reproduction (~6.3 h GPU):**
+```bash
+./paper_data/scripts/reproduce_all_runs.sh --skip-d1 --skip-d2
 ```
 
 ---
@@ -48,11 +57,11 @@ paper_data/
 │   ├── dataset_statistics.csv
 │   ├── dataset_statistics.json
 │   └── dataset_files_detailed.csv
-├── datasets/                        ← raw input data (git-ignored — too large)
-│   ├── D1_openvas/                     OpenVAS scan reports (native formats)
-│   ├── D1C_converted/                  Converted formats (XLSX, DOCX, JSON, PDF-images)
-│   ├── D2_cais_original/               CAIS/CTCiber real Tenable scans (private)
-│   └── D3_mock_cais/                   Synthetic CVE-based dataset (public)
+├── datasets/
+│   ├── D1_openvas/                     OpenVAS scan reports — tracked in git (~88 MB)
+│   ├── D1C_converted/                  Converted formats (XLSX, DOCX, JSON, PDF-images) — git-ignored, generated locally
+│   ├── D2_cais_original/               CAIS/CTCiber real Tenable scans — private, not redistributable
+│   └── D3_mock_cais/                   Synthetic CVE-based dataset — git-ignored, download via scripts/download_datasets.sh
 ├── results/                         ← benchmark results (one folder per run; git-ignored)
 │   ├── D1_openvas__v1_v2_v3__all_strategies__1run/
 │   ├── D1C_converted__v1_v2_v3__all_strategies__1run/
@@ -149,14 +158,16 @@ Each folder inside `results/` contains:
 | Path | `datasets/D2_cais_original/` |
 | Config | `configs/anonymization_config.json` (pre-builds 200k-entity cache) |
 
-**Performance comparison (v3.0, mean wall-clock per strategy-run):**
+**Performance comparison (v3.0, mean wall-clock per strategy-run, 10-run average, GPU-measured):**
 
-| Configuration | Format | Mean Time | Speedup |
+| Configuration | Format | Mean time/run (4 strategies) | Speedup |
 |---|---|---|---|
-| Without anonymization config | CSV | ~1780 s | 1× |
-| Without anonymization config | JSON | ~880 s | 1× |
-| **With anonymization config** | **CSV** | **13.2 s** | **~135×** |
-| **With anonymization config** | **JSON** | **18.6 s** | **~47×** |
+| Without anonymization config | CSV | ~1660 s | 1× |
+| Without anonymization config | JSON | ~808 s | 1× |
+| **With anonymization config** | **CSV** | **13.2 s** | **~126×** |
+| **With anonymization config** | **JSON** | **18.6 s** | **~43×** |
+
+> `standalone` only: CSV 589 s → 13 s (**47×**); JSON 453 s → 18 s (**25×**).
 
 ---
 
@@ -172,12 +183,14 @@ Each folder inside `results/` contains:
 
 **Performance comparison (v3.0, mean wall-clock per strategy-run):**
 
-| Configuration | Format | Mean Time | Speedup |
+| Configuration | Format | Mean time/run (4 strategies) | Speedup |
 |---|---|---|---|
 | Without anonymization config | CSV | ~240 s | 1× |
-| Without anonymization config | JSON | ~880 s | 1× |
+| Without anonymization config | JSON | ~293 s | 1× |
 | **With anonymization config** | **CSV** | **8.7 s** | **~28×** |
-| **With anonymization config** | **JSON** | **20.9 s** | **~42×** |
+| **With anonymization config** | **JSON** | **20.9 s** | **~14×** |
+
+> Paper Claim #3 uses the `standalone` strategy specifically: D3 CSV 73 s → 8 s (9.2×); D3 JSON 172 s → 20 s (8.4×).
 
 ---
 
@@ -271,12 +284,16 @@ entity recognition cache of up to 200,000 entities extracted from the target
 dataset before processing begins. This trades a one-time upfront cost for
 dramatically reduced per-run execution times:
 
+Mean time per run across all 4 strategies (10-run averages, GPU-measured):
+
 | Dataset | Without config | With config | Speedup |
 |---|---|---|---|
-| D2 CSV | ~1780 s/run | ~13 s/run | **~135×** |
-| D2 JSON | ~880 s/run | ~19 s/run | **~47×** |
-| D3 CSV | ~240 s/run | ~9 s/run | **~28×** |
-| D3 JSON | ~880 s/run | ~21 s/run | **~42×** |
+| D2 CSV | ~1660 s/run | ~13.2 s/run | **~126×** |
+| D2 JSON | ~808 s/run | ~18.6 s/run | **~43×** |
+| D3 CSV | ~240 s/run | ~8.7 s/run | **~28×** |
+| D3 JSON | ~293 s/run | ~21 s/run | **~14×** |
+
+> `standalone` strategy only (Claim #3 reference): D2 CSV 589 s → 13 s (**47×**); D2 JSON 453 s → 18 s (**25×**); D3 CSV 73 s → 8 s (**9.2×**); D3 JSON 172 s → 20 s (**8.4×**).
 
 ---
 
@@ -291,10 +308,25 @@ benchmark results from the paper. Read it fully before running anything.
 
 | Script | Purpose | Runtime |
 |---|---|---|
-| `test_minimal/run_tests.sh` | **Start here.** Smoke test with tiny datasets to verify the full pipeline works end-to-end in ~5–20 min. Runs D1, D1C, D2, D3 (500-row subsets), all versions, all strategies, then generates analysis. | ~5–20 min |
+| `test_minimal/run_tests.sh` | **Start here.** Smoke test with tiny datasets to verify the full pipeline works end-to-end. Runs D1, D1C, D2, D3 (500-row subsets), all versions, all strategies, then generates analysis. | ~5–20 min (GPU) |
 | `scripts/convert_d1_to_d1c.py` | Generates the **D1C** dataset from D1 by converting CSV→XLSX, TXT→DOCX, XML→JSON, PDF→PDF-images. Run this before `reproduce_all_runs.sh` if you don't have D1C already. | ~20–60 min |
-| `scripts/reproduce_all_runs.sh` | Full benchmark reproduction using the complete original datasets. Produces results that match the paper's tables exactly. | ~60–80 h |
+| `scripts/reproduce_all_runs.sh` | Full benchmark reproduction using the complete original datasets. Produces results that match the paper's tables exactly. | see table below |
 | `scripts/analyze_all.sh` | Generates charts, statistics, and PDFs from existing `benchmark_results.csv` files. Can be run independently after `reproduce_all_runs.sh`. | ~5–30 min |
+
+---
+
+### Step 0 — Download the D3 dataset (required for full reproduction)
+
+D3 (~693 MB: 247 MB CSV + 445 MB JSON) is **not** stored in git. Download it before
+running any benchmark that includes D3:
+
+```bash
+./paper_data/scripts/download_datasets.sh   # downloads D3 to paper_data/datasets/D3_mock_cais/
+```
+
+> **Note:** The download URL is a placeholder — see the script for instructions on
+> where to obtain D3 (Zenodo / GitHub Releases). The D1 dataset is already in git
+> and requires no download.
 
 ---
 
@@ -318,9 +350,9 @@ python3 benchmark/benchmark.py --force-setup --cpu-only
 ```
 
 > **GPU vs CPU:** v3.0 uses neural NER models (spaCy `en_core_web_lg`) that
-> benefit from a GPU but work correctly on CPU. With `--cpu-only`, runs will be
-> slower (~2–5× for NER-heavy workloads) but results are identical.
-> v1.0 and v2.0 are CPU-only regardless.
+> benefit from a GPU but also run on CPU. v1.0 and v2.0 are CPU-only regardless.
+> All runtimes in this document were measured on an NVIDIA RTX 5060 Ti;
+> CPU-only runtimes were not measured.
 
 ---
 
@@ -347,7 +379,7 @@ correctly configured. The script automatically sets up its own test datasets
 **What the script sets up automatically:**
 - **D1 test subset** — auto-copied from `paper_data/datasets/D1_openvas/` (in git)
 - **D1C test subset** — auto-generated via `scripts/convert_d1_to_d1c.py`
-- **D3 test subset** — 500-row CSV/JSON subset, tracked in git
+- **D3 test subset** — 500-row CSV/JSON subset (requires D3 at `paper_data/datasets/D3_mock_cais/`; download with `scripts/download_datasets.sh`)
 - **D2 test subset** — requires private CAIS data; use `--skip-d2` if not available
 
 Expected output: `13/13` steps pass (1 D1C conversion + 12 benchmark runs), `10/10` analysis steps pass,
@@ -386,27 +418,53 @@ the exact same structure and filenames as the original dataset used in the paper
 > **DPI note:** Default is 150 DPI (matching the original). Use `--dpi 200` for
 > higher quality OCR testing at the cost of ~2× larger PDF-image files.
 
+### Step 3 — Run the full benchmark reproduction
+
 Reproduces all runs from the paper using the complete datasets. Results are
 written to `paper_data/results/`, matching the archived structure exactly.
 
 > **Note on D2 (CAIS/CTCiber):** The D2 dataset is private and not included in
-> this repository. `--skip-d2` (or the equivalent flag) will skip those runs.
+> this repository. Pass `--skip-d2` to skip those runs.
 > D3 (synthetic mock CVE) is public and fully reproducible.
 
+**Measured runtimes (GPU — NVIDIA RTX 5060 Ti):**
+
+| Command / scenario | Datasets | Measured total (GPU) |
+|---|---|---|
+| `--skip-d1 --skip-d2` | D3 only (CSV+JSON, with+without config, 10 runs) | **~6.3 h** |
+| `--skip-d1` | D2 + D3 (requires private D2) | **~34 h** |
+| `--skip-d2` | D1 + D1C + D3 (all versions, all strategies, 2 runs for D1/D1C) | **~103 h** |
+| *(full, requires D2)* | D1 + D1C + D2 + D3 | **~131 h** |
+
+> These totals are summed directly from `wall_clock_time_sec` in the stored `benchmark_results.csv` files.
+> All measurements were taken on an NVIDIA RTX 5060 Ti. No CPU-only benchmark data was collected; CPU runtime is not estimated.
+
+**Per-dataset breakdown (what dominates the runtime):**
+
+| Dataset | Version | Measured total (stored) | Note |
+|---|---|---|---|
+| D1 (520 files × 2 runs) | v1.0 default | 18,184 s = 5.1 h | CPU-only |
+| D1 (520 files × 2 runs) | v2.0 default | 84,362 s = 23.4 h | CPU-only |
+| D1 (520 files × 2 runs) | v3.0 standalone | 9,923 s = 2.8 h | GPU |
+| D1 (520 files × 2 runs) | v3.0 filtered/hybrid | ~13,000 s = 3.6 h | GPU |
+| D1C (520 files × 2 runs) | v2.0 default | 102,935 s = 28.6 h | CPU-only, dominates D1C |
+| D1C (520 files × 2 runs) | v3.0 standalone | 16,375 s = 4.6 h | GPU (OCR-heavy) |
+| D2 CSV (1 file) | v3.0 standalone | 5,885 s = 1.6 h | 10 runs total |
+| D2 JSON (1 file) | v3.0 standalone | 4,531 s = 1.3 h | 10 runs total |
+| D3 CSV (1 file) | v3.0 standalone | 730 s = 12 min | 10 runs total |
+| D3 JSON (1 file) | v3.0 standalone | 1,721 s = 29 min | 10 runs total |
+
 ```bash
-# Full reproduction (~60–80 hours — all datasets)
+# Full reproduction (~131 h GPU — all datasets including D2)
 ./paper_data/scripts/reproduce_all_runs.sh
 
-# CPU-only machine (slower, identical results)
-./paper_data/scripts/reproduce_all_runs.sh --cpu-only
-
-# Skip D1/D1C (fastest path — only D2/D3, ~30 h without-config runs)
+# Skip D1/D1C (D2+D3 only, ~34 h GPU)
 ./paper_data/scripts/reproduce_all_runs.sh --skip-d1
 
-# Skip D2 (no access to private CAIS data)
+# Skip D2 (no private CAIS data — D1+D1C+D3, ~103 h GPU)
 ./paper_data/scripts/reproduce_all_runs.sh --skip-d2
 
-# D3 only (public dataset, ~3 h with-config, ~5 h without-config)
+# D3 only (public dataset, ~6.3 h GPU)
 ./paper_data/scripts/reproduce_all_runs.sh --skip-d1 --skip-d2
 
 # Dry run — print all commands without executing
@@ -420,18 +478,58 @@ written to `paper_data/results/`, matching the archived structure exactly.
 After benchmarks complete, generate charts, statistical tables, and PDFs:
 
 ```bash
-# Standard analyses (1–14, covers all paper figures and tables)
+# Standard analyses (1–14, covers all paper figures and tables) — ~5–30 min
 ./paper_data/scripts/analyze_all.sh
 
 # Extended analyses (1–17, includes additional exploratory plots)
 ./paper_data/scripts/analyze_all.sh --extended
 ```
 
-Analysis output is written to an `analysis/` subfolder inside each result
-directory (e.g., `paper_data/results/D3_mock_cve_csv__v3__all_strategies__10runs__with_config/analysis/`).
+The script iterates over every subfolder in `paper_data/results/` that contains
+a `benchmark_results.csv` and runs `benchmark/analyze_benchmark_scientific.py`
+on each. It uses `overhead_calibration__v3__all_strategies__10runs/benchmark_results.csv`
+automatically for overhead correction.
 
-> The `analysis/` folders are git-ignored. They are regenerated each time
-> `analyze_all.sh` runs.
+**Output location:** An `analysis/` subfolder is created inside each result directory:
+
+```
+paper_data/results/
+├── D3_mock_cve_csv__v3__all_strategies__10runs__without_config/
+│   ├── benchmark_results.csv
+│   └── analysis/                    ← generated by analyze_all.sh
+│       ├── fig01_wall_clock_time.pdf
+│       ├── fig02_throughput.pdf
+│       ├── ...
+│       ├── fig14_strategy_comparison.pdf
+│       └── summary_statistics.csv
+└── ...
+```
+
+> The `analysis/` folders are git-ignored. They are regenerated on each run.
+
+**Viewing results:**
+
+```bash
+# Open all generated PDFs (Linux)
+find paper_data/results -path '*/analysis/*.pdf' | sort | xargs -I{} xdg-open {}
+
+# Or open one specific result folder
+xdg-open paper_data/results/D3_mock_cve_csv__v3__all_strategies__10runs__without_config/analysis/
+
+# List all generated files
+find paper_data/results -path '*/analysis/*' -type f | sort
+```
+
+**Running analysis on a single result folder** (without re-running all benchmarks):
+
+```bash
+# Analyze one folder independently
+.venv/bin/python3 benchmark/analyze_benchmark_scientific.py \
+    paper_data/results/D3_mock_cve_csv__v3__all_strategies__10runs__without_config/benchmark_results.csv \
+    -o paper_data/results/D3_mock_cve_csv__v3__all_strategies__10runs__without_config/analysis/ \
+    --overhead paper_data/results/overhead_calibration__v3__all_strategies__10runs/benchmark_results.csv \
+    --pdf
+```
 
 ---
 

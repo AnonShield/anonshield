@@ -111,7 +111,7 @@ The annotated counts are recorded in the `.xlsx` files in each version/strategy 
 | 3.0\_hybrid | 724 | 64 | 25 | **91.9%** | **96.7%** | **94.2%** |
 | 3.0\_standalone | 739 | 102 | 43 | 87.9% | 94.5% | 91.1% |
 
-Model used: `attack-vector/SecureModernBERT-NER`. Preservation list applied: `TOOL`, `PLATFORM`, `FILE_PATH`, `THREAT_ACTOR`, `SERVICE`, `MALWARE`.
+Model used: `attack-vector/SecureModernBERT-NER`. Preservation list applied: `TOOL`, `PLATFORM`, `FILE_PATH`, `THREAT_ACTOR`, `SERVICE`, `REGISTRY_KEY`, `CAMPAIGN`, `MALWARE`, `SECTOR`. Config: `paper_data/configs/anonymization_config_openvas.json`.
 
 ---
 
@@ -127,7 +127,9 @@ python benchmark/benchmark.py \
   --file paper_data/evaluation/vulnnet_scans_openvas_compilado.csv \
   --versions 1.0 2.0 3.0 \
   --strategies filtered hybrid standalone presidio \
-  --transformer-model attack-vector/SecureModernBERT-NER
+  --transformer-model attack-vector/SecureModernBERT-NER \
+  --entities-to-preserve TOOL,PLATFORM,FILE_PATH,THREAT_ACTOR,SERVICE,REGISTRY_KEY,CAMPAIGN,MALWARE,SECTOR \
+  --anonymization-config paper_data/configs/anonymization_config_openvas.json
 ```
 
 Then open each generated XLSX file, extract the 67 sampled rows (indices from `scripts/numeros_sorteados.json`), and count TP/FP/FN per entity type.

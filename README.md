@@ -36,7 +36,7 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 | **Software** | Python 3.12 + [`uv`](https://astral.sh/uv) for all experiments; Docker optional (tool use only) |
 | **GPU (optional)** | NVIDIA driver ≥ 525 (CUDA 12.8) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) |
 | **OS** | Linux (tested and recommended); macOS/Windows supported via Docker only |
-| **Disk** | ~2–3 GB (Python env + NER models); D1 dataset ~88 MB (in git); D3 dataset ~700 MB (public, in git) |
+| **Disk** | ~2–3 GB (Python env + NER models); D1 dataset ~88 MB (in git); D3 dataset ~700 MB (public, **not** in git — download separately, see [Experiments](#experiments)) |
 
 ---
 
@@ -136,9 +136,13 @@ Expected: all tests pass with no errors.
 
 **Paper reference:** Tables 6, 7, and 8.
 
-**Dataset:** D3 — public synthetic mock-CAIS dataset (247 MB CSV / 445 MB JSON, 70,951 records) at `paper_data/datasets/D3_mock_cais/`. D2 (CAIS/RNP real Tenable scans, 420 MB CSV / 551 MB JSON) is private and cannot be redistributed; skip it with `--skip-d2`.
+**Dataset:** D3 — public synthetic mock-CAIS dataset (247 MB CSV / 445 MB JSON, 70,951 records) at `paper_data/datasets/D3_mock_cais/`. D3 is **not** stored in git (too large); download it before running:
+```bash
+./paper_data/scripts/download_datasets.sh   # downloads D3 (~693 MB)
+```
+D2 (CAIS/RNP real Tenable scans, 420 MB CSV / 551 MB JSON) is private and cannot be redistributed; skip it with `--skip-d2`.
 
-**Smoke test (~5–20 min on GPU, ~15–45 min on CPU):**
+**Smoke test (~5–20 min on GPU):**
 ```bash
 ./paper_data/test_minimal/run_tests.sh            # GPU
 ./paper_data/test_minimal/run_tests.sh --cpu-only  # CPU-only
@@ -146,13 +150,13 @@ Expected: all tests pass with no errors.
 
 Expected: `13/13` steps pass, CSV files created under `paper_data/test_minimal/results/`.
 
-**D3-only full reproduction (~6–7 h on GPU, ~20–35 h on CPU):**
+**D3-only full reproduction (~6.3 h on GPU — measured):**
 ```bash
 ./paper_data/scripts/reproduce_all_runs.sh --skip-d1 --skip-d2
 ./paper_data/scripts/analyze_all.sh
 ```
 
-**All public datasets (~200–400 h):**
+**All public datasets (~103 h on GPU — measured):**
 ```bash
 ./paper_data/scripts/reproduce_all_runs.sh --skip-d2
 ./paper_data/scripts/analyze_all.sh
@@ -198,7 +202,9 @@ python benchmark/benchmark.py \
   --file paper_data/evaluation/vulnnet_scans_openvas_compilado.csv \
   --versions 1.0 2.0 3.0 \
   --strategies filtered hybrid standalone presidio \
-  --transformer-model attack-vector/SecureModernBERT-NER
+  --transformer-model attack-vector/SecureModernBERT-NER \
+  --entities-to-preserve TOOL,PLATFORM,FILE_PATH,THREAT_ACTOR,SERVICE,REGISTRY_KEY,CAMPAIGN,MALWARE,SECTOR \
+  --anonymization-config paper_data/configs/anonymization_config_openvas.json
 ```
 
 Annotated outputs (anonymized CSV + XLSX with TP/FP/FN counts per entity type) are pre-computed and available in:
@@ -229,7 +235,7 @@ Annotated outputs (anonymized CSV + XLSX with TP/FP/FN counts per entity type) a
 **Dataset:** D3 with `paper_data/configs/anonymization_config_cve.json`.
 
 ```bash
-# Without config (~73 s on GPU, ~240 s on CPU — D3-CSV, standalone)
+# Without config (~73 s — D3-CSV, standalone, GPU-measured)
 uv run anon.py paper_data/datasets/D3_mock_cais/cve_dataset_anonimizados_stratified.csv \
   --anonymization-strategy standalone
 

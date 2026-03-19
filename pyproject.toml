@@ -30,5 +30,6 @@ dependencies = [
     "grex>=1.0.1",
     "wordcloud>=1.9.3",
     "sentence-transformers>=3.0.0",
-    "hdbscan>=0.8.33"
+    "hdbscan>=0.8.33",
+    "en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl",
 ]
