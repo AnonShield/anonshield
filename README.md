@@ -278,9 +278,11 @@ Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so 
   with config     :      X.X s
   Config speedup  : XX×
 
-  Note: with config, GPU and CPU times converge because no field
-  passes through the NER or regex pipeline. The CPU gain is
-  therefore larger than the GPU gain.
+  Note: for this specific config (only force_anonymize and
+  fields_to_exclude directives, zero fields_to_anonymize entries),
+  no field passes through the NER or regex pipeline, so GPU and
+  CPU times converge. Configs with fields_to_anonymize entries
+  would still run NER on those fields.
 ══════════════════════════════════════════════════════════════
 ```
 
