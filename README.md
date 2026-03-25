@@ -202,9 +202,7 @@ The stored `benchmark_results.csv` files under `paper_data/results/` contain the
 | XLSX | 60 s | ~60 s | 7 s | ~39 s | **8.5×** | **~1.5×** |
 | DOCX | 30 s | ~30 s | 9 s | ~52 s | **3.2×** | **~0.6×** |
 | JSON | 247 s | ~247 s | 11 s | ~58 s | **23.2×** | **~4.3×** |
-| PDF (image/OCR) | 59 s | ~59 s | 36 s | ~198 s† | **1.6×** | **~0.3×†** |
-
-> † PDF-image uses Tesseract OCR, which is CPU-bound regardless of GPU. The 5.5× factor overestimates CPU slowdown for this format; actual CPU time is closer to GPU time.
+| PDF (image/OCR) | 59 s | ~59 s | 36 s | ~198 s | **1.6×** | **~0.3×** |
 
 **Large-scale performance on D2 and D3 (v3.0 standalone, mean, Tables 7–8):**
 

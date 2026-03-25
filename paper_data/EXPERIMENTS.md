@@ -116,6 +116,17 @@ Each folder inside `results/` contains:
 | .xml | 130 | 34.1 MB | 20.6 KB | 1926 KB | 205.2 KB |
 | .pdf (text) | 130 | 33.3 MB | 111 KB | 1796 KB | 167.3 KB |
 
+**Per-file performance (mean across 130 targets, GPU-measured, paper Table 3):**
+
+> v1.0 and v2.0 are CPU-only — CPU time ≈ GPU time. v3.0 CPU estimated by applying the D3 standalone CPU/GPU factor (~5.5×) to GPU times. Per-file speedup on CPU = GPU speedup ÷ 5.5 (v3.0 loses GPU NER acceleration; v2.0 does not, so CPU speedup is lower than on GPU).
+
+| Format | v2.0 GPU/CPU | v3.0 standalone GPU | v3.0 standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
+|---|---|---|---|---|---|
+| XML | ~192 s | ~12 s | ~64 s | **16.5×** | **~3.0×** |
+| CSV | ~74 s | ~8 s | ~43 s | **9.6×** | **~1.7×** |
+| PDF (text) | ~27 s | ~9 s | ~47 s | **3.3×** | **~0.6×** |
+| TXT | ~31 s | ~10 s | ~57 s | **3.0×** | **~0.5×** |
+
 ---
 
 ### D1C — Converted Formats
@@ -145,6 +156,17 @@ Each folder inside `results/` contains:
 > **Note:** PDF-images are ~44× larger on average than their text-based counterparts
 > because they store rasterized page images for OCR testing.
 
+**Per-file performance (mean across 130 targets, GPU-measured, paper Table 4):**
+
+> v2.0 CPU time ≈ GPU time (CPU-only). v3.0 CPU estimated by applying the D3 standalone CPU/GPU factor (~5.5×) to GPU times.
+
+| Format | v2.0 GPU/CPU | v3.0 standalone GPU | v3.0 standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
+|---|---|---|---|---|---|
+| XLSX | ~60 s | ~7 s | ~39 s | **8.5×** | **~1.5×** |
+| DOCX | ~30 s | ~9 s | ~52 s | **3.2×** | **~0.6×** |
+| JSON | ~247 s | ~11 s | ~58 s | **23.2×** | **~4.3×** |
+| PDF (image/OCR) | ~59 s | ~36 s | ~198 s | **1.6×** | **~0.3×** |
+
 ---
 
 ### D2 — CAIS/CTCiber Real Tenable Scans
@@ -158,16 +180,20 @@ Each folder inside `results/` contains:
 | Path | `datasets/D2_cais_original/` |
 | Config | `configs/anonymization_config.json` (pre-builds 200k-entity cache) |
 
-**Performance comparison (v3.0, mean wall-clock per strategy-run, 10-run average, GPU-measured):**
+**Performance comparison (v3.0, mean wall-clock per strategy-run, 10-run average):**
 
-| Configuration | Format | Mean time/run (4 strategies) | Speedup |
-|---|---|---|---|
-| Without anonymization config | CSV | ~1660 s | 1× |
-| Without anonymization config | JSON | ~808 s | 1× |
-| **With anonymization config** | **CSV** | **13.2 s** | **~126×** |
-| **With anonymization config** | **JSON** | **18.6 s** | **~43×** |
+> GPU-measured on RTX 5060 Ti. CPU estimates use D3 standalone factor (5.9× CSV, 5.1× JSON without config; ~1× with config since no NER/regex runs). D2 CPU not directly measured.
 
-> `standalone` only: CSV 589 s → 13 s (**47×**); JSON 453 s → 18 s (**25×**).
+| Configuration | Format | GPU (mean, 4 strats) | CPU~est (mean, 4 strats) | Config gain (GPU) | Config gain (CPU~est) |
+|---|---|---|---|---|---|
+| Without anonymization config | CSV | ~1,660 s | ~10,200 s† | — | — |
+| Without anonymization config | JSON | ~808 s | ~2,670 s† | — | — |
+| **With anonymization config** | **CSV** | **13.2 s** | **~13.2 s** | **~126×** | **~773×** |
+| **With anonymization config** | **JSON** | **18.6 s** | **~18.6 s** | **~43×** | **~144×** |
+
+> `standalone` only (GPU): CSV 589 s → 13 s (**47×**); JSON 453 s → 18 s (**25×**).
+> `standalone` only (CPU~est): CSV ~3,470 s → ~13 s (**~267×**); JSON ~2,310 s → ~18 s (**~128×**).
+> † 4-strategy average: CPU~est = GPU × 6.4 (CSV) or × 3.3 (JSON), derived from D3 all-strategy averages.
 
 ---
 
@@ -237,6 +263,10 @@ Each `benchmark_results.csv` contains one row per (file × version × strategy �
 | `D3_mock_cve_json__v3__all_strategies__10runs__without_config` | D3 | none | 40 | 10 | 2026-02-08 |
 | `D3_mock_cve_csv__v3__all_strategies__10runs__with_config` | D3 | anonymization_config_cve.json | 40 | 10 | 2026-02-14 |
 | `D3_mock_cve_json__v3__all_strategies__10runs__with_config` | D3 | anonymization_config_cve.json | 40 | 10 | 2026-02-14 |
+| `D3_mock_cve_csv__v3__all_strategies__10runs__without_config__cpu` | D3 | none (CPU-only) | 40 | 10 | 2026-03-22 |
+| `D3_mock_cve_json__v3__all_strategies__10runs__without_config__cpu` | D3 | none (CPU-only) | 40 | 10 | 2026-03-22 |
+| `D3_mock_cve_csv__v3__all_strategies__10runs__with_config__cpu` | D3 | anonymization_config_cve.json (CPU-only) | 40 | 10 | 2026-03-22 |
+| `D3_mock_cve_json__v3__all_strategies__10runs__with_config__cpu` | D3 | anonymization_config_cve.json (CPU-only) | 40 | 10 | 2026-03-22 |
 | `overhead_calibration__v3__all_strategies__10runs` | near-zero | — | 60 | 10 | 2026-02-08 |
 
 **Consolidated files** (`results/consolidated/`):
@@ -389,7 +419,7 @@ correctly configured. The script automatically sets up its own test datasets
 **What the script sets up automatically:**
 - **D1 test subset** — auto-copied from `paper_data/datasets/D1_openvas/` (in git)
 - **D1C test subset** — auto-generated via `scripts/convert_d1_to_d1c.py`
-- **D3 test subset** — 500-row CSV/JSON subset (requires D3 at `paper_data/datasets/D3_mock_cais/`; extract with `scripts/extract_datasets.sh`)
+- **D3 test subset** — 500-row CSV/JSON subset committed directly at `paper_data/test_minimal/datasets/D3_mock_cve/` (no extraction needed)
 - **D2 test subset** — requires private CAIS data; use `--skip-d2` if not available
 
 Expected output: `13/13` steps pass (1 D1C conversion + 12 benchmark runs), `10/10` analysis steps pass,
@@ -442,29 +472,37 @@ written to `paper_data/results/`, matching the archived structure exactly.
 | Command / scenario | Datasets | Measured total (GPU) | Estimated total (CPU) |
 |---|---|---|---|
 | `--skip-d1 --skip-d2` | D3 only (CSV+JSON, with+without config, 10 runs) | **~6.3 h** | **~28 h** ✓ |
-| `--skip-d1` | D2 + D3 (requires private D2) | **~34 h** | **~176 h** † |
-| `--skip-d2` | D1 + D1C + D3 (all versions, all strategies, 2 runs for D1/D1C) | **~103 h** | **~155 h** † |
-| *(full, requires D2)* | D1 + D1C + D2 + D3 | **~131 h** | **~303 h** † |
+| `--skip-d1` | D2 + D3 (requires private D2) | **~34 h** | **~178 h** † |
+| `--skip-d2` | D1 + D1C + D3 (all versions, all strategies, 2 runs for D1/D1C) | **~103 h** | **~285 h** † |
+| *(full, requires D2)* | D1 + D1C + D2 + D3 | **~131 h** | **~435 h** † |
 
-> ✓ D3 CPU total directly measured (2026-03-22, AMD Ryzen 5 8600G, `CUDA_VISIBLE_DEVICES=""`). GPU/CPU ratio for D3: ~4.5× overall.
-> † CPU estimates derived by applying measured D3 GPU/CPU speedup factors (6.4× CSV, 3.3× JSON, ~1× with-config) to GPU-measured values for unmeasured datasets. v1.0 and v2.0 are CPU-only and contribute unchanged.
+> ✓ D3 CPU total directly measured (2026-03-22, AMD Ryzen 5 8600G, `CUDA_VISIBLE_DEVICES=""`).
+> † CPU estimates: v1.0 and v2.0 are CPU-only (unchanged). v3.0 all strategies estimated at GPU × 5.5 (D3 standalone average). D2 uses per-format D3 averages (6.4× CSV, 3.3× JSON without config; ~1× with config).
 
 **Per-dataset breakdown (what dominates the runtime):**
 
 | Dataset | Version | Measured total (stored) | Note |
 |---|---|---|---|
-| D1 (520 files × 2 runs) | v1.0 default | 18,184 s = 5.1 h | CPU-only (unchanged on CPU) |
-| D1 (520 files × 2 runs) | v2.0 default | 84,362 s = 23.4 h | CPU-only (unchanged on CPU) |
-| D1 (520 files × 2 runs) | v3.0 standalone | 9,923 s = 2.8 h (GPU) | CPU est. ~58,500 s = ~16 h |
-| D1 (520 files × 2 runs) | v3.0 filtered/hybrid | ~13,000 s = 3.6 h (GPU) | CPU est. ~83,000 s = ~23 h |
-| D1C (520 files × 2 runs) | v2.0 default | 102,935 s = 28.6 h | CPU-only (unchanged on CPU) |
-| D1C (520 files × 2 runs) | v3.0 standalone | 16,375 s = 4.6 h (GPU, OCR-heavy) | CPU est. ~82,000 s = ~23 h |
-| D2 CSV (1 file) | v3.0 standalone | 5,885 s = 1.6 h (GPU) | CPU est. ~34,700 s = ~9.6 h † |
-| D2 JSON (1 file) | v3.0 standalone | 4,531 s = 1.3 h (GPU) | CPU est. ~14,950 s = ~4.2 h † |
-| D3 CSV (1 file) | v3.0 standalone | 730 s = 12 min (GPU) | 4,336 s = 72 min (CPU) ✓ |
-| D3 JSON (1 file) | v3.0 standalone | 1,721 s = 29 min (GPU) | 8,819 s = 147 min (CPU) ✓ |
+| D1 (520 files × 2 runs) | v1.0 default | 18,184 s = 5.1 h | 18,184 s = 5.1 h (CPU-only) |
+| D1 (520 files × 2 runs) | v2.0 default | 84,362 s = 23.4 h | 84,362 s = 23.4 h (CPU-only) |
+| D1 (520 files × 2 runs) | v3.0 standalone | 9,923 s = 2.8 h (GPU) | ~54,600 s = ~15 h (×5.5) |
+| D1 (520 files × 2 runs) | v3.0 filtered | 12,991 s = 3.6 h (GPU) | ~71,500 s = ~20 h (×5.5) |
+| D1 (520 files × 2 runs) | v3.0 hybrid | 12,982 s = 3.6 h (GPU) | ~71,400 s = ~20 h (×5.5) |
+| D1 (520 files × 2 runs) | v3.0 presidio | 13,265 s = 3.7 h (GPU) | ~73,000 s = ~20 h (×5.5) |
+| **D1 total** | all | **151,707 s = 42.1 h** | **~373,000 s = ~104 h** |
+| D1C (520 files × 2 runs) | v1.0 default | 14,324 s = 4.0 h | 14,324 s = 4.0 h (CPU-only) |
+| D1C (520 files × 2 runs) | v2.0 default | 102,935 s = 28.6 h | 102,935 s = 28.6 h (CPU-only) |
+| D1C (520 files × 2 runs) | v3.0 standalone | 16,375 s = 4.5 h (GPU) | ~90,100 s = ~25 h (×5.5) |
+| D1C (520 files × 2 runs) | v3.0 filtered | 20,783 s = 5.8 h (GPU) | ~114,300 s = ~32 h (×5.5) |
+| D1C (520 files × 2 runs) | v3.0 hybrid | 20,769 s = 5.8 h (GPU) | ~114,200 s = ~32 h (×5.5) |
+| D1C (520 files × 2 runs) | v3.0 presidio | 21,198 s = 5.9 h (GPU) | ~116,600 s = ~32 h (×5.5) |
+| **D1C total** | all | **196,383 s = 54.6 h** | **~552,000 s = ~153 h** |
+| D2 CSV (1 file) | v3.0 standalone | 5,885 s = 1.6 h (GPU) | ~34,700 s = ~9.6 h † |
+| D2 JSON (1 file) | v3.0 standalone | 4,531 s = 1.3 h (GPU) | ~14,950 s = ~4.2 h † |
+| D3 CSV (1 file) | v3.0 standalone | 730 s = 12 min (GPU) | 4,336 s = 72 min ✓ |
+| D3 JSON (1 file) | v3.0 standalone | 1,721 s = 29 min (GPU) | 8,819 s = 147 min ✓ |
 
-> ✓ D3 CPU measured directly. † D2 CPU estimated using D3 speedup: 5.9× for CSV, 3.3× for JSON (standalone).
+> ✓ D3 CPU measured directly (2026-03-22). † D2 CPU estimated using D3 speedup: 5.9× for CSV, 3.3× for JSON (standalone, all-strategy averages).
 
 ```bash
 # Full reproduction (~131 h GPU — all datasets including D2)
