@@ -132,13 +132,13 @@ Expected: all tests pass with no errors.
 
 ## Experiments
 
-### Claim #1 — v3.0 (`standalone`) achieves 3–23× speedup over v2.0 per file on D1 (GPU) / 2–8× (CPU); compounds to ≥3,500× (GPU) / ≥560× (CPU) at D3 scale
+### Claim #1 — v3.0 (`standalone`) achieves 2–18× speedup over v2.0 per file on D1 (GPU); compounds to ≥3,500× (GPU) / ≥560× (CPU) at D3 scale
 
 **Paper reference:** Tables 3, 4, 6, 7, and 8.
 
 **What this claim asserts and why it has two parts:**
 
-The per-file speedup is measured on D1 (small files, 130 targets). On GPU, v3.0 benefits from accelerated NER inference, yielding 3–23× over v2.0 per file. On CPU-only hardware, the ratio is lower (2–8×) since v3.0's NER pipeline runs slower without a GPU, but v2.0 is also CPU-bound so the gap persists. The large-scale speedup at D3 scale (247 MB CSV, 70,951 records) emerges from two compounding effects: (i) v2.0 exhibits superlinear scaling on CSV (CV = 1.75 on D1), meaning its per-byte cost *grows* with file size; (ii) v3.0's LRU cache *improves* throughput with entity recurrence. Using the measured v2.0 throughput (~1 KB/s) and the stored v3.0 D3 runtimes, the extrapolated speedup is ≥3,500× (GPU) / ≥560× (CPU).
+The per-file speedup is measured on D1 (small files, 130 targets). On GPU, v3.0 benefits from accelerated NER inference, yielding 2–18× over v2.0 per file. On CPU-only hardware, the ratio is lower since v3.0's NER pipeline runs slower without a GPU, but v2.0 is also CPU-bound so the gap persists. The large-scale speedup at D3 scale (247 MB CSV, 70,951 records) emerges from two compounding effects: (i) v2.0 exhibits superlinear scaling on CSV (CV = 1.75 on D1), meaning its per-byte cost *grows* with file size; (ii) v3.0's LRU cache *improves* throughput with entity recurrence. Using the measured v2.0 throughput (~1 KB/s) and the stored v3.0 D3 runtimes, the extrapolated speedup is ≥3,500× (GPU) / ≥560× (CPU).
 
 **Verification options (in order of time cost):**
 
@@ -184,16 +184,16 @@ The stored `benchmark_results.csv` files under `paper_data/results/` contain the
 ./paper_data/scripts/analyze_all.sh   # regenerate charts from stored CSVs only
 ```
 
-**Per-file speedup on D1 (hardware-independent ratios, Table 3):**
+**Per-file speedup on D1 (GPU, median across 130 targets, Table 3):**
 
-| Format | v2.0 baseline (median) | v3.0 standalone (median) | Speedup |
+| Format | v2.0 (median) | v3.0 standalone (median) | Speedup |
 |---|---|---|---|
-| XML | 176 s | 10 s | **16.5×** |
-| CSV | 37 s | 7 s | **9.6×** |
-| PDF (text) | 13 s | 7 s | **3.3×** |
-| TXT | 13 s | 8 s | **3.0×** |
+| XML | 176 s | 10 s | **17.6×** |
+| CSV | 37 s | 7 s | **5.6×** |
+| PDF (text) | 13 s | 7 s | **1.8×** |
+| TXT | 13 s | 8 s | **1.6×** |
 
-> The large-scale speedup (≥3,532× on D3 CSV) follows from two independently verifiable inputs: (i) v2.0's throughput on D1 CSV (0.98 KB/s, measurable via Option B's spot check) and (ii) v3.0's runtime on D3 (stored in `benchmark_results.csv`). Full D1 reproduction takes ~35 h and full D3 reproduction is hardware-dependent — neither is expected of evaluators.
+> The large-scale speedup at D3 scale is verifiable via Option B's spot check, which extrapolates v2.0's measured throughput to the full D3 file. Full D1 reproduction takes ~35 h and full D3 reproduction is hardware-dependent — neither is expected of evaluators.
 
 > Full dataset details and step-by-step instructions: [`paper_data/EXPERIMENTS.md`](paper_data/EXPERIMENTS.md)
 
