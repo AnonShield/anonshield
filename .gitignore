@@ -206,7 +206,6 @@ Vulnerabilidades-CAIS/
 dados_teste*
 tests/test_data/
 teste*
-/scripts/
 anon.py.bal
 cve*
 !paper_data/test_minimal/datasets/D3_mock_cve/cve_dataset_anonimizados_stratified.csv
