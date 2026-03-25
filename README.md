@@ -257,7 +257,7 @@ python benchmark/benchmark.py \
 
 ---
 
-### Claim #3 — `anonymization_config` eliminates NER inference overhead, reducing D3 processing time by ~9× (GPU) to ~50× (CPU)
+### Claim #3 — `anonymization_config` eliminates NER inference overhead, reducing D3 processing time significantly (paper hardware: ~9× GPU / ~50× CPU; actual speedup depends on GPU speed)
 
 **Paper reference:** Tables 6 and 7 (config gain rows).
 
