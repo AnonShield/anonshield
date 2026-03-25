@@ -59,6 +59,11 @@ done
 CPU_FLAG=""
 [[ "$CPU_ONLY" == "true" ]] && CPU_FLAG="--cpu-only"
 
+# When running CPU-only, hide all CUDA devices from subprocesses so PyTorch
+# does not attempt to use the GPU even if one is present (avoids CUDA kernel
+# incompatibility errors on machines where CUDA is installed but misconfigured).
+[[ "$CPU_ONLY" == "true" ]] && export CUDA_VISIBLE_DEVICES=""
+
 # ── Python resolution ─────────────────────────────────────────────────────────
 # benchmark.py creates .venv automatically on first run.
 # convert_d1_to_d1c.py and analyze_benchmark_scientific.py need venv packages,

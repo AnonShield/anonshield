@@ -183,14 +183,17 @@ Each folder inside `results/` contains:
 
 **Performance comparison (v3.0, mean wall-clock per strategy-run):**
 
-| Configuration | Format | Mean time/run (4 strategies) | Speedup |
-|---|---|---|---|
-| Without anonymization config | CSV | ~240 s | 1× |
-| Without anonymization config | JSON | ~293 s | 1× |
-| **With anonymization config** | **CSV** | **8.7 s** | **~28×** |
-| **With anonymization config** | **JSON** | **20.9 s** | **~14×** |
+| Configuration | Format | GPU (RTX 5060 Ti) | CPU (no GPU) | GPU/CPU speedup |
+|---|---|---|---|---|
+| Without anonymization config | CSV | ~240 s | ~1547 s | **~6.4×** |
+| Without anonymization config | JSON | ~293 s | ~976 s | **~3.3×** |
+| **With anonymization config** | **CSV** | **8.7 s** | **~9.3 s** | **~1×** |
+| **With anonymization config** | **JSON** | **20.9 s** | **~21.4 s** | **~1×** |
 
-> Paper Claim #3 uses the `standalone` strategy specifically: D3 CSV 73 s → 8 s (9.2×); D3 JSON 172 s → 20 s (8.4×).
+> CPU measurements taken on the same machine (AMD Ryzen 5 8600G) with `CUDA_VISIBLE_DEVICES=""` (2026-03-22). With anonymization config, GPU and CPU times are nearly identical because the config used here contains only `force_anonymize` and `exclude` directives — fields are either force-anonymized directly or excluded entirely, bypassing the NER and regex pipeline completely, so there is no GPU work to accelerate.
+
+> Paper Claim #3 uses the `standalone` strategy specifically (GPU): D3 CSV 73 s → 8 s (9.2×); D3 JSON 172 s → 20 s (8.4×).
+> CPU-only (`standalone`): D3 CSV ~434 s → ~8.7 s (**~50×**); D3 JSON ~882 s → ~21 s (**~42×**). GPU/CPU speedup without config: ~5.9× (CSV), ~5.1× (JSON).
 
 ---
 
@@ -279,21 +282,26 @@ Each `benchmark_results.csv` contains one row per (file × version × strategy �
 
 ## Anonymization Config Effect
 
-The `anonymization_config.json` / `anonymization_config_cve.json` pre-builds an
-entity recognition cache of up to 200,000 entities extracted from the target
-dataset before processing begins. This trades a one-time upfront cost for
-dramatically reduced per-run execution times:
+The `anonymization_config.json` / `anonymization_config_cve.json` defines per-field
+directives (`force_anonymize`, `exclude`). Fields under `force_anonymize` are
+pseudonymized directly without NER/regex inference; fields under `exclude` are skipped
+entirely. As a result, **no field passes through the NER or regex pipeline**, eliminating
+the main processing bottleneck and making GPU acceleration irrelevant for config runs.
 
-Mean time per run across all 4 strategies (10-run averages, GPU-measured):
+Mean time per run across all 4 strategies (10-run averages):
 
-| Dataset | Without config | With config | Speedup |
-|---|---|---|---|
-| D2 CSV | ~1660 s/run | ~13.2 s/run | **~126×** |
-| D2 JSON | ~808 s/run | ~18.6 s/run | **~43×** |
-| D3 CSV | ~240 s/run | ~8.7 s/run | **~28×** |
-| D3 JSON | ~293 s/run | ~21 s/run | **~14×** |
+| Dataset | Without config (GPU) | Without config (CPU) | With config (GPU) | With config (CPU) | Config speedup (GPU) | Config speedup (CPU) |
+|---|---|---|---|---|---|---|
+| D2 CSV | ~1660 s/run | ~10,600 s/run † | ~13.2 s/run | ~13.2 s/run † | **~126×** | **~803×** † |
+| D2 JSON | ~808 s/run | ~2,700 s/run † | ~18.6 s/run | ~18.6 s/run † | **~43×** | **~145×** † |
+| D3 CSV | ~240 s/run | ~1547 s/run ✓ | ~8.7 s/run | ~9.3 s/run ✓ | **~28×** | **~166×** ✓ |
+| D3 JSON | ~293 s/run | ~976 s/run ✓ | ~20.9 s/run | ~21.4 s/run ✓ | **~14×** | **~46×** ✓ |
 
-> `standalone` strategy only (Claim #3 reference): D2 CSV 589 s → 13 s (**47×**); D2 JSON 453 s → 18 s (**25×**); D3 CSV 73 s → 8 s (**9.2×**); D3 JSON 172 s → 20 s (**8.4×**).
+> ✓ D3 CPU times directly measured (2026-03-22, AMD Ryzen 5 8600G, `CUDA_VISIBLE_DEVICES=""`).
+> † D2 CPU times estimated by applying the measured D3 GPU/CPU speedup factors (6.4× for CSV without-config, 3.3× for JSON without-config) to the GPU-measured D2 values. With-config CPU ≈ GPU since no field passes through NER/regex.
+
+> `standalone` strategy only (Claim #3 reference, GPU): D2 CSV 589 s → 13 s (**47×**); D2 JSON 453 s → 18 s (**25×**); D3 CSV 73 s → 8 s (**9.2×**); D3 JSON 172 s → 20 s (**8.4×**).
+> CPU-only (`standalone`): D3 CSV ~434 s → ~8.7 s (**~50×**); D3 JSON ~882 s → ~21 s (**~42×**).
 
 ---
 
@@ -351,8 +359,12 @@ python3 benchmark/benchmark.py --force-setup --cpu-only
 
 > **GPU vs CPU:** v3.0 uses neural NER models (spaCy `en_core_web_lg`) that
 > benefit from a GPU but also run on CPU. v1.0 and v2.0 are CPU-only regardless.
-> All runtimes in this document were measured on an NVIDIA RTX 5060 Ti;
-> CPU-only runtimes were not measured.
+> GPU runtimes were measured on an NVIDIA RTX 5060 Ti. D3 CPU-only runtimes were
+> also measured on the same machine (2026-03-22) and show a GPU/CPU speedup of
+> **~3.3–6.4×** for runs without anonymization config. With config, GPU and CPU
+> times are nearly identical (~1×) because the config uses only `force_anonymize`
+> and `exclude` directives, so no field passes through the NER or regex pipeline.
+> To force CPU-only mode on a machine with a GPU, use `CUDA_VISIBLE_DEVICES="" python3 benchmark/benchmark.py`.
 
 ---
 
@@ -427,32 +439,34 @@ written to `paper_data/results/`, matching the archived structure exactly.
 > this repository. Pass `--skip-d2` to skip those runs.
 > D3 (synthetic mock CVE) is public and fully reproducible.
 
-**Measured runtimes (GPU — NVIDIA RTX 5060 Ti):**
+**Measured runtimes:**
 
-| Command / scenario | Datasets | Measured total (GPU) |
-|---|---|---|
-| `--skip-d1 --skip-d2` | D3 only (CSV+JSON, with+without config, 10 runs) | **~6.3 h** |
-| `--skip-d1` | D2 + D3 (requires private D2) | **~34 h** |
-| `--skip-d2` | D1 + D1C + D3 (all versions, all strategies, 2 runs for D1/D1C) | **~103 h** |
-| *(full, requires D2)* | D1 + D1C + D2 + D3 | **~131 h** |
+| Command / scenario | Datasets | Measured total (GPU) | Estimated total (CPU) |
+|---|---|---|---|
+| `--skip-d1 --skip-d2` | D3 only (CSV+JSON, with+without config, 10 runs) | **~6.3 h** | **~28 h** ✓ |
+| `--skip-d1` | D2 + D3 (requires private D2) | **~34 h** | **~176 h** † |
+| `--skip-d2` | D1 + D1C + D3 (all versions, all strategies, 2 runs for D1/D1C) | **~103 h** | **~155 h** † |
+| *(full, requires D2)* | D1 + D1C + D2 + D3 | **~131 h** | **~303 h** † |
 
-> These totals are summed directly from `wall_clock_time_sec` in the stored `benchmark_results.csv` files.
-> All measurements were taken on an NVIDIA RTX 5060 Ti. No CPU-only benchmark data was collected; CPU runtime is not estimated.
+> ✓ D3 CPU total directly measured (2026-03-22, AMD Ryzen 5 8600G, `CUDA_VISIBLE_DEVICES=""`). GPU/CPU ratio for D3: ~4.5× overall.
+> † CPU estimates derived by applying measured D3 GPU/CPU speedup factors (6.4× CSV, 3.3× JSON, ~1× with-config) to GPU-measured values for unmeasured datasets. v1.0 and v2.0 are CPU-only and contribute unchanged.
 
 **Per-dataset breakdown (what dominates the runtime):**
 
 | Dataset | Version | Measured total (stored) | Note |
 |---|---|---|---|
-| D1 (520 files × 2 runs) | v1.0 default | 18,184 s = 5.1 h | CPU-only |
-| D1 (520 files × 2 runs) | v2.0 default | 84,362 s = 23.4 h | CPU-only |
-| D1 (520 files × 2 runs) | v3.0 standalone | 9,923 s = 2.8 h | GPU |
-| D1 (520 files × 2 runs) | v3.0 filtered/hybrid | ~13,000 s = 3.6 h | GPU |
-| D1C (520 files × 2 runs) | v2.0 default | 102,935 s = 28.6 h | CPU-only, dominates D1C |
-| D1C (520 files × 2 runs) | v3.0 standalone | 16,375 s = 4.6 h | GPU (OCR-heavy) |
-| D2 CSV (1 file) | v3.0 standalone | 5,885 s = 1.6 h | 10 runs total |
-| D2 JSON (1 file) | v3.0 standalone | 4,531 s = 1.3 h | 10 runs total |
-| D3 CSV (1 file) | v3.0 standalone | 730 s = 12 min | 10 runs total |
-| D3 JSON (1 file) | v3.0 standalone | 1,721 s = 29 min | 10 runs total |
+| D1 (520 files × 2 runs) | v1.0 default | 18,184 s = 5.1 h | CPU-only (unchanged on CPU) |
+| D1 (520 files × 2 runs) | v2.0 default | 84,362 s = 23.4 h | CPU-only (unchanged on CPU) |
+| D1 (520 files × 2 runs) | v3.0 standalone | 9,923 s = 2.8 h (GPU) | CPU est. ~58,500 s = ~16 h |
+| D1 (520 files × 2 runs) | v3.0 filtered/hybrid | ~13,000 s = 3.6 h (GPU) | CPU est. ~83,000 s = ~23 h |
+| D1C (520 files × 2 runs) | v2.0 default | 102,935 s = 28.6 h | CPU-only (unchanged on CPU) |
+| D1C (520 files × 2 runs) | v3.0 standalone | 16,375 s = 4.6 h (GPU, OCR-heavy) | CPU est. ~82,000 s = ~23 h |
+| D2 CSV (1 file) | v3.0 standalone | 5,885 s = 1.6 h (GPU) | CPU est. ~34,700 s = ~9.6 h † |
+| D2 JSON (1 file) | v3.0 standalone | 4,531 s = 1.3 h (GPU) | CPU est. ~14,950 s = ~4.2 h † |
+| D3 CSV (1 file) | v3.0 standalone | 730 s = 12 min (GPU) | 4,336 s = 72 min (CPU) ✓ |
+| D3 JSON (1 file) | v3.0 standalone | 1,721 s = 29 min (GPU) | 8,819 s = 147 min (CPU) ✓ |
+
+> ✓ D3 CPU measured directly. † D2 CPU estimated using D3 speedup: 5.9× for CSV, 3.3× for JSON (standalone).
 
 ```bash
 # Full reproduction (~131 h GPU — all datasets including D2)
