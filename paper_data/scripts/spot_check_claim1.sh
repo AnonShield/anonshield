@@ -85,7 +85,7 @@ if not t2 or not t3:
 sub_kb = os.path.getsize(sub) / 1024
 tp2    = sub_kb / t2           # KB/s — v2.0 throughput on this machine
 tp3    = sub_kb / t3           # KB/s — v3.0 throughput on this machine
-est2_h = full_kb / tp2 / 3600  # v2.0 extrapolated to full D3 (lower bound — superlinear)
+est2_h = full_kb / tp2 / 3600  # v2.0 extrapolated to full D3 (lower bound — from measured throughput)
 est3_s = full_kb / tp3         # v3.0 extrapolated to full D3 (upper bound — cache improves)
 
 print()
@@ -97,7 +97,7 @@ print(f"  v3.0  standalone : {t3:>8.1f} s   ({tp3:.0f} KB/s on this machine)")
 print(f"  Speedup          : {t2/t3:.0f}×  (larger with GPU — v3.0 benefits from accelerated NER)")
 print()
 print(f"  Extrapolating to full D3 (247 MB) via measured throughputs:")
-print(f"  v2.0 on full D3  : ≥ {est2_h:.1f} h   (lower bound — v2.0 superlinear on CSV)")
+print(f"  v2.0 on full D3  : ≥ {est2_h:.1f} h   (lower bound — extrapolated from measured throughput)")
 print(f"  v3.0 on full D3  : ≤ {est3_s:.0f} s   (upper bound — v3.0 cache improves at scale)")
 print(f"  Projected speedup: ≥ {est2_h*3600/est3_s:.0f}×")
 print("══════════════════════════════════════════════════════════════")
