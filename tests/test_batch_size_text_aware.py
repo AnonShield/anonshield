@@ -15,6 +15,8 @@ print("="*70)
 print("Testing: Adaptive Batch Size Based on Cell Text Length")
 print("="*70)
 
+os.makedirs('tests/test_data', exist_ok=True)
+
 # Test 1: CSV with SHORT cells
 print("\n1️⃣  Creating CSV with SHORT cells (avg ~10 chars)...")
 data_short = {
