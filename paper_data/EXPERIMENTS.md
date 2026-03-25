@@ -26,9 +26,9 @@ The script automatically:
 3. Runs benchmarks on all 3 datasets (D1, D1C, D3)
 4. Generates analysis charts and statistics
 
-**Download D3 dataset (public, ~693 MB — not in git):**
+**Extract D3 dataset (bundled as zip files in git — ~80 MB compressed):**
 ```bash
-./paper_data/scripts/download_datasets.sh   # downloads D3 (~693 MB)
+./paper_data/scripts/extract_datasets.sh   # extracts D3 and removes the zips
 ```
 
 **Full paper reproduction (public datasets — D1 + D1C + D3, ~103 h GPU):**
@@ -61,7 +61,7 @@ paper_data/
 │   ├── D1_openvas/                     OpenVAS scan reports — tracked in git (~88 MB)
 │   ├── D1C_converted/                  Converted formats (XLSX, DOCX, JSON, PDF-images) — git-ignored, generated locally
 │   ├── D2_cais_original/               CAIS/CTCiber real Tenable scans — private, not redistributable
-│   └── D3_mock_cais/                   Synthetic CVE-based dataset — git-ignored, download via scripts/download_datasets.sh
+│   └── D3_mock_cais/                   Synthetic CVE-based dataset — git-ignored, extract via scripts/extract_datasets.sh
 ├── results/                         ← benchmark results (one folder per run; git-ignored)
 │   ├── D1_openvas__v1_v2_v3__all_strategies__1run/
 │   ├── D1C_converted__v1_v2_v3__all_strategies__1run/
@@ -323,18 +323,16 @@ benchmark results from the paper. Read it fully before running anything.
 
 ---
 
-### Step 0 — Download the D3 dataset (required for full reproduction)
+### Step 0 — Extract the D3 dataset (required for full reproduction)
 
-D3 (~693 MB: 247 MB CSV + 445 MB JSON) is **not** stored in git. Download it before
-running any benchmark that includes D3:
+D3 is bundled as two zip files tracked in git (`D3_mock_cais_csv.zip` ~36 MB,
+`D3_mock_cais_json.zip` ~44 MB). Extract before running any D3 benchmark:
 
 ```bash
-./paper_data/scripts/download_datasets.sh   # downloads D3 to paper_data/datasets/D3_mock_cais/
+./paper_data/scripts/extract_datasets.sh   # extracts D3 to paper_data/datasets/D3_mock_cais/ and removes the zips
 ```
 
-> **Note:** The download URL is a placeholder — see the script for instructions on
-> where to obtain D3 (Zenodo / GitHub Releases). The D1 dataset is already in git
-> and requires no download.
+> D1 (~88 MB) is already tracked in git and requires no extraction.
 
 ---
 
@@ -391,7 +389,7 @@ correctly configured. The script automatically sets up its own test datasets
 **What the script sets up automatically:**
 - **D1 test subset** — auto-copied from `paper_data/datasets/D1_openvas/` (in git)
 - **D1C test subset** — auto-generated via `scripts/convert_d1_to_d1c.py`
-- **D3 test subset** — 500-row CSV/JSON subset (requires D3 at `paper_data/datasets/D3_mock_cais/`; download with `scripts/download_datasets.sh`)
+- **D3 test subset** — 500-row CSV/JSON subset (requires D3 at `paper_data/datasets/D3_mock_cais/`; extract with `scripts/extract_datasets.sh`)
 - **D2 test subset** — requires private CAIS data; use `--skip-d2` if not available
 
 Expected output: `13/13` steps pass (1 D1C conversion + 12 benchmark runs), `10/10` analysis steps pass,

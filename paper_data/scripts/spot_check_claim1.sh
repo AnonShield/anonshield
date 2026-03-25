@@ -26,7 +26,7 @@ else
     CPU_FLAG=""
 fi
 
-[[ -f "$D3" ]]    || { echo "ERROR: D3 not found. Run: ./paper_data/scripts/download_datasets.sh"; exit 1; }
+[[ -f "$D3" ]]    || { echo "ERROR: D3 not found. Run: ./paper_data/scripts/extract_datasets.sh"; exit 1; }
 [[ -f "$BENCH" ]] || { echo "ERROR: benchmark.py not found at $BENCH"; exit 1; }
 
 WORK=$(mktemp -d)

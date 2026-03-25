@@ -36,7 +36,7 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 | **Software** | Python 3.12 + [`uv`](https://astral.sh/uv) for all experiments; Docker optional (tool use only) |
 | **GPU (optional)** | NVIDIA driver ≥ 525 (CUDA 12.8) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) |
 | **OS** | Linux (tested and recommended); macOS/Windows supported via Docker only |
-| **Disk** | ~2–3 GB (Python env + NER models); D1 dataset ~88 MB (in git); D3 dataset ~700 MB (public, **not** in git — download separately, see [Experiments](#experiments)) |
+| **Disk** | ~2–3 GB (Python env + NER models); D1 ~88 MB (in git); D3 bundled as zips (~80 MB in git, ~700 MB extracted) |
 
 ---
 
@@ -175,7 +175,7 @@ Expected output (absolute times and ratio vary by hardware):
 **Option C — Full D3 benchmark (reproduces paper Tables 6–8):**
 Runtime is hardware-dependent and cannot be estimated without knowing the evaluator's machine.
 ```bash
-./paper_data/scripts/download_datasets.sh                     # download D3 (~693 MB, not in git)
+./paper_data/scripts/extract_datasets.sh                     # extract D3 from bundled zips (~80 MB → ~700 MB)
 ./paper_data/scripts/reproduce_all_runs.sh --skip-d1 --skip-d2
 ./paper_data/scripts/analyze_all.sh
 ```
