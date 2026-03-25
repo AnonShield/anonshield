@@ -138,7 +138,7 @@ Expected: all tests pass with no errors.
 
 **What this claim asserts and why it has two parts:**
 
-The per-file speedup is measured on D1 (small files, 130 targets). On GPU, v3.0 benefits from accelerated NER inference, yielding ~3×–~17× over v2.0 per file (paper Table 3, mean-based). On CPU-only hardware, v3.0 loses GPU acceleration (~5.5× slower per file) while v2.0 is already CPU-bound — so per-file speedup on CPU is ~GPU speedup ÷ 5.5, and v3.0 may be slower per file without a GPU. However, at D3 scale the advantage recovers due to v3.0's O(n) streaming vs v2.0's superlinear scaling: ≥3,532× on GPU and ≥594× on CPU (D3 CPU times are measured in stored results).
+The per-file speedup is measured on D1 (small files, 130 targets). On GPU, v3.0 benefits from accelerated NER inference, yielding ~3×–~17× over v2.0 per file (paper Table 3, mean-based). On CPU-only hardware, v3.0 loses GPU acceleration (~5.5× slower per file) while v2.0 is already CPU-bound — so per-file speedup on CPU is ~GPU speedup ÷ 5.5, and v3.0 may be slower per file without a GPU. However, at D3 scale the advantage recovers due to v3.0's O(n) streaming architecture vs v2.0's scaling behavior: ≥3,532× on GPU and ≥594× on CPU (D3 CPU times are measured in stored results).
 
 **Verification options (in order of time cost):**
 
@@ -166,7 +166,7 @@ Expected output (absolute times vary by hardware; speedup is larger with GPU):
   Speedup          : XX×  (larger with GPU — v3.0 benefits from accelerated NER)
 
   Extrapolating to full D3 (247 MB) via measured throughputs:
-  v2.0 on full D3  : ≥ XX.X h   (lower bound — v2.0 superlinear on CSV)
+  v2.0 on full D3  : ≥ XX.X h   (lower bound — extrapolated from measured throughput)
   v3.0 on full D3  : ≤ XXXX s   (upper bound — v3.0 cache improves at scale)
   Projected speedup: ≥ XX×
 ══════════════════════════════════════════════════════════════
