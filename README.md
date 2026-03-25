@@ -145,10 +145,10 @@ The per-file speedup is measured on D1 (small files, 130 targets). On GPU, v3.0 
 **Option A — Smoke test (~5–20 min, any hardware):**
 Verifies the full pipeline is functional on small subsets of D1, D1C, and D3.
 ```bash
-./paper_data/test_minimal/run_tests.sh            # with NVIDIA GPU
-./paper_data/test_minimal/run_tests.sh --cpu-only  # no GPU
+./paper_data/test_minimal/run_tests.sh --skip-d2            # with NVIDIA GPU (D2 is private — skip it)
+./paper_data/test_minimal/run_tests.sh --skip-d2 --cpu-only  # no GPU
 ```
-Expected: `13/13` steps pass. Absolute runtimes on 500-row subsets will not match the paper's full-scale numbers, but the pipeline is verified end-to-end.
+Expected: `13/13` steps pass (7 benchmark + 6 analysis). D2 is a private dataset not included in this repository; `--skip-d2` omits those 4 steps so the script exits cleanly. Absolute runtimes on 500-row subsets will not match the paper's full-scale numbers, but the pipeline is verified end-to-end.
 
 **Option B — Spot check (~8–10 min, any hardware):**
 Runs v2.0 and v3.0 on a ~512 KB subset of D3 CSV. v2.0 bottlenecks at ~1 KB/s on any hardware; v3.0 benefits from GPU acceleration, so the ratio varies by hardware (larger with GPU).
