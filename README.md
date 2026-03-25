@@ -179,7 +179,7 @@ Runtime is hardware-dependent and cannot be estimated without knowing the evalua
 ./paper_data/scripts/reproduce_all_runs.sh --skip-d1 --skip-d2
 ./paper_data/scripts/analyze_all.sh
 ```
-The stored `benchmark_results.csv` files under `paper_data/results/` contain the paper's original measurements and can be inspected without re-running:
+The stored `benchmark_results.csv` files under `paper_data/results_paper/` contain the paper's original measurements and can be inspected without re-running:
 ```bash
 ./paper_data/scripts/analyze_all.sh   # regenerate charts from stored CSVs only
 ```
@@ -213,7 +213,7 @@ The stored `benchmark_results.csv` files under `paper_data/results/` contain the
 | D3 CSV (247 MB) | 73.0 ± 1.6 s | 433.6 ± 145.7 s† | ≥3,532× | ≥594× |
 | D3 JSON (445 MB) | 172.1 ± 6.2 s | 881.9 ± 57.7 s† | ~1,569× | ~306× |
 
-> † D3 CPU times are measured (stored in `paper_data/results/D3_mock_cve_*__cpu`). D2 CPU times are estimated using the D3 standalone factor (~5.5×). v2.0 extrapolated from D1 throughput (0.98 KB/s CSV, 1.69 KB/s JSON) — CPU-bound, no GPU benefit assumed.
+> † D3 CPU times are measured (stored in `paper_data/results_paper/D3_mock_cve_*__cpu`). D2 CPU times are estimated using the D3 standalone factor (~5.5×). v2.0 extrapolated from D1 throughput (0.98 KB/s CSV, 1.69 KB/s JSON) — CPU-bound, no GPU benefit assumed.
 
 > Full dataset details and step-by-step instructions: [`paper_data/EXPERIMENTS.md`](paper_data/EXPERIMENTS.md)
 
@@ -293,7 +293,7 @@ Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so 
 | D3 CSV | 73.0 ± 1.6 s | 433.6 ± 145.7 s | 7.96 ± 0.08 s | 8.7 ± 0.6 s | **9.2×** | **~50×** |
 | D3 JSON | 172.1 ± 6.2 s | 881.9 ± 57.7 s | 20.43 ± 0.81 s | 20.9 ± 0.9 s | **8.4×** | **~42×** |
 
-> GPU values are from paper Table 8; CPU values are from stored benchmark runs (`paper_data/results/D3_mock_cve_*__cpu`). With config, GPU and CPU times converge because no field passes through the NER or regex pipeline. The CPU gain is therefore larger than on GPU. Absolute times on your hardware will differ.
+> GPU values are from paper Table 8; CPU values are from stored benchmark runs (`paper_data/results_paper/D3_mock_cve_*__cpu`). With config, GPU and CPU times converge because no field passes through the NER or regex pipeline. The CPU gain is therefore larger than on GPU. Absolute times on your hardware will differ.
 
 > Full reproduction steps: [`paper_data/EXPERIMENTS.md`](paper_data/EXPERIMENTS.md)
 
