@@ -209,6 +209,8 @@ teste*
 /scripts/
 anon.py.bal
 cve*
+!paper_data/test_minimal/datasets/D3_mock_cve/cve_dataset_anonimizados_stratified.csv
+!paper_data/test_minimal/datasets/D3_mock_cve/cve_dataset_anonimizados_stratified.json
 run
 benchmark/output
 benchmark/results
@@ -218,6 +220,7 @@ anonlfi_*/models/*
 anonlfi_*/logs/*
 anonlfi_*/db/*
 vulnnet*
+!paper_data/evaluation/vulnnet_scans_openvas_compilado.csv
 benchmark/orchestrated_results/*
 benchmark/converted_datasets/
 benchmark/dataset_statistics/
