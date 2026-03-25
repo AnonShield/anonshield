@@ -71,8 +71,8 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/AnonShield/AnonLFI3.0.git
-cd AnonLFI3.0
+git clone https://github.com/AnonShield/tool.git
+cd tool
 
 # 2. Install uv (if not already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
