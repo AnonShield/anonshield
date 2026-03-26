@@ -211,7 +211,7 @@ Each folder inside `results/` contains:
 
 | Configuration | Format | GPU (RTX 5060 Ti) | CPU (no GPU) | GPU/CPU speedup |
 |---|---|---|---|---|
-| Without anonymization config | CSV | ~240 s | ~1547 s | **~6.4×** |
+| Without anonymization config | CSV | ~240 s | ~1559 s | **~6.5×** |
 | Without anonymization config | JSON | ~293 s | ~976 s | **~3.3×** |
 | **With anonymization config** | **CSV** | **8.7 s** | **~9.3 s** | **~1×** |
 | **With anonymization config** | **JSON** | **20.9 s** | **~21.4 s** | **~1×** |
@@ -219,7 +219,7 @@ Each folder inside `results/` contains:
 > CPU measurements taken on the same machine (AMD Ryzen 5 8600G) with `CUDA_VISIBLE_DEVICES=""` (2026-03-22). With anonymization config, GPU and CPU times are nearly identical because the config used here contains only `force_anonymize` and `exclude` directives — fields are either force-anonymized directly or excluded entirely, bypassing the NER and regex pipeline completely, so there is no GPU work to accelerate.
 
 > Paper Claim #3 uses the `standalone` strategy specifically (GPU): D3 CSV 73 s → 8 s (9.2×); D3 JSON 172 s → 20 s (8.4×).
-> CPU-only (`standalone`): D3 CSV ~434 s → ~8.7 s (**~50×**); D3 JSON ~882 s → ~21 s (**~42×**). GPU/CPU speedup without config: ~5.9× (CSV), ~5.1× (JSON).
+> CPU-only (`standalone`): D3 CSV ~482 s → ~8.7 s (**~55×**); D3 JSON ~882 s → ~21 s (**~42×**). GPU/CPU speedup without config: ~6.6× (CSV), ~5.1× (JSON).
 
 ---
 
@@ -324,14 +324,14 @@ Mean time per run across all 4 strategies (10-run averages):
 |---|---|---|---|---|---|---|
 | D2 CSV | ~1660 s/run | ~10,600 s/run † | ~13.2 s/run | ~13.2 s/run † | **~126×** | **~803×** † |
 | D2 JSON | ~808 s/run | ~2,700 s/run † | ~18.6 s/run | ~18.6 s/run † | **~43×** | **~145×** † |
-| D3 CSV | ~240 s/run | ~1547 s/run ✓ | ~8.7 s/run | ~9.3 s/run ✓ | **~28×** | **~166×** ✓ |
+| D3 CSV | ~240 s/run | ~1559 s/run ✓ | ~8.7 s/run | ~9.3 s/run ✓ | **~28×** | **~168×** ✓ |
 | D3 JSON | ~293 s/run | ~976 s/run ✓ | ~20.9 s/run | ~21.4 s/run ✓ | **~14×** | **~46×** ✓ |
 
 > ✓ D3 CPU times directly measured (2026-03-22, AMD Ryzen 5 8600G, `CUDA_VISIBLE_DEVICES=""`).
 > † D2 CPU times estimated by applying the measured D3 GPU/CPU speedup factors (6.4× for CSV without-config, 3.3× for JSON without-config) to the GPU-measured D2 values. With-config CPU ≈ GPU since no field passes through NER/regex.
 
 > `standalone` strategy only (Claim #3 reference, GPU): D2 CSV 589 s → 13 s (**47×**); D2 JSON 453 s → 18 s (**25×**); D3 CSV 73 s → 8 s (**9.2×**); D3 JSON 172 s → 20 s (**8.4×**).
-> CPU-only (`standalone`): D3 CSV ~434 s → ~8.7 s (**~50×**); D3 JSON ~882 s → ~21 s (**~42×**).
+> CPU-only (`standalone`): D3 CSV ~482 s → ~8.7 s (**~55×**); D3 JSON ~882 s → ~21 s (**~42×**).
 
 ---
 

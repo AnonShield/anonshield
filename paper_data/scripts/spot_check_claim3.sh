@@ -4,13 +4,13 @@
 # on D3 CSV (full dataset, v3.0 standalone).
 #
 # Runs v3.0 standalone twice on the full D3 CSV: once without config
-# (~73 s GPU / ~434 s CPU) and once with config (~8 s GPU / ~9 s CPU).
+# (~73 s GPU / ~482 s CPU) and once with config (~8 s GPU / ~9 s CPU).
 # Prints measured times and config speedup ratio.
 #
 # Usage (from workspace root):
 #   ./paper_data/scripts/spot_check_claim3.sh [--cpu-only]
 #
-# Runtime: ~80 s GPU / ~450 s CPU (~1.5–8 min)
+# Runtime: ~80 s GPU / ~490 s CPU (~1.5–9 min)
 # =============================================================================
 set -euo pipefail
 
@@ -36,7 +36,7 @@ fi
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-echo "Running v3.0 standalone WITHOUT config (est. ~73 s GPU / ~434 s CPU)..."
+echo "Running v3.0 standalone WITHOUT config (est. ~73 s GPU / ~482 s CPU)..."
 python3 "$BENCH" --benchmark --file "$D3" \
     --versions 3.0 --strategies standalone --runs 1 $CPU_FLAG \
     --results-dir "$WORK/without" > "$WORK/without.log" 2>&1

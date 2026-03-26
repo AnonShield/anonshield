@@ -132,13 +132,13 @@ Expected: all tests pass with no errors.
 
 ## Experiments
 
-### Claim #1 — v3.0 (`standalone`) achieves ~3×–~17× speedup over v2.0 per file on D1 (GPU); ≥3,532× (GPU) / ≥594× (CPU) at D3 scale
+### Claim #1 — v3.0 (`standalone`) achieves ~3×–~17× speedup over v2.0 per file on D1 (GPU); ≥3,532× (GPU) / ≥535× (CPU) at D3 scale
 
 **Paper reference:** Tables 3, 4, 6, 7, and 8.
 
 **What this claim asserts and why it has two parts:**
 
-The per-file speedup is measured on D1 (small files, 130 targets). On GPU, v3.0 benefits from accelerated NER inference, yielding ~3×–~17× over v2.0 per file (paper Table 3, mean-based). On CPU-only hardware, v3.0 loses GPU acceleration (~5.5× slower per file) while v2.0 is already CPU-bound — so per-file speedup on CPU is ~GPU speedup ÷ 5.5, and v3.0 may be slower per file without a GPU. However, at D3 scale the advantage recovers due to v3.0's O(n) streaming architecture vs v2.0's scaling behavior: ≥3,532× on GPU and ≥594× on CPU (D3 CPU times are measured in stored results).
+The per-file speedup is measured on D1 (small files, 130 targets). On GPU, v3.0 benefits from accelerated NER inference, yielding ~3×–~17× over v2.0 per file (paper Table 3, mean-based). On CPU-only hardware, v3.0 loses GPU acceleration (~5.5× slower per file) while v2.0 is already CPU-bound — so per-file speedup on CPU is ~GPU speedup ÷ 5.5, and v3.0 may be slower per file without a GPU. However, at D3 scale the advantage recovers due to v3.0's O(n) streaming architecture vs v2.0's scaling behavior: ≥3,532× on GPU and ≥535× on CPU (D3 CPU times are measured in stored results).
 
 **Verification options (in order of time cost):**
 
@@ -186,7 +186,7 @@ The stored `benchmark_results.csv` files under `paper_data/results_paper/` conta
 
 **Per-file performance on D1 (130 targets, mean, Table 3):**
 
-> CPU estimates derived by applying the D3 standalone CPU/GPU factor (~5.5×) to v3.0 GPU times. v2.0 does not use GPU acceleration (CPU-bound DOM parsing), so v2.0 CPU ≈ v2.0 GPU. This means per-file speedup on CPU = GPU speedup ÷ 5.5 — v3.0 may be **slower** than v2.0 per file without a GPU, but remains faster at scale (D3: ≥590× CPU vs ≥3,532× GPU).
+> CPU estimates derived by applying the D3 standalone CPU/GPU factor (~5.5×) to v3.0 GPU times. v2.0 does not use GPU acceleration (CPU-bound DOM parsing), so v2.0 CPU ≈ v2.0 GPU. This means per-file speedup on CPU = GPU speedup ÷ 5.5 — v3.0 may be **slower** than v2.0 per file without a GPU, but remains faster at scale (D3: ≥535× CPU vs ≥3,532× GPU).
 
 | Format | v2.0 GPU | v2.0 CPU~est | v3.0 standalone GPU | v3.0 standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
 |---|---|---|---|---|---|---|
@@ -210,7 +210,7 @@ The stored `benchmark_results.csv` files under `paper_data/results_paper/` conta
 |---|---|---|---|---|
 | D2 CSV (377 MB) | 588.5 ± 30.7 s | ~3,237 s | ≥743× | ≥133× |
 | D2 JSON (550 MB) | 453.1 ± 35.9 s | ~2,492 s | ~738× | ~134× |
-| D3 CSV (247 MB) | 73.0 ± 1.6 s | 433.6 ± 145.7 s† | ≥3,532× | ≥594× |
+| D3 CSV (247 MB) | 73.0 ± 1.6 s | 481.5 ± 8.9 s† | ≥3,532× | ≥535× |
 | D3 JSON (445 MB) | 172.1 ± 6.2 s | 881.9 ± 57.7 s† | ~1,569× | ~306× |
 
 > † D3 CPU times are measured (stored in `paper_data/results_paper/D3_mock_cve_*__cpu`). D2 CPU times are estimated using the D3 standalone factor (~5.5×). v2.0 extrapolated from D1 throughput (0.98 KB/s CSV, 1.69 KB/s JSON) — CPU-bound, no GPU benefit assumed.
@@ -257,7 +257,7 @@ python benchmark/benchmark.py \
 
 ---
 
-### Claim #3 — `anonymization_config` eliminates NER inference overhead, reducing D3 processing time significantly (paper hardware: ~9× GPU / ~50× CPU; actual speedup depends on GPU speed)
+### Claim #3 — `anonymization_config` eliminates NER inference overhead, reducing D3 processing time significantly (paper hardware: ~9× GPU / ~55× CPU; actual speedup depends on GPU speed)
 
 **Paper reference:** Tables 6 and 7 (config gain rows).
 
@@ -290,7 +290,7 @@ Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so 
 
 | Format | Without config (GPU) | Without config (CPU) | With config (GPU) | With config (CPU) | Gain (GPU) | Gain (CPU) |
 |---|---|---|---|---|---|---|
-| D3 CSV | 73.0 ± 1.6 s | 433.6 ± 145.7 s | 7.96 ± 0.08 s | 8.7 ± 0.6 s | **9.2×** | **~50×** |
+| D3 CSV | 73.0 ± 1.6 s | 481.5 ± 8.9 s | 7.96 ± 0.08 s | 8.7 ± 0.6 s | **9.2×** | **~55×** |
 | D3 JSON | 172.1 ± 6.2 s | 881.9 ± 57.7 s | 20.43 ± 0.81 s | 20.9 ± 0.9 s | **8.4×** | **~42×** |
 
 > GPU values are from paper Table 8; CPU values are from stored benchmark runs (`paper_data/results_paper/D3_mock_cve_*__cpu`). With config, GPU and CPU times converge because no field passes through the NER or regex pipeline. The CPU gain is therefore larger than on GPU. Absolute times on your hardware will differ.
