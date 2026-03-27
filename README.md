@@ -154,8 +154,8 @@ Verifies the full pipeline is functional on small subsets of D1, D1C, and D3.
 ```
 Expected: the final line reads `RESULT: ALL PASSED`. D2 is a private dataset not included in this repository; `--skip-d2` omits those 4 steps so the script exits cleanly. Absolute runtimes on 500-row subsets will not match the paper's full-scale numbers, but the pipeline is verified end-to-end.
 
-**Option B — Spot check (~8–15 min depending on hardware):**
-Runs v2.0 and AnonShield on a ~512 KB subset of D3 CSV. v2.0 throughput is compute-limited and scales poorly with file size; AnonShield benefits from GPU acceleration when available, so the measured ratio varies by hardware. If the v2.0 environment is not yet set up, the script sets it up automatically on first run.
+**Option B — Spot check (~8–20 min after setup):**
+Runs v2.0 and AnonShield on a ~512 KB subset of D3 CSV. v2.0 throughput is compute-limited and scales poorly with file size; AnonShield benefits from GPU acceleration when available, so the measured ratio varies by hardware. On first run, the script automatically sets up v2.0 and v3.0 environments and downloads model weights (~several GB) — this can take significantly longer depending on network speed. Subsequent runs skip setup entirely.
 
 ```bash
 ./paper_data/scripts/extract_datasets.sh             # extract D3 from bundled zips (required once)
@@ -237,7 +237,7 @@ The stored `benchmark_results.csv` files under `paper_data/results_paper/` conta
    - `paper_data/evaluation/1.0/` and `paper_data/evaluation/2.0/`
 2. **Re-run the tool** on the evaluation dataset and compare the anonymized output against the reference:
 ```bash
-python benchmark/benchmark.py \
+python3 benchmark/benchmark.py \
   --benchmark \
   --file paper_data/evaluation/vulnnet_scans_openvas_compilado.csv \
   --versions 3.0 \
