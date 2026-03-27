@@ -6,13 +6,6 @@ Modular pseudonymization framework for Cybersecurity Incident Response Teams. An
 
 ## Available Tags
 
-## Support & Contact
-
-We welcome feedback, questions, and contributions from the community.
-
-* **Bugs & Feature Requests:** Please [open an issue](https://github.com/AnonShield/runshanondocker/issues) on our GitHub repository. This helps us track problems and keep the community informed.
-* **Direct Contact & Inquiries:** For institutional questions, partnerships, or to report a security vulnerability privately, reach out to our team at **[anonshield@unipampa.edu.br](mailto:anonshield@unipampa.edu.br)**.
-
 | Tag | Base | Use Case | Approx. Size |
 |-----|------|----------|-------------|
 | `latest` | `python:3.12-slim` | CPU — works on any x86_64 machine | ~2 GB |
@@ -144,7 +137,7 @@ Output is written to `./anon/output/anon_YOUR_FILE.csv`. The script automaticall
 | `--anonymization-strategy <s>` | Detection strategy — see below | `filtered` |
 | `--optimize` | Enable all performance optimizations | off |
 
-For the complete reference with examples for every option, see the **[CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/runshanondocker/blob/main/CLI_REFERENCE.md)**
+For the complete reference with examples for every option, see the **[CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md)**
 
 Run `./run.sh --help` (Linux/macOS) or `.\run.ps1 --help` (Windows) for the full options list.
 
@@ -154,7 +147,7 @@ Run `./run.sh --help` (Linux/macOS) or `.\run.ps1 --help` (Windows) for the full
 
 Choose with `--anonymization-strategy <name>`.
 
-**Throughput — GPU** (NVIDIA RTX 5060 Ti 16 GB · 420 MB CSV / 551 MB JSON, 70,951 vulnerability records):
+**Throughput — GPU** (NVIDIA RTX 5060 Ti 16 GB · D2 operational dataset · 420 MB CSV / 551 MB JSON, 70,951 Tenable vulnerability records):
 
 | Strategy | CSV (KB/s) | JSON (KB/s) | vs. slowest |
 |----------|-----------|------------|-------------|
@@ -163,7 +156,20 @@ Choose with `--anonymization-strategy <name>`.
 | `filtered` *(default)* | 240 | 627 | 1.4× faster |
 | `presidio` | 171 | 575 | baseline |
 
-**Throughput — CPU** (Intel Xeon E5-2650 · 136 OpenVAS vulnerability reports, median KB/s):
+**Throughput — CPU, no GPU** (AMD Ryzen 5 8600G (6c/12t) · D3 synthetic dataset · 247 MB CSV / 444 MB JSON, 70,951 CVE vulnerability records):
+
+Benchmark run without GPU to measure CPU-only performance on a large structured dataset.
+
+| Strategy | CSV (KB/s) | JSON (KB/s) | vs. slowest |
+|----------|-----------|------------|-------------|
+| `standalone` | **526** | **518** | CSV: **4×** faster |
+| `hybrid` | 134 | 461 | similar |
+| `filtered` *(default)* | 132 | 459 | similar |
+| `presidio` | 130 | 439 | baseline |
+
+**Throughput — CPU, heterogeneous formats** (Intel Xeon E5-2650 · D1 OpenVAS dataset · 136 vulnerability reports, median KB/s):
+
+Benchmark on a heterogeneous set of real OpenVAS scan reports in CSV, XML, and PDF format, measuring per-file median throughput on older server hardware.
 
 | Strategy | CSV (KB/s) | XML (KB/s) | PDF (KB/s) | vs. slowest |
 |----------|-----------|-----------|-----------|------------|
@@ -172,7 +178,7 @@ Choose with `--anonymization-strategy <name>`.
 | `presidio` | 0.85 | 1.85 | 3.56 | similar |
 | `filtered` *(default)* | 0.81 | 1.82 | 3.83 | baseline |
 
-> On GPU, `standalone` is **4× faster** than `presidio` on CSV. On CPU, the gap shrinks to ~15 % — choose based on your hardware.
+> On GPU, `standalone` is **4× faster** than `presidio` on CSV. On the AMD Ryzen (CPU-only, large dataset), the same ~4× advantage holds for CSV; on heterogeneous OpenVAS reports (Intel Xeon), the gap shrinks to ~15 %.
 
 **Accuracy** (67 annotated vulnerability records · GPU · `attack-vector/SecureModernBERT-NER` model · annotated by 3 security specialists):
 
@@ -180,7 +186,7 @@ Choose with `--anonymization-strategy <name>`.
 |----------|-----------|--------|----|-------|
 | `filtered` *(default)* | 91.9 % | 96.7 % | **94.2 %** | Best accuracy. Curated recognizer set; handles overlapping entity merges correctly. |
 | `hybrid` | 91.9 % | 96.7 % | **94.2 %** | Same accuracy as `filtered`. Uses manual text replacement instead of Presidio's anonymizer. |
-| `standalone` | 87.9 % | 94.5 % | 91.1 % | Slightly lower precision. Fastest on GPU. Experimental. |
+| `standalone` | 87.9 % | 94.5 % | 91.1 % | Slightly lower precision. Fastest on GPU. |
 | `presidio` | 71.6 % | 96.7 % | 82.3 % | Many false positives. Rarely the best choice. |
 
 **Recommendation:** `filtered` (default) gives the best accuracy at a small throughput cost. Use `standalone` on GPU for maximum throughput.
@@ -328,7 +334,7 @@ Run `./run.sh --list-entities` (Linux/macOS) or `.\run.ps1 --list-entities` (Win
 
 ## Full CLI Reference
 
-Every option explained in plain language with examples: **[CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/runshanondocker/blob/main/CLI_REFERENCE.md)**
+Every option explained in plain language with examples: **[CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md)**
 
 ---
 
@@ -336,5 +342,5 @@ Every option explained in plain language with examples: **[CLI_REFERENCE.md on G
 
 We welcome feedback, questions, and contributions from the community.
 
-* **Bugs & Feature Requests:** Please [open an issue](https://github.com/AnonShield/runshanondocker/issues) on our GitHub repository. This helps us track problems and keep the community informed.
+* **Bugs & Feature Requests:** Please [open an issue](https://github.com/AnonShield/tool/issues) on our GitHub repository. This helps us track problems and keep the community informed.
 * **Direct Contact & Inquiries:** For institutional questions, partnerships, or to report a security bug directly, reach out to our team at **[anonshield@unipampa.edu.br](mailto:anonshield@unipampa.edu.br)**.

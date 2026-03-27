@@ -5,7 +5,7 @@ How to build, test, and publish AnonShield Docker images.
 ## Prerequisites
 
 - Docker and Docker Compose installed
-- Docker Hub account with push access to `kapelinsky/anon`
+- Docker Hub account with push access to `anonshield/anon`
 - Logged in: `docker login`
 - Docker Hub Personal Access Token (for README updates)
 
@@ -15,10 +15,10 @@ From the project root:
 
 ```bash
 # CPU image
-docker build -t kapelinsky/anon:latest --target production -f docker/Dockerfile .
+docker build -t anonshield/anon:latest --target production -f docker/Dockerfile .
 
 # GPU image
-docker build -t kapelinsky/anon:gpu --target gpu -f docker/Dockerfile .
+docker build -t anonshield/anon:gpu --target gpu -f docker/Dockerfile .
 ```
 
 ## 2. Run Unit Tests
@@ -41,7 +41,7 @@ echo "John Doe works at Microsoft. Email: john@microsoft.com" > /tmp/test.txt
 docker run --rm \
   -e ANON_SECRET_KEY="test-key" \
   -v /tmp:/data \
-  kapelinsky/anon:latest /data/test.txt --output-dir /data/output
+  anonshield/anon:latest /data/test.txt --output-dir /data/output
 
 cat /tmp/output/anon_test.txt
 # Should show anonymized entities like [PERSON_...], [EMAIL_ADDRESS_...], [ORGANIZATION_...]
@@ -50,8 +50,8 @@ cat /tmp/output/anon_test.txt
 ## 4. Push Images
 
 ```bash
-docker push kapelinsky/anon:latest
-docker push kapelinsky/anon:gpu
+docker push anonshield/anon:latest
+docker push anonshield/anon:gpu
 ```
 
 ## 5. Update Docker Hub README
@@ -61,7 +61,7 @@ The README source is at `docker/DOCKERHUB_README.md`. To push it:
 ```bash
 # Get auth token
 HUB_TOKEN=$(curl -s -H "Content-Type: application/json" \
-  -X POST -d '{"username":"kapelinsky","password":"YOUR_PAT_TOKEN"}' \
+  -X POST -d '{"username":"anonshield","password":"YOUR_PAT_TOKEN"}' \
   https://hub.docker.com/v2/users/login/ | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
 
 # Push README
@@ -72,7 +72,7 @@ data = json.dumps({
     'full_description': readme,
     'description': 'AnonShield - PII pseudonymization framework for CSIRTs with OCR, NER, and SLM support.'
 }).encode()
-req = urllib.request.Request('https://hub.docker.com/v2/repositories/kapelinsky/anon/', data=data, method='PATCH')
+req = urllib.request.Request('https://hub.docker.com/v2/repositories/anonshield/anon/', data=data, method='PATCH')
 req.add_header('Authorization', 'Bearer $HUB_TOKEN')
 req.add_header('Content-Type', 'application/json')
 print(urllib.request.urlopen(req).status)
@@ -84,11 +84,11 @@ print(urllib.request.urlopen(req).status)
 Only create version tags for actual releases:
 
 ```bash
-docker tag kapelinsky/anon:latest kapelinsky/anon:3.1
-docker push kapelinsky/anon:3.1
+docker tag anonshield/anon:latest anonshield/anon:3.1
+docker push anonshield/anon:3.1
 
-docker tag kapelinsky/anon:gpu kapelinsky/anon:3.1-gpu
-docker push kapelinsky/anon:3.1-gpu
+docker tag anonshield/anon:gpu anonshield/anon:3.1-gpu
+docker push anonshield/anon:3.1-gpu
 ```
 
 ## Architecture
@@ -96,9 +96,9 @@ docker push kapelinsky/anon:3.1-gpu
 ```
 docker/Dockerfile stages:
   builder-cpu  → (discarded) Compiles deps with CPU-only torch
-  production   → kapelinsky/anon:latest  (python:3.12-slim, ~570MB compressed)
+  production   → anonshield/anon:latest  (python:3.12-slim, ~570MB compressed)
   builder-gpu  → (discarded) Compiles deps with CUDA torch
-  gpu          → kapelinsky/anon:gpu     (nvidia/cuda:12.1.1, ~2GB compressed)
+  gpu          → anonshield/anon:gpu     (nvidia/cuda:12.1.1, ~2GB compressed)
 ```
 
 ## Checklist
