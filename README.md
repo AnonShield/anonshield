@@ -79,10 +79,13 @@ cd tool
 # 2. Install uv (if not already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 3. Install Python dependencies
+# 3. Install system build dependencies (Linux — required to compile hdbscan and other C extensions)
+sudo apt update && sudo apt install -y python3-dev build-essential
+
+# 4. Install Python dependencies
 uv sync
 
-# 4. Set the HMAC secret key (required for pseudonymization)
+# 5. Set the HMAC secret key (required for pseudonymization)
 export ANON_SECRET_KEY=$(openssl rand -hex 32)
 # To persist across sessions:
 echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
