@@ -1,8 +1,8 @@
-# AnonLFI: Comparative Evaluation of Pseudonymization Strategies for Large-Scale Vulnerability Datasets in CSIRTs
+# AnonShield: Pseudonymization Strategies for Large-Scale Vulnerability Datasets in CSIRTs
 
-AnonLFI is a pseudonymization framework designed for Computer Security Incident Response Teams (CSIRTs). It replaces Personally Identifiable Information (PII) and cybersecurity indicators with cryptographically secure, deterministic pseudonyms (HMAC-SHA256), preserving referential integrity across documents while enabling GDPR/LGPD-compliant data sharing. Version 3.0 introduces four modular anonymization strategies, GPU acceleration, streaming processors for large files, and a schema-aware configuration mechanism. Evaluated on 70,951+ vulnerability records, it achieves more than 743× speedup over v2.0 and F1 = 94.2% with the `filtered`/`hybrid` strategies.
+AnonShield is a pseudonymization framework designed for Computer Security Incident Response Teams (CSIRTs). It replaces Personally Identifiable Information (PII) and cybersecurity indicators with cryptographically secure, deterministic pseudonyms (HMAC-SHA256), preserving referential integrity across documents while enabling GDPR/LGPD-compliant data sharing. AnonShield combines GPU-accelerated NER, an LRU entity cache, streaming processors for large files, and a schema-aware configuration mechanism. Evaluated on datasets up to 550 MB (70,951+ vulnerability records), it reduces processing time from ~92 hours to under 10 minutes (~738× speedup over v2.0 on D2 JSON; ≥743× on D2 CSV) and achieves F1 = 94.2%, Recall = 96.7% with the `filtered`/`hybrid` strategies.
 
-> **Paper:** *AnonLFI: Comparative Evaluation of Pseudonymization Strategies for Large-Scale Vulnerability Datasets in CSIRTs* — SBRC 2026 Salão de Ferramentas.
+> **Paper:** *AnonShield: Pseudonymization Strategies for Large-Scale Vulnerability Datasets in CSIRTs* — SBRC 2026 Salão de Ferramentas.
 
 ---
 
@@ -24,6 +24,8 @@ AnonLFI is a pseudonymization framework designed for Computer Security Incident 
 ## Considered Seals
 
 The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Sustainable (SeloS)**, and **Reproducible Experiments (SeloR)**.
+
+**SeloS — Sustainable:** The tool source code is maintained under `src/anon/` (core library: `engine.py`, `strategies.py`, `processors.py`, `entity_detector.py`, `standalone_strategy.py`, etc.) and the CLI entry point is `anon.py`. All dependencies are pinned in `pyproject.toml` and `uv.lock`, ensuring reproducible installation. Docker images (`anonshield/anon:latest` / `:gpu`) provide a fully self-contained execution environment.
 
 ---
 
@@ -58,7 +60,7 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 
 ## Security Concerns
 
-- AnonLFI processes sensitive cybersecurity data entirely **locally** — no data is transmitted to external services
+- AnonShield processes sensitive cybersecurity data entirely **locally** — no data is transmitted to external services
 - `db/entities.db` stores the PII entity mapping table — keep it secure; losing it makes de-anonymization impossible
 - The HMAC secret key (`ANON_SECRET_KEY`) must be protected — it is required to correlate pseudonyms across separate runs
 - The Docker `--gpu` flag passes `--gpus all` to the container; review this before use in shared environments
@@ -132,13 +134,13 @@ Expected: all tests pass with no errors.
 
 ## Experiments
 
-### Claim #1 — v3.0 (`standalone`) achieves ~3×–~17× speedup over v2.0 per file on D1 (GPU); ≥3,532× (GPU) / ≥535× (CPU) at D3 scale
+### Claim #1 — AnonShield (`standalone`) achieves ~3×–~17× speedup over v2.0 per file on D1 (GPU); ≥3,532× (GPU) / ≥535× (CPU) at D3 scale
 
 **Paper reference:** Tables 3, 4, 6, 7, and 8.
 
 **What this claim asserts and why it has two parts:**
 
-The per-file speedup is measured on D1 (small files, 130 targets). On GPU, v3.0 benefits from accelerated NER inference, yielding ~3×–~17× over v2.0 per file (paper Table 3, mean-based). On CPU-only hardware, v3.0 loses GPU acceleration (~5.5× slower per file) while v2.0 is already CPU-bound — so per-file speedup on CPU is ~GPU speedup ÷ 5.5, and v3.0 may be slower per file without a GPU. However, at D3 scale the advantage recovers due to v3.0's O(n) streaming architecture vs v2.0's scaling behavior: ≥3,532× on GPU and ≥535× on CPU (D3 CPU times are measured in stored results).
+The per-file speedup is measured on D1 (small files, 130 targets). On GPU, AnonShield benefits from accelerated NER inference, yielding ~3×–~17× over v2.0 per file (paper Table 3, mean-based). On CPU-only hardware, AnonShield loses GPU acceleration (~5.5× slower per file) while v2.0 is already CPU-bound — so per-file speedup on CPU is ~GPU speedup ÷ 5.5, and AnonShield may be slower per file without a GPU. However, at D3 scale the advantage recovers due to AnonShield's O(n) streaming architecture vs v2.0's scaling behavior: ≥3,532× on GPU and ≥535× on CPU (D3 CPU times are measured in stored results).
 
 **Verification options (in order of time cost):**
 
@@ -151,7 +153,7 @@ Verifies the full pipeline is functional on small subsets of D1, D1C, and D3.
 Expected: `13/13` steps pass (7 benchmark + 6 analysis). D2 is a private dataset not included in this repository; `--skip-d2` omits those 4 steps so the script exits cleanly. Absolute runtimes on 500-row subsets will not match the paper's full-scale numbers, but the pipeline is verified end-to-end.
 
 **Option B — Spot check (~8–10 min, any hardware):**
-Runs v2.0 and v3.0 on a ~512 KB subset of D3 CSV. v2.0 bottlenecks at ~1 KB/s on any hardware; v3.0 benefits from GPU acceleration, so the ratio varies by hardware (larger with GPU).
+Runs v2.0 and AnonShield on a ~512 KB subset of D3 CSV. v2.0 bottlenecks at ~1 KB/s on any hardware; AnonShield benefits from GPU acceleration, so the ratio varies by hardware (larger with GPU).
 ```bash
 ./paper_data/scripts/spot_check_claim1.sh            # with NVIDIA GPU
 ./paper_data/scripts/spot_check_claim1.sh --cpu-only  # no GPU
@@ -162,12 +164,12 @@ Expected output (absolute times vary by hardware; speedup is larger with GPU):
   Claim #1 Spot Check  (515 KB subset of D3 CSV)
 ══════════════════════════════════════════════════════════════
   v2.0  default    :    XXX.X s   (X.XX KB/s on this machine)
-  v3.0  standalone :     XX.X s   (XXX KB/s on this machine)
-  Speedup          : XX×  (larger with GPU — v3.0 benefits from accelerated NER)
+  AnonShield  standalone :     XX.X s   (XXX KB/s on this machine)
+  Speedup          : XX×  (larger with GPU — AnonShield benefits from accelerated NER)
 
   Extrapolating to full D3 (247 MB) via measured throughputs:
   v2.0 on full D3  : ≥ XX.X h   (lower bound — extrapolated from measured throughput)
-  v3.0 on full D3  : ≤ XXXX s   (upper bound — v3.0 cache improves at scale)
+  AnonShield on full D3  : ≤ XXXX s   (upper bound — AnonShield cache improves at scale)
   Projected speedup: ≥ XX×
 ══════════════════════════════════════════════════════════════
 ```
@@ -186,9 +188,9 @@ The stored `benchmark_results.csv` files under `paper_data/results_paper/` conta
 
 **Per-file performance on D1 (130 targets, mean, Table 3):**
 
-> CPU estimates derived by applying the D3 standalone CPU/GPU factor (~5.5×) to v3.0 GPU times. v2.0 does not use GPU acceleration (CPU-bound DOM parsing), so v2.0 CPU ≈ v2.0 GPU. This means per-file speedup on CPU = GPU speedup ÷ 5.5 — v3.0 may be **slower** than v2.0 per file without a GPU, but remains faster at scale (D3: ≥535× CPU vs ≥3,532× GPU).
+> CPU estimates derived by applying the D3 standalone CPU/GPU factor (~5.5×) to AnonShield GPU times. v2.0 does not use GPU acceleration (CPU-bound DOM parsing), so v2.0 CPU ≈ v2.0 GPU. This means per-file speedup on CPU = GPU speedup ÷ 5.5 — AnonShield may be **slower** than v2.0 per file without a GPU, but remains faster at scale (D3: ≥535× CPU vs ≥3,532× GPU).
 
-| Format | v2.0 GPU | v2.0 CPU~est | v3.0 standalone GPU | v3.0 standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
+| Format | v2.0 GPU | v2.0 CPU~est | AnonShield standalone GPU | AnonShield standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
 |---|---|---|---|---|---|---|
 | XML | 192 s | ~192 s | 12 s | ~64 s | **16.5×** | **~3.0×** |
 | CSV | 74 s | ~74 s | 8 s | ~43 s | **9.6×** | **~1.7×** |
@@ -197,18 +199,18 @@ The stored `benchmark_results.csv` files under `paper_data/results_paper/` conta
 
 **Per-file performance on D1C (130 targets, mean, Table 4):**
 
-| Format | v2.0 GPU | v2.0 CPU~est | v3.0 standalone GPU | v3.0 standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
+| Format | v2.0 GPU | v2.0 CPU~est | AnonShield standalone GPU | AnonShield standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
 |---|---|---|---|---|---|---|
 | XLSX | 60 s | ~60 s | 7 s | ~39 s | **8.5×** | **~1.5×** |
 | DOCX | 30 s | ~30 s | 9 s | ~52 s | **3.2×** | **~0.6×** |
 | JSON | 247 s | ~247 s | 11 s | ~58 s | **23.2×** | **~4.3×** |
 | PDF (image/OCR) | 59 s | ~59 s | 36 s | ~198 s | **1.6×** | **~0.3×** |
 
-**Large-scale performance on D2 and D3 (v3.0 standalone, mean, Tables 7–8):**
+**Large-scale performance on D2 and D3 (AnonShield standalone, mean, Tables 7–8):**
 
 | Dataset/Format | GPU | CPU~est | Speedup vs v2.0 (GPU) | Speedup vs v2.0 (CPU~est) |
 |---|---|---|---|---|
-| D2 CSV (377 MB) | 588.5 ± 30.7 s | ~3,237 s | ≥743× | ≥133× |
+| D2 CSV (419.72 MB) | 588.5 ± 30.7 s | ~3,237 s | ≥743× | ≥133× |
 | D2 JSON (550 MB) | 453.1 ± 35.9 s | ~2,492 s | ~738× | ~134× |
 | D3 CSV (247 MB) | 73.0 ± 1.6 s | 481.5 ± 8.9 s† | ≥3,532× | ≥535× |
 | D3 JSON (445 MB) | 172.1 ± 6.2 s | 881.9 ± 57.7 s† | ~1,569× | ~306× |
@@ -272,7 +274,7 @@ python benchmark/benchmark.py \
 Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so removing it saves more). Absolute times vary by hardware.
 ```
 ══════════════════════════════════════════════════════════════
-  Claim #3 Spot Check  (D3 CSV, v3.0 standalone)
+  Claim #3 Spot Check  (D3 CSV, AnonShield standalone)
 ══════════════════════════════════════════════════════════════
   without config  :    XXX.X s
   with config     :      X.X s
