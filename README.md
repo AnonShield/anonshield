@@ -300,6 +300,15 @@ Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so 
 
 ---
 
+## Support & Contact
+
+We welcome feedback, questions, and contributions from the community.
+
+* **Bugs & Feature Requests:** Please [open an issue](https://github.com/AnonShield/tool/issues) on our GitHub repository.
+* **Direct Contact & Inquiries:** For institutional questions, partnerships, or to report a security bug directly, reach out to our team at **[anonshield@unipampa.edu.br](mailto:anonshield@unipampa.edu.br)**.
+
+---
+
 ## License
 
 This project is licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE) for the full text.
