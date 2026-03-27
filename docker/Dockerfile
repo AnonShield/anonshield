@@ -70,6 +70,7 @@ COPY --from=builder-cpu /app/.venv /app/.venv/
 COPY src/ /app/src/
 COPY prompts/ /app/prompts/
 COPY tests/ /app/tests/
+COPY examples/ /app/examples/
 COPY anon.py /app/
 COPY scripts/ /app/scripts/
 COPY docker/docker-entrypoint.sh /usr/local/bin/
@@ -156,6 +157,7 @@ COPY --from=builder-gpu /app/.venv /app/.venv/
 COPY src/ /app/src/
 COPY prompts/ /app/prompts/
 COPY tests/ /app/tests/
+COPY examples/ /app/examples/
 COPY anon.py /app/
 COPY scripts/ /app/scripts/
 COPY docker/docker-entrypoint.sh /usr/local/bin/
