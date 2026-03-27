@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# AnonLFI - Script de Benchmark CTCiber e CVE Dataset
+# AnonShield - Script de Benchmark CTCiber e CVE Dataset
 #
-# Executa benchmarks nas estratégias v3.0 com diferentes configurações:
+# Executa benchmarks nas estratégias AnonShield com diferentes configurações:
 # - Dados CTCiber com cache-size customizado (200000)
 # - Dados CVE com configuração default
 #
@@ -33,7 +33,7 @@ CVE_CSV="$BASE_DIR/cve_dataset_anonimizados_stratified.csv"
 CVE_JSON="$BASE_DIR/cve_dataset_anonimizados_stratified.json"
 CVE_CONFIG="$BASE_DIR/anonymization_config_cve.json"
 
-# Estratégias v3.0 (todas disponíveis)
+# Estratégias AnonShield (todas disponíveis)
 STRATEGIES="standalone hybrid filtered presidio"
 
 # Número de runs
@@ -49,10 +49,10 @@ echo ""
 mkdir -p "$SESSION_DIR"
 
 # ============================================================
-# FASE 1: Benchmark CTCiber CSV (v3.0, max-cache-size 200000)
+# FASE 1: Benchmark CTCiber CSV (AnonShield, max-cache-size 200000)
 # ============================================================
 echo ""
-echo "[FASE 1] Benchmark CTCiber CSV (v3.0, max-cache-size 200000, $RUNS runs)"
+echo "[FASE 1] Benchmark CTCiber CSV (AnonShield, max-cache-size 200000, $RUNS runs)"
 echo "--------------------------------------------------------------"
 
 PHASE1_DIR="$SESSION_DIR/01_ctciber_csv_cache200k"
@@ -77,10 +77,10 @@ else
 fi
 
 # ============================================================
-# FASE 2: Benchmark CTCiber JSON (v3.0, max-cache-size 200000)
+# FASE 2: Benchmark CTCiber JSON (AnonShield, max-cache-size 200000)
 # ============================================================
 echo ""
-echo "[FASE 2] Benchmark CTCiber JSON (v3.0, max-cache-size 200000, $RUNS runs)"
+echo "[FASE 2] Benchmark CTCiber JSON (AnonShield, max-cache-size 200000, $RUNS runs)"
 echo "--------------------------------------------------------------"
 
 PHASE2_DIR="$SESSION_DIR/02_ctciber_json_cache200k"
@@ -105,10 +105,10 @@ else
 fi
 
 # ============================================================
-# FASE 3: Benchmark CVE CSV (v3.0, max-cache-size padrão)
+# FASE 3: Benchmark CVE CSV (AnonShield, max-cache-size padrão)
 # ============================================================
 echo ""
-echo "[FASE 3] Benchmark CVE CSV (v3.0, max-cache-size padrão, $RUNS runs)"
+echo "[FASE 3] Benchmark CVE CSV (AnonShield, max-cache-size padrão, $RUNS runs)"
 echo "--------------------------------------------------------------"
 
 PHASE3_DIR="$SESSION_DIR/03_cve_csv_default"
@@ -132,10 +132,10 @@ else
 fi
 
 # ============================================================
-# FASE 4: Benchmark CVE JSON (v3.0, max-cache-size padrão)
+# FASE 4: Benchmark CVE JSON (AnonShield, max-cache-size padrão)
 # ============================================================
 echo ""
-echo "[FASE 4] Benchmark CVE JSON (v3.0, max-cache-size padrão, $RUNS runs)"
+echo "[FASE 4] Benchmark CVE JSON (AnonShield, max-cache-size padrão, $RUNS runs)"
 echo "--------------------------------------------------------------"
 
 PHASE4_DIR="$SESSION_DIR/04_cve_json_default"

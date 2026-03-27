@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-AnonLFI Benchmark Suite - Professional Benchmarking Tool
+AnonShield Benchmark Suite - Professional Benchmarking Tool
 
-A modular, resilient benchmarking system for comparing AnonLFI versions 1.0, 2.0, and 3.0.
+A modular, resilient benchmarking system for comparing AnonLFI v1.0, v2.0 and AnonShield.
 Designed with SOLID principles for maintainability and extensibility.
 
 Features:
@@ -44,14 +44,14 @@ from typing import Optional, List, Dict, Any, Iterator, Callable
 # =============================================================================
 
 class AnonVersion(Enum):
-    """Supported AnonLFI versions."""
+    """Supported versions."""
     V1_0 = "1.0"
     V2_0 = "2.0"
-    V3_0 = "3.0"
+    V3_0 = "3.0" # Now called AnonShield
 
 
 class Strategy(Enum):
-    """Anonymization strategies (v3.0 only)."""
+    """Anonymization strategies (AnonShield only)."""
     DEFAULT = "default"
     PRESIDIO = "presidio"
     FILTERED = "filtered"  # Formerly "balanced" - Presidio with filtered scope (FASTEST)
@@ -65,7 +65,7 @@ class Strategy(Enum):
 
 @dataclass
 class VersionConfig:
-    """Configuration for each AnonLFI version."""
+    """Configuration for each version."""
     version: AnonVersion
     relative_path: str
     venv_name: str
@@ -122,7 +122,7 @@ VERSION_CONFIGS = {
         version=AnonVersion.V3_0,
         relative_path=".",
         venv_name=".venv",
-        # v3.0: All v2.0 formats + .log, .jsonl, .tif, .webp, .jp2, .pnm (19 formats)
+        # AnonShield: All v2.0 formats + .log, .jsonl, .tif, .webp, .jp2, .pnm (19 formats)
         supported_extensions=(
             ".txt", ".log", ".pdf", ".docx", ".csv", ".xlsx", ".xml",
             ".json", ".jsonl",
@@ -388,8 +388,9 @@ class EnvironmentSetup:
         version_str = self.config.version.value
         log_file = self.log_dir / f"setup_v{version_str}.log"
 
+        name = "AnonShield" if version_str == "3.0" else "AnonLFI"
         print(f"\n{'='*60}")
-        print(f"[SETUP] AnonLFI v{version_str}")
+        print(f"[SETUP] {name} v{version_str}")
         print(f"{'='*60}")
 
         if self.config.venv_path.exists() and not force:
@@ -410,7 +411,7 @@ class EnvironmentSetup:
                 if not self._run_uv_sync(log):
                     return False
 
-                # Step 2: For v3.0, configure PyTorch based on GPU mode (following Dockerfile logic)
+                # Step 2: For AnonShield, configure PyTorch based on GPU mode (following Dockerfile logic)
                 if self.config.version == AnonVersion.V3_0:
                     if not self._configure_torch(log):
                         return False
@@ -462,7 +463,7 @@ class EnvironmentSetup:
         return True
 
     def _configure_torch(self, log) -> bool:
-        """Configure PyTorch for GPU or CPU (v3.0 only, following Dockerfile GPU logic)."""
+        """Configure PyTorch for GPU or CPU (AnonShield only, following Dockerfile GPU logic)."""
 
         pip_exe = self.config.venv_path / "bin" / "pip"
         if platform.system() == "Windows":
@@ -1048,7 +1049,7 @@ class BenchmarkRunner:
         run_output_dir = self.output_dir / version_str / strat_str
         run_output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Add strategy, overwrite and optimization flags for v3.0
+        # Add strategy, overwrite and optimization flags for AnonShield
         if self.config.version == AnonVersion.V3_0:
             if strategy != Strategy.DEFAULT:
                 cmd.extend(["--anonymization-strategy", strategy.value])
@@ -1138,7 +1139,7 @@ class DirectoryBenchmarkRunner:
     a directory to anon.py instead of individual files. The tool loads its
     NLP models once and processes all files sequentially.
 
-    Only works for v2.0 and v3.0 (v1.0 does not support directory input).
+    Only works for v2.0 and AnonShield (v1.0 does not support directory input).
     Records one aggregated metrics row per (version, strategy, run_number),
     plus individual per-file rows from [BENCHMARK_TIMING] instrumentation.
 
@@ -1738,7 +1739,7 @@ class BenchmarkOrchestrator:
 
         # Determine GPU mode (--cpu-only overrides --gpu)
         gpu_mode = self.args.gpu and not getattr(self.args, 'cpu_only', False)
-        print(f"[INFO] PyTorch mode for v3.0: {'GPU (CUDA 12.8)' if gpu_mode else 'CPU-only'}")
+        print(f"[INFO] PyTorch mode for AnonShield: {'GPU (CUDA 12.8)' if gpu_mode else 'CPU-only'}")
 
         versions_to_setup = self._get_versions_to_run()
 
@@ -2000,7 +2001,7 @@ class BenchmarkOrchestrator:
     def _run_directory_benchmarks(self):
         """Run benchmarks in directory mode (one invocation per version/strategy).
 
-        For v2.0 and v3.0: passes a directory of all test files to anon.py,
+        For v2.0 and AnonShield: passes a directory of all test files to anon.py,
         which loads models once and processes all files sequentially.
         Eliminates ~55-77s model loading overhead per file.
 
@@ -2024,7 +2025,7 @@ class BenchmarkOrchestrator:
         versions_to_run = self._get_versions_to_run()
 
         # Calculate total runs
-        total_dir_runs = 0   # Directory mode runs (v2.0, v3.0)
+        total_dir_runs = 0   # Directory mode runs (v2.0, AnonShield)
         total_file_runs = 0  # Single-file runs (v1.0 fallback)
         for version in versions_to_run:
             config = VERSION_CONFIGS[version]
@@ -2056,7 +2057,7 @@ class BenchmarkOrchestrator:
 
                 for strategy in config.strategies:
                     if config.supports_directory:
-                        # === DIRECTORY MODE for v2.0 / v3.0 ===
+                        # === DIRECTORY MODE for v2.0 / AnonShield ===
                         run_key = f"{version.value}|{strategy.value}|DIRECTORY_RUN|{run_num}"
                         if run_key in self.results_manager.state.completed_runs:
                             print(f"\n  [SKIP] Already completed: v{version.value} | {strategy.value} | DIR | Run #{run_num}")
@@ -3043,7 +3044,7 @@ class BenchmarkOrchestrator:
 def create_parser() -> argparse.ArgumentParser:
     """Create argument parser."""
     parser = argparse.ArgumentParser(
-        description="AnonLFI Benchmark Suite - Compare performance across versions",
+        description="AnonShield Benchmark Suite - Compare performance across versions",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -3062,13 +3063,13 @@ Examples:
   # Run specific versions only
   python benchmark.py --benchmark --versions 2.0 3.0 --data-dir ./dados_teste
 
-  # Run v3.0 with specific strategies only
+  # Run AnonShield with specific strategies only
   python benchmark.py --benchmark --versions 3.0 --strategies fast balanced --data-dir ./dados_teste
 
   # Resume interrupted run
   python benchmark.py --benchmark --data-dir ./dados_teste
 
-  # Directory mode: eliminates model loading overhead for v2.0/v3.0
+  # Directory mode: eliminates model loading overhead for v2.0/AnonShield
   python benchmark.py --benchmark --directory-mode --data-dir ./dados_teste
 
   # Regression estimation: predict processing time for large files
@@ -3104,9 +3105,9 @@ Examples:
     setup_group.add_argument("--force-setup", action="store_true",
                             help="Force recreation of virtual environments")
     setup_group.add_argument("--gpu", action="store_true", default=True,
-                            help="Use GPU-enabled PyTorch for v3.0 (default: True)")
+                            help="Use GPU-enabled PyTorch for AnonShield (default: True)")
     setup_group.add_argument("--cpu-only", action="store_true",
-                            help="Use CPU-only PyTorch for v3.0 (overrides --gpu)")
+                            help="Use CPU-only PyTorch for AnonShield (overrides --gpu)")
 
     # Benchmark options
     bench_group = parser.add_argument_group("Benchmark Options")
@@ -3127,21 +3128,21 @@ Examples:
                             default="benchmark-secret-key-2026",
                             help="Secret key for anonymization")
     bench_group.add_argument("--directory-mode", action="store_true",
-                            help="Use directory mode for v2.0/v3.0: pass all files in a single "
+                            help="Use directory mode for v2.0/AnonShield: pass all files in a single "
                                  "invocation to eliminate per-file model loading overhead (~55-77s). "
                                  "v1.0 falls back to single-file mode. Records aggregate metrics.")
     bench_group.add_argument("--strategies", nargs="+",
                             choices=["presidio", "filtered", "hybrid", "standalone", "slm", "fast", "balanced"],
-                            help="Strategies to benchmark for v3.0 (default: all strategies). "
+                            help="Strategies to benchmark for AnonShield (default: all strategies). "
                                  "New names: 'filtered' (fastest, recommended), 'hybrid', 'standalone'. "
                                  "Legacy names 'fast' (=hybrid) and 'balanced' (=filtered) still work. "
                                  "Example: --strategies filtered hybrid")
     bench_group.add_argument("--transformer-model", type=str,
-                            help="Transformer model for NER detection (v3.0 only). "
+                            help="Transformer model for NER detection (AnonShield only). "
                                  "Example: 'attack-vector/SecureModernBERT-NER'. "
                                  "If not specified, uses the default model from config.py")
     bench_group.add_argument("--db-dir", type=str,
-                            help="Base directory for database files (v3.0 only). "
+                            help="Base directory for database files (AnonShield only). "
                                  "Creates separate subdirectories per strategy automatically. "
                                  "Example: 'benchmark/databases'")
     bench_group.add_argument("--entities-to-preserve", type=str,
@@ -3153,7 +3154,7 @@ Examples:
                                  "Defines force_anonymize, fields_to_anonymize, and fields_to_exclude. "
                                  "Example: 'benchmark/openvas_anonymization_config.json'")
     bench_group.add_argument("--max-cache-size", type=int, dest="cache_size",
-                            help="Maximum cache size for anonymization mappings (v3.0 only). "
+                            help="Maximum cache size for anonymization mappings (AnonShield only). "
                                  "Controls the LRU cache size for consistent entity mapping. "
                                  "Example: 200000")
     bench_group.add_argument("--cleanup-outputs", action="store_true",
@@ -3257,7 +3258,7 @@ def main():
             if s in strategy_map:
                 selected_strategies.append(strategy_map[s])
         
-        # Update v3.0 config with selected strategies
+        # Update AnonShield config with selected strategies
         if selected_strategies:
             VERSION_CONFIGS[AnonVersion.V3_0] = VersionConfig(
                 version=AnonVersion.V3_0,
@@ -3272,7 +3273,7 @@ def main():
                 requires_secret_key=True,
                 strategies=tuple(selected_strategies)
             )
-            print(f"[INFO] Using selected v3.0 strategies: {[s.value for s in selected_strategies]}")
+            print(f"[INFO] Using selected AnonShield strategies: {[s.value for s in selected_strategies]}")
 
     # Create orchestrator
     orchestrator = BenchmarkOrchestrator(args)

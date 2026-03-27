@@ -1,14 +1,14 @@
 #!/bin/bash
 # =============================================================================
-# analyze_all.sh — Run scientific analysis on all benchmark results in paper_data
+# analyze_paper_results.sh — Run scientific analysis on paper_data/results_paper
 #
-# For each benchmark_results.csv found in paper_data/results/, this script
+# For each benchmark_results.csv found in paper_data/results_paper/, this script
 # generates analysis charts, statistics, and PDFs inside an analysis/ subfolder
 # adjacent to the benchmark_results.csv file.
 #
 # Usage (from workspace root — no activation needed):
-#   ./paper_data/scripts/analyze_all.sh              # standard analyses (1-14)
-#   ./paper_data/scripts/analyze_all.sh --extended   # include extended (15-17)
+#   ./paper_data/scripts/analyze_paper_results.sh              # standard analyses (1-14)
+#   ./paper_data/scripts/analyze_paper_results.sh --extended   # include extended (15-17)
 # =============================================================================
 
 set -euo pipefail
@@ -16,7 +16,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PAPER_DATA="$WORKSPACE_ROOT/paper_data"
-RESULTS_DIR="$PAPER_DATA/results"
+RESULTS_DIR="$PAPER_DATA/results_paper"
 ANALYZER="$WORKSPACE_ROOT/benchmark/analyze_benchmark_scientific.py"
 OVERHEAD_CSV="$RESULTS_DIR/overhead_calibration__anonshield__all_strategies__10runs/benchmark_results.csv"
 VENV_PY="$WORKSPACE_ROOT/.venv/bin/python3"
@@ -47,7 +47,7 @@ if [[ ! -f "$ANALYZER" ]]; then
     exit 1
 fi
 if [[ ! -f "$OVERHEAD_CSV" ]]; then
-    echo "WARNING: overhead calibration data not found; overhead correction will be skipped."
+    echo "WARNING: overhead calibration data not found at $OVERHEAD_CSV; overhead correction will be skipped."
     OVERHEAD_ARG=""
 else
     OVERHEAD_ARG="--overhead $OVERHEAD_CSV"
@@ -55,7 +55,7 @@ fi
 
 echo ""
 echo "============================================================"
-echo " AnonShield — Scientific Analysis Runner"
+echo " AnonShield — Paper Results Analysis Runner"
 echo " Results dir : $RESULTS_DIR"
 echo " Overhead    : ${OVERHEAD_ARG:-none}"
 echo "============================================================"
@@ -65,13 +65,18 @@ SUCCESS=0
 FAILED=0
 SKIPPED=0
 
-# Iterate over every subdirectory in results/
+# Iterate over every subdirectory in results_paper/
 for RUN_DIR in "$RESULTS_DIR"/*/; do
     [[ -d "$RUN_DIR" ]] || continue
 
+    # Skip consolidated or analysis folders if they exist
+    RUN_NAME="$(basename "$RUN_DIR")"
+    if [[ "$RUN_NAME" == "consolidated" || "$RUN_NAME" == "analysis" ]]; then
+        continue
+    fi
+
     CSV="$RUN_DIR/benchmark_results.csv"
     OUTPUT_DIR="$RUN_DIR/analysis"
-    RUN_NAME="$(basename "$RUN_DIR")"
 
     if [[ ! -f "$CSV" ]]; then
         echo "⚠  SKIPPED  $RUN_NAME  (no benchmark_results.csv)"

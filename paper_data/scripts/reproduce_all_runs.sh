@@ -16,13 +16,13 @@
 #   D3  — Synthetic Mock CVE dataset (cve_dataset_anonimizados_stratified.csv/.json)
 #
 # RUNS REPRODUCED
-#   • D1  : v1.0 + v2.0 (default) + v3.0 (filtered/hybrid/standalone/presidio), 2 runs each
+#   • D1  : v1.0 + v2.0 (default) + AnonShield (filtered/hybrid/standalone/presidio), 2 runs each
 #   • D1C : same version/strategy matrix, 2 runs each
-#   • D2  : v3.0, 4 strategies, 10 runs — WITHOUT anonymization config (~30 min/run)
-#   • D2  : v3.0, 4 strategies, 10 runs — WITH    anonymization config (~3 min/run)
-#   • D3  : v3.0, 4 strategies, 10 runs — WITHOUT anonymization config (~4 min/run)
-#   • D3  : v3.0, 4 strategies, 10 runs — WITH    anonymization config (~15 sec/run)
-#   • Overhead calibration: v3.0, all strategies, 10 runs
+#   • D2  : AnonShield, 4 strategies, 10 runs — WITHOUT anonymization config (~30 min/run)
+#   • D2  : AnonShield, 4 strategies, 10 runs — WITH    anonymization config (~3 min/run)
+#   • D3  : AnonShield, 4 strategies, 10 runs — WITHOUT anonymization config (~4 min/run)
+#   • D3  : AnonShield, 4 strategies, 10 runs — WITH    anonymization config (~15 sec/run)
+#   • Overhead calibration: AnonShield, all strategies, 10 runs
 #
 # USAGE (from workspace root — no activation needed, venv is auto-created):
 #   ./paper_data/scripts/reproduce_all_runs.sh [--skip-d1] [--skip-d2] [--skip-d3] [--cpu-only]
@@ -132,9 +132,9 @@ echo "======================================================================"
 
 # ── OVERHEAD CALIBRATION ─────────────────────────────────────────────────────
 if [[ "$SKIP_OVERHEAD" == "false" ]]; then
-    print_section "OVERHEAD CALIBRATION (v3.0 | 4 strategies | 10 runs | ~5 min)"
+    print_section "OVERHEAD CALIBRATION (AnonShield | 4 strategies | 10 runs | ~5 min)"
 
-    OUT="$RESULTS/overhead_calibration__v3__all_strategies__10runs"
+    OUT="$RESULTS/overhead_calibration__anonshield__all_strategies__10runs"
     mkdir -p "$OUT"
     run_cmd python3 "$BENCHMARK" \
         --calibrate-overhead \
@@ -151,10 +151,10 @@ if [[ "$SKIP_D1" == "false" ]]; then
     echo "  Input : $DATASETS/D1_openvas/"
     echo "  Est.  : several hours (130 × 4 × 6 combos × 2 runs)"
 
-    OUT="$RESULTS/D1_openvas__v1_v2_v3__all_strategies__1run"
+    OUT="$RESULTS/D1_openvas__v1_v2_anonshield__all_strategies__1run"
     mkdir -p "$OUT"
 
-    # v1.0+v2.0 ignore --strategies (use DEFAULT internally); v3.0 uses the four listed
+    # v1.0+v2.0 ignore --strategies (use DEFAULT internally); AnonShield uses the four listed
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
         --data-dir "$DATASETS/D1_openvas" \
@@ -183,7 +183,7 @@ if [[ "$SKIP_D1" == "false" ]]; then
     echo "  Input : $DATASETS/D1C_converted/"
     echo "  Est.  : several hours (D1C PDF-images are large)"
 
-    OUT_D1C="$RESULTS/D1C_converted__v1_v2_v3__all_strategies__1run"
+    OUT_D1C="$RESULTS/D1C_converted__v1_v2_anonshield__all_strategies__1run"
     mkdir -p "$OUT_D1C"
 
     run_cmd python3 "$BENCHMARK" \
@@ -201,11 +201,11 @@ if [[ "$SKIP_D2" == "false" ]]; then
 
     # D2 — CSV — WITHOUT anonymization config
     # WARNING: ~30 min per run × 10 runs × 4 strategies = ~20 hours
-    print_section "D2 CSV — WITHOUT anonymization config (v3.0 | 4 strategies | 10 runs | ~20h)"
+    print_section "D2 CSV — WITHOUT anonymization config (AnonShield | 4 strategies | 10 runs | ~20h)"
     echo "  Input : $DATASETS/D2_cais_original/consolidated_data.csv"
     echo "  Config: NONE (cold NLP model load on each run)"
 
-    OUT="$RESULTS/D2_cais_csv__v3__all_strategies__10runs__without_config"
+    OUT="$RESULTS/D2_cais_csv__anonshield__all_strategies__10runs__without_config"
     mkdir -p "$OUT"
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
@@ -217,10 +217,10 @@ if [[ "$SKIP_D2" == "false" ]]; then
         --results-dir "$OUT"
 
     # D2 — JSON — WITHOUT anonymization config (~15 min per run, JSON is smaller)
-    print_section "D2 JSON — WITHOUT anonymization config (v3.0 | 4 strategies | 10 runs | ~10h)"
+    print_section "D2 JSON — WITHOUT anonymization config (AnonShield | 4 strategies | 10 runs | ~10h)"
     echo "  Input : $DATASETS/D2_cais_original/consolidated_data.json"
 
-    OUT="$RESULTS/D2_cais_json__v3__all_strategies__10runs__without_config"
+    OUT="$RESULTS/D2_cais_json__anonshield__all_strategies__10runs__without_config"
     mkdir -p "$OUT"
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
@@ -233,11 +233,11 @@ if [[ "$SKIP_D2" == "false" ]]; then
 
     # D2 — CSV — WITH anonymization config (pre-loaded entity cache)
     # ~13 sec per run — the anonymization_config enables a 200k-entity cache
-    print_section "D2 CSV — WITH anonymization config (v3.0 | 4 strategies | 10 runs | ~9 min)"
+    print_section "D2 CSV — WITH anonymization config (AnonShield | 4 strategies | 10 runs | ~9 min)"
     echo "  Input : $DATASETS/D2_cais_original/consolidated_data.csv"
     echo "  Config: $CONFIGS/anonymization_config.json  (cache=200k entities)"
 
-    OUT="$RESULTS/D2_cais_csv__v3__all_strategies__10runs__with_config"
+    OUT="$RESULTS/D2_cais_csv__anonshield__all_strategies__10runs__with_config"
     mkdir -p "$OUT"
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
@@ -251,11 +251,11 @@ if [[ "$SKIP_D2" == "false" ]]; then
         --results-dir "$OUT"
 
     # D2 — JSON — WITH anonymization config
-    print_section "D2 JSON — WITH anonymization config (v3.0 | 4 strategies | 10 runs | ~12 min)"
+    print_section "D2 JSON — WITH anonymization config (AnonShield | 4 strategies | 10 runs | ~12 min)"
     echo "  Input : $DATASETS/D2_cais_original/consolidated_data.json"
     echo "  Config: $CONFIGS/anonymization_config.json"
 
-    OUT="$RESULTS/D2_cais_json__v3__all_strategies__10runs__with_config"
+    OUT="$RESULTS/D2_cais_json__anonshield__all_strategies__10runs__with_config"
     mkdir -p "$OUT"
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
@@ -273,10 +273,10 @@ fi
 if [[ "$SKIP_D3" == "false" ]]; then
 
     # D3 — CSV — WITHOUT anonymization config (~4 min per run)
-    print_section "D3 CSV — WITHOUT anonymization config (v3.0 | 4 strategies | 10 runs | ~2.7h)"
+    print_section "D3 CSV — WITHOUT anonymization config (AnonShield | 4 strategies | 10 runs | ~2.7h)"
     echo "  Input : $DATASETS/D3_mock_cais/cve_dataset_anonimizados_stratified.csv"
 
-    OUT="$RESULTS/D3_mock_cve_csv__v3__all_strategies__10runs__without_config"
+    OUT="$RESULTS/D3_mock_cve_csv__anonshield__all_strategies__10runs__without_config"
     mkdir -p "$OUT"
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
@@ -288,10 +288,10 @@ if [[ "$SKIP_D3" == "false" ]]; then
         --results-dir "$OUT"
 
     # D3 — JSON — WITHOUT anonymization config
-    print_section "D3 JSON — WITHOUT anonymization config (v3.0 | 4 strategies | 10 runs | ~2.5h)"
+    print_section "D3 JSON — WITHOUT anonymization config (AnonShield | 4 strategies | 10 runs | ~2.5h)"
     echo "  Input : $DATASETS/D3_mock_cais/cve_dataset_anonimizados_stratified.json"
 
-    OUT="$RESULTS/D3_mock_cve_json__v3__all_strategies__10runs__without_config"
+    OUT="$RESULTS/D3_mock_cve_json__anonshield__all_strategies__10runs__without_config"
     mkdir -p "$OUT"
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
@@ -303,11 +303,11 @@ if [[ "$SKIP_D3" == "false" ]]; then
         --results-dir "$OUT"
 
     # D3 — CSV — WITH anonymization config (~8.7 sec per run)
-    print_section "D3 CSV — WITH anonymization config (v3.0 | 4 strategies | 10 runs | ~6 min)"
+    print_section "D3 CSV — WITH anonymization config (AnonShield | 4 strategies | 10 runs | ~6 min)"
     echo "  Input : $DATASETS/D3_mock_cais/cve_dataset_anonimizados_stratified.csv"
-    echo "  Config: $CONFIGS/anonymization_config_cve.json  (cache=200k entities)"
+    echo "  Config: $CONFIGS/anonymization_config_cve.json"
 
-    OUT="$RESULTS/D3_mock_cve_csv__v3__all_strategies__10runs__with_config"
+    OUT="$RESULTS/D3_mock_cve_csv__anonshield__all_strategies__10runs__with_config"
     mkdir -p "$OUT"
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
@@ -320,11 +320,11 @@ if [[ "$SKIP_D3" == "false" ]]; then
         --results-dir "$OUT"
 
     # D3 — JSON — WITH anonymization config
-    print_section "D3 JSON — WITH anonymization config (v3.0 | 4 strategies | 10 runs | ~14 min)"
+    print_section "D3 JSON — WITH anonymization config (AnonShield | 4 strategies | 10 runs | ~14 min)"
     echo "  Input : $DATASETS/D3_mock_cais/cve_dataset_anonimizados_stratified.json"
     echo "  Config: $CONFIGS/anonymization_config_cve.json"
 
-    OUT="$RESULTS/D3_mock_cve_json__v3__all_strategies__10runs__with_config"
+    OUT="$RESULTS/D3_mock_cve_json__anonshield__all_strategies__10runs__with_config"
     mkdir -p "$OUT"
     run_cmd python3 "$BENCHMARK" \
         --benchmark \

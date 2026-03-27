@@ -112,7 +112,7 @@
 - **Median Size:** 4.1673 MB (4267.4 KB)
 - **Std Dev:** 20604.4 KB
 - **Conversion:** PDF text → Images → PDF images
-- **Purpose:** Testing OCR capabilities of v2.0 and v3.0
+- **Purpose:** Testing OCR capabilities of v2.0 and AnonShield
 
 ## Size Distribution
 

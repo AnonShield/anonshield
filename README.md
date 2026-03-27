@@ -1,8 +1,8 @@
-# AnonShield: Pseudonymization Strategies for Large-Scale Vulnerability Datasets in CSIRTs
+# AnonShield: Scalable On-Premise Pseudonymization for CSIRT Vulnerability Data
 
 AnonShield is a pseudonymization framework designed for Computer Security Incident Response Teams (CSIRTs). It replaces Personally Identifiable Information (PII) and cybersecurity indicators with cryptographically secure, deterministic pseudonyms (HMAC-SHA256), preserving referential integrity across documents while enabling GDPR/LGPD-compliant data sharing. AnonShield combines GPU-accelerated NER, an LRU entity cache, streaming processors for large files, and a schema-aware configuration mechanism. Evaluated on datasets up to 550 MB (70,951+ vulnerability records), it reduces processing time from ~92 hours to under 10 minutes (~738× speedup over v2.0 on D2 JSON; ≥743× on D2 CSV) and achieves F1 = 94.2%, Recall = 96.7% with the `filtered`/`hybrid` strategies.
 
-> **Paper:** *AnonShield: Pseudonymization Strategies for Large-Scale Vulnerability Datasets in CSIRTs* — SBRC 2026 Salão de Ferramentas.
+> **Paper:** *AnonShield: Scalable On-Premise Pseudonymization for CSIRT Vulnerability Data* — SBRC 2026 Salão de Ferramentas.
 
 ---
 
@@ -15,7 +15,7 @@ AnonShield is a pseudonymization framework designed for Computer Security Incide
 | [Dependencies](#dependencies) | Required packages and external tools |
 | [Security Concerns](#security-concerns) | Risks and mitigations for evaluators |
 | [Installation](#installation) | Step-by-step setup (local and Docker) |
-| [Minimal Test](#minimal-test) | Quick functional verification (~2–5 min) |
+| [Minimal Test](#minimal-test) | Quick functional verification (~5–10 min) |
 | [Experiments](#experiments) | Reproduction of the three main paper claims |
 | [License](#license) | Licensing information |
 
@@ -109,7 +109,7 @@ docker pull anonshield/anon:latest       # CPU
 
 ## Minimal Test
 
-~2–5 minutes. No datasets beyond what is already in the repository.
+~5–10 minutes. No datasets beyond what is already in the repository.
 
 ```bash
 # Set a secret key
@@ -150,7 +150,7 @@ Verifies the full pipeline is functional on small subsets of D1, D1C, and D3.
 ./paper_data/test_minimal/run_tests.sh --skip-d2            # with NVIDIA GPU (D2 is private — skip it)
 ./paper_data/test_minimal/run_tests.sh --skip-d2 --cpu-only  # no GPU
 ```
-Expected: `13/13` steps pass (7 benchmark + 6 analysis). D2 is a private dataset not included in this repository; `--skip-d2` omits those 4 steps so the script exits cleanly. Absolute runtimes on 500-row subsets will not match the paper's full-scale numbers, but the pipeline is verified end-to-end.
+Expected: `Benchmark steps passed : 7` / `Total failures : 0` and `Analysis done — passed: 6  failed: 0`. D2 is a private dataset not included in this repository; `--skip-d2` omits those 4 steps so the script exits cleanly. Absolute runtimes on 500-row subsets will not match the paper's full-scale numbers, but the pipeline is verified end-to-end.
 
 **Option B — Spot check (~8–10 min, any hardware):**
 Runs v2.0 and AnonShield on a ~512 KB subset of D3 CSV. v2.0 bottlenecks at ~1 KB/s on any hardware; AnonShield benefits from GPU acceleration, so the ratio varies by hardware (larger with GPU).
@@ -181,10 +181,7 @@ Runtime is hardware-dependent and cannot be estimated without knowing the evalua
 ./paper_data/scripts/reproduce_all_runs.sh --skip-d1 --skip-d2
 ./paper_data/scripts/analyze_all.sh
 ```
-The stored `benchmark_results.csv` files under `paper_data/results_paper/` contain the paper's original measurements and can be inspected without re-running:
-```bash
-./paper_data/scripts/analyze_all.sh   # regenerate charts from stored CSVs only
-```
+The stored `benchmark_results.csv` files under `paper_data/results_paper/` contain the paper's original measurements and can be inspected directly without re-running.
 
 **Per-file performance on D1 (130 targets, mean, Table 3):**
 
@@ -268,8 +265,8 @@ python benchmark/benchmark.py \
 **Dataset:** D3 with `paper_data/configs/anonymization_config_cve.json`.
 
 ```bash
-./paper_data/scripts/spot_check_claim3.sh            # with NVIDIA GPU
-./paper_data/scripts/spot_check_claim3.sh --cpu-only  # no GPU
+./paper_data/scripts/spot_check_claim3.sh            # with NVIDIA GPU  (~80 s)
+./paper_data/scripts/spot_check_claim3.sh --cpu-only  # no GPU          (~490 s / ~8 min)
 ```
 Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so removing it saves more). Absolute times vary by hardware.
 ```
@@ -283,8 +280,7 @@ Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so 
   Note: for this specific config (only force_anonymize and
   fields_to_exclude directives, zero fields_to_anonymize entries),
   no field passes through the NER or regex pipeline, so GPU and
-  CPU times converge. Configs with fields_to_anonymize entries
-  would still run NER on those fields.
+  CPU times converge. The CPU gain is therefore larger than on GPU.
 ══════════════════════════════════════════════════════════════
 ```
 

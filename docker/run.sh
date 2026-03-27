@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# AnonLFI — Docker wrapper
+# AnonShield — Docker wrapper
 #
 # Creates an ./anon/ folder in your current directory to keep everything
 # together: input files, output, and the NER model cache.

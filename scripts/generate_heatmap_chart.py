@@ -2,7 +2,7 @@
 """
 Generate 3-panel chart for Tabela 3:
   (A) Throughput (KB/s)  |  (B) Total Time (hours)  |  (C) Speedup vs v1.0
-All versions (v1.0, v2.0, v3.0 strategies), CSV + JSON.
+All versions (v1.0, v2.0, AnonShield strategies), CSV + JSON.
 """
 
 import pandas as pd
@@ -17,7 +17,7 @@ JSON_DATA  = SESSION / "01_cve_dataset_v3_10runs_json" / "benchmark_results.csv"
 OVERHEAD   = SESSION / "02_overhead_calibration_10runs" / "benchmark_results.csv"
 REGRESSION = SESSION / "03_regression_3runs"            / "benchmark_results.csv"
 
-# ── v3.0 measured (10 runs) ──────────────────────────────────────────
+# ── AnonShield measured (10 runs) ──────────────────────────────────────────
 def load_v3(path, fmt):
     df = pd.read_csv(path)
     df = df[df["status"] == "SUCCESS"]

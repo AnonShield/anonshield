@@ -77,12 +77,25 @@ class ColorScheme:
             # Version 2.0
             '2.0_default': cls.WONG_PURPLE,
 
-            # Version 3.0
-            '3.0_filtered': cls.WONG_YELLOW,
-            '3.0_hybrid': cls.WONG_GREEN,
-            '3.0_presidio': cls.WONG_ORANGE,
-            '3.0_standalone': cls.WONG_SKY_BLUE,
+            # AnonShield (Version 3.0)
+            'AnonShield_filtered': cls.WONG_YELLOW,
+            'AnonShield_hybrid': cls.WONG_GREEN,
+            'AnonShield_presidio': cls.WONG_ORANGE,
+            'AnonShield_standalone': cls.WONG_SKY_BLUE,
         }
+
+    @classmethod
+    def get_version_display_names(cls) -> Dict[str, str]:
+        """Human-readable display names for version_strategy labels (paper branding)."""
+        return {
+            '1.0_default':         'AnonLFI v1.0',
+            '2.0_default':         'AnonLFI v2.0',
+            'AnonShield_filtered':  'AnonShield filtered',
+            'AnonShield_hybrid':    'AnonShield hybrid',
+            'AnonShield_presidio':  'AnonShield presidio',
+            'AnonShield_standalone':'AnonShield standalone',
+        }
+
 
 
 @dataclass(frozen=True)
@@ -323,6 +336,10 @@ class VisualizationConfig:
             return [color_map.get(s, self.colors.get_categorical_palette(n)[i % 8])
                     for i, s in enumerate(strategies)]
         return self.colors.get_categorical_palette(n)
+
+    def get_version_display_names(self) -> Dict[str, str]:
+        """Human-readable display names for version_strategy labels (paper branding)."""
+        return ColorScheme.get_version_display_names()
 
     @staticmethod
     def sort_strategies_by_version(strategies: list) -> list:

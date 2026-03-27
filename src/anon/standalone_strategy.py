@@ -4,7 +4,7 @@ Standalone Strategy - Zero Presidio Dependencies.
 This module implements a pure Python NLP pipeline for entity detection and anonymization
 without any Presidio dependencies. It loads models directly and handles all processing manually.
 
-Author: AnonLFI Team
+Author: AnonShield Team
 Architecture: SOLID principles, minimal dependencies, maximum performance
 """
 

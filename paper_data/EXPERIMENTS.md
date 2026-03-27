@@ -63,17 +63,17 @@ paper_data/
 │   ├── D2_cais_original/               CAIS/CTCiber real Tenable scans — private, not redistributable
 │   └── D3_mock_cais/                   Synthetic CVE-based dataset — git-ignored, extract via scripts/extract_datasets.sh
 ├── results/                         ← benchmark results (one folder per run; git-ignored)
-│   ├── D1_openvas__v1_v2_v3__all_strategies__1run/
-│   ├── D1C_converted__v1_v2_v3__all_strategies__1run/
-│   ├── D2_cais_csv__v3__all_strategies__10runs__without_config/
-│   ├── D2_cais_csv__v3__all_strategies__10runs__with_config/
-│   ├── D2_cais_json__v3__all_strategies__10runs__without_config/
-│   ├── D2_cais_json__v3__all_strategies__10runs__with_config/
-│   ├── D3_mock_cve_csv__v3__all_strategies__10runs__without_config/
-│   ├── D3_mock_cve_csv__v3__all_strategies__10runs__with_config/
-│   ├── D3_mock_cve_json__v3__all_strategies__10runs__without_config/
-│   ├── D3_mock_cve_json__v3__all_strategies__10runs__with_config/
-│   ├── overhead_calibration__v3__all_strategies__10runs/
+│   ├── D1_openvas__v1_v2_anonshield__all_strategies__1run/
+│   ├── D1C_converted__v1_v2_anonshield__all_strategies__1run/
+│   ├── D2_cais_csv__anonshield__all_strategies__10runs__without_config/
+│   ├── D2_cais_csv__anonshield__all_strategies__10runs__with_config/
+│   ├── D2_cais_json__anonshield__all_strategies__10runs__without_config/
+│   ├── D2_cais_json__anonshield__all_strategies__10runs__with_config/
+│   ├── D3_mock_cve_csv__anonshield__all_strategies__10runs__without_config/
+│   ├── D3_mock_cve_csv__anonshield__all_strategies__10runs__with_config/
+│   ├── D3_mock_cve_json__anonshield__all_strategies__10runs__without_config/
+│   ├── D3_mock_cve_json__anonshield__all_strategies__10runs__with_config/
+│   ├── overhead_calibration__anonshield__all_strategies__10runs/
 │   └── consolidated/                   merged CSVs across all experiments
 ├── scripts/                         ← full reproduction and analysis scripts
 │   ├── convert_d1_to_d1c.py            convert D1 → D1C (CSV→XLSX, TXT→DOCX, XML→JSON, PDF→PDF-images)
@@ -118,9 +118,9 @@ Each folder inside `results/` contains:
 
 **Per-file performance (mean across 130 targets, GPU-measured, paper Table 3):**
 
-> v1.0 and v2.0 are CPU-only — CPU time ≈ GPU time. v3.0 CPU estimated by applying the D3 standalone CPU/GPU factor (~5.5×) to GPU times. Per-file speedup on CPU = GPU speedup ÷ 5.5 (v3.0 loses GPU NER acceleration; v2.0 does not, so CPU speedup is lower than on GPU).
+> v1.0 and v2.0 are CPU-only — CPU time ≈ GPU time. AnonShield CPU estimated by applying the D3 standalone CPU/GPU factor (~5.5×) to GPU times. Per-file speedup on CPU = GPU speedup ÷ 5.5 (AnonShield loses GPU NER acceleration; v2.0 does not, so CPU speedup is lower than on GPU).
 
-| Format | v2.0 GPU/CPU | v3.0 standalone GPU | v3.0 standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
+| Format | v2.0 GPU/CPU | AnonShield standalone GPU | AnonShield standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
 |---|---|---|---|---|---|
 | XML | ~192 s | ~12 s | ~64 s | **16.5×** | **~3.0×** |
 | CSV | ~74 s | ~8 s | ~43 s | **9.6×** | **~1.7×** |
@@ -158,9 +158,9 @@ Each folder inside `results/` contains:
 
 **Per-file performance (mean across 130 targets, GPU-measured, paper Table 4):**
 
-> v2.0 CPU time ≈ GPU time (CPU-only). v3.0 CPU estimated by applying the D3 standalone CPU/GPU factor (~5.5×) to GPU times.
+> v2.0 CPU time ≈ GPU time (CPU-only). AnonShield CPU estimated by applying the D3 standalone CPU/GPU factor (~5.5×) to GPU times.
 
-| Format | v2.0 GPU/CPU | v3.0 standalone GPU | v3.0 standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
+| Format | v2.0 GPU/CPU | AnonShield standalone GPU | AnonShield standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
 |---|---|---|---|---|---|
 | XLSX | ~60 s | ~7 s | ~39 s | **8.5×** | **~1.5×** |
 | DOCX | ~30 s | ~9 s | ~52 s | **3.2×** | **~0.6×** |
@@ -180,7 +180,7 @@ Each folder inside `results/` contains:
 | Path | `datasets/D2_cais_original/` |
 | Config | `configs/anonymization_config.json` (pre-builds 200k-entity cache) |
 
-**Performance comparison (v3.0, mean wall-clock per strategy-run, 10-run average):**
+**Performance comparison (AnonShield, mean wall-clock per strategy-run, 10-run average):**
 
 > GPU-measured on RTX 5060 Ti. CPU estimates use D3 standalone factor (5.9× CSV, 5.1× JSON without config; ~1× with config since no NER/regex runs). D2 CPU not directly measured.
 
@@ -207,7 +207,7 @@ Each folder inside `results/` contains:
 | Path | `datasets/D3_mock_cais/` |
 | Config | `configs/anonymization_config_cve.json` (pre-builds 200k-entity cache) |
 
-**Performance comparison (v3.0, mean wall-clock per strategy-run):**
+**Performance comparison (AnonShield, mean wall-clock per strategy-run):**
 
 | Configuration | Format | GPU (RTX 5060 Ti) | CPU (no GPU) | GPU/CPU speedup |
 |---|---|---|---|---|
@@ -253,21 +253,21 @@ Each `benchmark_results.csv` contains one row per (file × version × strategy �
 
 | Result Folder | Dataset | Config | Rows | Runs | Date |
 |---|---|---|---|---|---|
-| `D1_openvas__v1_v2_v3__all_strategies__1run` | D1 | — | 7,698 | 2 | 2026-02-08 |
-| `D1C_converted__v1_v2_v3__all_strategies__1run` | D1C | — | 8,251 | 2 | 2026-02-08 |
-| `D2_cais_csv__v3__all_strategies__10runs__without_config` | D2 | none | 40 | 10 | 2026-02-12 |
-| `D2_cais_json__v3__all_strategies__10runs__without_config` | D2 | none | 40 | 10 | 2026-02-11 |
-| `D2_cais_csv__v3__all_strategies__10runs__with_config` | D2 | anonymization_config.json | 40 | 10 | 2026-02-14 |
-| `D2_cais_json__v3__all_strategies__10runs__with_config` | D2 | anonymization_config.json | 40 | 10 | 2026-02-14 |
-| `D3_mock_cve_csv__v3__all_strategies__10runs__without_config` | D3 | none | 40 | 10 | 2026-02-07 |
-| `D3_mock_cve_json__v3__all_strategies__10runs__without_config` | D3 | none | 40 | 10 | 2026-02-08 |
-| `D3_mock_cve_csv__v3__all_strategies__10runs__with_config` | D3 | anonymization_config_cve.json | 40 | 10 | 2026-02-14 |
-| `D3_mock_cve_json__v3__all_strategies__10runs__with_config` | D3 | anonymization_config_cve.json | 40 | 10 | 2026-02-14 |
-| `D3_mock_cve_csv__v3__all_strategies__10runs__without_config__cpu` | D3 | none (CPU-only) | 40 | 10 | 2026-03-22 |
-| `D3_mock_cve_json__v3__all_strategies__10runs__without_config__cpu` | D3 | none (CPU-only) | 40 | 10 | 2026-03-22 |
-| `D3_mock_cve_csv__v3__all_strategies__10runs__with_config__cpu` | D3 | anonymization_config_cve.json (CPU-only) | 40 | 10 | 2026-03-22 |
-| `D3_mock_cve_json__v3__all_strategies__10runs__with_config__cpu` | D3 | anonymization_config_cve.json (CPU-only) | 40 | 10 | 2026-03-22 |
-| `overhead_calibration__v3__all_strategies__10runs` | near-zero | — | 60 | 10 | 2026-02-08 |
+| `D1_openvas__v1_v2_anonshield__all_strategies__1run` | D1 | — | 7,698 | 2 | 2026-02-08 |
+| `D1C_converted__v1_v2_anonshield__all_strategies__1run` | D1C | — | 8,251 | 2 | 2026-02-08 |
+| `D2_cais_csv__anonshield__all_strategies__10runs__without_config` | D2 | none | 40 | 10 | 2026-02-12 |
+| `D2_cais_json__anonshield__all_strategies__10runs__without_config` | D2 | none | 40 | 10 | 2026-02-11 |
+| `D2_cais_csv__anonshield__all_strategies__10runs__with_config` | D2 | anonymization_config.json | 40 | 10 | 2026-02-14 |
+| `D2_cais_json__anonshield__all_strategies__10runs__with_config` | D2 | anonymization_config.json | 40 | 10 | 2026-02-14 |
+| `D3_mock_cve_csv__anonshield__all_strategies__10runs__without_config` | D3 | none | 40 | 10 | 2026-02-07 |
+| `D3_mock_cve_json__anonshield__all_strategies__10runs__without_config` | D3 | none | 40 | 10 | 2026-02-08 |
+| `D3_mock_cve_csv__anonshield__all_strategies__10runs__with_config` | D3 | anonymization_config_cve.json | 40 | 10 | 2026-02-14 |
+| `D3_mock_cve_json__anonshield__all_strategies__10runs__with_config` | D3 | anonymization_config_cve.json | 40 | 10 | 2026-02-14 |
+| `D3_mock_cve_csv__anonshield__all_strategies__10runs__without_config__cpu` | D3 | none (CPU-only) | 40 | 10 | 2026-03-22 |
+| `D3_mock_cve_json__anonshield__all_strategies__10runs__without_config__cpu` | D3 | none (CPU-only) | 40 | 10 | 2026-03-22 |
+| `D3_mock_cve_csv__anonshield__all_strategies__10runs__with_config__cpu` | D3 | anonymization_config_cve.json (CPU-only) | 40 | 10 | 2026-03-22 |
+| `D3_mock_cve_json__anonshield__all_strategies__10runs__with_config__cpu` | D3 | anonymization_config_cve.json (CPU-only) | 40 | 10 | 2026-03-22 |
+| `overhead_calibration__anonshield__all_strategies__10runs` | near-zero | — | 60 | 10 | 2026-02-08 |
 
 **Consolidated files** (`results/consolidated/`):
 
@@ -276,7 +276,7 @@ Each `benchmark_results.csv` contains one row per (file × version × strategy �
 | `all_datasets__session_20260208__complete.csv` | All D1+D1C+D2+D3 results from session 2026-02-08 | 9,594 |
 | `D2_D3__session_20260214__with_anon_config.csv` | D2+D3 with_config runs from session 2026-02-14 | 160 |
 
-> **D1/D1C note:** v1.0 and v2.0 ran with `default` strategy only. v3.0 ran with
+> **D1/D1C note:** v1.0 and v2.0 ran with `default` strategy only. AnonShield ran with
 > `filtered`, `hybrid`, `standalone`, `presidio`. The folder label `__1run` refers
 > to this being the single planned execution session, not the number of benchmark
 > repeat runs (which is 2).
@@ -293,10 +293,10 @@ Each `benchmark_results.csv` contains one row per (file × version × strategy �
 | Strategy | Available in | Description |
 |---|---|---|
 | `default` | v1.0, v2.0 | Built-in heuristic anonymizer |
-| `standalone` | v3.0 | NLP-only (spaCy NER, no entity lists) |
-| `filtered` | v3.0 | NLP + entity allow/deny filter lists |
-| `hybrid` | v3.0 | Combined regex + NLP |
-| `presidio` | v3.0 | Microsoft Presidio engine |
+| `standalone` | AnonShield | NLP-only (spaCy NER, no entity lists) |
+| `filtered` | AnonShield | NLP + entity allow/deny filter lists |
+| `hybrid` | AnonShield | Combined regex + NLP |
+| `presidio` | AnonShield | Microsoft Presidio engine |
 
 ---
 
@@ -385,7 +385,7 @@ python3 benchmark/benchmark.py --force-setup --gpu
 python3 benchmark/benchmark.py --force-setup --cpu-only
 ```
 
-> **GPU vs CPU:** v3.0 uses neural NER models (spaCy `en_core_web_lg`) that
+> **GPU vs CPU:** AnonShield uses neural NER models (spaCy `en_core_web_lg`) that
 > benefit from a GPU but also run on CPU. v1.0 and v2.0 are CPU-only regardless.
 > GPU runtimes were measured on an NVIDIA RTX 5060 Ti. D3 CPU-only runtimes were
 > also measured on the same machine (2026-03-22) and show a GPU/CPU speedup of
@@ -477,7 +477,7 @@ written to `paper_data/results_paper/`, matching the archived structure exactly.
 | *(full, requires D2)* | D1 + D1C + D2 + D3 | **~131 h** | **~435 h** † |
 
 > ✓ D3 CPU total directly measured (2026-03-22, AMD Ryzen 5 8600G, `CUDA_VISIBLE_DEVICES=""`).
-> † CPU estimates: v1.0 and v2.0 are CPU-only (unchanged). v3.0 all strategies estimated at GPU × 5.5 (D3 standalone average). D2 uses per-format D3 averages (6.4× CSV, 3.3× JSON without config; ~1× with config).
+> † CPU estimates: v1.0 and v2.0 are CPU-only (unchanged). AnonShield all strategies estimated at GPU × 5.5 (D3 standalone average). D2 uses per-format D3 averages (6.4× CSV, 3.3× JSON without config; ~1× with config).
 
 **Per-dataset breakdown (what dominates the runtime):**
 
@@ -485,22 +485,22 @@ written to `paper_data/results_paper/`, matching the archived structure exactly.
 |---|---|---|---|
 | D1 (520 files × 2 runs) | v1.0 default | 18,184 s = 5.1 h | 18,184 s = 5.1 h (CPU-only) |
 | D1 (520 files × 2 runs) | v2.0 default | 84,362 s = 23.4 h | 84,362 s = 23.4 h (CPU-only) |
-| D1 (520 files × 2 runs) | v3.0 standalone | 9,923 s = 2.8 h (GPU) | ~54,600 s = ~15 h (×5.5) |
-| D1 (520 files × 2 runs) | v3.0 filtered | 12,991 s = 3.6 h (GPU) | ~71,500 s = ~20 h (×5.5) |
-| D1 (520 files × 2 runs) | v3.0 hybrid | 12,982 s = 3.6 h (GPU) | ~71,400 s = ~20 h (×5.5) |
-| D1 (520 files × 2 runs) | v3.0 presidio | 13,265 s = 3.7 h (GPU) | ~73,000 s = ~20 h (×5.5) |
+| D1 (520 files × 2 runs) | AnonShield standalone | 9,923 s = 2.8 h (GPU) | ~54,600 s = ~15 h (×5.5) |
+| D1 (520 files × 2 runs) | AnonShield filtered | 12,991 s = 3.6 h (GPU) | ~71,500 s = ~20 h (×5.5) |
+| D1 (520 files × 2 runs) | AnonShield hybrid | 12,982 s = 3.6 h (GPU) | ~71,400 s = ~20 h (×5.5) |
+| D1 (520 files × 2 runs) | AnonShield presidio | 13,265 s = 3.7 h (GPU) | ~73,000 s = ~20 h (×5.5) |
 | **D1 total** | all | **151,707 s = 42.1 h** | **~373,000 s = ~104 h** |
 | D1C (520 files × 2 runs) | v1.0 default | 14,324 s = 4.0 h | 14,324 s = 4.0 h (CPU-only) |
 | D1C (520 files × 2 runs) | v2.0 default | 102,935 s = 28.6 h | 102,935 s = 28.6 h (CPU-only) |
-| D1C (520 files × 2 runs) | v3.0 standalone | 16,375 s = 4.5 h (GPU) | ~90,100 s = ~25 h (×5.5) |
-| D1C (520 files × 2 runs) | v3.0 filtered | 20,783 s = 5.8 h (GPU) | ~114,300 s = ~32 h (×5.5) |
-| D1C (520 files × 2 runs) | v3.0 hybrid | 20,769 s = 5.8 h (GPU) | ~114,200 s = ~32 h (×5.5) |
-| D1C (520 files × 2 runs) | v3.0 presidio | 21,198 s = 5.9 h (GPU) | ~116,600 s = ~32 h (×5.5) |
+| D1C (520 files × 2 runs) | AnonShield standalone | 16,375 s = 4.5 h (GPU) | ~90,100 s = ~25 h (×5.5) |
+| D1C (520 files × 2 runs) | AnonShield filtered | 20,783 s = 5.8 h (GPU) | ~114,300 s = ~32 h (×5.5) |
+| D1C (520 files × 2 runs) | AnonShield hybrid | 20,769 s = 5.8 h (GPU) | ~114,200 s = ~32 h (×5.5) |
+| D1C (520 files × 2 runs) | AnonShield presidio | 21,198 s = 5.9 h (GPU) | ~116,600 s = ~32 h (×5.5) |
 | **D1C total** | all | **196,383 s = 54.6 h** | **~552,000 s = ~153 h** |
-| D2 CSV (1 file) | v3.0 standalone | 5,885 s = 1.6 h (GPU) | ~34,700 s = ~9.6 h † |
-| D2 JSON (1 file) | v3.0 standalone | 4,531 s = 1.3 h (GPU) | ~14,950 s = ~4.2 h † |
-| D3 CSV (1 file) | v3.0 standalone | 730 s = 12 min (GPU) | 4,336 s = 72 min ✓ |
-| D3 JSON (1 file) | v3.0 standalone | 1,721 s = 29 min (GPU) | 8,819 s = 147 min ✓ |
+| D2 CSV (1 file) | AnonShield standalone | 5,885 s = 1.6 h (GPU) | ~34,700 s = ~9.6 h † |
+| D2 JSON (1 file) | AnonShield standalone | 4,531 s = 1.3 h (GPU) | ~14,950 s = ~4.2 h † |
+| D3 CSV (1 file) | AnonShield standalone | 730 s = 12 min (GPU) | 4,336 s = 72 min ✓ |
+| D3 JSON (1 file) | AnonShield standalone | 1,721 s = 29 min (GPU) | 8,819 s = 147 min ✓ |
 
 > ✓ D3 CPU measured directly (2026-03-22). † D2 CPU estimated using D3 speedup: 5.9× for CSV, 3.3× for JSON (standalone, all-strategy averages).
 
@@ -537,14 +537,14 @@ After benchmarks complete, generate charts, statistical tables, and PDFs:
 
 The script iterates over every subfolder in `paper_data/results_paper/` that contains
 a `benchmark_results.csv` and runs `benchmark/analyze_benchmark_scientific.py`
-on each. It uses `overhead_calibration__v3__all_strategies__10runs/benchmark_results.csv`
+on each. It uses `overhead_calibration__anonshield__all_strategies__10runs/benchmark_results.csv`
 automatically for overhead correction.
 
 **Output location:** An `analysis/` subfolder is created inside each result directory:
 
 ```
 paper_data/results_paper/
-├── D3_mock_cve_csv__v3__all_strategies__10runs__without_config/
+├── D3_mock_cve_csv__anonshield__all_strategies__10runs__without_config/
 │   ├── benchmark_results.csv
 │   └── analysis/                    ← generated by analyze_all.sh
 │       ├── fig01_wall_clock_time.pdf
@@ -564,7 +564,7 @@ paper_data/results_paper/
 find paper_data/results -path '*/analysis/*.pdf' | sort | xargs -I{} xdg-open {}
 
 # Or open one specific result folder
-xdg-open paper_data/results_paper/D3_mock_cve_csv__v3__all_strategies__10runs__without_config/analysis/
+xdg-open paper_data/results_paper/D3_mock_cve_csv__anonshield__all_strategies__10runs__without_config/analysis/
 
 # List all generated files
 find paper_data/results -path '*/analysis/*' -type f | sort
@@ -575,9 +575,9 @@ find paper_data/results -path '*/analysis/*' -type f | sort
 ```bash
 # Analyze one folder independently
 .venv/bin/python3 benchmark/analyze_benchmark_scientific.py \
-    paper_data/results_paper/D3_mock_cve_csv__v3__all_strategies__10runs__without_config/benchmark_results.csv \
-    -o paper_data/results_paper/D3_mock_cve_csv__v3__all_strategies__10runs__without_config/analysis/ \
-    --overhead paper_data/results_paper/overhead_calibration__v3__all_strategies__10runs/benchmark_results.csv \
+    paper_data/results_paper/D3_mock_cve_csv__anonshield__all_strategies__10runs__without_config/benchmark_results.csv \
+    -o paper_data/results_paper/D3_mock_cve_csv__anonshield__all_strategies__10runs__without_config/analysis/ \
+    --overhead paper_data/results_paper/overhead_calibration__anonshield__all_strategies__10runs/benchmark_results.csv \
     --pdf
 ```
 
@@ -589,7 +589,7 @@ find paper_data/results -path '*/analysis/*' -type f | sort
 |---|---|---|
 | v1.0 | Heuristic anonymizer, no OCR | *(built-in default, no flag needed)* |
 | v2.0 | v1.0 + Tesseract OCR | *(built-in default, no flag needed)* |
-| v3.0 | Neural NER + OCR + multiple engines | `filtered` `hybrid` `standalone` `presidio` |
+| AnonShield | Neural NER + OCR + multiple engines | `filtered` `hybrid` `standalone` `presidio` |
 
 > `--strategies default` is **not a valid CLI flag** — do not pass it. v1.0 and
 > v2.0 use their internal default strategy automatically.

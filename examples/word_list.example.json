@@ -1,5 +1,5 @@
 {
-  "_comment": "Word list for AnonLFI. Each key is the entity type label (uppercased automatically). Any label is valid, including custom ones. Terms in each list are always anonymized regardless of NER model output.",
+  "_comment": "Word list for AnonShield. Each key is the entity type label (uppercased automatically). Any label is valid, including custom ones. Terms in each list are always anonymized regardless of NER model output.",
   "ORGANIZATION": [
     "PROCERGS",
     "SSP RS",

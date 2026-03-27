@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Dataset Conversion Tool for AnonLFI Benchmark
+Dataset Conversion Tool for AnonShield Benchmark
 
 Converts vulnnet_scans_openvas dataset files to multiple formats:
 - CSV → XLSX (Excel)

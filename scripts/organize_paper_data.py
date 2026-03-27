@@ -69,55 +69,55 @@ RESULT_SOURCES = {
     # D2 – CAIS/RNP       (default config, session_20260208_005447)
     "D2_default_config/ctciber_csv_10runs": (
         BASE / "benchmark/orchestrated_results/session_20260208_005447/01_ctciber_csv_cache200k/benchmark_results.csv",
-        "D2 CSV – v3.0 all strategies, 10 runs (default config)",
+        "D2 CSV – AnonShield all strategies, 10 runs (default config)",
     ),
     "D2_default_config/ctciber_json_10runs": (
         BASE / "benchmark/orchestrated_results/session_20260208_005447/02_ctciber_json_cache200k/benchmark_results.csv",
-        "D2 JSON – v3.0 all strategies, 10 runs (default config)",
+        "D2 JSON – AnonShield all strategies, 10 runs (default config)",
     ),
     # D2 – CAIS/RNP       (anonymization_config.json, session_ctciber_cve)
     "D2_anon_config/ctciber_csv_10runs": (
         BASE / "benchmark/orchestrated_results/session_ctciber_cve_20260214_031239/01_ctciber_csv_cache200k/benchmark_results.csv",
-        "D2 CSV – v3.0 all strategies, 10 runs (anonymization_config.json)",
+        "D2 CSV – AnonShield all strategies, 10 runs (anonymization_config.json)",
     ),
     "D2_anon_config/ctciber_json_10runs": (
         BASE / "benchmark/orchestrated_results/session_ctciber_cve_20260214_031239/02_ctciber_json_cache200k/benchmark_results.csv",
-        "D2 JSON – v3.0 all strategies, 10 runs (anonymization_config.json)",
+        "D2 JSON – AnonShield all strategies, 10 runs (anonymization_config.json)",
     ),
     # D2 – extra (session_20260211 – direct consolidated files)
     "D2_extra/consolidated_json_10runs": (
         BASE / "ignore/dados_CTCiber_AnonShield/benchmark_results/session_20260211_220041/01_consolidated_json_10runs/benchmark_results.csv",
-        "D2 Consolidated JSON – v3.0, 10 runs",
+        "D2 Consolidated JSON – AnonShield, 10 runs",
     ),
     "D2_extra/consolidated_csv_10runs": (
         BASE / "ignore/dados_CTCiber_AnonShield/benchmark_results/session_20260211_220041/02_consolidated_csv_10runs/benchmark_results.csv",
-        "D2 Consolidated CSV – v3.0, 10 runs",
+        "D2 Consolidated CSV – AnonShield, 10 runs",
     ),
     # D3 – Mock CAIS/CVE   (default config, session_20260208_005447)
     "D3_default_config/cve_csv_10runs": (
         BASE / "benchmark/orchestrated_results/session_20260208_005447/00_cve_dataset_v3_10runs_csv/benchmark_results.csv",
-        "D3 CVE CSV – v3.0 all strategies, 10 runs (default config)",
+        "D3 CVE CSV – AnonShield all strategies, 10 runs (default config)",
     ),
     "D3_default_config/cve_json_10runs": (
         BASE / "benchmark/orchestrated_results/session_20260208_005447/01_cve_dataset_v3_10runs_json/benchmark_results.csv",
-        "D3 CVE JSON – v3.0 all strategies, 10 runs (default config)",
+        "D3 CVE JSON – AnonShield all strategies, 10 runs (default config)",
     ),
     "D3_default_config/cve_csv_default_strat": (
         BASE / "benchmark/orchestrated_results/session_20260208_005447/03_cve_csv_default/benchmark_results.csv",
-        "D3 CVE CSV – v3.0 default strategy only, 10 runs",
+        "D3 CVE CSV – AnonShield default strategy only, 10 runs",
     ),
     "D3_default_config/cve_json_default_strat": (
         BASE / "benchmark/orchestrated_results/session_20260208_005447/04_cve_json_default/benchmark_results.csv",
-        "D3 CVE JSON – v3.0 default strategy only, 10 runs",
+        "D3 CVE JSON – AnonShield default strategy only, 10 runs",
     ),
     # D3 – Mock CAIS/CVE   (anonymization_config_cve.json, session_ctciber_cve)
     "D3_anon_config/cve_csv_10runs": (
         BASE / "benchmark/orchestrated_results/session_ctciber_cve_20260214_031239/03_cve_csv_default/benchmark_results.csv",
-        "D3 CVE CSV – v3.0 all strategies, 10 runs (anonymization_config_cve.json)",
+        "D3 CVE CSV – AnonShield all strategies, 10 runs (anonymization_config_cve.json)",
     ),
     "D3_anon_config/cve_json_10runs": (
         BASE / "benchmark/orchestrated_results/session_ctciber_cve_20260214_031239/04_cve_json_default/benchmark_results.csv",
-        "D3 CVE JSON – v3.0 all strategies, 10 runs (anonymization_config_cve.json)",
+        "D3 CVE JSON – AnonShield all strategies, 10 runs (anonymization_config_cve.json)",
     ),
     # Combined session results
     "combined/session_20260208_005447": (
@@ -248,7 +248,7 @@ def step3_create_structure():
     # Create top-level README
     OUT.mkdir(exist_ok=True)
     report_lines = []
-    report_lines.append("# Paper Data – AnonLFI Benchmark")
+    report_lines.append("# Paper Data – AnonShield Benchmark")
     report_lines.append(f"\nGenerated: {datetime.now().isoformat()}")
     report_lines.append("""
 ## Structure

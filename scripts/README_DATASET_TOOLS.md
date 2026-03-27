@@ -1,6 +1,6 @@
 # Dataset Conversion & Analysis Tools
 
-Ferramentas profissionais para converter e analisar o dataset `vulnnet_scans_openvas` em múltiplos formatos para benchmark do AnonLFI.
+Ferramentas profissionais para converter e analisar o dataset `vulnnet_scans_openvas` em múltiplos formatos para benchmark do AnonShield.
 
 ## 📋 Visão Geral
 
@@ -271,9 +271,9 @@ python benchmark/benchmark.py \
 |--------|-----|-----|-----|------|------|------|-----|--------|
 | v1.0   | ✓   | ✓   | ✓   | ✓    | ✓    | ✗    | ✗   | ✗      |
 | v2.0   | ✓   | ✓   | ✓   | ✓    | ✓    | ✓    | ✓   | ✓      |
-| v3.0   | ✓   | ✓   | ✓   | ✓    | ✓    | ✓    | ✓   | ✓      |
+| AnonShield   | ✓   | ✓   | ✓   | ✓    | ✓    | ✓    | ✓   | ✓      |
 
-**Nota**: v1.0 suporta 5 formatos, v2.0 e v3.0 suportam 13-19 formatos.
+**Nota**: v1.0 suporta 5 formatos, v2.0 e AnonShield suportam 13-19 formatos.
 
 ## 🏗️ Arquitetura dos Scripts
 
@@ -340,7 +340,7 @@ done
 
 ### Caso 2: Teste de OCR (PDF → Images)
 
-**Objetivo**: Avaliar performance de OCR em v2.0 e v3.0.
+**Objetivo**: Avaliar performance de OCR em v2.0 e AnonShield.
 
 ```bash
 # 1. Gerar imagens dos PDFs

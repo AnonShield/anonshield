@@ -133,11 +133,10 @@ class ScientificBenchmarkAnalyzer:
             if failed_count > 0:
                 print(f"   ⚠️  Filtered out {failed_count} failed runs")
 
-        # Create combined identifier
+        # Create combined identifier with paper branding (3.0 → AnonShield)
         if 'version' in self.df.columns and 'strategy' in self.df.columns:
-            self.df['version_strategy'] = (
-                self.df['version'].astype(str) + '_' + self.df['strategy']
-            )
+            version_label = self.df['version'].astype(str).replace({'3.0': 'AnonShield'})
+            self.df['version_strategy'] = version_label + '_' + self.df['strategy']
 
         # Clean file extensions and create file_type alias
         if 'file_extension' in self.df.columns:

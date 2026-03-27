@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# AnonLFI Docker Entrypoint - Lazy Loading Implementation
+# AnonShield Docker Entrypoint - Lazy Loading Implementation
 # =============================================================================
 #
 # This script implements lazy loading of ML models based on runtime arguments.
@@ -253,7 +253,7 @@ handle_preload() {
 # =============================================================================
 
 main() {
-    log_info "AnonLFI Container Starting..."
+    log_info "AnonShield Container Starting..."
 
     # Handle preload if specified
     handle_preload
@@ -295,7 +295,7 @@ main() {
         export VIRTUAL_ENV="/app/.venv"
         python -m unittest discover -v -s tests/
     else
-        log_success "All required models ready. Starting AnonLFI..."
+        log_success "All required models ready. Starting AnonShield..."
         exec /app/.venv/bin/python anon.py "$@"
     fi
 }

@@ -1,7 +1,7 @@
-# AnonLFI Benchmark Suite
+# AnonShield Benchmark Suite
 
 A professional, modular benchmarking framework for evaluating and comparing
-AnonLFI anonymization tool versions (1.0, 2.0, and 3.0). Designed for
+AnonLFI (v1.0, v2.0) and AnonShield anonymization tool versions. Designed for
 reproducible academic research with comprehensive metrics collection,
 fault tolerance, and incremental progress persistence.
 
@@ -31,10 +31,10 @@ fault tolerance, and incremental progress persistence.
 
 ## Overview
 
-The benchmark suite measures anonymization performance across three AnonLFI
-versions with varying strategies, collecting time, memory, CPU, GPU, I/O, and
-throughput metrics. It is designed for multi-day benchmark campaigns with full
-resilience to interruptions.
+The benchmark suite measures anonymization performance across AnonLFI (v1.0, v2.0)
+and AnonShield versions with varying strategies, collecting time, memory,
+CPU, GPU, I/O, and throughput metrics. It is designed for multi-day benchmark
+campaigns with full resilience to interruptions.
 
 **Versions under test:**
 
@@ -42,12 +42,12 @@ resilience to interruptions.
 |---------|------------|-------------|:----------:|
 | v1.0    | default    | Single file only | No |
 | v2.0    | default    | Single file or directory | Yes |
-| v3.0    | presidio, filtered, hybrid, standalone, slm | Single file or directory | Yes |
+| AnonShield    | presidio, filtered, hybrid, standalone, slm | Single file or directory | Yes |
 
 **Key capabilities:**
 
 - Automatic virtual environment creation via `uv sync`
-- GPU-aware setup for v3.0 (CUDA 12.8, following production Dockerfile)
+- GPU-aware setup for AnonShield (CUDA 12.8, following production Dockerfile)
 - Model cache warming before benchmarks begin
 - Real-time terminal output streaming during processing
 - Per-run log file persistence
@@ -114,7 +114,7 @@ benchmark.py
 - **psutil:** `pip install psutil` (in your base Python)
 - **GNU time:** `/usr/bin/time` (not the shell builtin; install with `apt install time`)
 - **nvidia-smi:** Required for GPU metrics (optional; gracefully degrades if unavailable)
-- **CUDA 12.x:** Required for v3.0 GPU mode (optional; `--cpu-only` flag available)
+- **CUDA 12.x:** Required for AnonShield GPU mode (optional; `--cpu-only` flag available)
 
 ### Installing uv on Ubuntu/WSL
 
@@ -151,10 +151,10 @@ The setup phase creates isolated virtual environments for each version and
 prepares them for benchmarking.
 
 ```bash
-# Setup all versions (GPU mode for v3.0)
+# Setup all versions (GPU mode for AnonShield)
 python benchmark/benchmark.py --setup
 
-# Setup with CPU-only PyTorch for v3.0
+# Setup with CPU-only PyTorch for AnonShield
 python benchmark/benchmark.py --setup --cpu-only
 
 # Force-recreate all environments
@@ -170,10 +170,10 @@ For each version:
 
 1. **`uv sync`**: Creates a virtual environment and installs all dependencies
    from the version's `pyproject.toml`. The `UV_PROJECT_ENVIRONMENT` variable
-   controls the venv location (`.venv` for v1.0/v2.0, `.venv` for v3.0
+   controls the venv location (`.venv` for v1.0/v2.0, `.venv` for AnonShield
    to avoid conflicting with the development venv).
 
-2. **PyTorch configuration** (v3.0 only): Installs GPU-enabled PyTorch from
+2. **PyTorch configuration** (AnonShield only): Installs GPU-enabled PyTorch from
    `https://download.pytorch.org/whl/cu128` and `cupy-cuda12x==12.3.0`,
    following the same logic as the production GPU Dockerfile. Falls back to
    CPU-only if GPU installation fails.
@@ -189,7 +189,7 @@ For each version:
 |---------|-----------|-------------------|
 | v1.0 | `anonlfi_1.0/.venv/` | `anonlfi_1.0/` |
 | v2.0 | `anonlfi_2.0/.venv/` | `anonlfi_2.0/` |
-| v3.0 | `.venv/` | `.` (project root) |
+| AnonShield | `.venv/` | `.` (project root) |
 
 ---
 
@@ -240,7 +240,7 @@ The benchmark builds version-specific commands:
   - No strategy flag, no secret key, single file only
 - **v2.0:** `python anon.py <absolute_file_path>`
   - `ANON_SECRET_KEY` set in environment
-- **v3.0:** `python anon.py <absolute_file_path> --anonymization-strategy <strategy> --output-dir <path> --overwrite --use-datasets --batch-size auto`
+- **AnonShield:** `python anon.py <absolute_file_path> --anonymization-strategy <strategy> --output-dir <path> --overwrite --use-datasets --batch-size auto`
   - `ANON_SECRET_KEY` set in environment
   - `--overwrite` ensures re-runs don't fail on existing output files
   - `--use-datasets` and `--batch-size auto` for GPU optimization (presidio/fast/balanced only)
@@ -292,12 +292,12 @@ dados_teste/
 |---------|----------|----------|-------|
 | v1.0 | default | 7 SUCCESS, 2 SKIPPED | .json and .pdf not supported |
 | v2.0 | default | 9 SUCCESS | All formats supported |
-| v3.0 | presidio | 9 SUCCESS | All formats, all strategies |
-| v3.0 | fast | 9 SUCCESS | May report 0 entities (by design) |
-| v3.0 | balanced | 9 SUCCESS | All formats |
-| v3.0 | slm | 9 SUCCESS | Uses Ollama (local LLM), requires Ollama running |
+| AnonShield | presidio | 9 SUCCESS | All formats, all strategies |
+| AnonShield | fast | 9 SUCCESS | May report 0 entities (by design) |
+| AnonShield | balanced | 9 SUCCESS | All formats |
+| AnonShield | slm | 9 SUCCESS | Uses Ollama (local LLM), requires Ollama running |
 
-> **Note on v3.0 fast strategy:** The fast strategy uses xlm-roberta directly
+> **Note on AnonShield fast strategy:** The fast strategy uses xlm-roberta directly
 > and may report 0 detected entities. This is expected behavior -- it counts
 > entities from `merged_entities` which may be empty if the transformer
 > detects nothing. This does not affect anonymization quality metrics.
@@ -357,9 +357,9 @@ Results are saved to `benchmark_results.csv` with
 |---------|----------|:--------:|:-------:|:-------:|:-------:|:-----------:|
 | v1.0    | default  |  54.81   |  0.66   |  53.77  |  55.96  |   2,467     |
 | v2.0    | default  |  58.32   |  2.87   |  55.07  |  62.95  |   2,467     |
-| v3.0    | presidio |  58.70   |  0.78   |  57.63  |  60.12  |   3,121     |
-| v3.0    | fast     |  57.80   |  0.93   |  56.35  |  59.59  |   3,121     |
-| v3.0    | balanced |  62.27   |  6.03   |  55.43  |  72.50  |   3,121     |
+| AnonShield    | presidio |  58.70   |  0.78   |  57.63  |  60.12  |   3,121     |
+| AnonShield    | fast     |  57.80   |  0.93   |  56.35  |  59.59  |   3,121     |
+| AnonShield    | balanced |  62.27   |  6.03   |  55.43  |  72.50  |   3,121     |
 
 Overhead is dominated by NLP model loading (xlm-roberta-large, spaCy
 pt_core_news_lg). The cost is paid once per process invocation regardless
@@ -553,7 +553,7 @@ At least one mode must be specified. Modes can be combined:
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--force-setup` | false | Force recreation of virtual environments |
-| `--gpu` | true | Use GPU-enabled PyTorch for v3.0 |
+| `--gpu` | true | Use GPU-enabled PyTorch for AnonShield |
 | `--cpu-only` | false | Use CPU-only PyTorch (overrides `--gpu`) |
 
 ### Benchmark Options
@@ -567,7 +567,7 @@ At least one mode must be specified. Modes can be combined:
 | `--file-pattern REGEX` | none | Regex pattern to filter test files |
 | `--results-dir PATH` | `benchmark/results` | Custom results directory (isolated state/CSV/JSON) |
 | `--secret-key KEY` | `benchmark-secret-key-2026` | Secret key for ANON_SECRET_KEY |
-| `--directory-mode` | false | Process all files in a single invocation (v2.0/v3.0 only) |
+| `--directory-mode` | false | Process all files in a single invocation (v2.0/AnonShield only) |
 
 ### Regression Options (use with `--regression`)
 
@@ -608,7 +608,7 @@ CSV and JSON result files.
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `version` | str | AnonLFI version (1.0, 2.0, 3.0) |
+| `version` | str | Version (AnonLFI v1.0, v2.0 or AnonShield) |
 | `strategy` | str | Anonymization strategy (default, presidio, fast, balanced, slm) |
 | `file_name` | str | Input file name |
 | `file_path` | str | Full path to input file |
@@ -697,7 +697,7 @@ is not available, all GPU fields default to 0 and `gpu_available` is `false`.
 
 ### Formats Supported by Each Version
 
-| Extension | v1.0 | v2.0 | v3.0 | Category |
+| Extension | v1.0 | v2.0 | AnonShield | Category |
 |-----------|:----:|:----:|:----:|----------|
 | `.txt` | Y | Y | Y | Text |
 | `.log` | - | - | Y | Text |
@@ -717,7 +717,7 @@ is not available, all GPU fields default to 0 and `gpu_available` is `false`.
 | `.jp2` | - | - | Y | Image |
 | `.pnm` | - | - | Y | Image |
 
-**Total formats:** v1.0 = 5, v2.0 = 13, v3.0 = 19
+**Total formats:** v1.0 = 5, v2.0 = 13, AnonShield = 19
 
 When a file's extension is not supported by a given version, the run is
 marked as `SKIPPED` (not `FAILED`) and no processing time is recorded.
@@ -756,7 +756,7 @@ benchmark/
 ├── run_logs/                   # Per-run log files (auto-created)
 │   ├── setup_v1.0.log
 │   ├── setup_v2.0.log
-│   ├── setup_v3.0.log
+│   ├── setup_AnonShield.log
 │   └── v{ver}_{strategy}_{file}_run{n}.log
 └── output/                     # Anonymized output files (auto-created)
 ```
@@ -850,7 +850,7 @@ The benchmark supports three measurement modes, controlled by the
 | Mode | How | Overhead | Use Case |
 |------|-----|----------|----------|
 | `single_file` | One process per file | Included (~55-77s) | Per-file profiling, v1.0 compatibility |
-| `directory_aggregate` | One process, all files | Once total | Fast batch measurement for v2.0/v3.0 |
+| `directory_aggregate` | One process, all files | Once total | Fast batch measurement for v2.0/AnonShield |
 | `directory_per_file` | Parsed from `[BENCHMARK_TIMING]` lines | Excluded | Pure processing throughput analysis |
 | `overhead_calibration` | 5-byte file, isolating model load | IS the overhead | Measuring model loading cost |
 | `regression` | Subsets of large files | Included | Predicting time for large files |
@@ -907,7 +907,7 @@ To reproduce benchmark results:
 
 1. Use the same machine and OS environment.
 2. Ensure no competing workloads (CPU, GPU, I/O).
-3. Use the same versions of AnonLFI (git commit hashes).
+3. Use the same versions (AnonLFI or AnonShield) (git commit hashes).
 4. Use `--clean` to start from a fresh state.
 5. Use the same `--secret-key` value.
 6. Record the system specification (CPU model, RAM, GPU model, CUDA version).
@@ -916,7 +916,7 @@ To reproduce benchmark results:
 
 ## Known Limitations
 
-1. **v3.0 fast strategy entity count:** The fast strategy may report 0
+1. **AnonShield fast strategy entity count:** The fast strategy may report 0
    detected entities. This is by design -- it uses xlm-roberta directly
    and only counts entities from `merged_entities`, which may be empty
    even when anonymization was performed.
@@ -988,9 +988,9 @@ This occurs if `--clean` was not used and the CSV was corrupted. Fix:
 python benchmark/benchmark.py --clean --benchmark --data-dir ./dados_teste
 ```
 
-### v3.0 fails with "output file already exists"
+### AnonShield fails with "output file already exists"
 
-The `--overwrite` flag is automatically added to v3.0 commands. If you see
+The `--overwrite` flag is automatically added to AnonShield commands. If you see
 this error, ensure you are using the latest version of `benchmark.py`.
 
 ### Process killed by OOM

@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
             echo "  OUTPUT_DIR  Output directory (default: benchmark/results)"
             echo "  RUNS        Number of runs per configuration (default: 2)"
             echo "  VERSIONS    Versions to test (default: 1.0 2.0 3.0)"
-            echo "  STRATEGIES  Strategies for v3.0 (default: filtered hybrid standalone)"
+            echo "  STRATEGIES  Strategies for AnonShield (default: filtered hybrid standalone)"
             echo ""
             echo "Examples:"
             echo "  # Run with defaults (output to benchmark/results)"
@@ -116,7 +116,7 @@ main() {
     echo "  Data directory: $BASE_DIR (contains:$found_dirs)"
     echo "  Output: $OUTPUT_DIR"
     echo "  Versions: $VERSIONS"
-    echo "  Strategies (v3.0): $STRATEGIES"
+    echo "  Strategies (AnonShield): $STRATEGIES"
     echo "  Runs per config: $RUNS"
     echo ""
     

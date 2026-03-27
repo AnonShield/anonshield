@@ -1,6 +1,6 @@
 # Docker Release Guide
 
-How to build, test, and publish AnonLFI Docker images.
+How to build, test, and publish AnonShield Docker images.
 
 ## Prerequisites
 
@@ -70,7 +70,7 @@ import json, urllib.request
 readme = open('docker/DOCKERHUB_README.md').read()
 data = json.dumps({
     'full_description': readme,
-    'description': 'AnonLFI 3.0 - PII pseudonymization framework for CSIRTs with OCR, NER, and SLM support.'
+    'description': 'AnonShield - PII pseudonymization framework for CSIRTs with OCR, NER, and SLM support.'
 }).encode()
 req = urllib.request.Request('https://hub.docker.com/v2/repositories/kapelinsky/anon/', data=data, method='PATCH')
 req.add_header('Authorization', 'Bearer $HUB_TOKEN')

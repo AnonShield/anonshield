@@ -1420,6 +1420,7 @@ class ScalabilityCharts:
 
         groups = self.config.sort_strategies_by_version(list(data[group_by].unique()))
         colors = self.config.get_colors(len(groups), groups)
+        display_names = self.config.get_version_display_names()
 
         # Panel A: Linear scale (time vs size)
         ax1 = fig.add_subplot(gs[0, 0])
@@ -1429,7 +1430,7 @@ class ScalabilityCharts:
             x = group_data.loc[valid, 'file_size_mb'].values
             y = group_data.loc[valid, 'wall_clock_time_sec'].values
 
-            ax1.scatter(x, y, alpha=0.5, s=30, color=colors[idx], label=group,
+            ax1.scatter(x, y, alpha=0.5, s=30, color=colors[idx], label=display_names.get(group, group),
                        edgecolors='black', linewidth=0.3)
 
         ax1.set_xlabel('File Size (MB)', fontweight='bold')
@@ -1455,7 +1456,7 @@ class ScalabilityCharts:
             result = RegressionAnalyzer.log_log_regression(x, y)
 
             if 'error' not in result:
-                ax2.scatter(x, y, alpha=0.5, s=30, color=colors[idx], label=group,
+                ax2.scatter(x, y, alpha=0.5, s=30, color=colors[idx], label=display_names.get(group, group),
                            edgecolors='black', linewidth=0.3)
 
                 # Plot fitted line in log space
@@ -1489,7 +1490,7 @@ class ScalabilityCharts:
             y = group_data.loc[valid, 'throughput_kb_per_sec'].values
 
             if len(x) > 0:
-                ax3.scatter(x, y, alpha=0.5, s=30, color=colors[idx], label=group,
+                ax3.scatter(x, y, alpha=0.5, s=30, color=colors[idx], label=display_names.get(group, group),
                            edgecolors='black', linewidth=0.3)
 
                 # Add mean line

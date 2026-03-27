@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Dataset Statistics Analyzer for AnonLFI Benchmark
+Dataset Statistics Analyzer for AnonShield Benchmark
 
 Analyzes file sizes and generates detailed statistics for each format.
 Produces comprehensive reports in multiple formats (CSV, JSON, Markdown).

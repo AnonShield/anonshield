@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# AnonLFI - Docker Compose Wrapper with Auto-Provisioning
+# AnonShield - Docker Compose Wrapper with Auto-Provisioning
 # =============================================================================
 #
 # Automatically selects the Docker Compose profile based on CLI arguments
@@ -187,7 +187,7 @@ main() {
     local service="anon"
     [[ "$profile" == gpu* ]] && service="anon-gpu"
 
-    log_info "Running AnonLFI ($service)..."
+    log_info "Running AnonShield ($service)..."
     
     # For GPU profiles, use appropriate Docker GPU configuration
     if [[ "$profile" == gpu* ]]; then

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# AnonLFI - Script de Benchmark Completo
+# AnonShield - Script de Benchmark Completo
 #
 # Executa todas as fases de benchmark com resultados em pastas separadas.
 # Resumível: pode ser interrompido e retomado de onde parou.
@@ -27,7 +27,7 @@ fi
 CVE_DATASET="$BASE_DIR/cve_dataset_anonimizados_stratified.json"
 VULNNET_DIR="$BASE_DIR/vulnnet_scans_openvas"
 
-# Estratégias v3.0 (sem SLM - muito lento para benchmark)
+# Estratégias AnonShield (sem SLM - muito lento para benchmark)
 STRATEGIES="standalone hybrid filtered presidio"
 
 echo "=============================================================="
@@ -40,10 +40,10 @@ echo ""
 mkdir -p "$SESSION_DIR"
 
 # ============================================================
-# FASE 1: Benchmark CVE Dataset (v3.0, 10 runs)
+# FASE 1: Benchmark CVE Dataset (AnonShield, 10 runs)
 # ============================================================
 echo ""
-echo "[FASE 1] Benchmark CVE Dataset (v3.0, 10 runs)"
+echo "[FASE 1] Benchmark CVE Dataset (AnonShield, 10 runs)"
 echo "--------------------------------------------------------------"
 
 PHASE1_DIR="$SESSION_DIR/01_cve_dataset_v3_10runs"

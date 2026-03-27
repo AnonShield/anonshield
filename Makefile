@@ -1,7 +1,7 @@
 # =============================================================================
-# AnonLFI - Makefile
+# AnonShield - Makefile
 # =============================================================================
-# Convenient commands for building and running AnonLFI containers
+# Convenient commands for building and running AnonShield containers
 #
 # Usage:
 #   make build          - Build CPU image
@@ -15,7 +15,7 @@
 
 # Default target
 help:
-	@echo "AnonLFI Docker Commands"
+	@echo "AnonShield Docker Commands"
 	@echo "======================="
 	@echo ""
 	@echo "Build:"
@@ -49,11 +49,11 @@ help:
 # =============================================================================
 
 build:
-	@echo "Building AnonLFI CPU image..."
+	@echo "Building AnonShield CPU image..."
 	docker-compose build anon
 
 build-gpu:
-	@echo "Building AnonLFI GPU image..."
+	@echo "Building AnonShield GPU image..."
 	docker-compose --profile gpu build anon-gpu
 
 build-all: build build-gpu
@@ -68,7 +68,7 @@ run:
 ifndef FILE
 	$(error FILE is required. Usage: make run FILE=./data/input.txt)
 endif
-	@echo "Running AnonLFI on $(FILE)..."
+	@echo "Running AnonShield on $(FILE)..."
 	docker-compose run --rm anon $(FILE) $(ARGS)
 
 # Run anonymization on a file (GPU version)
@@ -76,7 +76,7 @@ run-gpu:
 ifndef FILE
 	$(error FILE is required. Usage: make run-gpu FILE=./data/input.txt)
 endif
-	@echo "Running AnonLFI (GPU) on $(FILE)..."
+	@echo "Running AnonShield (GPU) on $(FILE)..."
 	docker-compose --profile gpu run --rm anon-gpu $(FILE) $(ARGS)
 
 # Run with SLM features enabled
@@ -88,7 +88,7 @@ endif
 	@docker-compose --profile slm up -d ollama
 	@echo "Waiting for Ollama to be ready..."
 	@sleep 5
-	@echo "Running AnonLFI with SLM on $(FILE)..."
+	@echo "Running AnonShield with SLM on $(FILE)..."
 	docker-compose --profile slm run --rm anon $(FILE) $(ARGS)
 
 # Interactive shell
@@ -154,7 +154,7 @@ down:
 
 # Remove containers and images
 clean: down
-	@echo "Removing AnonLFI images..."
+	@echo "Removing AnonShield images..."
 	-docker rmi anon:latest anon:gpu 2>/dev/null || true
 	@echo "Cleanup complete"
 
@@ -188,7 +188,7 @@ lint:
 
 # First-time setup
 setup:
-	@echo "Setting up AnonLFI..."
+	@echo "Setting up AnonShield..."
 	@cp -n .env.example .env 2>/dev/null || true
 	@mkdir -p data
 	@echo "Building images..."

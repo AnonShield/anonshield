@@ -1,8 +1,8 @@
-# AnonLFI Anonymization Strategies - Complete Technical Guide
+# AnonShield Anonymization Strategies - Complete Technical Guide
 
 **Version:** 3.0  
 **Last Updated:** February 2026  
-**Author:** AnonLFI Team
+**Author:** AnonShield Team
 
 ---
 
@@ -28,7 +28,7 @@
 
 ## Overview
 
-AnonLFI 3.0 implements **five distinct anonymization strategies**. All strategies share a common **DRY (Don't Repeat Yourself)** architecture where regex patterns are centralized in `engine.RegexPatterns`, ensuring consistency across implementations.
+AnonShield implements **five distinct anonymization strategies**. All strategies share a common **DRY (Don't Repeat Yourself)** architecture where regex patterns are centralized in `engine.RegexPatterns`, ensuring consistency across implementations.
 
 ### Available Strategies
 
@@ -1599,7 +1599,7 @@ python anon.py file.txt --anonymization-strategy <strategy>
 ### Version History
 
 ```yaml
-v3.0 (Current):
+AnonShield (Current):
   - Strategy names: filtered (default), presidio, hybrid, standalone, slm
   - Centralized RegexPatterns class (DRY principle)
   - Standalone strategy implementation (no Presidio dependencies)
@@ -1616,4 +1616,4 @@ v3.0 (Current):
 
 **Document Version:** 1.0  
 **Last Updated:** February 7, 2026  
-**Maintained By:** AnonLFI Development Team
+**Maintained By:** AnonShield Development Team

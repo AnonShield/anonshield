@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AnonLFI Benchmark Time Estimator
+AnonShield Benchmark Time Estimator
 
 Uses a two-component model to estimate benchmark execution time:
 
@@ -433,7 +433,7 @@ def generate_markdown_report(
     lines = []
     now = datetime.now().isoformat(timespec='seconds')
 
-    lines.append("# AnonLFI Benchmark Time Estimates")
+    lines.append("# AnonShield Benchmark Time Estimates")
     lines.append("")
     lines.append(f"**Generated:** {now}")
     lines.append(f"**Data directory:** `{data_dir}`")
@@ -515,7 +515,7 @@ def generate_markdown_report(
     # ==== VERSION SUPPORT MATRIX ====
     lines.append("## 4. Version Support Matrix")
     lines.append("")
-    lines.append("| Extension | v1.0 | v2.0 | v3.0 |")
+    lines.append("| Extension | v1.0 | v2.0 | AnonShield |")
     lines.append("|-----------|:----:|:----:|:----:|")
 
     all_exts = sorted(set().union(*VERSION_EXTENSIONS.values()))
@@ -694,13 +694,13 @@ def generate_before_after_comparison(
     lines = []
     now = datetime.now().isoformat(timespec='seconds')
 
-    lines.append("# AnonLFI Processing Time: Before & After Comparison")
+    lines.append("# AnonShield Processing Time: Before & After Comparison")
     lines.append("")
     lines.append(f"**Generated:** {now}")
     lines.append(f"**Runs per configuration:** {n_runs}")
     lines.append("")
     lines.append("This report shows the expected processing time for each file when migrating")
-    lines.append("from older versions (v1.0, v2.0) to the new v3.0 with different strategies.")
+    lines.append("from older versions (v1.0, v2.0) to the new AnonShield with different strategies.")
     lines.append("")
 
     # Collect all unique files
@@ -735,7 +735,7 @@ def generate_before_after_comparison(
         lines.append(f"| Version | Strategy | Throughput (KB/s) | Time ({n_runs} run{'s' if n_runs > 1 else ''}) | vs v1.0 | vs v2.0 |")
         lines.append("|---------|----------|------------------:|---------------:|--------:|--------:|")
         
-        # Sort: v1.0, v2.0, then v3.0 strategies
+        # Sort: v1.0, v2.0, then AnonShield strategies
         sorted_ests = sorted(fdata['estimates'], key=lambda x: (
             {'1.0': 0, '2.0': 1, '3.0': 2}[x['version']],
             x['strategy']
@@ -790,11 +790,11 @@ def generate_before_after_comparison(
                 lines.append("**Recommendation:**")
                 if ext == '.csv' and v1_time:
                     improvement = (v1_time / fastest_v3['time_sec'])
-                    lines.append(f"- Migrating from v1.0 to v3.0 (`{fastest_v3['strategy']}`) provides **{improvement:.1f}x speedup**")
+                    lines.append(f"- Migrating from v1.0 to AnonShield (`{fastest_v3['strategy']}`) provides **{improvement:.1f}x speedup**")
                     lines.append(f"- Time reduction: {v1_time/3600:.2f}h → {fastest_v3['time_sec']/3600:.2f}h (saves {(v1_time - fastest_v3['time_sec'])/3600:.2f}h)")
                 elif ext == '.json' and v2_time:
                     improvement = (v2_time / fastest_v3['time_sec'])
-                    lines.append(f"- Migrating from v2.0 to v3.0 (`{fastest_v3['strategy']}`) provides **{improvement:.1f}x speedup**")
+                    lines.append(f"- Migrating from v2.0 to AnonShield (`{fastest_v3['strategy']}`) provides **{improvement:.1f}x speedup**")
                     lines.append(f"- Time reduction: {v2_time/3600:.2f}h → {fastest_v3['time_sec']/3600:.2f}h (saves {(v2_time - fastest_v3['time_sec'])/3600:.2f}h)")
                 lines.append("")
 
@@ -825,7 +825,7 @@ def generate_before_after_comparison(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AnonLFI Benchmark Time Estimator (throughput-based model)"
+        description="AnonShield Benchmark Time Estimator (throughput-based model)"
     )
     parser.add_argument("--data-dir", type=str, default="dados_teste",
                        help="Directory containing test files")

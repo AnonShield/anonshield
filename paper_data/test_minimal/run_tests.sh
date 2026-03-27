@@ -8,7 +8,7 @@
 #   D2  — 500 rows/records of CAIS/CTCiber CSV + JSON
 #   D3  — 500 rows/records of synthetic CVE CSV + JSON
 #
-# Each run uses v3.0, --strategies filtered, --runs 1.
+# Each run uses AnonShield, --strategies filtered, --runs 1.
 # D1 also tests v1.0 + v2.0 (default strategy).
 # D2 and D3 test both without and with anonymization config.
 #
@@ -159,7 +159,7 @@ fi
 # ── D1 — OpenVAS (3 targets × 4 native formats) ──────────────────────────────
 if [[ "$SKIP_D1" == "false" ]]; then
     section "D1 — OpenVAS native (3 targets: alpine_3.7, centos_6, centos_7)"
-    echo "  v1.0+v2.0 default, v3.0 filtered | 1 run"
+    echo "  v1.0+v2.0 default, AnonShield filtered | 1 run"
     OUT="$RESULTS/D1_test"
 
     run_cmd python3 "$BENCHMARK" \
@@ -200,7 +200,7 @@ if [[ "$SKIP_D1" == "false" ]]; then
 
     # ── D1C — Converted formats ───────────────────────────────────────────────
     section "D1C — Converted formats (3 targets × xlsx, docx, json, pdf-images)"
-    echo "  v1.0+v2.0 default, v3.0 filtered | 1 run"
+    echo "  v1.0+v2.0 default, AnonShield filtered | 1 run"
     OUT_D1C="$RESULTS/D1C_test"
 
     run_cmd python3 "$BENCHMARK" \
@@ -215,7 +215,7 @@ fi
 
 # ── D2 — CAIS/CTCiber (500 rows CSV + 500 records JSON) ───────────────────────
 if [[ "$SKIP_D2" == "false" ]]; then
-    section "D2 — CAIS/CTCiber (500 rows/records, v3.0, filtered, 1 run)"
+    section "D2 — CAIS/CTCiber (500 rows/records, AnonShield, filtered, 1 run)"
 
     D2_CSV="$DATASETS/D2_cais/consolidated_data.csv"
     D2_JSON="$DATASETS/D2_cais/consolidated_data.json"
@@ -268,7 +268,7 @@ fi
 
 # ── D3 — Synthetic Mock CVE (500 rows CSV + 500 records JSON) ────────────────
 if [[ "$SKIP_D3" == "false" ]]; then
-    section "D3 — Synthetic Mock CVE (500 rows/records, v3.0, filtered, 1 run)"
+    section "D3 — Synthetic Mock CVE (500 rows/records, AnonShield, filtered, 1 run)"
 
     D3_CSV="$DATASETS/D3_mock_cve/cve_dataset_anonimizados_stratified.csv"
     D3_JSON="$DATASETS/D3_mock_cve/cve_dataset_anonimizados_stratified.json"

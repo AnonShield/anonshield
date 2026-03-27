@@ -21,19 +21,19 @@ paper_data/evaluation/
 │   ├── 2.0anon_vulnnet_scans_openvas_compilado.xlsx       ← annotated (TP/FP/FN)
 │   ├── 2.0entities.db
 │   └── v2.0_default_vulnnet_scans_openvas_compilado.csv_run1.log
-├── 3.0-filtered/filtered/           ← v3.0 filtered strategy output
+├── 3.0-filtered/filtered/           ← AnonShield filtered strategy output
 │   ├── 3.0filtered_anon_vulnnet_scans_openvas_compilado.xlsx  ← annotated (TP/FP/FN)
 │   ├── anon_vulnnet_scans_openvas_compilado.csv
 │   └── entities.db
-├── 3.0-hybrid/hybrid/               ← v3.0 hybrid strategy output
+├── 3.0-hybrid/hybrid/               ← AnonShield hybrid strategy output
 │   ├── 3.0hybrid_anon_vulnnet_scans_openvas_compilado.xlsx    ← annotated (TP/FP/FN)
 │   ├── anon_vulnnet_scans_openvas_compilado.csv
 │   └── entities.db
-├── 3.0-presidio/presidio/           ← v3.0 presidio strategy output
+├── 3.0-presidio/presidio/           ← AnonShield presidio strategy output
 │   ├── 3.0presidio_anon_vulnnet_scans_openvas_compilado.xlsx  ← annotated (TP/FP/FN)
 │   ├── anon_vulnnet_scans_openvas_compilado.csv
 │   └── entities.db
-├── 3.0-standalone/standalone/       ← v3.0 standalone strategy output
+├── 3.0-standalone/standalone/       ← AnonShield standalone strategy output
 │   ├── 3.0standalone_anon_vulnnet_scans_openvas_compilado.xlsx ← annotated (TP/FP/FN)
 │   ├── anon_vulnnet_scans_openvas_compilado.csv
 │   └── entities.db

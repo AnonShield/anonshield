@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AnonLFI Benchmark Time Estimator - REGRESSION VERSION
+AnonShield Benchmark Time Estimator - REGRESSION VERSION
 
 Uses linear regression to compute throughput from calibration data.
 This version fits: processing_time = a + b * file_size_kb
@@ -119,7 +119,7 @@ def compute_throughput_profiles_regression(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AnonLFI Benchmark Time Estimator (REGRESSION version)"
+        description="AnonShield Benchmark Time Estimator (REGRESSION version)"
     )
     parser.add_argument("--data-dir", type=str, default="dados_teste",
                        help="Directory containing test files")

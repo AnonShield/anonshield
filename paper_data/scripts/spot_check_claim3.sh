@@ -1,9 +1,9 @@
 #!/bin/bash
 # =============================================================================
 # spot_check_claim3.sh — Claim #3 verification: anonymization_config speedup
-# on D3 CSV (full dataset, v3.0 standalone).
+# on D3 CSV (full dataset, AnonShield standalone).
 #
-# Runs v3.0 standalone twice on the full D3 CSV: once without config
+# Runs AnonShield standalone twice on the full D3 CSV: once without config
 # (~73 s GPU / ~482 s CPU) and once with config (~8 s GPU / ~9 s CPU).
 # Prints measured times and config speedup ratio.
 #
@@ -36,12 +36,12 @@ fi
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-echo "Running v3.0 standalone WITHOUT config (est. ~73 s GPU / ~482 s CPU)..."
+echo "Running AnonShield standalone WITHOUT config (est. ~73 s GPU / ~482 s CPU)..."
 python3 "$BENCH" --benchmark --file "$D3" \
     --versions 3.0 --strategies standalone --runs 1 $CPU_FLAG \
     --results-dir "$WORK/without" > "$WORK/without.log" 2>&1
 
-echo "Running v3.0 standalone WITH config (est. ~8 s GPU / ~9 s CPU)..."
+echo "Running AnonShield standalone WITH config (est. ~8 s GPU / ~9 s CPU)..."
 python3 "$BENCH" --benchmark --file "$D3" \
     --versions 3.0 --strategies standalone --runs 1 $CPU_FLAG \
     --anonymization-config "$CFG" \
@@ -68,7 +68,7 @@ if not t_no or not t_with:
 
 print()
 print("══════════════════════════════════════════════════════════════")
-print("  Claim #3 Spot Check  (D3 CSV, v3.0 standalone)")
+print("  Claim #3 Spot Check  (D3 CSV, AnonShield standalone)")
 print("══════════════════════════════════════════════════════════════")
 print(f"  without config  : {t_no:>8.1f} s")
 print(f"  with config     : {t_with:>8.1f} s")

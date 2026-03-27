@@ -1,6 +1,6 @@
 # CLI Reference — Complete Argument Guide
 
-This document covers every command-line option available in AnonLFI. Each argument includes a plain-language description, a concrete example, and notes on when to use it.
+This document covers every command-line option available in AnonShield. Each argument includes a plain-language description, a concrete example, and notes on when to use it.
 
 > **How to run the tool:**
 >

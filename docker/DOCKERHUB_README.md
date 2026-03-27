@@ -1,4 +1,4 @@
-# AnonLFI 3.0 — PII Pseudonymization for CSIRTs
+# AnonShield — PII Pseudonymization for CSIRTs
 
 Modular pseudonymization framework for Cybersecurity Incident Response Teams. Anonymizes PII and cybersecurity indicators using HMAC-SHA256, preserving structure in JSON, XML, CSV, and more. Supports 24 languages, OCR, and custom cybersecurity recognizers (IP, CVE, hash, URL, etc.).
 
