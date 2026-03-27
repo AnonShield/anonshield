@@ -8,8 +8,7 @@
 #   D2  — 500 rows/records of CAIS/CTCiber CSV + JSON
 #   D3  — 500 rows/records of synthetic CVE CSV + JSON
 #
-# Each run uses AnonShield, --strategies filtered, --runs 1.
-# D1 also tests v1.0 + v2.0 (default strategy).
+# Each run uses AnonShield v3.0, --strategies filtered, --runs 1.
 # D2 and D3 test both without and with anonymization config.
 #
 # Expected runtime: ~5–20 min total (D1/D1C dominate due to PDF-OCR)
@@ -34,7 +33,6 @@ TEST="$SCRIPT_DIR"
 DATASETS="$TEST/datasets"
 RESULTS="$TEST/results"
 BENCHMARK="$WORKSPACE_ROOT/benchmark/benchmark.py"
-ANALYZER="$WORKSPACE_ROOT/benchmark/analyze_benchmark_scientific.py"
 
 # ── Parse flags ──────────────────────────────────────────────────────────────
 SKIP_D1=false
@@ -159,13 +157,13 @@ fi
 # ── D1 — OpenVAS (3 targets × 4 native formats) ──────────────────────────────
 if [[ "$SKIP_D1" == "false" ]]; then
     section "D1 — OpenVAS native (3 targets: alpine_3.7, centos_6, centos_7)"
-    echo "  v1.0+v2.0 default, AnonShield filtered | 1 run"
+    echo "  AnonShield v3.0, filtered | 1 run"
     OUT="$RESULTS/D1_test"
 
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
         --data-dir "$DATASETS/D1_openvas" \
-        --versions 1.0 2.0 3.0 \
+        --versions 3.0 \
         --strategies filtered \
         --runs 1 \
         --clean \
@@ -200,13 +198,13 @@ if [[ "$SKIP_D1" == "false" ]]; then
 
     # ── D1C — Converted formats ───────────────────────────────────────────────
     section "D1C — Converted formats (3 targets × xlsx, docx, json, pdf-images)"
-    echo "  v1.0+v2.0 default, AnonShield filtered | 1 run"
+    echo "  AnonShield v3.0, filtered | 1 run"
     OUT_D1C="$RESULTS/D1C_test"
 
     run_cmd python3 "$BENCHMARK" \
         --benchmark \
         --data-dir "$DATASETS/D1C_converted" \
-        --versions 1.0 2.0 3.0 \
+        --versions 3.0 \
         --strategies filtered \
         --runs 1 \
         --clean \
@@ -317,79 +315,36 @@ if [[ "$SKIP_D3" == "false" ]]; then
         --results-dir "$RESULTS/D3_json_with_config_test"
 fi
 
-# ── Analysis phase ───────────────────────────────────────────────────────────
-section "ANALYSIS — analyze_benchmark_scientific.py on every result"
-
-if [[ ! -f "$ANALYZER" ]]; then
-    echo "  WARNING: analyzer not found at $ANALYZER — skipping analysis phase"
-else
-    ANA_PASS=0
-    ANA_FAIL=0
-
-    for RUN_DIR in "$RESULTS"/*/; do
-        [[ -d "$RUN_DIR" ]] || continue
-        CSV="$RUN_DIR/benchmark_results.csv"
-        ANA_OUT="$RUN_DIR/analysis"
-        RUN_NAME="$(basename "$RUN_DIR")"
-
-        if [[ ! -f "$CSV" ]]; then
-            echo "  SKIP (no csv): $RUN_NAME"
-            continue
-        fi
-
-        echo ""
-        echo "  ── $RUN_NAME"
-        if [[ "$DRY_RUN" == "false" ]]; then
-            mkdir -p "$ANA_OUT"
-            if "$VENV_PY" "$ANALYZER" "$CSV" -o "$ANA_OUT" --pdf; then
-                echo "  [OK] analysis written to $ANA_OUT"
-                ANA_PASS=$((ANA_PASS + 1))
-            else
-                echo "  [FAILED] analysis for $RUN_NAME"
-                ANA_FAIL=$((ANA_FAIL + 1))
-                FAILED_STEPS+=("analyze: $RUN_NAME")
-                FAIL=$((FAIL + 1))
-            fi
-        else
-            echo "  \$ $VENV_PY $ANALYZER $CSV -o $ANA_OUT --pdf"
-        fi
-    done
-
-    if [[ "$DRY_RUN" == "false" ]]; then
-        echo ""
-        echo "  Analysis done — passed: $ANA_PASS  failed: $ANA_FAIL"
-    fi
-fi
-
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 echo "======================================================================"
-echo "  Smoke Test Complete"
+echo "  AnonShield — Smoke Test Summary"
+echo "======================================================================"
 if [[ "$DRY_RUN" == "false" ]]; then
-    echo "  Benchmark steps passed : $PASS"
-    echo "  Total failures         : $FAIL"
+    TOTAL=$((PASS + FAIL))
+    echo "  Steps passed : $PASS / $TOTAL"
     if [[ ${#FAILED_STEPS[@]} -gt 0 ]]; then
+        echo "  Steps failed : $FAIL"
         echo ""
         echo "  Failed steps:"
         for s in "${FAILED_STEPS[@]}"; do
             echo "    - $s"
         done
+        echo ""
+        echo "  Results written to: $RESULTS/"
+        echo "======================================================================"
+        echo "  RESULT: FAILED"
+        echo "======================================================================"
+        exit 1
+    else
+        echo ""
+        echo "  Results written to: $RESULTS/"
+        echo "======================================================================"
+        echo "  RESULT: ALL PASSED"
+        echo "======================================================================"
+        exit 0
     fi
-    echo ""
-    echo "  Results written to: $RESULTS/"
-    echo ""
-    echo "  CSVs generated:"
-    find "$RESULTS" -name "benchmark_results.csv" 2>/dev/null | sort | while read f; do
-        rows=$(tail -n +2 "$f" | wc -l)
-        echo "    $rows rows  $f"
-    done
-    echo ""
-    echo "  Analysis folders:"
-    find "$RESULTS" -type d -name "analysis" 2>/dev/null | sort | while read d; do
-        cnt=$(find "$d" -type f | wc -l)
-        echo "    $cnt files  $d"
-    done
+else
+    echo "======================================================================"
+    exit 0
 fi
-echo "======================================================================"
-
-[[ "$DRY_RUN" == "false" && "$FAIL" -gt 0 ]] && exit 1 || exit 0

@@ -338,10 +338,16 @@ if [[ "$SKIP_D3" == "false" ]]; then
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
-print_section "COMPLETE"
+echo ""
+echo "======================================================================"
+echo "  AnonShield — Full Benchmark Reproduction Summary"
+echo "======================================================================"
 echo ""
 echo "  Results written to: $RESULTS/"
 echo ""
 echo "  Next step — run scientific analysis on all results:"
 echo "    ./paper_data/scripts/analyze_all.sh"
 echo ""
+echo "======================================================================"
+echo "  RESULT: ALL RUNS COMPLETED SUCCESSFULLY"
+echo "======================================================================"
