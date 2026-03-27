@@ -6,11 +6,58 @@ This document records the annotation methodology adopted by the three security s
 
 ## Visual Annotation Examples
 
-### Annotated row — example of TP, FP, and correct entities
+### Overview — multiple annotated rows
+
+![Overview of multiple annotated rows](images/overview_multiple_rows.png)
+
+General view of the annotated spreadsheet showing multiple records. Green cells are TPs, red/orange are FNs or FPs.
+
+---
+
+### Annotated row — TP, FP, and correct entities (Oracle as FP)
 
 ![Annotated row example in XLSX](images/exemplo_linha_anotada.png)
 
-The record above illustrates a typical annotated row in the XLSX. In green (TP): `IP_ADDRESS`, `HOSTNAME`, `PORT`, `OID`, `CVE_ID`, and `UUID` — all correctly detected and pseudonymized. In orange (FP): the word "Oracle" in the *NVT Name* and *Summary* fields, which appears as part of a publicly known product name ("Oracle MySQL Server") and the CVE title — in this context the annotators did not consider it an organizational entity identifying the target, and therefore registered it as FP in this analysis.
+A typical annotated row. In green (TP): `IP_ADDRESS`, `HOSTNAME`, `PORT`, `OID`, `CVE_ID`, and `UUID` — all correctly detected and pseudonymized. In orange (FP): "Oracle" in the *NVT Name* and *Summary* fields — it appears as part of a publicly known product name ("Oracle MySQL Server") and the CVE title. The annotators did not consider it an organizational entity identifying the target and registered it as FP.
+
+![FP — Oracle in product title context](images/fp_oracle_in_product_title.png)
+
+Closer view showing the same FP pattern across multiple rows: "Oracle MySQL" highlighted in orange wherever it appears in vulnerability titles and descriptions.
+
+---
+
+### FN — PORT not anonymized
+
+![FN — port numbers 80 and 443 exposed](images/fn_port_not_anonymized.png)
+
+The text "80 or 443" (in red) remained exposed in the *Summary* field — the system did not detect those port numbers in this prose context. Registered as FN.
+
+---
+
+### Partial URL — filtered / hybrid / presidio
+
+![Partial URL anonymization — filtered/hybrid/presidio](images/partial_url_filtered_hybrid_presidio.png)
+
+In the *Specific Result* field, the domain portion of the URL was replaced by `[URL_5b4c6514]` (green / TP) but the path `abalho_vulnnet/phpmyadmin/setup/...` remained exposed (orange / FN). The `HOSTNAME` inside the path (`[HOSTNAME_92edf642]`) was correctly anonymized. Applied rule: 1 TP + 1 FN per partially anonymized URL.
+
+---
+
+### FN — partial URL and hostname in free text
+
+![FN — partial URL and undetected hostname in free text](images/fn_hostname_free_text_and_partial_url.png)
+
+Two cases visible in the same record:
+
+1. **Partial URL** — `[URL_5ebbbe71]abalho_vulnnet/` in the HTTP methods table: domain pseudonymized (TP), path `abalho_vulnnet` exposed (FN).
+2. **Hostname in free text** — `prometheus-old.trabalho_vulnnet` in the *Hostname determination* block remained fully exposed in all versions (FN). The IP (`[IP_ADDRESS_7a8c33e2]`) was correctly anonymized (TP).
+
+---
+
+### FN — ISC BIND organization in technical prose
+
+![FN — ISC BIND organization not detected](images/fn_isc_bind_organization.png)
+
+"ISC BIND" in the *NVT Name* and *Summary* fields remained exposed (red / FN) in v3.0 (SecureModernBERT). The `CVE_ID` in the same field was correctly anonymized (green / TP). The `PORT` in *Specific Result* was also correctly anonymized (TP). The 5 FNs recorded for the Presidio strategy in v3.0 were predominantly from this pattern.
 
 ---
 
@@ -18,7 +65,7 @@ The record above illustrates a typical annotated row in the XLSX. In green (TP):
 
 ![TLS fingerprint anonymization example](images/exemplo_tls_fingerprint.png)
 
-The *Specific Result* field above shows the expected behavior for TLS fingerprints in the filtered, hybrid, and presidio strategies: each complete fingerprint (SHA-1, SHA-256, serial) is treated as a single `HASH` entity, generating one pseudonym per fingerprint. Issuer, subject, and repeated subject are treated as `HOSTNAME`. Dates (`valid from`, `valid until`), algorithms, and key size remain exposed — the annotators did not count them as FN since they are not part of the entity types evaluated in this study.
+The *Specific Result* field shows the expected behavior for TLS fingerprints in the filtered, hybrid, and presidio strategies: each complete fingerprint (SHA-1, SHA-256, serial) is treated as a single `HASH` entity, generating one pseudonym per fingerprint. Issuer, subject, and repeated subject are treated as `HOSTNAME`. Dates (`valid from`, `valid until`), algorithms, and key size remain exposed — not counted as FN since they are not part of the entity types evaluated in this study.
 
 ---
 
@@ -109,7 +156,29 @@ The specific problem with **standalone** is that it can generate more pseudonyms
 | IP 10.0.0.1 appears 3× in the original, all anonymized                                              | **3 TP**                            |
 | IP 10.0.0.1 and 192.168.1.5 both anonymized (1 occurrence each)                                     | **2 TP**                            |
 
-### 4.2 TLS fingerprint fragmentation in Standalone
+### 4.2 Multiple CVEs merged into a single pseudonym (filtered / hybrid / presidio)
+
+In the filtered, hybrid, and presidio strategies, Presidio's entity merging occasionally collapsed multiple comma-separated CVE IDs in the same field into a single pseudonym. Observed example from the CVEs column:
+
+```
+Original : CVE-2016-5770,CVE-2016-5771
+Anonymized: [CVE_ID_a035b8b5]
+```
+
+The annotators registered **1 TP** for this case. Both CVEs were effectively hidden (none leaked), and the field was pseudonymized with the correct type. The merge was treated as a single anonymization event rather than a loss of individual entities.
+
+Note that in other rows the same strategies correctly produced one pseudonym per CVE:
+
+```
+Original : CVE-2016-10166,CVE-2019-6977,CVE-2019-9020,CVE-2019-9021,CVE-2019-9023,CVE-2019-9024
+Anonymized: [CVE_ID_8af62bcb],[CVE_ID_7b07667e],[CVE_ID_3f3256a7],[CVE_ID_1cf18239],[CVE_ID_9c343a65],[CVE_ID_2f3b5a7d]
+```
+
+In that case: 6 CVEs, 6 pseudonyms → **6 TP**.
+
+---
+
+### 4.3 TLS fingerprint fragmentation in Standalone
 
 Standalone fragmented colon-separated TLS fingerprints into multiple individual `HASH` pseudonyms — one per byte. Observed example:
 
