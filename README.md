@@ -130,7 +130,7 @@ Run the unit test suite:
 uv run python -m unittest discover tests/
 ```
 
-Expected: all tests pass with no errors.
+Expected: the final line reads `OK` (all tests passed) or `FAILED` (one or more tests failed). Some tests intentionally exercise error paths and will print `ERROR` or warning messages during the run — this is normal and does not indicate a failure. Only the final `OK` / `FAILED` verdict matters.
 
 ---
 
@@ -152,7 +152,7 @@ Verifies the full pipeline is functional on small subsets of D1, D1C, and D3.
 ./paper_data/test_minimal/run_tests.sh --skip-d2            # with NVIDIA GPU (D2 is private — skip it)
 ./paper_data/test_minimal/run_tests.sh --skip-d2 --cpu-only  # no GPU
 ```
-Expected: `Benchmark steps passed : 7` / `Total failures : 0` and `Analysis done — passed: 6  failed: 0`. D2 is a private dataset not included in this repository; `--skip-d2` omits those 4 steps so the script exits cleanly. Absolute runtimes on 500-row subsets will not match the paper's full-scale numbers, but the pipeline is verified end-to-end.
+Expected: the final line reads `RESULT: ALL PASSED`. D2 is a private dataset not included in this repository; `--skip-d2` omits those 4 steps so the script exits cleanly. Absolute runtimes on 500-row subsets will not match the paper's full-scale numbers, but the pipeline is verified end-to-end.
 
 **Option B — Spot check (~8–15 min depending on hardware):**
 Runs v2.0 and AnonShield on a ~512 KB subset of D3 CSV. v2.0 throughput is compute-limited and scales poorly with file size; AnonShield benefits from GPU acceleration when available, so the measured ratio varies by hardware. If the v2.0 environment is not yet set up, the script sets it up automatically on first run.
