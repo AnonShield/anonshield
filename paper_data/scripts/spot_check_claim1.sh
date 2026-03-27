@@ -32,7 +32,7 @@ fi
 # ── Auto-setup v2.0 environment if not found ──────────────────────────────
 if [[ ! -d "$WS/anonlfi_2.0/.venv" ]]; then
     echo "  AnonLFI v2.0 environment not found — running setup (required once)..."
-    python3 "$BENCH" --setup --versions 1.0 2.0 3.0 $CPU_FLAG
+    python3 "$BENCH" --setup --versions 2.0 3.0 $CPU_FLAG
     if [[ ! -d "$WS/anonlfi_2.0/.venv" ]]; then
         echo "  ERROR: v2.0 setup failed. Check output above."
         exit 1
