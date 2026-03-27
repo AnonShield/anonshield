@@ -158,6 +158,7 @@ Expected: the final line reads `RESULT: ALL PASSED`. D2 is a private dataset not
 Runs v2.0 and AnonShield on a ~512 KB subset of D3 CSV. v2.0 throughput is compute-limited and scales poorly with file size; AnonShield benefits from GPU acceleration when available, so the measured ratio varies by hardware. If the v2.0 environment is not yet set up, the script sets it up automatically on first run.
 
 ```bash
+./paper_data/scripts/extract_datasets.sh             # extract D3 from bundled zips (required once)
 ./paper_data/scripts/spot_check_claim1.sh            # with NVIDIA GPU
 ./paper_data/scripts/spot_check_claim1.sh --cpu-only  # no GPU
 ```
@@ -268,7 +269,8 @@ python benchmark/benchmark.py \
 **Dataset:** D3 with `paper_data/configs/anonymization_config_cve.json`.
 
 ```bash
-./paper_data/scripts/spot_check_claim3.sh            # with NVIDIA GPU  (~80 s)
+./paper_data/scripts/extract_datasets.sh              # extract D3 from bundled zips (required once)
+./paper_data/scripts/spot_check_claim3.sh             # with NVIDIA GPU  (~80 s)
 ./paper_data/scripts/spot_check_claim3.sh --cpu-only  # no GPU          (~490 s / ~8 min)
 ```
 Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so removing it saves more). Absolute times vary by hardware.
