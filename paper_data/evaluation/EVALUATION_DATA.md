@@ -102,6 +102,8 @@ For **partial anonymizations** (e.g., a URL where only the domain was replaced b
 
 The annotated counts are recorded in the `.xlsx` files in each version/strategy subfolder.
 
+> **Note for programmatic verification:** Each annotated XLSX contains a `=SUM(...)` formula in the **last row** of the TP, FP, and FN columns. When computing totals programmatically, skip the last row or filter only for numeric (integer/float) cells and ignore string/formula cells — otherwise the column sum will be doubled (once from the data rows, once from the SUM cell itself).
+
 ---
 
 ## Results (Table 5 in the paper)

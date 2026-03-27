@@ -38,7 +38,7 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 | **Software** | Python 3.12 + [`uv`](https://astral.sh/uv) for all experiments; Docker optional (tool use only) |
 | **GPU (optional)** | NVIDIA driver ≥ 525 (CUDA 12.8) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) |
 | **OS** | Linux (tested and recommended); macOS/Windows supported via Docker only |
-| **Disk** | ~2–3 GB (Python env + NER models); D1 ~88 MB (in git); D3 bundled as zips (~80 MB in git, ~700 MB extracted) |
+| **Disk** | `.venv` after `uv sync`: ~6.5 GB; NER models: ~1.5 GB (downloaded on first run to `~/.cache/huggingface/`); D1 ~133 MB (in git); D3 bundled as zips (~80 MB in git, ~700 MB extracted). Benchmark comparisons with v2.0 (via `--setup`) require ~8 GB additional (v2.0 venv + models). **Total for full experiment suite: ~17 GB.** |
 
 ---
 
@@ -47,7 +47,7 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 **Python environment (all experiments):**
 - Python 3.12 + [`uv`](https://astral.sh/uv) — all packages pinned in `pyproject.toml` / `uv.lock`
 - Key packages: `presidio-analyzer`, `presidio-anonymizer`, `transformers`, `spacy`, `torch`, `pandas`, `pymupdf`, `pytesseract`, `lxml`, `orjson`, `scipy`, `statsmodels`
-- NER models downloaded automatically on first run and cached in `anon/models/` (~1–2 GB)
+- NER models downloaded automatically on first run and cached in `~/.cache/huggingface/` (~1.5 GB)
 
 **Optional:**
 - Tesseract OCR — required only for OCR-mode tests (PDF/image files):
@@ -144,7 +144,7 @@ The per-file speedup is measured on D1 (small files, 130 targets). On GPU, AnonS
 
 **Verification options (in order of time cost):**
 
-**Option A — Smoke test (~5–20 min, any hardware):**
+**Option A — Smoke test (~5–25 min depending on hardware):**
 Verifies the full pipeline is functional on small subsets of D1, D1C, and D3.
 ```bash
 ./paper_data/test_minimal/run_tests.sh --skip-d2            # with NVIDIA GPU (D2 is private — skip it)
@@ -152,8 +152,9 @@ Verifies the full pipeline is functional on small subsets of D1, D1C, and D3.
 ```
 Expected: `Benchmark steps passed : 7` / `Total failures : 0` and `Analysis done — passed: 6  failed: 0`. D2 is a private dataset not included in this repository; `--skip-d2` omits those 4 steps so the script exits cleanly. Absolute runtimes on 500-row subsets will not match the paper's full-scale numbers, but the pipeline is verified end-to-end.
 
-**Option B — Spot check (~8–10 min, any hardware):**
-Runs v2.0 and AnonShield on a ~512 KB subset of D3 CSV. v2.0 bottlenecks at ~1 KB/s on any hardware; AnonShield benefits from GPU acceleration, so the ratio varies by hardware (larger with GPU).
+**Option B — Spot check (~8–15 min depending on hardware):**
+Runs v2.0 and AnonShield on a ~512 KB subset of D3 CSV. v2.0 throughput is compute-limited and scales poorly with file size; AnonShield benefits from GPU acceleration when available, so the measured ratio varies by hardware. If the v2.0 environment is not yet set up, the script sets it up automatically on first run.
+
 ```bash
 ./paper_data/scripts/spot_check_claim1.sh            # with NVIDIA GPU
 ./paper_data/scripts/spot_check_claim1.sh --cpu-only  # no GPU
@@ -165,7 +166,7 @@ Expected output (absolute times vary by hardware; speedup is larger with GPU):
 ══════════════════════════════════════════════════════════════
   v2.0  default    :    XXX.X s   (X.XX KB/s on this machine)
   AnonShield  standalone :     XX.X s   (XXX KB/s on this machine)
-  Speedup          : XX×  (larger with GPU — AnonShield benefits from accelerated NER)
+  Speedup          : XX×  (varies by hardware — larger when GPU is available)
 
   Extrapolating to full D3 (247 MB) via measured throughputs:
   v2.0 on full D3  : ≥ XX.X h   (lower bound — extrapolated from measured throughput)

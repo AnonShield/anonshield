@@ -7,7 +7,7 @@
 # Usage (from workspace root):
 #   ./paper_data/scripts/spot_check_claim1.sh [--cpu-only]
 #
-# Runtime: ~8–10 min (dominated by v2.0 at ~1 KB/s on any hardware).
+# Runtime: ~8–15 min depending on hardware (dominated by v2.0 low throughput).
 # =============================================================================
 set -euo pipefail
 
@@ -28,6 +28,16 @@ fi
 
 [[ -f "$D3" ]]    || { echo "ERROR: D3 not found. Run: ./paper_data/scripts/extract_datasets.sh"; exit 1; }
 [[ -f "$BENCH" ]] || { echo "ERROR: benchmark.py not found at $BENCH"; exit 1; }
+
+# ── Auto-setup v2.0 environment if not found ──────────────────────────────
+if [[ ! -d "$WS/anonlfi_2.0/.venv" ]]; then
+    echo "  AnonLFI v2.0 environment not found — running setup (required once)..."
+    python3 "$BENCH" --setup --versions 1.0 2.0 3.0 $CPU_FLAG
+    if [[ ! -d "$WS/anonlfi_2.0/.venv" ]]; then
+        echo "  ERROR: v2.0 setup failed. Check output above."
+        exit 1
+    fi
+fi
 
 WORK=$(mktemp -d)
 SUB="$WORK/sub.csv"
@@ -50,7 +60,7 @@ print(f"  {os.path.getsize(dst)/1024:.0f} KB")
 PY
 
 # ── Run benchmarks ────────────────────────────────────────────────────────
-echo "Running v2.0  (est. ~8–10 min on any hardware)..."
+echo "Running v2.0  (est. ~8–10 min, varies by hardware)..."
 python3 "$BENCH" --benchmark --file "$SUB" \
     --versions 2.0 --runs 1 $CPU_FLAG \
     --results-dir "$WORK/v2" > "$WORK/v2.log" 2>&1
@@ -94,7 +104,7 @@ print(f"  Claim #1 Spot Check  ({sub_kb:.0f} KB subset of D3 CSV)")
 print("══════════════════════════════════════════════════════════════")
 print(f"  v2.0  default    : {t2:>8.1f} s   ({tp2:.2f} KB/s on this machine)")
 print(f"  AnonShield  standalone : {t3:>8.1f} s   ({tp3:.0f} KB/s on this machine)")
-print(f"  Speedup          : {t2/t3:.0f}×  (larger with GPU — AnonShield benefits from accelerated NER)")
+print(f"  Speedup          : {t2/t3:.0f}×  (varies by hardware — larger when GPU is available)")
 print()
 print(f"  Extrapolating to full D3 (247 MB) via measured throughputs:")
 print(f"  v2.0 on full D3  : ≥ {est2_h:.1f} h   (lower bound — extrapolated from measured throughput)")
