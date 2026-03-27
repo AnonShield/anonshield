@@ -23498,7 +23498,7 @@
           "descriptions": [
             {
               "lang": "en",
-              "value": "A vulnerability in szad670401/hyperlpr v3.0 allows for a Denial of Service (DoS) attack. The server fails to handle excessive characters appended to the end of multipart boundaries, regardless of the character used. This flaw can be exploited by sending malformed multipart requests with arbitrary characters at the end of the boundary, leading to excessive resource consumption and a complete denial of service for all users. The vulnerability is unauthenticated, meaning no user login or interaction is required for an attacker to exploit this issue."
+              "value": "A vulnerability in szad670401/hyperlpr AnonShield allows for a Denial of Service (DoS) attack. The server fails to handle excessive characters appended to the end of multipart boundaries, regardless of the character used. This flaw can be exploited by sending malformed multipart requests with arbitrary characters at the end of the boundary, leading to excessive resource consumption and a complete denial of service for all users. The vulnerability is unauthenticated, meaning no user login or interaction is required for an attacker to exploit this issue."
             }
           ],
           "affected": [
