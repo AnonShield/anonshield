@@ -96,6 +96,8 @@ echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
 
 ### Docker (tool use only — not required for experiments)
 
+> **⚠️ Warning:** The Docker images contain only the anonymization tool (`anon.py`). They do **not** include the benchmark suite, datasets (D1/D3), evaluation data, or any experiment scripts. To reproduce the paper's claims, use the local installation with `uv sync` as described above.
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/AnonShield/runshanondocker/main/run.sh -o run.sh
 chmod +x run.sh
