@@ -27,7 +27,7 @@ AnonShield is a pseudonymization framework designed for Computer Security Incide
 
 The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Sustainable (SeloS)**, and **Reproducible Experiments (SeloR)**.
 
-**SeloS — Sustainable:** The source code is organized into 25+ focused modules under `src/anon/` with clear separation of concerns: `engine.py` (orchestration), `strategies.py` (anonymization algorithms), `processors.py` (file-format handling), `entity_detector.py` (NER), `repository.py`/`database.py` (data layer), `cache_manager.py`, `hash_generator.py`, `security.py`, and others. The CLI entry point is `anon.py`. Design patterns are applied explicitly: *Strategy* for anonymization algorithms, *Template Method* for file processors, *Repository* for data access, and *Dependency Injection* in the orchestrator; `core/protocols.py` defines Protocol-based interfaces for dependency inversion. ~90% of public APIs carry type annotations and ~85% of classes/methods have docstrings with `Args`/`Returns`/`Raises`. Naming follows PEP 8 throughout. Beyond inline documentation, five developer guides are provided under `docs/developers/` (`ARCHITECTURE.md`, `ANONYMIZATION_STRATEGIES.md`, `EVALUATION_GUIDE.md`, `SLM_INTEGRATION_GUIDE.md`, `UTILITY_SCRIPTS_GUIDE.md`, ~2,500 lines total), including a Mermaid architecture diagram. The paper's three main claims are directly traceable to source modules: Claim #1 (speedup) → streaming processors and adaptive batching in `processors.py`/`engine.py`; Claim #2 (F1/Recall) → `filtered`/`hybrid` strategies in `strategies.py`; Claim #3 (config gain) → NER-bypass logic in `engine.py`/`config.py`. All dependencies are pinned in `pyproject.toml` and `uv.lock`; Docker images (`anonshield/anon:latest` / `:gpu`) provide a fully self-contained execution environment.
+**SeloS — Sustainable:** The source code is organized into 25 focused modules under `src/anon/` with clear separation of concerns: `engine.py` (orchestration), `strategies.py` (anonymization algorithms), `processors.py` (file-format handling), `entity_detector.py` (NER), `repository.py`/`database.py` (data layer), `cache_manager.py`, `hash_generator.py`, `security.py`, and others. The CLI entry point is `anon.py`. Design patterns are applied explicitly: *Strategy* for anonymization algorithms, *Template Method* for file processors, *Repository* for data access, and *Dependency Injection* in the orchestrator; `core/protocols.py` defines Protocol-based interfaces for dependency inversion. ~90% of public APIs carry type annotations and ~85% of classes/methods have docstrings with `Args`/`Returns`/`Raises`. Naming follows PEP 8 throughout. Beyond inline documentation, four developer guides are provided under [`docs/developers/`](docs/developers/) ([`ARCHITECTURE.md`](docs/developers/ARCHITECTURE.md), [`ANONYMIZATION_STRATEGIES.md`](docs/developers/ANONYMIZATION_STRATEGIES.md), [`SLM_INTEGRATION_GUIDE.md`](docs/developers/SLM_INTEGRATION_GUIDE.md), [`UTILITY_SCRIPTS_GUIDE.md`](docs/developers/UTILITY_SCRIPTS_GUIDE.md), ~2,500 lines total), including a Mermaid architecture diagram. All dependencies are pinned in `pyproject.toml` and `uv.lock`; Docker images (`anonshield/anon:latest` / `:gpu`) provide a fully self-contained execution environment.
 
 ---
 
@@ -200,7 +200,7 @@ Runtime is hardware-dependent and cannot be estimated without knowing the evalua
 ```
 Paper hardware (measured): full Option C (`reproduce_all_runs --skip-d1 --skip-d2` + `analyze_all`) completed in **22,906.43 s (~6.36 h)** on this setup.
 
-The stored `benchmark_results.csv` files under `paper_data/results_paper/` contain the paper's original measurements and can be inspected directly without re-running.
+The stored `benchmark_results.csv` files under [`paper_data/results_paper/`](paper_data/results_paper/) contain the paper's original measurements and can be inspected directly without re-running.
 
 > Full dataset details and step-by-step instructions: [`paper_data/EXPERIMENTS.md`](paper_data/EXPERIMENTS.md)
 
@@ -214,11 +214,11 @@ The stored `benchmark_results.csv` files under `paper_data/results_paper/` conta
 
 **What evaluators can verify:**
 1. **Inspect the pre-computed annotated outputs** directly (no re-running required):
-   - `paper_data/evaluation/3.0-filtered/filtered/` — anonymized CSV + XLSX with TP/FP/FN counts
-   - `paper_data/evaluation/3.0-hybrid/hybrid/`
-   - `paper_data/evaluation/3.0-standalone/standalone/`
-   - `paper_data/evaluation/3.0-presidio/presidio/`
-   - `paper_data/evaluation/1.0/` and `paper_data/evaluation/2.0/`
+   - [`paper_data/evaluation/3.0-filtered/filtered/`](paper_data/evaluation/3.0-filtered/filtered/) — anonymized CSV + XLSX with TP/FP/FN counts
+   - [`paper_data/evaluation/3.0-hybrid/hybrid/`](paper_data/evaluation/3.0-hybrid/hybrid/)
+   - [`paper_data/evaluation/3.0-standalone/standalone/`](paper_data/evaluation/3.0-standalone/standalone/)
+   - [`paper_data/evaluation/3.0-presidio/presidio/`](paper_data/evaluation/3.0-presidio/presidio/)
+   - [`paper_data/evaluation/1.0/`](paper_data/evaluation/1.0/) and [`paper_data/evaluation/2.0/`](paper_data/evaluation/2.0/)
 2. **Re-run the tool** on the evaluation dataset and compare the anonymized output against the reference:
 
    > **⚠️ GPU recommended:** This command uses the `SecureModernBERT-NER` transformer model. Measured runtimes for the `filtered` strategy on the 9.2 MB evaluation file: **~4 min on GPU** (RTX 5060 Ti, 38.7 KB/s) and **~2h on CPU** (Intel i5-1035G1, 1.4 KB/s). For all 4 strategies: **~15–20 min on GPU**, **~7–8h on CPU**. **If you do not have an NVIDIA GPU, prefer Option 1 (pre-computed outputs) to avoid the long runtime.**
@@ -257,7 +257,7 @@ Paper hardware (example): command completed in **983.37 s (~16.39 min)** after r
 
 **What this claim asserts:** A schema-aware `anonymization_config` that specifies only `force_anonymize` and `exclude` directives bypasses the NER and regex pipeline entirely — no field undergoes inference. On GPU (paper hardware), this reduces D3 CSV processing from ~73 s to ~8 s (~9×). The CPU gain is larger because NER inference costs more without a GPU. The paper also reports gains on D2 (private dataset, not reproducible by evaluators).
 
-**Dataset:** D3 with `paper_data/configs/anonymization_config_cve.json`.
+**Dataset:** D3 with [`paper_data/configs/anonymization_config_cve.json`](paper_data/configs/anonymization_config_cve.json).
 
 ```bash
 ./paper_data/scripts/extract_datasets.sh              # extract D3 from bundled zips (required once)
