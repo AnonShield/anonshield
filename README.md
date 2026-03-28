@@ -39,6 +39,7 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 | **Hardware (tester — laptop)** | Intel Core i5-1035G1 · 20 GB RAM · no discrete GPU — CPU-only mode; 45/45 tests OK in ~3m55s |
 | **Hardware (tester — server A)** | 2× Intel Xeon E5-2650 · 130 GB RAM · NVIDIA Tesla C2050 + Quadro 5000 present (Fermi, sm\_20 — below the sm\_75 minimum; no driver installed); tool runs CPU-only; 45/45 tests OK in ~10m19s |
 | **Hardware (tester — server B)** | AMD Ryzen 7 5800X (8c/16t) · 130 GB RAM · NVIDIA GeForce RTX 3060 12 GB (driver 550.163.01, CUDA 12.4) — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~3m15s |
+| **Hardware (tester — laptop 2)** | Intel Core i5-12450HX (8c) · 16 GB DDR4 · NVIDIA GeForce RTX 3050 6 GB · Zorin OS 18 — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~2m21s |
 | **Minimum for smoke test** | 4 GB RAM · x86\_64 · Python 3.12 + uv |
 | **Software** | Python 3.12 + [`uv`](https://astral.sh/uv) for all experiments; Docker optional (tool use only) |
 | **GPU (optional)** | NVIDIA driver ≥ 525 (CUDA 12.8) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html); GPU must be **sm\_75 (Turing) or newer** — torch 2.11.0+cu128 [dropped Volta (sm\_70) and older](https://github.com/pytorch/pytorch/releases/tag/v2.11.0) |
