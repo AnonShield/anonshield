@@ -144,11 +144,11 @@ Expected: the final line reads `OK` (all tests passed) or `FAILED` (one or more 
 
 ### Claim #1 — AnonShield (`standalone`) achieves ~3×–~17× speedup over v2.0 per file on D1 (GPU); ≥3,532× (GPU) / ≥535× (CPU) at D3 scale
 
-**Paper reference:** Tables 3, 4, 6, 7, and 8.
+**Paper reference:** Performance results section (D1/D2/D3).
 
 **What this claim asserts and why it has two parts:**
 
-The per-file speedup is measured on D1 (small files, 130 targets). On GPU, AnonShield benefits from accelerated NER inference, yielding ~3×–~17× over v2.0 per file (paper Table 3, mean-based). On CPU-only hardware, AnonShield loses GPU acceleration (~5.5× slower per file) while v2.0 is already CPU-bound — so per-file speedup on CPU is ~GPU speedup ÷ 5.5, and AnonShield may be slower per file without a GPU. However, at D3 scale the advantage recovers due to AnonShield's O(n) streaming architecture vs v2.0's scaling behavior: ≥3,532× on GPU and ≥535× on CPU (D3 CPU times are measured in stored results).
+The per-file speedup is measured on D1 (small files, 130 targets). On GPU, AnonShield benefits from accelerated NER inference, yielding ~3×–~17× over v2.0 per file (mean-based). On CPU-only hardware, AnonShield loses GPU acceleration (~5.5× slower per file) while v2.0 is already CPU-bound — so per-file speedup on CPU is ~GPU speedup ÷ 5.5, and AnonShield may be slower per file without a GPU. However, at D3 scale the advantage recovers due to AnonShield's O(n) streaming architecture vs v2.0's scaling behavior: ≥3,532× on GPU and ≥535× on CPU (D3 CPU times are measured in stored results).
 
 **Verification options (in order of time cost):**
 
@@ -191,7 +191,7 @@ Expected output (absolute times vary by hardware; speedup is larger with GPU):
 ══════════════════════════════════════════════════════════════
 ```
 
-**Option C — Full D3 benchmark (reproduces paper Tables 6–8):**
+**Option C — Full D3 benchmark:**
 Runtime is hardware-dependent and cannot be estimated without knowing the evaluator's machine.
 ```bash
 ./paper_data/scripts/extract_datasets.sh                     # extract D3 from bundled zips (~80 MB → ~700 MB)
@@ -202,44 +202,13 @@ Paper hardware (measured): full Option C (`reproduce_all_runs --skip-d1 --skip-d
 
 The stored `benchmark_results.csv` files under `paper_data/results_paper/` contain the paper's original measurements and can be inspected directly without re-running.
 
-**Per-file performance on D1 (130 targets, mean, Table 3):**
-
-> CPU estimates derived by applying the D3 standalone CPU/GPU factor (~5.5×) to AnonShield GPU times. v2.0 does not use GPU acceleration (CPU-bound DOM parsing), so v2.0 CPU ≈ v2.0 GPU. This means per-file speedup on CPU = GPU speedup ÷ 5.5 — AnonShield may be **slower** than v2.0 per file without a GPU, but remains faster at scale (D3: ≥535× CPU vs ≥3,532× GPU).
-
-| Format | v2.0 GPU | v2.0 CPU~est | AnonShield standalone GPU | AnonShield standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
-|---|---|---|---|---|---|---|
-| XML | 192 s | ~192 s | 12 s | ~64 s | **16.5×** | **~3.0×** |
-| CSV | 74 s | ~74 s | 8 s | ~43 s | **9.6×** | **~1.7×** |
-| PDF (text) | 27 s | ~27 s | 9 s | ~47 s | **3.3×** | **~0.6×** |
-| TXT | 31 s | ~31 s | 10 s | ~57 s | **3.0×** | **~0.5×** |
-
-**Per-file performance on D1C (130 targets, mean, Table 4):**
-
-| Format | v2.0 GPU | v2.0 CPU~est | AnonShield standalone GPU | AnonShield standalone CPU~est | Speedup (GPU) | Speedup (CPU~est) |
-|---|---|---|---|---|---|---|
-| XLSX | 60 s | ~60 s | 7 s | ~39 s | **8.5×** | **~1.5×** |
-| DOCX | 30 s | ~30 s | 9 s | ~52 s | **3.2×** | **~0.6×** |
-| JSON | 247 s | ~247 s | 11 s | ~58 s | **23.2×** | **~4.3×** |
-| PDF (image/OCR) | 59 s | ~59 s | 36 s | ~198 s | **1.6×** | **~0.3×** |
-
-**Large-scale performance on D2 and D3 (AnonShield standalone, mean, Tables 7–8):**
-
-| Dataset/Format | GPU | CPU~est | Speedup vs v2.0 (GPU) | Speedup vs v2.0 (CPU~est) |
-|---|---|---|---|---|
-| D2 CSV (419.72 MB) | 588.5 ± 30.7 s | ~3,237 s | ≥743× | ≥133× |
-| D2 JSON (550 MB) | 453.1 ± 35.9 s | ~2,492 s | ~738× | ~134× |
-| D3 CSV (247 MB) | 73.0 ± 1.6 s | 481.5 ± 8.9 s† | ≥3,532× | ≥535× |
-| D3 JSON (445 MB) | 172.1 ± 6.2 s | 881.9 ± 57.7 s† | ~1,569× | ~306× |
-
-> † D3 CPU times are measured (stored in `paper_data/results_paper/D3_mock_cve_*__cpu`). D2 CPU times are estimated using the D3 standalone factor (~5.5×). v2.0 extrapolated from D1 throughput (0.98 KB/s CSV, 1.69 KB/s JSON) — CPU-bound, no GPU benefit assumed.
-
 > Full dataset details and step-by-step instructions: [`paper_data/EXPERIMENTS.md`](paper_data/EXPERIMENTS.md)
 
 ---
 
 ### Claim #2 — `filtered` and `hybrid` strategies achieve F1 = 94.2%, Recall = 96.7%
 
-**Paper reference:** Table 5.
+**Paper reference:** Accuracy evaluation section.
 
 **What this claim asserts:** On a stratified sample of 67 OpenVAS vulnerability records annotated by three security specialists, the `filtered` and `hybrid` strategies achieve F1 = 94.2% and Recall = 96.7%. Annotation was performed by the paper authors and is **not expected to be reproduced by evaluators** — it required manual expert judgment across 13 entity types.
 
@@ -284,9 +253,9 @@ Paper hardware (example): command completed in **983.37 s (~16.39 min)** after r
 
 ### Claim #3 — `anonymization_config` eliminates NER inference overhead, reducing D3 processing time significantly (paper hardware: ~9× GPU / ~55× CPU; actual speedup depends on GPU speed)
 
-**Paper reference:** Tables 6 and 7 (config gain rows).
+**Paper reference:** Config gain results section.
 
-**What this claim asserts:** A schema-aware `anonymization_config` that specifies only `force_anonymize` and `exclude` directives bypasses the NER and regex pipeline entirely — no field undergoes inference. On GPU (paper hardware), this reduces D3 CSV processing from ~73 s to ~8 s (~9×, Table 8). The CPU gain is larger because NER inference costs more without a GPU. The paper also reports gains on D2 (private dataset, not reproducible by evaluators).
+**What this claim asserts:** A schema-aware `anonymization_config` that specifies only `force_anonymize` and `exclude` directives bypasses the NER and regex pipeline entirely — no field undergoes inference. On GPU (paper hardware), this reduces D3 CSV processing from ~73 s to ~8 s (~9×). The CPU gain is larger because NER inference costs more without a GPU. The paper also reports gains on D2 (private dataset, not reproducible by evaluators).
 
 **Dataset:** D3 with `paper_data/configs/anonymization_config_cve.json`.
 
@@ -312,15 +281,6 @@ Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so 
   CPU times converge. The CPU gain is therefore larger than on GPU.
 ══════════════════════════════════════════════════════════════
 ```
-
-**Gains on D3 — `standalone` strategy (paper hardware: RTX 5060 Ti / Ryzen 5 8600G):**
-
-| Format | Without config (GPU) | Without config (CPU) | With config (GPU) | With config (CPU) | Gain (GPU) | Gain (CPU) |
-|---|---|---|---|---|---|---|
-| D3 CSV | 73.0 ± 1.6 s | 481.5 ± 8.9 s | 7.96 ± 0.08 s | 8.7 ± 0.6 s | **9.2×** | **~55×** |
-| D3 JSON | 172.1 ± 6.2 s | 881.9 ± 57.7 s | 20.43 ± 0.81 s | 20.9 ± 0.9 s | **8.4×** | **~42×** |
-
-> GPU values are from paper Table 8; CPU values are from stored benchmark runs (`paper_data/results_paper/D3_mock_cve_*__cpu`). With config, GPU and CPU times converge because no field passes through the NER or regex pipeline. The CPU gain is therefore larger than on GPU. Absolute times on your hardware will differ.
 
 > Full reproduction steps: [`paper_data/EXPERIMENTS.md`](paper_data/EXPERIMENTS.md)
 
