@@ -300,23 +300,25 @@ class FilteredPresidioStrategy:
 
 #### Filtered Entity Scope
 
-**Included (25 types):**
+**Included (24 types, default model — derived dynamically from `ENTITY_MAPPING` + custom recognizers):**
 
 ```python
+# Derived at runtime by FilteredPresidioStrategy._get_core_entities()
+# combining ENTITY_MAPPING values and load_custom_recognizers() supported_entities
 FILTERED_ENTITIES = [
     # Infrastructure
     "IP_ADDRESS", "URL", "HOSTNAME", "MAC_ADDRESS", "PORT",
-    
+
     # Security
     "CVE_ID", "CPE_STRING", "HASH", "AUTH_TOKEN", "PASSWORD", "USERNAME",
     "CERTIFICATE", "CRYPTOGRAPHIC_KEY", "CERT_SERIAL", "OID",
-    
+
     # PII
-    "PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION",
-    
+    "PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION", "ORGANIZATION",
+
     # Financial
     "CREDIT_CARD",
-    
+
     # Identifiers
     "UUID", "FILE_PATH", "PGP_BLOCK"
 ]
