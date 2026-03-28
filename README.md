@@ -36,7 +36,7 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 | | |
 |---|---|
 | **Hardware (paper experiments)** | NVIDIA RTX 5060 Ti 16 GB VRAM · AMD Ryzen 5 8600G (6c/12t) · 32 GB DDR5 6000 MHz |
-| **Hardware (tester — laptop)** | Intel Core i5-1035G1 · 20 GB RAM · no discrete GPU — CPU-only mode |
+| **Hardware (tester — laptop)** | Intel Core i5-1035G1 · 20 GB RAM · no discrete GPU — CPU-only mode; 45/45 tests OK in ~3m55s |
 | **Hardware (tester — server A)** | 2× Intel Xeon E5-2650 · 130 GB RAM · NVIDIA Tesla C2050 + Quadro 5000 present but **no NVIDIA driver installed** (`nvidia-smi` fails); tool runs CPU-only |
 | **Hardware (tester — server B)** | AMD Ryzen 7 5800X (8c/16t) · 130 GB RAM · NVIDIA GeForce RTX 3060 12 GB (driver 550.163.01, CUDA 12.4) — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~3m15s |
 | **Minimum for smoke test** | 4 GB RAM · x86\_64 · Python 3.12 + uv |
