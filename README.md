@@ -37,11 +37,11 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 |---|---|
 | **Hardware (paper experiments)** | NVIDIA RTX 5060 Ti 16 GB VRAM (driver 590.48.01, CUDA 13.1) · AMD Ryzen 5 8600G (6c/12t) · 32 GB DDR5 6000 MHz — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~2m18s |
 | **Hardware (tester — laptop)** | Intel Core i5-1035G1 · 20 GB RAM · no discrete GPU — CPU-only mode; 45/45 tests OK in ~3m55s |
-| **Hardware (tester — server A)** | 2× Intel Xeon E5-2650 · 130 GB RAM · NVIDIA Tesla C2050 + Quadro 5000 present but **no NVIDIA driver installed** (`nvidia-smi` fails); tool runs CPU-only |
+| **Hardware (tester — server A)** | 2× Intel Xeon E5-2650 · 130 GB RAM · NVIDIA Tesla C2050 + Quadro 5000 present but **no NVIDIA driver installed** (`nvidia-smi` fails); tool runs CPU-only. Note: even with a driver, these GPUs (Fermi, sm\_20) would not work — torch 2.11.0+cu128 [requires sm\_75 (Turing) or newer](https://github.com/pytorch/pytorch/releases/tag/v2.11.0) |
 | **Hardware (tester — server B)** | AMD Ryzen 7 5800X (8c/16t) · 130 GB RAM · NVIDIA GeForce RTX 3060 12 GB (driver 550.163.01, CUDA 12.4) — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~3m15s |
 | **Minimum for smoke test** | 4 GB RAM · x86\_64 · Python 3.12 + uv |
 | **Software** | Python 3.12 + [`uv`](https://astral.sh/uv) for all experiments; Docker optional (tool use only) |
-| **GPU (optional)** | NVIDIA driver ≥ 525 (CUDA 12.8) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) |
+| **GPU (optional)** | NVIDIA driver ≥ 525 (CUDA 12.8) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html); GPU must be **sm\_75 (Turing) or newer** — torch 2.11.0+cu128 [dropped Volta (sm\_70) and older](https://github.com/pytorch/pytorch/releases/tag/v2.11.0) |
 | **OS** | Linux (tested and recommended); macOS/Windows supported via Docker only |
 | **Disk** | `.venv` after `uv sync`: ~7.9 GB; NER models: ~1.5 GB (downloaded on first run to `~/.cache/huggingface/`); D1 ~133 MB (in git); D3 bundled as zips (~80 MB in git, ~700 MB extracted). Benchmark comparisons with v2.0 (via `--setup`) require ~8 GB additional (v2.0 venv + models). **Total for full experiment suite: ~17 GB.** |
 
