@@ -37,7 +37,7 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 |---|---|
 | **Hardware (paper experiments)** | NVIDIA RTX 5060 Ti 16 GB VRAM (driver 590.48.01, CUDA 13.1) · AMD Ryzen 5 8600G (6c/12t) · 32 GB DDR5 6000 MHz — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~2m18s |
 | **Hardware (tester — laptop)** | Intel Core i5-1035G1 · 20 GB RAM · no discrete GPU — CPU-only mode; 45/45 tests OK in ~3m55s |
-| **Hardware (tester — server A)** | 2× Intel Xeon E5-2650 · 130 GB RAM · NVIDIA Tesla C2050 + Quadro 5000 present (Fermi, sm\_20 — below the sm\_75 minimum; no driver installed); tool runs CPU-only; 45/45 tests OK in ~10m19s |
+| **Hardware (tester — server A)** | 2× Intel Xeon E5-2650 · 130 GB RAM · NVIDIA Tesla C2050 + Quadro 5000 *(2010, Fermi, sm\_20 — not to be confused with the newer Quadro RTX 5000 which is Turing sm\_75)* present but below the sm\_75 minimum; no driver installed; tool runs CPU-only; 45/45 tests OK in ~10m19s |
 | **Hardware (tester — server B)** | AMD Ryzen 7 5800X (8c/16t) · 130 GB RAM · NVIDIA GeForce RTX 3060 12 GB (driver 550.163.01, CUDA 12.4) — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~3m15s |
 | **Hardware (tester — laptop 2)** | Intel Core i5-12450HX (8c) · 16 GB DDR4 · NVIDIA GeForce RTX 3050 6 GB · Zorin OS 18 — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~2m21s |
 | **Minimum for smoke test** | 4 GB RAM · x86\_64 · Python 3.12 + uv |
