@@ -269,6 +269,7 @@ done
 
 SNIPPET_FILE="$RUN_DIR/readme_option_c_timing.md"
 ALL_CLAIMS_FILE="$RUN_DIR/readme_claim_timings.md"
+CLAIMS_HW_FILE="$RUN_DIR/claim_timings_hardware.md"
 idx_extract="$(find_idx_by_label "Claim #3: extract_datasets" || true)"
 idx_reproduce="$(find_idx_by_label "Claim #1: full D3 reproduce" || true)"
 idx_analyze="$(find_idx_by_label "Claim #1: full D3 analyze" || true)"
@@ -344,6 +345,8 @@ if [[ "$HAS_GPU" -eq 1 ]]; then
   gpu_model="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1)"
   [[ -z "$gpu_model" ]] && gpu_model="detected"
 fi
+ram_total="$(free -h 2>/dev/null | awk '/^Mem:/ {print $2; exit}')"
+[[ -z "$ram_total" ]] && ram_total="unknown"
 
 {
   echo "**Option C — Full D3 benchmark (reproduces paper Tables 6–8):**"
@@ -394,6 +397,45 @@ fi
   echo "- Spot check (extract + CPU): $(format_duration "$claim3_cpu_total") (extract: \`$extract_status\`, spot: \`$claim3_spot_cpu_status\`)"
 } > "$ALL_CLAIMS_FILE"
 
+{
+  echo "# Claim timings + hardware"
+  echo
+  echo "- Run ID: \`$RUN_ID\`"
+  echo "- Hostname: \`$(hostname)\`"
+  echo "- Timestamp: \`$(date -Iseconds)\`"
+  echo "- CPU: \`$cpu_model\`"
+  echo "- RAM: \`$ram_total\`"
+  echo "- GPU: \`$gpu_model\`"
+  echo "- Tesseract enabled: \`$ENABLE_TESSERACT\`"
+  echo "- Tesseract installed: \`$HAS_TESSERACT\`"
+  echo "- Arquivo completo de hardware: [hardware.txt](hardware.txt)"
+  echo "- Tempos brutos por comando: [times.csv](times.csv)"
+  echo
+  echo "## Claim #1"
+  echo "| Cenário | Tempo | Status |"
+  echo "|---|---:|---|"
+  echo "| Option A (smoke, GPU) | $(format_duration "$claim1_option_a_gpu_total") | \`$claim1_smoke_gpu_status\` |"
+  echo "| Option A (smoke, CPU) | $(format_duration "$claim1_option_a_cpu_total") | \`$claim1_smoke_cpu_status\` |"
+  echo "| Option B (extract + spot, GPU) | $(format_duration "$claim1_option_b_gpu_total") | \`$claim1_spot_gpu_status\` |"
+  echo "| Option B (extract + spot, CPU) | $(format_duration "$claim1_option_b_cpu_total") | \`$claim1_spot_cpu_status\` |"
+  echo "| Option C (extract + reproduce + analyze) | $(format_duration "$option_c_total") | extract=\`$extract_status\`, reproduce=\`$reproduce_status\`, analyze=\`$analyze_status\` |"
+  echo
+  echo "## Claim #2"
+  echo "| Cenário | Tempo | Status |"
+  echo "|---|---:|---|"
+  echo "| Benchmark 3.0 (4 estratégias) | $(format_duration "$claim2_real") | \`$claim2_status\` |"
+  echo
+  echo "## Claim #3"
+  echo "| Cenário | Tempo | Status |"
+  echo "|---|---:|---|"
+  echo "| Spot check (extract + GPU) | $(format_duration "$claim3_gpu_total") | extract=\`$extract_status\`, spot=\`$claim3_spot_gpu_status\` |"
+  echo "| Spot check (extract + CPU) | $(format_duration "$claim3_cpu_total") | extract=\`$extract_status\`, spot=\`$claim3_spot_cpu_status\` |"
+  echo
+  if [[ "$ENABLE_TESSERACT" -eq 0 || "$HAS_TESSERACT" -ne 1 ]]; then
+    echo "> Nota: esta execução foi feita sem Tesseract; etapas OCR aparecem como \`skipped_no_tesseract\`."
+  fi
+} > "$CLAIMS_HW_FILE"
+
 if [[ "$UPDATE_README" -eq 1 ]]; then
   python3 - "$ROOT_DIR/README.md" "$ALL_CLAIMS_FILE" <<'PY'
 import pathlib
@@ -425,6 +467,7 @@ fi
 printf '\n[ok] relatório pronto em: %s\n' "$MD_FILE"
 printf '[ok] snippet Option C: %s\n' "$SNIPPET_FILE"
 printf '[ok] snippet todas claims: %s\n' "$ALL_CLAIMS_FILE"
+printf '[ok] claims + hardware: %s\n' "$CLAIMS_HW_FILE"
 if [[ "$UPDATE_README" -eq 1 ]]; then
   printf '[ok] README atualizado automaticamente com tempos medidos.\n'
 fi
