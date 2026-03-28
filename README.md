@@ -141,6 +141,7 @@ Expected: the final line reads `OK` (all tests passed) or `FAILED` (one or more 
 
 ## Experiments
 
+
 ### Claim #1 — AnonShield (`standalone`) achieves ~3×–~17× speedup over v2.0 per file on D1 (GPU); ≥3,532× (GPU) / ≥535× (CPU) at D3 scale
 
 **Paper reference:** Tables 3, 4, 6, 7, and 8.
@@ -160,6 +161,8 @@ sudo apt install tesseract-ocr
 ./paper_data/test_minimal/run_tests.sh --skip-d2            # with NVIDIA GPU (D2 is private — skip it)
 ./paper_data/test_minimal/run_tests.sh --skip-d2 --cpu-only  # no GPU
 ```
+Paper hardware (example): GPU command **313.21 s (~5.22 min)**; CPU command **700.36 s (~11.67 min)**.
+
 Expected: the final line reads `RESULT: ALL PASSED`. D2 is a private dataset not included in this repository; `--skip-d2` omits those 4 steps so the script exits cleanly. Absolute runtimes on 500-row subsets will not match the paper's full-scale numbers, but the pipeline is verified end-to-end.
 
 **Option B — Spot check (~8–20 min after setup):**
@@ -170,6 +173,8 @@ Runs v2.0 and AnonShield on a ~512 KB subset of D3 CSV. v2.0 throughput is compu
 ./paper_data/scripts/spot_check_claim1.sh            # with NVIDIA GPU
 ./paper_data/scripts/spot_check_claim1.sh --cpu-only  # no GPU
 ```
+Paper hardware (example): GPU path (**extract + spot_check**) **248.62 s (~4.14 min)**; CPU path **282.86 s (~4.71 min)**.
+
 Expected output (absolute times vary by hardware; speedup is larger with GPU):
 ```
 ══════════════════════════════════════════════════════════════
@@ -193,6 +198,8 @@ Runtime is hardware-dependent and cannot be estimated without knowing the evalua
 ./paper_data/scripts/reproduce_all_runs.sh --skip-d1 --skip-d2
 ./paper_data/scripts/analyze_all.sh
 ```
+Paper hardware (measured): full Option C (`reproduce_all_runs --skip-d1 --skip-d2` + `analyze_all`) completed in **22,906.43 s (~6.36 h)** on this setup.
+
 The stored `benchmark_results.csv` files under `paper_data/results_paper/` contain the paper's original measurements and can be inspected directly without re-running.
 
 **Per-file performance on D1 (130 targets, mean, Table 3):**
@@ -260,6 +267,8 @@ python3 benchmark/benchmark.py \
   --anonymization-config paper_data/configs/anonymization_config_openvas.json
 ```
 
+Paper hardware (example): command completed in **983.37 s (~16.39 min)** after rebuilding the environment.
+
 **Reference results (pre-computed, 67 records, 3 specialists, 13 entity types):**
 
 | Strategy | TP | FP | FN | Precision | Recall | F1 |
@@ -286,6 +295,8 @@ python3 benchmark/benchmark.py \
 ./paper_data/scripts/spot_check_claim3.sh             # with NVIDIA GPU  (~80 s)
 ./paper_data/scripts/spot_check_claim3.sh --cpu-only  # no GPU          (~490 s / ~8 min)
 ```
+Paper hardware (example): GPU path (**extract + spot_check**) **83.70 s (~1.40 min)**; CPU path **504.43 s (~8.41 min)**.
+
 Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so removing it saves more). Absolute times vary by hardware.
 ```
 ══════════════════════════════════════════════════════════════
