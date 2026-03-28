@@ -19,6 +19,7 @@ graph TD
         RawText -- "orchestrator.anonymize()" --> Orch;
         Orch -- "Selects Strategy (--strategy)" --> STR_CHOICE{Strategy};
         STR_CHOICE -- "'presidio', 'filtered', 'hybrid', 'standalone'" --> PRESIDIO_STR(Traditional Strategy);
+        STR_CHOICE -- "'slm'" --> SLM_STR(SLM Strategy);
     end
 
     subgraph "3. Traditional Engine (Presidio/Regex)"
@@ -28,6 +29,11 @@ graph TD
         Presidio -- "Generates Slug" --> Anonymizer(CustomSlugAnonymizer);
         Anonymizer -- "HMAC + DB" --> DB[(entities.db)];
         Anonymizer -- "Replaces PII" --> AnonymizedText[Anonymized Text];
+    end
+
+    subgraph "3b. SLM Engine (Ollama)"
+        SLM_STR -- "Queries" --> Ollama(OllamaClient);
+        Ollama -- "Local LLM inference" --> AnonymizedText;
     end
 
     subgraph "4. Output Generation"
@@ -203,9 +209,24 @@ After batch processing, the orchestrator verifies input count == output count. O
 │   ├── cache_manager.py             # LRU cache
 │   ├── security.py                  # Key validation
 │   ├── model_manager.py             # Model loading and management
-│   └── core/
-│       ├── config_loader.py         # Configuration loading
-│       └── protocols.py             # Protocol interfaces
+│   ├── tqdm_handler.py              # Progress bar handler
+│   ├── core/
+│   │   ├── config_loader.py         # Configuration loading
+│   │   └── protocols.py             # Protocol interfaces
+│   ├── slm/                         # Small Language Model integration
+│   │   ├── client.py                # OllamaClient (SLMClient protocol)
+│   │   ├── prompts.py               # PromptManager
+│   │   ├── ollama_manager.py        # Ollama process management
+│   │   ├── anonymizers/
+│   │   │   └── slm_anonymizer.py    # End-to-end SLM anonymization
+│   │   ├── detectors/
+│   │   │   └── slm_detector.py      # SLM as entity detector
+│   │   └── mappers/
+│   │       └── entity_mapper.py     # SLM entity mapping
+│   └── evaluation/                  # Evaluation support
+│       ├── ground_truth.py          # Ground truth loading
+│       ├── hash_tracker.py          # Hash tracking for evaluation
+│       └── metrics_calculator.py    # TP/FP/FN metrics
 │
 ├── scripts/                         # Utility scripts
 │   ├── deanonymize.py               # Controlled de-anonymization
