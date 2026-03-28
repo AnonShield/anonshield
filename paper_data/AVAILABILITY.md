@@ -23,7 +23,7 @@ Dataset D2 is subject to a data-sharing agreement with CAIS/RNP and cannot be pu
 
 ## Accuracy evaluation
 
-- Annotated outputs (one XLSX per strategy/version), sampling protocol, and ground-truth CSV: [paper_data/evaluation](evaluation)
+- Annotated outputs (one XLSX per strategy/version) and sampling protocol: [paper_data/evaluation](evaluation)
 - Annotation manual (criteria, edge cases, and decision flow): [ANNOTATION_MANUAL.md](evaluation/ANNOTATION_MANUAL.md)
 
 ## Configuration files and reproduction scripts
