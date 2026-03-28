@@ -27,7 +27,7 @@ AnonShield is a pseudonymization framework designed for Computer Security Incide
 
 The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Sustainable (SeloS)**, and **Reproducible Experiments (SeloR)**.
 
-**SeloS — Sustainable:** The source code is organized into 25 focused modules under `src/anon/` with clear separation of concerns: `engine.py` (orchestration), `strategies.py` (anonymization algorithms), `processors.py` (file-format handling), `entity_detector.py` (NER), `repository.py`/`database.py` (data layer), `cache_manager.py`, `hash_generator.py`, `security.py`, and others. The CLI entry point is `anon.py`. Design patterns are applied explicitly: *Strategy* for anonymization algorithms, *Template Method* for file processors, *Repository* for data access, and *Dependency Injection* in the orchestrator; `core/protocols.py` defines Protocol-based interfaces for dependency inversion. ~90% of public APIs carry type annotations and ~85% of classes/methods have docstrings with `Args`/`Returns`/`Raises`. Naming follows PEP 8 throughout. Beyond inline documentation, four developer guides are provided under [`docs/developers/`](docs/developers/) ([`ARCHITECTURE.md`](docs/developers/ARCHITECTURE.md), [`ANONYMIZATION_STRATEGIES.md`](docs/developers/ANONYMIZATION_STRATEGIES.md), [`SLM_INTEGRATION_GUIDE.md`](docs/developers/SLM_INTEGRATION_GUIDE.md), [`UTILITY_SCRIPTS_GUIDE.md`](docs/developers/UTILITY_SCRIPTS_GUIDE.md), ~2,500 lines total), including a Mermaid architecture diagram. All dependencies are pinned in `pyproject.toml` and `uv.lock`; Docker images (`anonshield/anon:latest` / `:gpu`) provide a fully self-contained execution environment.
+**SeloS — Sustainable:** The source code is organized into 25 focused modules under [`src/anon/`](src/anon/) with clear separation of concerns: [`engine.py`](src/anon/engine.py) (orchestration), [`strategies.py`](src/anon/strategies.py) (anonymization algorithms), [`processors.py`](src/anon/processors.py) (file-format handling), [`entity_detector.py`](src/anon/entity_detector.py) (NER), [`repository.py`](src/anon/repository.py)/[`database.py`](src/anon/database.py) (data layer), [`cache_manager.py`](src/anon/cache_manager.py), [`hash_generator.py`](src/anon/hash_generator.py), [`security.py`](src/anon/security.py), and others. The CLI entry point is [`anon.py`](anon.py). Design patterns are applied explicitly: *Strategy* for anonymization algorithms, *Template Method* for file processors, *Repository* for data access, and *Dependency Injection* in the orchestrator; [`core/protocols.py`](src/anon/core/protocols.py) defines Protocol-based interfaces for dependency inversion. ~90% of public APIs carry type annotations and ~85% of classes/methods have docstrings with `Args`/`Returns`/`Raises`. Naming follows PEP 8 throughout. Beyond inline documentation, four developer guides are provided under [`docs/developers/`](docs/developers/) ([`ARCHITECTURE.md`](docs/developers/ARCHITECTURE.md), [`ANONYMIZATION_STRATEGIES.md`](docs/developers/ANONYMIZATION_STRATEGIES.md), [`SLM_INTEGRATION_GUIDE.md`](docs/developers/SLM_INTEGRATION_GUIDE.md), [`UTILITY_SCRIPTS_GUIDE.md`](docs/developers/UTILITY_SCRIPTS_GUIDE.md), ~2,400 lines total), including a Mermaid architecture diagram. All dependencies are pinned in [`pyproject.toml`](pyproject.toml) and [`uv.lock`](uv.lock); Docker images (`anonshield/anon:latest` / `:gpu`) provide a fully self-contained execution environment.
 
 ---
 
@@ -51,7 +51,7 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 ## Dependencies
 
 **Python environment (all experiments):**
-- Python 3.12 + [`uv`](https://astral.sh/uv) — all packages pinned in `pyproject.toml` / `uv.lock`
+- Python 3.12 + [`uv`](https://astral.sh/uv) — all packages pinned in [`pyproject.toml`](pyproject.toml) / [`uv.lock`](uv.lock)
 - Key packages: `presidio-analyzer`, `presidio-anonymizer`, `transformers`, `spacy`, `torch`, `pandas`, `pymupdf`, `pytesseract`, `lxml`, `orjson`, `scipy`, `statsmodels`
 - NER models downloaded automatically on first run and cached in `~/.cache/huggingface/` (~1.5 GB)
 
@@ -97,11 +97,11 @@ export ANON_SECRET_KEY=$(openssl rand -hex 32)
 echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
 ```
 
-**GPU:** CUDA-enabled PyTorch (`cu128`) and CuPy are included in `pyproject.toml` and installed automatically by `uv sync`. No extra steps required — GPU acceleration is enabled by default when an NVIDIA GPU is present.
+**GPU:** CUDA-enabled PyTorch (`cu128`) and CuPy are included in [`pyproject.toml`](pyproject.toml) and installed automatically by `uv sync`. No extra steps required — GPU acceleration is enabled by default when an NVIDIA GPU is present.
 
 ### Docker (tool use only — not required for experiments)
 
-> **⚠️ Warning:** The Docker images contain only the anonymization tool (`anon.py`). They do **not** include the benchmark suite, datasets (D1/D3), evaluation data, or any experiment scripts. To reproduce the paper's claims, use the local installation with `uv sync` as described above.
+> **⚠️ Warning:** The Docker images contain only the anonymization tool ([`anon.py`](anon.py)). They do **not** include the benchmark suite, datasets (D1/D3), evaluation data, or any experiment scripts. To reproduce the paper's claims, use the local installation with `uv sync` as described above.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/AnonShield/runshanondocker/main/run.sh -o run.sh
@@ -247,7 +247,7 @@ Paper hardware (example): command completed in **983.37 s (~16.39 min)** after r
 | `standalone` | 739 | 102 | 43 | 87.9% | 94.5% | 91.1% |
 | `presidio` | 724 | 287 | 25 | 71.6% | 96.7% | 82.3% |
 
-> Annotation methodology and XLSX format details: [`paper_data/evaluation/EVALUATION_DATA.md`](paper_data/evaluation/EVALUATION_DATA.md)
+> Annotation methodology and XLSX format details: [`paper_data/evaluation/EVALUATION_DATA.md`](paper_data/evaluation/EVALUATION_DATA.md) · [`ANNOTATION_MANUAL.md`](paper_data/evaluation/ANNOTATION_MANUAL.md)
 
 ---
 
