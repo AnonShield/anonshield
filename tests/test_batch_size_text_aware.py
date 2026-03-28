@@ -15,7 +15,8 @@ print("="*70)
 print("Testing: Adaptive Batch Size Based on Cell Text Length")
 print("="*70)
 
-os.makedirs('tests/test_data', exist_ok=True)
+_TEST_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_data')
+os.makedirs(_TEST_DATA_DIR, exist_ok=True)
 
 # Test 1: CSV with SHORT cells
 print("\n1️⃣  Creating CSV with SHORT cells (avg ~10 chars)...")
@@ -25,7 +26,7 @@ data_short = {
     'email': [f'user{i}@test.com' for i in range(100)]
 }
 df_short = pd.DataFrame(data_short)
-df_short.to_csv('tests/test_data/csv_short_cells.csv', index=False)
+df_short.to_csv(os.path.join(_TEST_DATA_DIR, 'csv_short_cells.csv'), index=False)
 print(f"   ✅ Created csv_short_cells.csv (3 columns, short text)")
 
 # Test 2: CSV with LONG cells (like your CVE dataset)
@@ -37,7 +38,7 @@ data_long = {
     'cve_data': [long_json for _ in range(100)]  # Long JSON in each cell
 }
 df_long = pd.DataFrame(data_long)
-df_long.to_csv('tests/test_data/csv_long_cells.csv', index=False)
+df_long.to_csv(os.path.join(_TEST_DATA_DIR, 'csv_long_cells.csv'), index=False)
 
 # Calculate actual average
 avg_short = sum(len(str(v)) for row in data_short.values() for v in row) / (100 * 3)
