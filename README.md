@@ -238,7 +238,9 @@ The stored `benchmark_results.csv` files under `paper_data/results_paper/` conta
    - `paper_data/evaluation/1.0/` and `paper_data/evaluation/2.0/`
 2. **Re-run the tool** on the evaluation dataset and compare the anonymized output against the reference:
 
-   > **⚠️ GPU required:** This command uses the `SecureModernBERT-NER` transformer model. On CPU-only hardware it processes the 9.2 MB file at ~44 B/s (~60 h to complete). **If you do not have an NVIDIA GPU, use Option 1 (pre-computed outputs) instead.**
+   > **⚠️ GPU recommended:** This command uses the `SecureModernBERT-NER` transformer model. Measured runtimes for the `filtered` strategy on the 9.2 MB evaluation file: **~4 min on GPU** (RTX 5060 Ti, 38.7 KB/s) and **~2h on CPU** (Intel i5-1035G1, 1.4 KB/s). For all 4 strategies: **~15–20 min on GPU**, **~7–8h on CPU**. **If you do not have an NVIDIA GPU, prefer Option 1 (pre-computed outputs) to avoid the long runtime.**
+   >
+   > **Note on the progress bar:** the time-remaining estimate shown in the terminal during processing is unreliable and should be ignored. During the first ~1–3 minutes the model is being compiled and loaded — throughput is near zero at this stage, causing the progress bar to project absurdly large estimates (e.g. "60h remaining" or "2h remaining"). Once the model finishes loading the speed increases sharply and the run completes well within the times shown above. **Do not interrupt the process based on the initial estimate.**
 
 ```bash
 python3 benchmark/benchmark.py \
