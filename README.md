@@ -35,7 +35,7 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 
 | | |
 |---|---|
-| **Hardware (paper experiments)** | NVIDIA RTX 5060 Ti 16 GB VRAM · AMD Ryzen 5 8600G (6c/12t) · 32 GB DDR5 6000 MHz |
+| **Hardware (paper experiments)** | NVIDIA RTX 5060 Ti 16 GB VRAM (driver 590.48.01, CUDA 13.1) · AMD Ryzen 5 8600G (6c/12t) · 32 GB DDR5 6000 MHz — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~2m18s |
 | **Hardware (tester — laptop)** | Intel Core i5-1035G1 · 20 GB RAM · no discrete GPU — CPU-only mode; 45/45 tests OK in ~3m55s |
 | **Hardware (tester — server A)** | 2× Intel Xeon E5-2650 · 130 GB RAM · NVIDIA Tesla C2050 + Quadro 5000 present but **no NVIDIA driver installed** (`nvidia-smi` fails); tool runs CPU-only |
 | **Hardware (tester — server B)** | AMD Ryzen 7 5800X (8c/16t) · 130 GB RAM · NVIDIA GeForce RTX 3060 12 GB (driver 550.163.01, CUDA 12.4) — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~3m15s |
@@ -153,6 +153,9 @@ The per-file speedup is measured on D1 (small files, 130 targets). On GPU, AnonS
 **Option A — Smoke test (~5–25 min depending on hardware):**
 Verifies the full pipeline is functional on small subsets of D1, D1C, and D3.
 ```bash
+# D1C includes image-based PDF targets — install Tesseract before running:
+sudo apt install tesseract-ocr
+
 ./paper_data/test_minimal/run_tests.sh --skip-d2            # with NVIDIA GPU (D2 is private — skip it)
 ./paper_data/test_minimal/run_tests.sh --skip-d2 --cpu-only  # no GPU
 ```
