@@ -519,11 +519,20 @@ def main():
             cupy.cuda.Stream.null.synchronize()
             cupy_works = True
         except Exception as e:
-            logging.info(f"CuPy not usable on this GPU ({e}). spaCy will use CPU, transformers will use GPU via PyTorch.")
+            logging.info(f"CuPy not usable on this GPU ({e}). spaCy will use CPU.")
         if cupy_works and spacy.prefer_gpu():  # type: ignore
             logging.info(f"spaCy GPU activated (CuPy backend on {gpu_name})")
         else:
-            logging.info(f"Transformers/PyTorch will use GPU. spaCy NLP pipeline on CPU.")
+            # CuPy unavailable/incompatible: spaCy stays on CPU, but force the
+            # HuggingFace transformer pipeline to use GPU via PyTorch directly.
+            # hf_token_pipe reads get_torch_default_device() from its module scope,
+            # so patching it here (before any nlp.add_pipe call) redirects to CUDA.
+            try:
+                import spacy_huggingface_pipelines.token_classification as _shp_tc
+                _shp_tc.get_torch_default_device = lambda: torch.device("cuda:0")
+                logging.info(f"Transformers pipeline GPU activated via PyTorch direct (spaCy NLP on CPU).")
+            except Exception as e2:
+                logging.info(f"Could not activate GPU for transformer pipeline: {e2}. Running fully on CPU.")
     else:
         logging.info("CUDA not detected by PyTorch. Running on CPU.")
 
