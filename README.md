@@ -91,11 +91,7 @@ export ANON_SECRET_KEY=$(openssl rand -hex 32)
 echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
 ```
 
-**GPU only** — after `uv sync`, install CUDA-enabled PyTorch and CuPy:
-```bash
-.venv/bin/pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128
-.venv/bin/pip install cupy-cuda12x==12.3.0
-```
+**GPU:** CUDA-enabled PyTorch (`cu128`) and CuPy are included in `pyproject.toml` and installed automatically by `uv sync`. No extra steps required — GPU acceleration is enabled by default when an NVIDIA GPU is present.
 
 ### Docker (tool use only — not required for experiments)
 
@@ -239,6 +235,9 @@ The stored `benchmark_results.csv` files under `paper_data/results_paper/` conta
    - `paper_data/evaluation/3.0-presidio/presidio/`
    - `paper_data/evaluation/1.0/` and `paper_data/evaluation/2.0/`
 2. **Re-run the tool** on the evaluation dataset and compare the anonymized output against the reference:
+
+   > **⚠️ GPU required:** This command uses the `SecureModernBERT-NER` transformer model. On CPU-only hardware it processes the 9.2 MB file at ~44 B/s (~60 h to complete). **If you do not have an NVIDIA GPU, use Option 1 (pre-computed outputs) instead.**
+
 ```bash
 python3 benchmark/benchmark.py \
   --benchmark \
