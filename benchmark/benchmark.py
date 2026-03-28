@@ -411,12 +411,7 @@ class EnvironmentSetup:
                 if not self._run_uv_sync(log):
                     return False
 
-                # Step 2: For AnonShield, configure PyTorch based on GPU mode (following Dockerfile logic)
-                if self.config.version == AnonVersion.V3_0:
-                    if not self._configure_torch(log):
-                        return False
-
-                # Step 3: Warm up model cache
+                # Step 2: Warm up model cache
                 if not self._warmup_cache(log):
                     print(f"  [WARN] Cache warmup failed, but continuing...")
 
