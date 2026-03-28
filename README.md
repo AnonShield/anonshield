@@ -4,6 +4,8 @@ AnonShield is a pseudonymization framework designed for Computer Security Incide
 
 > **Paper:** *AnonShield: Scalable On-Premise Pseudonymization for CSIRT Vulnerability Data* — SBRC 2026 Salão de Ferramentas.
 
+> **Note:** In parts of this repository — including benchmark scripts, CLI flags (`--versions 3.0`), result directory names, and internal logs — AnonShield is referred to as **v3.0**. This reflects its versioning relative to the predecessor tools AnonLFI v1.0 and v2.0, which are used as baselines in the benchmark comparisons.
+
 ---
 
 ## README Structure
@@ -38,7 +40,7 @@ The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Susta
 | **Software** | Python 3.12 + [`uv`](https://astral.sh/uv) for all experiments; Docker optional (tool use only) |
 | **GPU (optional)** | NVIDIA driver ≥ 525 (CUDA 12.8) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) |
 | **OS** | Linux (tested and recommended); macOS/Windows supported via Docker only |
-| **Disk** | `.venv` after `uv sync`: ~6.5 GB; NER models: ~1.5 GB (downloaded on first run to `~/.cache/huggingface/`); D1 ~133 MB (in git); D3 bundled as zips (~80 MB in git, ~700 MB extracted). Benchmark comparisons with v2.0 (via `--setup`) require ~8 GB additional (v2.0 venv + models). **Total for full experiment suite: ~17 GB.** |
+| **Disk** | `.venv` after `uv sync`: ~7.9 GB; NER models: ~1.5 GB (downloaded on first run to `~/.cache/huggingface/`); D1 ~133 MB (in git); D3 bundled as zips (~80 MB in git, ~700 MB extracted). Benchmark comparisons with v2.0 (via `--setup`) require ~8 GB additional (v2.0 venv + models). **Total for full experiment suite: ~17 GB.** |
 
 ---
 
