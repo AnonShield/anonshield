@@ -2,6 +2,8 @@
 
 Modular pseudonymization framework for Cybersecurity Incident Response Teams. Anonymizes PII and cybersecurity indicators using HMAC-SHA256, preserving structure in JSON, XML, CSV, and more. Supports 24 languages, OCR, and custom cybersecurity recognizers (IP, CVE, hash, URL, etc.).
 
+> **Source code, documentation & research artifact:** [github.com/AnonShield/tool](https://github.com/AnonShield/tool)
+
 ---
 
 ## Available Tags
@@ -31,13 +33,13 @@ Modular pseudonymization framework for Cybersecurity Incident Response Teams. An
 
 **Linux / macOS** — open a terminal:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AnonShield/runshanondocker/main/run.sh -o run.sh
+curl -fsSL https://raw.githubusercontent.com/AnonShield/tool/main/docker/run.sh -o run.sh
 chmod +x run.sh
 ```
 
 **Windows** — open **PowerShell**:
 ```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/runshanondocker/main/run.ps1 -OutFile run.ps1
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/tool/main/docker/run.ps1 -OutFile run.ps1
 ```
 
 > `curl` is built into Linux and macOS. `Invoke-WebRequest` is built into Windows 10/11. No extra installation needed.
@@ -335,6 +337,20 @@ Run `./run.sh --list-entities` (Linux/macOS) or `.\run.ps1 --list-entities` (Win
 ## Full CLI Reference
 
 Every option explained in plain language with examples: **[CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md)**
+
+---
+
+## Source Code & Documentation
+
+| Resource | Link |
+|----------|------|
+| Repository | [github.com/AnonShield/tool](https://github.com/AnonShield/tool) |
+| CLI Reference | [docs/users/CLI_REFERENCE.md](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md) |
+| Architecture | [docs/developers/ARCHITECTURE.md](https://github.com/AnonShield/tool/blob/main/docs/developers/ARCHITECTURE.md) |
+| Anonymization Strategies | [docs/developers/ANONYMIZATION_STRATEGIES.md](https://github.com/AnonShield/tool/blob/main/docs/developers/ANONYMIZATION_STRATEGIES.md) |
+| Benchmark Suite | [benchmark/BENCHMARK.md](https://github.com/AnonShield/tool/blob/main/benchmark/BENCHMARK.md) |
+| Experiments & Datasets | [paper_data/EXPERIMENTS.md](https://github.com/AnonShield/tool/blob/main/paper_data/EXPERIMENTS.md) |
+| Issues | [github.com/AnonShield/tool/issues](https://github.com/AnonShield/tool/issues) |
 
 ---
 
