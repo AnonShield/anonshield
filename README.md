@@ -147,6 +147,9 @@ uv run python -m unittest discover tests/
 
 Expected: the final line reads `OK` (all tests passed) or `FAILED` (one or more tests failed). Some tests intentionally exercise error paths and will print `ERROR` or warning messages during the run — this is normal and does not indicate a failure. Only the final `OK` / `FAILED` verdict matters.
 
+Tester — server B (AMD Ryzen 7 5800X · RTX 3060): anonymization example **36.7 s**; unit tests **192.1 s (~3.20 min)**.
+Tester — server A (2× Intel Xeon E5-2650, CPU-only): anonymization example **66.7 s**; unit tests **807.0 s (~13.45 min)**.
+
 ---
 
 ## Experiments
@@ -184,6 +187,8 @@ Runs v2.0 and AnonShield on a ~512 KB subset of D3 CSV. v2.0 throughput is compu
 ./paper_data/scripts/spot_check_claim1.sh --cpu-only  # no GPU
 ```
 Paper hardware (example): GPU path (**extract + spot_check**) **248.62 s (~4.14 min)**; CPU path **282.86 s (~4.71 min)**.
+Tester — server B (AMD Ryzen 7 5800X · RTX 3060): GPU path **272.8 s (~4.55 min)**; CPU path **242.6 s (~4.04 min)**.
+Tester — server A (2× Intel Xeon E5-2650, CPU-only): GPU path skipped (no GPU); CPU path **966.0 s (~16.1 min)**.
 
 Expected output (absolute times vary by hardware; speedup is larger with GPU):
 ```
@@ -209,6 +214,8 @@ Runtime is hardware-dependent and cannot be estimated without knowing the evalua
 ./paper_data/scripts/analyze_all.sh
 ```
 Paper hardware (measured): full Option C (`reproduce_all_runs --skip-d1 --skip-d2` + `analyze_all`) completed in **22,906.43 s (~6.36 h)** on GPU; **~103,035 s (~28.62 h)** on CPU-only (derived from stored per-run `wall_clock_time_sec`).
+Tester — server B (AMD Ryzen 7 5800X · RTX 3060): full Option C **32,549.1 s (~9.04 h)** (extract **2.4 s**; reproduce **32,489.3 s (~9.02 h)**; analyze **57.5 s**).
+Tester — server A (2× Intel Xeon E5-2650, CPU-only): full Option C estimated **~326,554 s (~90.7 h ≈ 3.78 days)** — projected from 7 real D3 CSV runs (per-run avg: filtered ~6,023 s, hybrid ~6,009 s, standalone ~1,596 s, presidio ~6,137 s), extrapolated to the remaining runs and datasets using the 3.17× ratio relative to the paper hardware CPU stored results.
 
 The stored `benchmark_results.csv` files under [`paper_data/results_paper/`](paper_data/results_paper/) contain the paper's original measurements and can be inspected directly without re-running.
 
@@ -247,6 +254,8 @@ python3 benchmark/benchmark.py \
 ```
 
 Paper hardware (example): command completed in **983.37 s (~16.39 min)** after rebuilding the environment.
+Tester — server B (AMD Ryzen 7 5800X · RTX 3060): command completed in **1,210.6 s (~20.2 min)**.
+Tester — server A (2× Intel Xeon E5-2650, CPU-only): command completed in **15,879.4 s (~4.41 h)**.
 
 **Reference results (pre-computed, 67 records, 3 specialists, 13 entity types):**
 
@@ -275,6 +284,8 @@ Paper hardware (example): command completed in **983.37 s (~16.39 min)** after r
 ./paper_data/scripts/spot_check_claim3.sh --cpu-only  # no GPU          (~490 s / ~8 min)
 ```
 Paper hardware (example): GPU path (**extract + spot_check**) **83.70 s (~1.40 min)**; CPU path **504.43 s (~8.41 min)**.
+Tester — server B (AMD Ryzen 7 5800X · RTX 3060): GPU path **119.4 s (~1.99 min)**; CPU path **488.6 s (~8.14 min)**.
+Tester — server A (2× Intel Xeon E5-2650, CPU-only): GPU path skipped (no GPU); CPU path **1,670.1 s (~27.8 min)**.
 
 Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so removing it saves more). Absolute times vary by hardware.
 ```
