@@ -208,7 +208,7 @@ Runtime is hardware-dependent and cannot be estimated without knowing the evalua
 ./paper_data/scripts/reproduce_all_runs.sh --skip-d1 --skip-d2
 ./paper_data/scripts/analyze_all.sh
 ```
-Paper hardware (measured): full Option C (`reproduce_all_runs --skip-d1 --skip-d2` + `analyze_all`) completed in **22,906.43 s (~6.36 h)** on this setup.
+Paper hardware (measured): full Option C (`reproduce_all_runs --skip-d1 --skip-d2` + `analyze_all`) completed in **22,906.43 s (~6.36 h)** on GPU; **~103,035 s (~28.62 h)** on CPU-only (derived from stored per-run `wall_clock_time_sec`).
 
 The stored `benchmark_results.csv` files under [`paper_data/results_paper/`](paper_data/results_paper/) contain the paper's original measurements and can be inspected directly without re-running.
 
