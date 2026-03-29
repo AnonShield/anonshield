@@ -1,8 +1,3 @@
-![Accuracy](https://img.shields.io/badge/F1--Score-94.2%25-green)
-![Recall](https://img.shields.io/badge/Recall-96.7%25-blue)
-![License](https://img.shields.io/badge/License-GPL%20v3.0-red)
-![Context](https://img.shields.io/badge/SBRC-2026-orange)
-
 # AnonShield: Scalable On-Premise Pseudonymization for CSIRT Vulnerability Data
 
 AnonShield is a pseudonymization framework designed for Computer Security Incident Response Teams (CSIRTs). It replaces Personally Identifiable Information (PII) and cybersecurity indicators with cryptographically secure, deterministic pseudonyms (HMAC-SHA256), preserving referential integrity across documents while enabling GDPR/LGPD-compliant data sharing. AnonShield combines GPU-accelerated NER, an LRU entity cache, streaming processors for large files, and a schema-aware configuration mechanism. Evaluated on datasets up to 550 MB (70,951+ vulnerability records), it reduces processing time from ~92 hours to under 10 minutes (~738× speedup over v2.0 on D2 JSON; ≥743× on D2 CSV) and achieves F1 = 94.2%, Recall = 96.7% with the `filtered`/`hybrid` strategies.
