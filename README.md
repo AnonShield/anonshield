@@ -103,14 +103,24 @@ echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
 
 > **⚠️ Warning:** The Docker images contain only the anonymization tool ([`anon.py`](anon.py)). They do **not** include the benchmark suite, datasets (D1/D3), evaluation data, or any experiment scripts. To reproduce the paper's claims, use the local installation with `uv sync` as described above.
 
+> **No system dependencies required** — Python, uv, and all libraries are already inside the image. The only prerequisite is Docker. The download commands (`curl` on Linux/macOS, `Invoke-WebRequest` on Windows) and the secret key generators (`openssl` on Linux/macOS, `RandomNumberGenerator` on Windows) are native to each OS — nothing extra to install.
+
+**Linux / macOS** — uses `curl` and `openssl` (built-in):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AnonShield/runshanondocker/main/run.sh -o run.sh
+curl -fsSL https://raw.githubusercontent.com/AnonShield/tool/main/docker/run.sh -o run.sh
 chmod +x run.sh
 export ANON_SECRET_KEY=$(openssl rand -hex 32)
-docker pull anonshield/anon:latest       # CPU
-# docker pull anonshield/anon:gpu        # GPU
-./run.sh ./your_file.csv                 # anonymize a file
+./run.sh ./your_file.csv
 ```
+
+**Windows** — uses `Invoke-WebRequest` and `RandomNumberGenerator` (built-in PowerShell):
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/tool/main/docker/run.ps1 -OutFile run.ps1
+$env:ANON_SECRET_KEY = [System.BitConverter]::ToString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).Replace("-","").ToLower()
+.\run.ps1 .\your_file.csv
+```
+
+Full usage, options, and examples: [Docker Hub README](https://hub.docker.com/r/anonshield/anon)
 
 ---
 
