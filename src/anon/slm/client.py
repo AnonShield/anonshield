@@ -267,6 +267,16 @@ class MockSLMClient:
         self.logger = logging.getLogger(__class__.__name__)
     
     def query(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> SLMResponse:
+        """Return a mock SLMResponse cycling through the configured responses.
+
+        Args:
+            prompt: The user prompt (ignored by the mock).
+            system_prompt: Optional system prompt (ignored by the mock).
+            **kwargs: Additional keyword arguments (ignored).
+
+        Returns:
+            An SLMResponse with the next mock content and success=True.
+        """
         response_content = self.mock_responses[self.call_count % len(self.mock_responses)] if self.mock_responses else ""
         self.call_count += 1
         
@@ -278,6 +288,17 @@ class MockSLMClient:
         )
     
     def query_json(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+        """Return the next mock response parsed as a JSON dict.
+
+        Args:
+            prompt: The user prompt (ignored by the mock).
+            system_prompt: Optional system prompt (ignored by the mock).
+            **kwargs: Additional keyword arguments (ignored).
+
+        Returns:
+            A dict parsed from the mock response content, or
+            ``{"error": "Mock response is not valid JSON"}`` on parse failure.
+        """
         response = self.query(prompt, system_prompt, **kwargs)
         try:
             return json.loads(response.content)

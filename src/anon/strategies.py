@@ -62,6 +62,20 @@ class FullPresidioStrategy(AnonymizationStrategy):
         return [ent for ent in all_entities if ent not in self.entities_to_preserve]
 
     def anonymize(self, texts: List[str], operator_params: Dict) -> Tuple[List[str], List[Tuple]]:
+        """Anonymize a batch of texts using the full Presidio pipeline.
+
+        Checks the LRU cache first, then runs Presidio analysis and
+        anonymization on uncached texts, collecting entity mappings for
+        database persistence.
+
+        Args:
+            texts: Raw input strings to anonymize.
+            operator_params: Presidio operator configuration including
+                hash_generator and custom_slug_length.
+
+        Returns:
+            A tuple of (anonymized_texts, collected_entities).
+        """
         self.logger.debug("Executing PresidioStrategy")
         if not texts: return [], []
 
@@ -209,6 +223,20 @@ class HybridPresidioStrategy(AnonymizationStrategy):
         return "".join(new_text_parts), collected_entities_for_text
 
     def anonymize(self, texts: List[str], operator_params: Dict) -> Tuple[List[str], List[Tuple]]:
+        """Anonymize a batch of texts using the filtered/hybrid NER pipeline.
+
+        Uses a filtered entity scope and a custom replacement loop instead of
+        Presidio's AnonymizerEngine. Optionally merges SLM-detected entities
+        in hybrid mode or replaces standard detection entirely in exclusive mode.
+
+        Args:
+            texts: Raw input strings to anonymize.
+            operator_params: Configuration including hash_generator and
+                custom_slug_length.
+
+        Returns:
+            A tuple of (anonymized_texts, collected_entities).
+        """
         self.logger.debug(f"Executing FastStrategy with SLM mode: {self.slm_detector_mode if self.slm_detector else 'off'}")
         if not texts: return [], []
 

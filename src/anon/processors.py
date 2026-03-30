@@ -180,6 +180,14 @@ def calculate_adaptive_batch_size(
 
 
 class FileProcessor(ABC):
+    """Abstract base class for all file-format processors.
+
+    Implements the Template Method pattern: ``process()`` defines the common
+    pipeline (setup, dispatch to anonymization or NER generation, cleanup)
+    while subclasses provide format-specific extraction and output logic via
+    ``_extract_texts()``, ``_process_anonymization()``, and
+    ``_get_output_extension()``.
+    """
     DEFAULT_BATCH_SIZE = DefaultSizes.BATCH_SIZE
     _PATH_INDEX_RE = re.compile(r'\[\d+\]')
 
@@ -259,6 +267,15 @@ class FileProcessor(ABC):
             yield batch
 
     def process(self) -> str:
+        """Run the full processing pipeline for the configured file.
+
+        Dispatches to NER data-generation mode or standard anonymization mode
+        depending on ``self.ner_data_generation``, handles errors, and ensures
+        GC and file-handle cleanup on exit.
+
+        Returns:
+            Absolute path to the output file produced.
+        """
         self._setup_optimization()
         output_path: str = ""
         logging.info(f"Starting processing for file: {self.file_path}")
@@ -513,6 +530,11 @@ class FileProcessor(ABC):
 
 
 class TextFileProcessor(FileProcessor):
+    """Processor for plain-text files (.txt, .log).
+
+    Reads the file line-by-line and anonymizes each line, writing the result
+    to a corresponding output file.
+    """
     def _get_output_extension(self) -> str:
         return ".txt"
 
@@ -636,6 +658,11 @@ class TextFileProcessor(FileProcessor):
 
 
 class ImageFileProcessor(FileProcessor):
+    """Processor for raster image files (JPEG, PNG, GIF, BMP, TIFF, WebP, etc.).
+
+    Extracts text via OCR (pytesseract) and anonymizes the extracted content,
+    writing the result as a plain-text file.
+    """
     def _get_output_extension(self) -> str:
         return ".txt"
 
@@ -648,6 +675,11 @@ class ImageFileProcessor(FileProcessor):
 
 
 class DocxFileProcessor(FileProcessor):
+    """Processor for Microsoft Word documents (.docx).
+
+    Extracts text from paragraphs and embedded images (via OCR) and writes
+    the anonymized content as a plain-text file.
+    """
     def _get_output_extension(self) -> str:
         return ".txt"
 
@@ -752,6 +784,12 @@ class DocxFileProcessor(FileProcessor):
 
 
 class PdfFileProcessor(FileProcessor):
+    """Processor for PDF files (.pdf).
+
+    Extracts text blocks and embedded images page-by-page (PyMuPDF + OCR)
+    with explicit memory cleanup between pages, and writes the anonymized
+    content as a plain-text file.
+    """
     def _get_output_extension(self) -> str:
         return ".txt"
 
@@ -877,6 +915,12 @@ class PdfFileProcessor(FileProcessor):
 
 
 class CsvFileProcessor(FileProcessor):
+    """Processor for comma-separated value files (.csv).
+
+    Reads the file in chunks via Pandas, builds a per-column translation map
+    of unique values to pseudonyms, and writes the anonymized data back as CSV
+    preserving headers and structure.
+    """
     def _get_output_extension(self) -> str:
         return ".csv"
     
@@ -1062,6 +1106,12 @@ class CsvFileProcessor(FileProcessor):
 
 
 class XlsxFileProcessor(FileProcessor):
+    """Processor for Excel workbooks (.xlsx).
+
+    Loads the workbook in-memory with openpyxl, iterates cells to build a
+    translation map of unique values to pseudonyms, and writes the result as
+    a new .xlsx file preserving sheet structure and formatting.
+    """
     def _get_output_extension(self) -> str:
         return ".xlsx"
 
@@ -1194,6 +1244,14 @@ class XlsxFileProcessor(FileProcessor):
 
 
 class XmlFileProcessor(FileProcessor):
+    """Processor for XML files (.xml).
+
+    Parses the document tree with lxml, collects text nodes by XPath path,
+    builds a translation map, and reconstructs the tree with anonymized values,
+    preserving element structure, attributes, and namespace declarations.
+    Files larger than ``XML_MEMORY_THRESHOLD_BYTES`` are processed in streaming
+    mode when ``--force-large-xml`` is set.
+    """
     XML_MEMORY_THRESHOLD_BYTES = 200 * 1024 * 1024 # 200 MB
 
     def _get_output_extension(self) -> str:

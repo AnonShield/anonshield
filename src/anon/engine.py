@@ -135,6 +135,17 @@ class CustomSlugAnonymizer(Operator):
     Custom Presidio operator that replaces text with an HMAC-based slug.
     """
     def operate(self, text: str, params: dict | None = None) -> str:
+        """Replace entity text with an HMAC-based slug.
+
+        Args:
+            text: The raw entity text detected by Presidio.
+            params: Operator parameters including hash_generator, entity_type,
+                custom_slug_length, and entity_collector.
+
+        Returns:
+            A pseudonym string of the form ``[ENTITY_TYPE_hash]``, or
+            ``[ENTITY_TYPE]`` when slug_length is 0.
+        """
         # 1. Clean the text (remove extra spaces)
         clean_text = " ".join(text.split()).strip()
         
@@ -163,9 +174,16 @@ class CustomSlugAnonymizer(Operator):
 
         return f"[{entity_type}_{display_hash}]"
 
-    def validate(self, params: dict | None = None) -> None: pass
-    def operator_name(self) -> str: return "custom_slug"
-    def operator_type(self) -> OperatorType: return OperatorType.Anonymize
+    def validate(self, params: dict | None = None) -> None:
+        """Validate operator parameters (no-op; validation is handled upstream)."""
+
+    def operator_name(self) -> str:
+        """Return the unique name identifying this Presidio operator."""
+        return "custom_slug"
+
+    def operator_type(self) -> OperatorType:
+        """Return the Presidio operator type (Anonymize)."""
+        return OperatorType.Anonymize
 
 
 def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> List[PatternRecognizer]:
@@ -503,6 +521,19 @@ class AnonymizationOrchestrator:
         return batch_analyzer, anonymizer
 
     def anonymize_text(self, text: str, forced_entity_type: Optional[Union[str, List[str]]] = None) -> str:
+        """Anonymize a single text string.
+
+        Convenience wrapper around ``anonymize_texts`` for single-item use.
+
+        Args:
+            text: The raw input string to anonymize.
+            forced_entity_type: If set, skip NER and treat the whole text as
+                this entity type. Accepts a single type string or a list of
+                candidate types.
+
+        Returns:
+            The anonymized string with PII replaced by pseudonyms.
+        """
         if not isinstance(text, str) or not text.strip():
             return text
         anonymized_texts, _ = self.anonymize_texts([text], forced_entity_type=forced_entity_type)
@@ -673,6 +704,16 @@ class AnonymizationOrchestrator:
         return anonymized_list, collected_entities_from_forced
 
     def detect_entities(self, texts: List[str]) -> List[dict]:
+        """Detect PII entities in a list of texts using the Presidio analyzer.
+
+        Args:
+            texts: Input strings to analyze.
+
+        Returns:
+            A list of dicts, one per text that contains at least one entity.
+            Each dict has keys ``text`` (original) and ``labels`` (list of
+            recognized entity dicts with ``label``, ``start``, ``end``).
+        """
         if not texts:
             return []
 

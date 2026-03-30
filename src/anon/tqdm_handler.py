@@ -13,6 +13,11 @@ class TqdmLoggingHandler(logging.Handler):
         super().__init__(level)
 
     def emit(self, record):
+        """Format and emit a log record via tqdm.write.
+
+        Args:
+            record: The log record to emit.
+        """
         try:
             msg = self.format(record)
             tqdm.write(msg, file=None, end='\n')
