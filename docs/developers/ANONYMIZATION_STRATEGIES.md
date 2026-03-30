@@ -1614,6 +1614,12 @@ AnonShield (Current):
 - [Transformers Documentation](https://huggingface.co/docs/transformers/)
 - [Ollama Documentation](https://ollama.com/docs/)
 
+### See Also
+
+- [Extensibility Guide](EXTENSIBILITY.md) — how to implement and register a custom anonymization strategy
+- [Architecture Reference](ARCHITECTURE.md) — system design and module responsibilities
+- [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md) — SLM-based strategy details
+
 ---
 
 **Document Version:** 1.0  

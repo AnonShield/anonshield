@@ -108,3 +108,11 @@ To switch from Ollama to a different provider (e.g., an OpenAI-compatible API):
 3. In `anon.py`, instantiate your new client instead of `OllamaClient` based on a configuration setting or a new CLI argument.
 
 Because the rest of the application depends on the protocol, no other code changes are required.
+
+---
+
+### See Also
+
+- [Extensibility Guide](EXTENSIBILITY.md) — full reference for implementing a custom `SLMClient`, adding prompt versions, and injecting the SLM layer into the orchestrator
+- [Architecture Reference](ARCHITECTURE.md) — system design and module responsibilities
+- [Anonymization Strategies](ANONYMIZATION_STRATEGIES.md) — comparison of all built-in strategies

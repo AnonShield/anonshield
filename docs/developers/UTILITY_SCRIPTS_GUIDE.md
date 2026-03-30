@@ -440,3 +440,10 @@ Distribution Match: ✅ Perfect
 5. **Data Consolidation**: Combine multiple CAIS data sources (different months, formats) into unified dataset
 6. **Distribution Analysis**: Study real-world vulnerability frequency patterns without exposing actual incident data
 
+---
+
+### See Also
+
+- [Extensibility Guide](EXTENSIBILITY.md) — how to add new file processors, strategies, and pipeline components
+- [Architecture Reference](ARCHITECTURE.md) — system design and module responsibilities
+
