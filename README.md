@@ -147,9 +147,6 @@ uv run python -m unittest discover tests/
 
 Expected: the final line reads `OK` (all tests passed) or `FAILED` (one or more tests failed). Some tests intentionally exercise error paths and will print `ERROR` or warning messages during the run — this is normal and does not indicate a failure. Only the final `OK` / `FAILED` verdict matters.
 
-Tester — server B (AMD Ryzen 7 5800X · RTX 3060): anonymization example **36.7 s**; unit tests **192.1 s (~3.20 min)**.
-Tester — server A (2× Intel Xeon E5-2650, CPU-only): anonymization example **66.7 s**; unit tests **807.0 s (~13.45 min)**.
-
 ---
 
 ## Experiments
