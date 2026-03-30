@@ -1,6 +1,6 @@
 # Container Inventory — D1 (OpenVAS)
 
-Containers used to perform scans with OpenVAS. This table contains information about the 130 containers analysed, which generated 130 PDFs extracted by the tool.
+Containers used to perform scans with OpenVAS. This table contains information about the 130 containers analysed.
 
 ## Container Distribution
 
