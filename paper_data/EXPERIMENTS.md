@@ -180,7 +180,7 @@ Each folder inside `results_paper/` contains:
 | Source | CAIS/RNP — real institutional Tenable vulnerability scans |
 | Access | **Private** — not publicly redistributable |
 | Content | Consolidated multi-host scan report |
-| Formats | CSV (420 MB, 1,202,268 rows) · JSON (551 MB) |
+| Formats | CSV (420 MB, 70,951 records) · JSON (551 MB) |
 | Path | `datasets/D2_cais_original/` |
 | Config | `configs/anonymization_config.json` (pre-builds 200k-entity cache) |
 
@@ -207,7 +207,7 @@ Each folder inside `results_paper/` contains:
 |---|---|
 | Source | Stratified synthetic dataset based on CVE/NVD data |
 | Access | **Public** — freely redistributable |
-| Formats | CSV (247 MB, 70,952 rows) · JSON (445 MB) |
+| Formats | CSV (248 MB, 70,951 records + 1 header row) · JSON (445 MB) |
 | Path | `datasets/D3_mock_cais/` |
 | Config | `configs/anonymization_config_cve.json` (pre-builds 200k-entity cache) |
 
