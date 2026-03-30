@@ -322,4 +322,4 @@ This project is licensed under the **GNU General Public License v3.0**. See [LIC
 
 ---
 
-*[CLI Reference](docs/users/CLI_REFERENCE.md) · [Architecture](docs/developers/ARCHITECTURE.md) · [Anonymization Strategies](docs/developers/ANONYMIZATION_STRATEGIES.md) · [Extensibility](docs/developers/EXTENSIBILITY.md) · [Benchmark Suite](benchmark/BENCHMARK.md) · [Experiments & Datasets](paper_data/EXPERIMENTS.md) · [Evaluation Data](paper_data/evaluation/EVALUATION_DATA.md)*
+*[CLI Reference](docs/users/CLI_REFERENCE.md) · [Architecture](docs/developers/ARCHITECTURE.md) · [Anonymization Strategies](docs/developers/ANONYMIZATION_STRATEGIES.md) · [Extensibility](docs/developers/EXTENSIBILITY.md) · [Benchmark Suite](benchmark/BENCHMARK.md) · [Experiments & Datasets](paper_data/EXPERIMENTS.md) · [Evaluation Data](paper_data/evaluation/EVALUATION_DATA.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)*

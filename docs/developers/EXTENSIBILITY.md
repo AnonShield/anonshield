@@ -984,3 +984,12 @@ AnonymizationOrchestrator(
 ```
 
 If a component is not provided, the orchestrator creates a safe default (e.g. a no-op cache, the default `HashGenerator`), so you only need to supply the ones you intend to replace.
+
+---
+
+### See Also
+
+- [Architecture Reference](ARCHITECTURE.md) — system design and module responsibilities
+- [Anonymization Strategies](ANONYMIZATION_STRATEGIES.md) — detailed description of each built-in strategy
+- [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md) — deep dive into the SLM module architecture
+- [Contributing](../../CONTRIBUTING.md) — development setup, conventions, and pull-request process

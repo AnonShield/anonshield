@@ -259,3 +259,5 @@ After batch processing, the orchestrator verifies input count == output count. O
 - [Extensibility Guide](EXTENSIBILITY.md) — all extension points with worked examples (strategies, processors, cache, storage, SLM client, model providers, etc.)
 - [Anonymization Strategies](ANONYMIZATION_STRATEGIES.md) — detailed description of each built-in strategy
 - [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md) — deep dive into the SLM module architecture
+- [Contributing](../../CONTRIBUTING.md) — development setup, conventions, and pull-request process
+- [Changelog](../../CHANGELOG.md) — release history
