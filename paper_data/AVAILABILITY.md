@@ -13,7 +13,7 @@ Dataset D2 is subject to a data-sharing agreement with CAIS/RNP and cannot be pu
 
 ## Datasets
 
-- **D1** — OpenVAS (public, tracked in git): [paper_data/datasets/D1_openvas](datasets/D1_openvas)
+- **D1** — OpenVAS (public, tracked in git): [paper_data/datasets/D1_openvas](datasets/D1_openvas) — [container inventory](datasets/D1_openvas/inventory.md)
 - **D3** — Mock CAIS (public, compressed): [paper_data/datasets/D3_mock_cais](datasets/D3_mock_cais)
 - **D2** — CAIS/RNP: private; contact data owner for access.
 
