@@ -262,7 +262,8 @@ def _parse_arguments():
     parser.add_argument("--no-report", action="store_true", help="Disable the creation of a performance report in the 'logs' directory.")
 
     # Anonymization options
-    parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve.")
+    parser.add_argument("--entities", type=str, default="", help="Comma-separated list of entity types to anonymize. If set, ONLY these entities are anonymized (complement of --preserve-entities). Example: EMAIL_ADDRESS,IP_ADDRESS,CPF")
+    parser.add_argument("--preserve-entities", type=str, default="", help="Comma-separated list of entity types to preserve (skip). Ignored when --entities is set.")
     parser.add_argument("--allow-list", type=str, default="", help="Comma-separated list of terms to never anonymize.")
     parser.add_argument("--slug-length", type=int, default=DefaultSizes.DEFAULT_SLUG_LENGTH, help=f"Length of the anonymized slug (0-64). If 0, only the entity type label is used and no secret key is required. Default: {DefaultSizes.DEFAULT_SLUG_LENGTH}.")
     parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a .json file with field-level anonymization rules for structured files (JSON, CSV, XML). See documentation for format.")
@@ -557,15 +558,26 @@ def main():
     allow_list = [term.strip() for term in args.allow_list.split(',') if term]
     logging.debug(f"Allow list: {allow_list}")
     
-    requested_preserve = [e.strip().upper() for e in args.preserve_entities.split(',') if e and e.strip()]
-    logging.debug(f"Requested entities to preserve: {requested_preserve}")
-    supported_entities_upper = {s.upper() for s in get_supported_entities()}
-    unknown_entities = [e for e in requested_preserve if e not in supported_entities_upper]
-    if unknown_entities:
-        logging.warning(f"Unsupported entities will be ignored: {', '.join(unknown_entities)}")
+    supported_entities_upper = {s.upper() for s in get_supported_entities(args.anonymization_strategy, args.transformer_model)}
 
-    # Add non-PII entities to preservation list automatically
-    entities_to_preserve = list(Global.NON_PII_ENTITIES) + [e for e in requested_preserve if e in supported_entities_upper]
+    # --entities: positive selection — only anonymize the listed types
+    requested_entities = [e.strip().upper() for e in args.entities.split(',') if e and e.strip()]
+    if requested_entities:
+        unknown = [e for e in requested_entities if e not in supported_entities_upper]
+        if unknown:
+            logging.warning(f"Unknown entity types in --entities (will be ignored): {', '.join(unknown)}")
+        valid_entities = {e for e in requested_entities if e in supported_entities_upper}
+        # Preserve everything NOT explicitly requested (plus built-in non-PII)
+        entities_to_preserve = list(Global.NON_PII_ENTITIES | (supported_entities_upper - valid_entities))
+        logging.info(f"--entities mode: anonymizing only {sorted(valid_entities)}")
+    else:
+        # --preserve-entities: negative selection — preserve the listed types
+        requested_preserve = [e.strip().upper() for e in args.preserve_entities.split(',') if e and e.strip()]
+        unknown_entities = [e for e in requested_preserve if e not in supported_entities_upper]
+        if unknown_entities:
+            logging.warning(f"Unsupported entities in --preserve-entities will be ignored: {', '.join(unknown_entities)}")
+        entities_to_preserve = list(Global.NON_PII_ENTITIES) + [e for e in requested_preserve if e in supported_entities_upper]
+
     logging.info(f"Auto-preserving non-PII entities: {', '.join(sorted(Global.NON_PII_ENTITIES))}")
     logging.debug(f"Effective entities to preserve: {entities_to_preserve}")
 
