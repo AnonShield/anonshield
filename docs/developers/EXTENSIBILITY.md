@@ -263,6 +263,66 @@ ProcessorRegistry.register([".yaml", ".yml"], YamlFileProcessor)
 
 ---
 
+## 3b. Adding a New OCR Engine
+
+**Files:** `src/anon/ocr/base.py`, `src/anon/ocr/factory.py`
+
+All OCR engines implement the `OCREngine` ABC and are instantiated via `get_ocr_engine(name)`.
+
+### Interface
+
+```python
+from src.anon.ocr.base import OCREngine
+
+class MyOCREngine(OCREngine):
+    @property
+    def name(self) -> str:
+        return "myengine"
+
+    def is_available(self) -> bool:
+        try:
+            import myengine_lib  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
+    def extract_text(self, image_bytes: bytes) -> str:
+        import myengine_lib
+        return myengine_lib.ocr(image_bytes)
+```
+
+### Register in the factory
+
+Add one entry to `_REGISTRY` in `src/anon/ocr/factory.py`:
+
+```python
+from .my_engine import MyOCREngine
+
+_REGISTRY: dict[str, type[OCREngine]] = {
+    "tesseract": TesseractEngine,
+    "easyocr":   EasyOCREngine,
+    # ...
+    "myengine":  MyOCREngine,   # ← add here
+}
+```
+
+Add the CLI choice in `anon.py`:
+
+```python
+parser.add_argument("--ocr-engine",
+    choices=["tesseract", "easyocr", "paddleocr", "doctr", "kerasocr", "myengine"],
+    ...)
+```
+
+Add an optional extra in `pyproject.toml` if the engine has a separate install:
+
+```toml
+[project.optional-dependencies]
+myengine = ["myengine-lib>=1.0"]
+```
+
+---
+
 ## 4. Entity Types and Regex Patterns
 
 **Files:** `src/anon/config.py`, `src/anon/engine.py`
@@ -383,47 +443,60 @@ recognizers.append(
 
 ## 5. Transformer Models
 
-**File:** `src/anon/engine.py` (`_setup_engines`)
+**File:** `src/anon/model_registry.py`
+
+Model selection goes through a registry — adding a new model does **not** require modifying `engine.py` or `strategies.py`.
 
 ### 5.1 How model selection works
 
-The CLI flag `--transformer-model` accepts any HuggingFace model identifier. The engine selects the entity-label mapping based on the model name:
+The CLI flag `--transformer-model` accepts any HuggingFace model identifier. The engine looks up the entity-label mapping in the registry:
 
 ```python
-def _setup_engines(self):
-    if "SecureModernBERT-NER" in self.transformer_model:
-        entity_mapping = SECURE_MODERNBERT_ENTITY_MAPPING
-    else:
-        entity_mapping = ENTITY_MAPPING
-    # ... initialise Presidio with chosen model and mapping
+from .model_registry import get_entity_mapping
+entity_mapping = get_entity_mapping(self.transformer_model)
+# Falls back to the default mapping with a warning for unknown models
 ```
 
-### 5.2 Adding support for a new model
+### 5.2 Adding a model in code
 
-1. Define the label→canonical mapping in `config.py`:
+Register the model once, anywhere before engine initialization:
 
 ```python
-MY_MODEL_ENTITY_MAPPING = {
-    "B-PER": "PERSON",
-    "B-ORG": "ORGANIZATION",
-    "B-LOC": "LOCATION",
-    "B-MISC": "MISC",
-}
+from src.anon.model_registry import register_model
+
+register_model(
+    model_id="my-org/my-ner-model",
+    entity_mapping={
+        "PER": "PERSON",
+        "ORG": "ORGANIZATION",
+        "LOC": "LOCATION",
+        "MISC": "MISC",
+    },
+    description="Domain-specific NER",
+    languages=["en", "pt"],
+)
 ```
 
-2. Import and select the mapping in `_setup_engines()`:
+### 5.3 Adding a model via YAML config
 
-```python
-from src.anon.config import MY_MODEL_ENTITY_MAPPING
+Add a `custom_models` block to your run config file — no code changes needed:
 
-if "my-model-name" in self.transformer_model:
-    entity_mapping = MY_MODEL_ENTITY_MAPPING
+```yaml
+custom_models:
+  - id: my-org/my-ner-model
+    entity_mapping:
+      PER: PERSON
+      ORG: ORGANIZATION
+      LOC: LOCATION
+    description: Domain-specific NER
 ```
 
-3. Use the model via the CLI:
+### 5.4 Use the model
 
 ```bash
-uv run anon.py file.csv --transformer-model my-org/my-model-name
+uv run anon.py file.csv --transformer-model my-org/my-ner-model
+# or in config:
+# transformer_model: my-org/my-ner-model
 ```
 
 ---

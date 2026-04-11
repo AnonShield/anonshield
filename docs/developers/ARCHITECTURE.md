@@ -102,7 +102,43 @@ Central coordinator. Responsibilities:
 - Manages the batch fallback mechanism.
 - Collects entity statistics for reporting.
 
-### 3. File Processors (`processors.py`)
+### 3. OCR Abstraction Layer (`src/anon/ocr/`)
+
+All OCR operations go through a factory and a shared ABC, making it trivial to add new engines without touching processor code.
+
+```
+src/anon/ocr/
+├── __init__.py            # exports get_ocr_engine()
+├── base.py                # OCREngine ABC (extract_text, is_available, name)
+├── tesseract_engine.py    # pytesseract wrapper (default)
+├── easyocr_engine.py      # EasyOCR (lazy Reader init)
+├── paddleocr_engine.py    # PaddleOCR (lazy pipeline init)
+├── doctr_engine.py        # DocTR torch backend (lazy predictor)
+├── kerasocr_engine.py     # Keras-OCR (lazy pipeline)
+└── factory.py             # get_ocr_engine(name) → OCREngine
+```
+
+`FileProcessor._do_ocr(image_bytes)` dispatches to the injected engine (falls back to Tesseract if none is set). All four OCR call sites in image/DOCX/PDF processors use this single method.
+
+### 4. Model Registry (`src/anon/model_registry.py`)
+
+A single `MODEL_REGISTRY` dict maps model IDs to their NER entity label mappings. Adding a new model requires only one `register_model()` call — no conditionals in `engine.py` or `strategies.py`.
+
+```python
+# Before (hardcoded):
+if "SecureModernBERT-NER" in model:
+    entity_mapping = SECURE_MODERNBERT_ENTITY_MAPPING
+else:
+    entity_mapping = ENTITY_MAPPING
+
+# After (registry):
+from .model_registry import get_entity_mapping
+entity_mapping = get_entity_mapping(model_id)
+```
+
+Custom models can be registered at runtime from the YAML config file (`custom_models:` key).
+
+### 5. File Processors (`processors.py`)
 
 Template Method Pattern with a base `FileProcessor` and specialized subclasses:
 
@@ -198,13 +234,21 @@ After batch processing, the orchestrator verifies input count == output count. O
 │   ├── docker-compose.yml           # Service profiles
 │   └── docker-entrypoint.sh        # Container entrypoint
 │
+├── examples/
+│   ├── anon_config.example.yaml     # Full config file template (all options)
+│   ├── profiles/
+│   │   └── banking_pt.yaml          # Pre-configured Brazilian banking profile
+│   └── patterns/
+│       └── banking_pt.yaml          # Custom patterns: CPF, CNPJ, PIX, CEP, RG
+│
 ├── src/anon/                        # Core library
 │   ├── config.py                    # Entity mappings, language lists
 │   ├── engine.py                    # AnonymizationOrchestrator
 │   ├── strategies.py                # FullPresidio, Filtered, Hybrid strategies
-│   ├── standalone_strategy.py       # StandaloneStrategy
-│   ├── entity_detector.py           # NER entity detection
-│   ├── processors.py                # File processors
+│   ├── standalone_strategy.py       # StandaloneStrategy + RegexOnlyStrategy
+│   ├── model_registry.py            # Transformer model registry
+│   ├── entity_detector.py           # NER entity detection + regex-only extraction
+│   ├── processors.py                # File processors (OCR engine injection)
 │   ├── repository.py                # EntityRepository (SQLite)
 │   ├── database.py                  # Thread-safe DB writer queue
 │   ├── hash_generator.py            # HMAC-SHA256 hash generation
@@ -214,7 +258,17 @@ After batch processing, the orchestrator verifies input count == output count. O
 │   ├── tqdm_handler.py              # Progress bar handler
 │   ├── core/
 │   │   ├── config_loader.py         # Configuration loading
+│   │   ├── run_config.py            # YAML run config loader + CLI merger
 │   │   └── protocols.py             # Protocol interfaces
+│   ├── ocr/                         # OCR abstraction layer
+│   │   ├── __init__.py
+│   │   ├── base.py                  # OCREngine ABC
+│   │   ├── tesseract_engine.py
+│   │   ├── easyocr_engine.py
+│   │   ├── paddleocr_engine.py
+│   │   ├── doctr_engine.py
+│   │   ├── kerasocr_engine.py
+│   │   └── factory.py               # get_ocr_engine(name) factory
 │   ├── slm/                         # Small Language Model integration
 │   │   ├── client.py                # OllamaClient (SLMClient protocol)
 │   │   ├── prompts.py               # PromptManager

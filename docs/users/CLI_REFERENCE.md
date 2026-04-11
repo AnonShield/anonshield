@@ -145,6 +145,28 @@ Supported languages:
 
 ---
 
+### `--config <path>`
+
+**Default:** none
+
+**What it does:** Loads all run settings from a YAML (or JSON) file before applying CLI flags. Any argument you pass on the command line overrides the corresponding value in the file.
+
+This is the recommended way to share repeatable configurations across runs — for example, a banking-document profile or a CI/CD pipeline preset.
+
+**Supported keys:** Every CLI argument has a matching key in the config file. See [`docs/users/CONFIGURATION_FILE.md`](CONFIGURATION_FILE.md) for the full schema.
+
+```bash
+# Load a pre-configured banking profile
+./docker/run.sh ./invoice.pdf --config examples/profiles/banking_pt.yaml
+
+# Override a single value from the config
+./docker/run.sh ./invoice.pdf --config examples/profiles/banking_pt.yaml --slug-length 0
+```
+
+> **Example config file:** `examples/anon_config.example.yaml` — fully commented template with every available option.
+
+---
+
 ### `--lang <code>`
 
 **Default:** `en`
@@ -254,6 +276,29 @@ Output filenames always follow the pattern `anon_<original_filename>.<ext>`.
 ```
 
 > **Tip:** Use `--list-entities` to see all valid entity type names.
+
+---
+
+### `--entities <TYPES>`
+
+**Default:** none (all detectable entities are anonymized)
+
+**What it does:** A comma-separated list of entity types that **should** be anonymized. All other types are left untouched. This is the positive-selection complement of `--preserve-entities`.
+
+Use `--entities` when you want to anonymize only a specific, known set of types and leave everything else unchanged.
+
+```bash
+# Anonymize only email addresses and credit cards
+./docker/run.sh ./contacts.csv --entities "EMAIL_ADDRESS,CREDIT_CARD"
+
+# Anonymize only Brazilian tax IDs (regex strategy + custom patterns)
+./docker/run.sh ./banking_doc.pdf \
+  --anonymization-strategy regex \
+  --custom-patterns examples/patterns/banking_pt.yaml \
+  --entities "CPF,CNPJ"
+```
+
+> **Note:** `--entities` takes priority over `--preserve-entities`. If both are set, `--entities` wins.
 
 ---
 
@@ -379,6 +424,48 @@ You can use any entity type label, including custom ones (`MY_SYSTEM`, `THREAT_A
 > **How it works:** Each term is compiled into a case-insensitive, word-boundary-aware regex pattern with a confidence score of 1.0 (maximum). This ensures these terms are always detected and anonymized, regardless of surrounding context.
 
 > **Tip:** Combine with `--anonymization-config` on structured files for full control: use `force_anonymize` for known fields, and `--word-list` for known values that appear across free-text fields.
+
+---
+
+### `--custom-patterns <path>`
+
+**Default:** none
+
+**What it does:** Loads additional regex patterns from a YAML or JSON file and adds them to the detection pipeline alongside the built-in patterns. This lets you detect domain-specific entity types (banking IDs, medical record numbers, internal codes) without modifying the source code.
+
+**File format (YAML):**
+```yaml
+- entity_type: CPF           # label used in anonymized output
+  pattern: '\d{3}\.\d{3}\.\d{3}-\d{2}'
+  score: 0.95                # confidence (0.0–1.0)
+
+- entity_type: IBAN
+  pattern: '[A-Z]{2}\d{2}[A-Z0-9]{1,30}'
+  score: 0.85
+  flags: IGNORECASE          # optional: IGNORECASE, MULTILINE
+```
+
+JSON format is also accepted (same fields, wrapped in an array).
+
+```bash
+# Add Brazilian banking patterns
+./docker/run.sh ./banking_doc.pdf \
+  --custom-patterns examples/patterns/banking_pt.yaml
+
+# Combine with regex strategy for maximum speed
+./docker/run.sh ./banking_doc.pdf \
+  --anonymization-strategy regex \
+  --custom-patterns examples/patterns/banking_pt.yaml
+
+# Combine with entity selection
+./docker/run.sh ./banking_doc.pdf \
+  --custom-patterns examples/patterns/banking_pt.yaml \
+  --entities "CPF,EMAIL_ADDRESS,CREDIT_CARD"
+```
+
+> **Example pattern files:** `examples/patterns/banking_pt.yaml` (Brazilian banking: CPF, CNPJ, PIX keys, CEP, RG).
+
+> **Config file support:** Custom patterns can also be embedded directly in a `--config` YAML file under the `custom_patterns:` key. See [`CONFIGURATION_FILE.md`](CONFIGURATION_FILE.md).
 
 ---
 
@@ -549,6 +636,7 @@ You can use any entity type label, including custom ones (`MY_SYSTEM`, `THREAT_A
 | `presidio` | Full Presidio pipeline with all recognizers enabled | Broadest detection, more false positives |
 | `hybrid` | Presidio detection + manual text replacement (no Presidio anonymizer) | When Presidio's anonymizer causes issues |
 | `standalone` | Loads NER models directly, bypasses Presidio entirely | **Maximum GPU throughput (4× faster)** |
+| `regex` | Pure regex only — zero NLP/NER model loading | **Fastest of all; domain-specific pipelines with `--custom-patterns`** |
 | `slm` | End-to-end anonymization using a local language model (Ollama) | Experimental / research use |
 
 **Performance comparison — GPU (NVIDIA RTX 5060 Ti, 551 MB JSON, 70,951 records):**
@@ -576,11 +664,44 @@ You can use any entity type label, including custom ones (`MY_SYSTEM`, `THREAT_A
 # Maximum GPU throughput
 ./docker/run.sh ./large_dataset.json --anonymization-strategy standalone
 
+# Regex-only: no model loading, maximum throughput for domain-specific patterns
+./docker/run.sh ./banking_docs/ \
+  --anonymization-strategy regex \
+  --custom-patterns examples/patterns/banking_pt.yaml
+
 # Experimental: use a local LLM (requires Ollama)
 ./docker/run.sh ./report.txt --anonymization-strategy slm
 ```
 
-> **Recommendation:** Use `filtered` for accuracy. Use `standalone` on GPU when processing large datasets where speed is the priority.
+> **Recommendation:** Use `filtered` for accuracy. Use `standalone` on GPU for large datasets. Use `regex` when you have domain-specific patterns and do not need NER.
+
+---
+
+### `--ocr-engine <engine>`
+
+**Default:** `tesseract`
+
+**What it does:** Selects the OCR engine used to extract text from image-based inputs (PNG, JPG, TIFF, etc.) and scanned PDF pages.
+
+| Engine | Accuracy | Speed | Languages | Notes |
+|--------|----------|-------|-----------|-------|
+| `tesseract` | Good | Fast | 100+ | Default; requires `tesseract` system package |
+| `easyocr` | Very good | Medium | 80+ | Best for noisy/rotated images; install: `pip install easyocr` |
+| `paddleocr` | Excellent | Fast | 80+ | Strongest on Chinese/Japanese/Korean; install: `pip install paddleocr paddlepaddle` |
+| `doctr` | Excellent | Medium | 60+ | Best layout preservation; install: `pip install "python-doctr[torch]"` |
+| `kerasocr` | Good | Slow | English | Keras-based; install: `pip install keras-ocr` |
+
+All non-default engines are optional dependencies — install only what you need.
+
+```bash
+# Use EasyOCR for a noisy scanned document
+./docker/run.sh ./scanned_invoice.pdf --ocr-engine easyocr
+
+# Use PaddleOCR for Asian-language documents
+./docker/run.sh ./japanese_report.pdf --ocr-engine paddleocr --lang ja
+```
+
+> **See also:** [`docs/users/OCR_ENGINES.md`](OCR_ENGINES.md) — detailed comparison, installation instructions, and benchmarks for all five engines.
 
 ---
 
@@ -988,11 +1109,14 @@ These options control how the tool manages the Ollama service that runs the loca
 | `--overwrite` | off | Overwrite existing output files |
 | `--no-report` | off | Skip the performance report in `logs/` |
 | `--log-level` | `WARNING` | Verbosity: `DEBUG` `INFO` `WARNING` `ERROR` `CRITICAL` |
+| `--config` | — | Path to YAML/JSON run config file (CLI args override) |
+| `--entities` | — | Comma-separated entity types to anonymize (positive selection) |
 | `--preserve-entities` | — | Comma-separated entity types to skip |
 | `--allow-list` | — | Comma-separated terms to never anonymize |
 | `--slug-length` | `64` | Length of the hash suffix in pseudonyms (0–64) |
 | `--anonymization-config` | — | Path to JSON config for field-level control |
 | `--word-list` | — | Path to JSON file of known terms to always anonymize |
+| `--custom-patterns` | — | Path to YAML/JSON file with custom regex patterns |
 | `--preserve-row-context` | off | Process every CSV/XLSX cell individually |
 | `--json-stream-threshold-mb` | `100` | Stream JSON files larger than this many MB |
 | `--optimize` | off | Enable all performance optimizations |
@@ -1003,7 +1127,8 @@ These options control how the tool manages the Ollama service that runs the loca
 | `--regex-priority` | off | Prioritize regex over model detections |
 | `--force-large-xml` | off | Override XML memory safety limits |
 | `--disable-gc` | off | Disable Python garbage collection |
-| `--anonymization-strategy` | `filtered` | Detection engine: `filtered` `presidio` `hybrid` `standalone` `slm` |
+| `--anonymization-strategy` | `filtered` | Detection engine: `filtered` `presidio` `hybrid` `standalone` `regex` `slm` |
+| `--ocr-engine` | `tesseract` | OCR engine: `tesseract` `easyocr` `paddleocr` `doctr` `kerasocr` |
 | `--transformer-model` | `Davlan/xlm-roberta-base-ner-hrl` | NER model to use |
 | `--db-mode` | `persistent` | Database mode: `persistent` or `in-memory` |
 | `--db-dir` | `db` | Directory for the database file |
