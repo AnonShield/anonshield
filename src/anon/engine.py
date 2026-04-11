@@ -27,7 +27,6 @@ from presidio_anonymizer import AnonymizerEngine, OperatorConfig  # type: ignore
 from presidio_anonymizer.operators import Operator, OperatorType  # type: ignore
 
 from .config import (
-    ENTITY_MAPPING,
     SECRET_KEY,
     TRANSFORMER_MODEL,
     ProcessingLimits,
@@ -494,12 +493,9 @@ class AnonymizationOrchestrator:
                 {"lang_code": effective_lang, "model_name": {"spacy": spacy_model_name, "transformers": self.transformer_model}}
             ]
             
-            # Choose entity mapping based on transformer model
-            if "SecureModernBERT-NER" in self.transformer_model:
-                from .config import SECURE_MODERNBERT_ENTITY_MAPPING
-                entity_mapping = SECURE_MODERNBERT_ENTITY_MAPPING
-            else:
-                entity_mapping = ENTITY_MAPPING
+            # Choose entity mapping via registry (supports user-registered models)
+            from .model_registry import get_entity_mapping
+            entity_mapping = get_entity_mapping(self.transformer_model)
                 
             ner_config = NerModelConfiguration(
                 model_to_presidio_entity_mapping=entity_mapping, 

@@ -715,6 +715,16 @@ def main():
             elif isinstance(src, list):
                 compiled_patterns.extend(_compile_inline_patterns(src, set(entities_to_preserve)))
 
+        # --- Custom models from config file ---
+        custom_models_cfg = getattr(args, '_config_custom_models', None)
+        if custom_models_cfg:
+            from src.anon.model_registry import register_model
+            for m in custom_models_cfg:
+                mid = m.get("id") or m.get("model_id")
+                mapping = m.get("entity_mapping", {})
+                if mid and mapping:
+                    register_model(mid, mapping, description=m.get("description", ""))
+
         entity_detector = EntityDetector(
             compiled_patterns=compiled_patterns,
             entities_to_preserve=set(entities_to_preserve),

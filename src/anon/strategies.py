@@ -178,14 +178,9 @@ class HybridPresidioStrategy(AnonymizationStrategy):
     def _get_core_entities(self) -> List[str]:
         """Returns a curated list of entities supported by our core recognizers (NLP + Custom Regex)."""
         from .engine import load_custom_recognizers
-        from .config import ENTITY_MAPPING, SECURE_MODERNBERT_ENTITY_MAPPING
-        
-        # Choose entity mapping based on transformer model
-        if "SecureModernBERT-NER" in self.transformer_model:
-            entity_mapping = SECURE_MODERNBERT_ENTITY_MAPPING
-        else:
-            entity_mapping = ENTITY_MAPPING
-        
+        from .model_registry import get_entity_mapping
+
+        entity_mapping = get_entity_mapping(self.transformer_model)
         core_entities = set(entity_mapping.values())
         for recognizer in load_custom_recognizers(langs=[self.lang]):
             core_entities.update(recognizer.supported_entities)
@@ -350,14 +345,9 @@ class FilteredPresidioStrategy(FullPresidioStrategy):
     def _get_core_entities(self) -> List[str]:
         """Returns a curated list of entities supported by our core recognizers (NLP + Custom Regex)."""
         from .engine import load_custom_recognizers
-        from .config import ENTITY_MAPPING, SECURE_MODERNBERT_ENTITY_MAPPING
-        
-        # Choose entity mapping based on transformer model
-        if "SecureModernBERT-NER" in self.transformer_model:
-            entity_mapping = SECURE_MODERNBERT_ENTITY_MAPPING
-        else:
-            entity_mapping = ENTITY_MAPPING
-        
+        from .model_registry import get_entity_mapping
+
+        entity_mapping = get_entity_mapping(self.transformer_model)
         core_entities = set(entity_mapping.values())
         for recognizer in load_custom_recognizers(langs=[self.lang]):
             core_entities.update(recognizer.supported_entities)
