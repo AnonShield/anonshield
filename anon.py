@@ -253,6 +253,11 @@ def _parse_arguments():
     parser = argparse.ArgumentParser(description="Anonymize sensitive information or generate NER training data.")
     parser.add_argument("file_path", nargs='?', help="Path to the file or directory to be processed.")
 
+    # Config file (processed before all other args)
+    parser.add_argument("--config", type=str, default=None, metavar="CONFIG_FILE",
+                        help="Path to a YAML or JSON run config file. CLI arguments override config file values. "
+                             "See examples/anon_config.example.yaml for format.")
+
     # General options
     parser.add_argument("--list-entities", action="store_true", help="List all supported entity types and exit.")
     parser.add_argument("--list-languages", action="store_true", help="List all supported languages and exit.")
@@ -268,6 +273,10 @@ def _parse_arguments():
     parser.add_argument("--slug-length", type=int, default=DefaultSizes.DEFAULT_SLUG_LENGTH, help=f"Length of the anonymized slug (0-64). If 0, only the entity type label is used and no secret key is required. Default: {DefaultSizes.DEFAULT_SLUG_LENGTH}.")
     parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a .json file with field-level anonymization rules for structured files (JSON, CSV, XML). See documentation for format.")
     parser.add_argument("--word-list", type=str, default=None, help="Path to a .json file mapping category names to lists of known terms that must always be anonymized (e.g. organization names, internal system names, acronyms).")
+    parser.add_argument("--custom-patterns", type=str, default=None, metavar="PATTERNS_FILE",
+                        help="Path to a YAML or JSON file with custom regex patterns. "
+                             "Format: [{entity_type, pattern, score, flags?}, ...]. "
+                             "See examples/patterns/banking_pt.yaml for an example.")
 
     # OCR options
     parser.add_argument("--ocr-engine", type=str, default="tesseract",
@@ -338,6 +347,23 @@ def _parse_arguments():
 
     args = parser.parse_args()
     logging.debug(f"Parsed arguments: {args}")
+
+    # --- Config file: merge before any other logic (CLI wins) ---
+    if args.config:
+        try:
+            from src.anon.core.run_config import load_run_config, merge_with_args as _merge
+            cfg = load_run_config(args.config)
+            _merge(cfg, args)
+            # Inject custom_patterns list from config into args for later processing
+            if cfg.custom_patterns and not getattr(args, '_config_custom_patterns', None):
+                args._config_custom_patterns = cfg.custom_patterns
+            # Register custom models from config
+            if cfg.custom_models:
+                args._config_custom_models = cfg.custom_models
+        except FileNotFoundError as e:
+            parser.error(str(e))
+        except Exception as e:
+            parser.error(f"Failed to load config file '{args.config}': {e}")
 
     if args.list_entities:
         _handle_list_entities(args.anonymization_strategy, args.transformer_model)
@@ -411,6 +437,57 @@ def _load_word_list_patterns(word_list_path: str, entities_to_preserve: set) -> 
             total_terms += 1
     logging.info(f"Word list loaded: {total_terms} terms from {len(word_list_data)} categories.")
     return patterns
+
+
+def _compile_inline_patterns(pattern_list: list, entities_to_preserve: set) -> list:
+    """Compile a list of pattern dicts (from config file) into compiled_patterns format."""
+    import re as _re
+    compiled = []
+    for entry in pattern_list:
+        entity_type = str(entry.get("entity_type", "CUSTOM")).upper()
+        pattern_str = entry.get("pattern")
+        if not pattern_str:
+            logging.warning("Custom pattern entry missing 'pattern' field: %s", entry)
+            continue
+        if entity_type in entities_to_preserve:
+            continue
+        score = float(entry.get("score", 0.8))
+        flag_str = str(entry.get("flags", "")).upper()
+        flags = _re.DOTALL | _re.IGNORECASE
+        if "MULTILINE" in flag_str:
+            flags |= _re.MULTILINE
+        try:
+            compiled.append({"label": entity_type, "regex": _re.compile(pattern_str, flags), "score": score})
+        except _re.error as e:
+            logging.warning("Invalid custom pattern '%s': %s", pattern_str, e)
+    return compiled
+
+
+def _load_custom_patterns(path: str, entities_to_preserve: set) -> list:
+    """Load custom regex patterns from a YAML or JSON file."""
+    import re as _re
+    p = Path(path)
+    if not p.exists():
+        logging.error("Custom patterns file not found: '%s'", path)
+        sys.exit(1)
+    try:
+        if p.suffix in (".yaml", ".yml"):
+            import yaml
+            with p.open(encoding="utf-8") as f:
+                data = yaml.safe_load(f) or []
+        else:
+            with p.open(encoding="utf-8") as f:
+                data = json.load(f)
+        if not isinstance(data, list):
+            logging.error("Custom patterns file must be a list of objects: '%s'", path)
+            sys.exit(1)
+    except Exception as e:
+        logging.error("Failed to parse custom patterns file '%s': %s", path, e)
+        sys.exit(1)
+
+    result = _compile_inline_patterns(data, entities_to_preserve)
+    logging.info("Custom patterns loaded: %d patterns from '%s'", len(result), path)
+    return result
 
 
 def main():
@@ -625,6 +702,18 @@ def main():
             compiled_patterns.extend(
                 _load_word_list_patterns(args.word_list, set(entities_to_preserve))
             )
+
+        # --- Custom patterns from --custom-patterns or config file ---
+        custom_pattern_sources = []
+        if getattr(args, 'custom_patterns', None):
+            custom_pattern_sources.append(args.custom_patterns)
+        if getattr(args, '_config_custom_patterns', None):
+            custom_pattern_sources.append(getattr(args, '_config_custom_patterns', None))
+        for src in custom_pattern_sources:
+            if isinstance(src, str):
+                compiled_patterns.extend(_load_custom_patterns(src, set(entities_to_preserve)))
+            elif isinstance(src, list):
+                compiled_patterns.extend(_compile_inline_patterns(src, set(entities_to_preserve)))
 
         entity_detector = EntityDetector(
             compiled_patterns=compiled_patterns,

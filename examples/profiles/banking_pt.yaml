@@ -1,0 +1,31 @@
+# AnonShield - Banking Documents Profile (Brazilian Portuguese)
+# Optimized for anonymizing Brazilian banking documents for testing.
+# Usage: python anon.py input.pdf --config examples/profiles/banking_pt.yaml
+
+lang: pt
+strategy: regex
+slug_length: 8
+ocr_engine: tesseract
+log_level: WARNING
+
+# Anonymize only these entity types
+entities:
+  - EMAIL_ADDRESS
+  - PHONE_NUMBER
+  - IP_ADDRESS
+  - CREDIT_CARD
+  - UUID
+  - CPF
+  - CNPJ
+  - BANK_ACCOUNT
+  - BANK_AGENCY
+  - PIX_KEY_UUID
+  - PIX_KEY_PHONE
+  - CEP
+  - RG
+
+# Custom patterns for Brazilian banking
+custom_patterns: examples/patterns/banking_pt.yaml
+
+db_mode: in-memory
+overwrite: true

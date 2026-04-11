@@ -1,0 +1,45 @@
+# Custom regex patterns for Brazilian banking documents
+# Usage: python anon.py input.txt --custom-patterns examples/patterns/banking_pt.yaml
+#
+# Format: list of {entity_type, pattern, score, flags (optional)}
+# flags: IGNORECASE, MULTILINE (default: DOTALL|IGNORECASE)
+
+# Brazilian CPF (tax ID): 123.456.789-09
+- entity_type: CPF
+  pattern: '\d{3}\.\d{3}\.\d{3}-\d{2}'
+  score: 0.95
+
+# Brazilian CNPJ (company tax ID): 12.345.678/0001-90
+- entity_type: CNPJ
+  pattern: '\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}'
+  score: 0.95
+
+# Bank account number (generic BR format): 12345-6 or 123456-7
+- entity_type: BANK_ACCOUNT
+  pattern: '\d{5,6}-\d{1}'
+  score: 0.85
+
+# Bank agency number: 1234 or 1234-5
+- entity_type: BANK_AGENCY
+  pattern: '\b\d{4}(?:-\d{1})?\b'
+  score: 0.75
+
+# PIX random key (UUID format)
+- entity_type: PIX_KEY_UUID
+  pattern: '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
+  score: 0.9
+
+# PIX phone key: +55 11 91234-5678 or 11912345678
+- entity_type: PIX_KEY_PHONE
+  pattern: '(?:\+55\s?)?(?:\(?\d{2}\)?[\s-]?)?\d{4,5}[\s-]?\d{4}'
+  score: 0.75
+
+# Brazilian ZIP code (CEP): 01310-100 or 01310100
+- entity_type: CEP
+  pattern: '\d{5}-?\d{3}'
+  score: 0.8
+
+# RG (state ID): 12.345.678-9
+- entity_type: RG
+  pattern: '\d{2}\.\d{3}\.\d{3}-\d{1}'
+  score: 0.85

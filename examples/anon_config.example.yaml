@@ -1,0 +1,90 @@
+# AnonShield - Global Run Configuration Example
+# Usage: python anon.py input.txt --config anon_config.yaml
+#
+# All CLI arguments can be set here. CLI arguments override config file values.
+# Fields not set here use the CLI defaults.
+
+# Language of the documents to process
+lang: en
+
+# Anonymization strategy:
+#   filtered   - Presidio pipeline, curated entity scope (default, best accuracy)
+#   presidio   - Full Presidio pipeline (maximum coverage, slowest)
+#   hybrid     - Presidio detection + custom replacement (GPU-optimized)
+#   standalone - Zero Presidio, direct model execution (fastest with NER)
+#   regex      - Pure regex only, zero NLP/ML overhead (fastest of all)
+#   slm        - End-to-end Small Language Model (experimental)
+strategy: filtered
+
+# NER transformer model (HuggingFace model ID)
+# Default: Davlan/xlm-roberta-base-ner-hrl (multilingual)
+# Alternative: attack-vector/SecureModernBERT-NER (cybersecurity)
+transformer_model: Davlan/xlm-roberta-base-ner-hrl
+
+# Length of the HMAC anonymization hash (0–64)
+# 0 = [ENTITY_TYPE] only (no hash, no secret key required)
+slug_length: 8
+
+# OCR engine for image/PDF processing: tesseract, easyocr, paddleocr, doctr, kerasocr
+ocr_engine: tesseract
+
+# Positive entity selection: ONLY these types will be anonymized
+# If set, --preserve-entities is ignored.
+# entities:
+#   - EMAIL_ADDRESS
+#   - IP_ADDRESS
+#   - PERSON
+
+# Entity types to preserve (skip anonymization)
+# preserve_entities:
+#   - CVE_ID
+#   - URL
+
+# Terms to never anonymize (exact match, case-insensitive)
+# allow_list:
+#   - ACME Corp
+#   - internal-tool
+
+# Path to word list JSON (terms that must always be anonymized)
+# word_list: examples/word_list.example.json
+
+# Path to custom regex patterns file (YAML or JSON)
+# custom_patterns: examples/patterns/banking_pt.yaml
+
+# Path to field-level anonymization rules for structured files (JSON/CSV/XML)
+# anonymization_config: examples/anonymization_config.json
+
+# Database mode: persistent (saves to disk) or in-memory
+db_mode: persistent
+
+# Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_level: WARNING
+
+# Give higher confidence score to regex patterns over NER model
+regex_priority: false
+
+# Minimum word length to process (0 = no limit)
+min_word_length: 0
+
+# Skip purely numeric strings
+skip_numeric: false
+
+# Enable in-memory LRU cache for anonymization results
+use_cache: true
+max_cache_size: 10000
+
+# Batch size for processing (integer or "auto")
+batch_size: auto
+
+# Overwrite existing output files
+overwrite: false
+
+# Register custom NER transformer models
+# Each entry needs an id and an entity_mapping dict
+# custom_models:
+#   - id: my-org/custom-ner-model
+#     entity_mapping:
+#       PER: PERSON
+#       ORG: ORGANIZATION
+#       LOC: LOCATION
+#     description: Custom domain-specific NER model
