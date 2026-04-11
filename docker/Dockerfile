@@ -59,7 +59,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/.venv/bin:$PATH" \
     VIRTUAL_ENV="/app/.venv"
 
-RUN apt-get update && apt-get install -y --no-install-recommends bash curl \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash curl \
+    tesseract-ocr tesseract-ocr-por \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /app
