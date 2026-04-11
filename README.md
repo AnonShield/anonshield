@@ -1,322 +1,75 @@
-# AnonShield: Scalable On-Premise Pseudonymization for CSIRT Vulnerability Data
+# AnonShield: Scalable On-Premise Pseudonymization
 
-AnonShield is a pseudonymization framework designed for Computer Security Incident Response Teams (CSIRTs). It replaces Personally Identifiable Information (PII) and cybersecurity indicators with cryptographically secure, deterministic pseudonyms (HMAC-SHA256), preserving referential integrity across documents while enabling GDPR/LGPD-compliant data sharing. AnonShield combines GPU-accelerated NER, an LRU entity cache, streaming processors for large files, and a schema-aware configuration mechanism. Evaluated on datasets up to 550 MB (70,951 vulnerability records), it reduces processing time from ~92 hours to under 10 minutes (~738× speedup over v2.0 on D2 JSON; ≥743× on D2 CSV) and achieves F1 = 94.2%, Recall = 96.7% with the `filtered`/`hybrid` strategies.
+AnonShield is a pseudonymization framework designed for secure and compliant data sharing. It replaces Personally Identifiable Information (PII) and sensitive indicators with cryptographically secure, deterministic pseudonyms (HMAC-SHA256), preserving referential integrity across documents while ensuring GDPR/LGPD compliance.
 
-> **Paper:** *AnonShield: Scalable On-Premise Pseudonymization for CSIRT Vulnerability Data* — SBRC 2026 Salão de Ferramentas.
+## Key Features
 
-> **Note:** In parts of this repository — including benchmark scripts, CLI flags (`--versions 3.0`), result directory names, and internal logs — AnonShield is referred to as **v3.0**. This reflects its versioning relative to the predecessor tools AnonLFI v1.0 and v2.0, which are used as baselines in the benchmark comparisons.
-
----
-
-## README Structure
-
-| Section | Description |
-|---|---|
-| [Considered Seals](#considered-seals) | SBRC quality seals targeted by this artifact |
-| [Basic Information](#basic-information) | Hardware, OS, and software environment |
-| [Dependencies](#dependencies) | Required packages and external tools |
-| [Security Concerns](#security-concerns) | Risks and mitigations for evaluators |
-| [Installation](#installation) | Step-by-step setup (local and Docker) |
-| [Minimal Test](#minimal-test) | Quick functional verification (~5–10 min) |
-| [Experiments](#experiments) | Reproduction of the three main paper claims |
-| [License](#license) | Licensing information |
-
----
-
-## Considered Seals
-
-The seals considered are: **Available (SeloD)**, **Functional (SeloF)**, **Sustainable (SeloS)**, and **Reproducible Experiments (SeloR)**.
-
-**SeloS — Sustainable:** The source code is organized into 25 focused modules under [`src/anon/`](src/anon/) with clear separation of concerns: [`engine.py`](src/anon/engine.py) (orchestration), [`strategies.py`](src/anon/strategies.py) (anonymization algorithms), [`processors.py`](src/anon/processors.py) (file-format handling), [`entity_detector.py`](src/anon/entity_detector.py) (NER), [`repository.py`](src/anon/repository.py)/[`database.py`](src/anon/database.py) (data layer), [`cache_manager.py`](src/anon/cache_manager.py), [`hash_generator.py`](src/anon/hash_generator.py), [`security.py`](src/anon/security.py), and others. The CLI entry point is [`anon.py`](anon.py). Design patterns are applied explicitly: *Strategy* for anonymization algorithms, *Template Method* for file processors, *Repository* for data access, and *Dependency Injection* in the orchestrator; [`core/protocols.py`](src/anon/core/protocols.py) defines Protocol-based interfaces for dependency inversion. ~73% of public APIs carry full type annotations and 100% of public classes/methods have docstrings. Beyond inline documentation, five developer guides are provided under [`docs/developers/`](docs/developers/) ([`ARCHITECTURE.md`](docs/developers/ARCHITECTURE.md), [`ANONYMIZATION_STRATEGIES.md`](docs/developers/ANONYMIZATION_STRATEGIES.md), [`SLM_INTEGRATION_GUIDE.md`](docs/developers/SLM_INTEGRATION_GUIDE.md), [`UTILITY_SCRIPTS_GUIDE.md`](docs/developers/UTILITY_SCRIPTS_GUIDE.md), [`EXTENSIBILITY.md`](docs/developers/EXTENSIBILITY.md), ~3,500 lines total), including a Mermaid architecture diagram. All dependencies are pinned in [`pyproject.toml`](pyproject.toml) and [`uv.lock`](uv.lock); Docker images (`anonshield/anon:latest` / `:gpu`) provide a fully self-contained execution environment.
-
----
-
-## Basic Information
-
-| | |
-|---|---|
-| **Hardware (paper experiments)** | NVIDIA RTX 5060 Ti 16 GB VRAM (driver 590.48.01, CUDA 13.1) · AMD Ryzen 5 8600G (6c/12t) · 32 GB DDR5 6000 MHz — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~2m18s |
-| **Hardware (tester — laptop)** | Intel Core i5-1035G1 · 20 GB RAM · no discrete GPU — CPU-only mode; 45/45 tests OK in ~3m55s |
-| **Hardware (tester — server A)** | 2× Intel Xeon E5-2650 · 130 GB RAM · NVIDIA Tesla C2050 + Quadro 5000 *(2010, Fermi, sm\_20 — not to be confused with the newer Quadro RTX 5000 which is Turing sm\_75)* present but below the sm\_75 minimum; no driver installed; tool runs CPU-only; 45/45 tests OK in ~10m19s |
-| **Hardware (tester — server B)** | AMD Ryzen 7 5800X (8c/16t) · 130 GB RAM · NVIDIA GeForce RTX 3060 12 GB (driver 550.163.01, CUDA 12.4) — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~3m15s |
-| **Hardware (tester — laptop 2)** | Intel Core i5-12450HX (8c) · 16 GB DDR4 · NVIDIA GeForce RTX 3050 6 GB · Zorin OS 18 — GPU used (`Device set to use cuda:0`); 45/45 tests OK in ~2m21s |
-| **Minimum for smoke test** | 4 GB RAM · x86\_64 · Python 3.12 + uv |
-| **Software** | Python 3.12 + [`uv`](https://astral.sh/uv) for all experiments; Docker optional (tool use only) |
-| **GPU (optional)** | NVIDIA driver ≥ 525 (CUDA 12.8) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html); GPU must be **sm\_75 (Turing) or newer** — torch 2.11.0+cu128 [dropped Volta (sm\_70) and older](https://github.com/pytorch/pytorch/releases/tag/v2.11.0) |
-| **OS** | Linux (tested and recommended); macOS/Windows supported via Docker only |
-| **Disk** | `.venv` after `uv sync`: ~7.9 GB; NER models: ~1.5 GB (downloaded on first run to `~/.cache/huggingface/`); D1 ~133 MB (in git); D3 bundled as zips (~80 MB in git, ~700 MB extracted). Benchmark comparisons with v2.0 (via `--setup`) require ~8 GB additional (v2.0 venv + models). **Total for full experiment suite: ~17 GB.** |
-
----
-
-## Dependencies
-
-**Python environment (all experiments):**
-- Python 3.12 + [`uv`](https://astral.sh/uv) — all packages pinned in [`pyproject.toml`](pyproject.toml) / [`uv.lock`](uv.lock)
-- Key packages: `presidio-analyzer`, `presidio-anonymizer`, `transformers`, `spacy`, `torch`, `pandas`, `pymupdf`, `pytesseract`, `lxml`, `orjson`, `scipy`, `statsmodels`
-- NER models downloaded automatically on first run and cached in `~/.cache/huggingface/` (~1.5 GB)
-
-**Optional:**
-- Tesseract OCR — required only for OCR-mode tests (PDF/image files):
-  ```bash
-  sudo apt install tesseract-ocr  # Ubuntu/Debian
-  ```
-- Docker — for tool use only (not needed for experiments): `anonshield/anon:latest` (~2 GB CPU) or `anonshield/anon:gpu` (~6 GB GPU)
-
----
-
-## Security Concerns
-
-- AnonShield processes sensitive cybersecurity data entirely **locally** — no data is transmitted to external services
-- `db/entities.db` stores the PII entity mapping table — keep it secure; losing it makes de-anonymization impossible
-- The HMAC secret key (`ANON_SECRET_KEY`) must be protected — it is required to correlate pseudonyms across separate runs
-- The Docker `--gpu` flag passes `--gpus all` to the container; review this before use in shared environments
-
----
+- **Multi-Format Support**: Process JSON, CSV, XML, PDF, DOCX, XLSX, and plain text.
+- **GPU-Accelerated NER**: Fast entity detection using state-of-the-art transformer models.
+- **Scalable Architecture**: O(n) streaming processors for handling large files (tested up to 550 MB+).
+- **Referential Integrity**: Uses HMAC-SHA256 to ensure the same entity always receives the same pseudonym across different files and runs.
+- **Schema-Aware Configuration**: Fine-grained control over which fields to anonymize in structured files.
+- **On-Premise**: Process sensitive data entirely locally without external API dependencies.
 
 ## Installation
 
-### Local (recommended for experiments)
+### Local Setup (Linux)
+
+1. **Install uv**:
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+2. **Clone and Install**:
+   ```bash
+   git clone https://github.com/AnonShield/tool.git
+   cd tool
+   uv sync
+   ```
+
+3. **Set your Secret Key**:
+   ```bash
+   export ANON_SECRET_KEY=$(openssl rand -hex 32)
+   ```
+
+### Docker (Recommended)
+
+Run AnonShield without installing Python dependencies:
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/AnonShield/tool.git
-cd tool
-
-# 2. Install uv (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 3. Install system build dependencies (Linux — required to compile hdbscan and other C extensions)
-sudo apt update && sudo apt install -y python3-dev build-essential
-
-# 4. Install Python dependencies
-uv sync
-
-# 5. Set the HMAC secret key (required for pseudonymization)
-export ANON_SECRET_KEY=$(openssl rand -hex 32)
-# To persist across sessions:
-echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
-```
-
-**GPU:** CUDA-enabled PyTorch (`cu128`) and CuPy are included in [`pyproject.toml`](pyproject.toml) and installed automatically by `uv sync`. No extra steps required — GPU acceleration is enabled by default when an NVIDIA GPU is present.
-
-### Docker (tool use only — not required for experiments)
-
-> **⚠️ Warning:** The Docker images contain only the anonymization tool ([`anon.py`](anon.py)). They do **not** include the benchmark suite, datasets (D1/D3), evaluation data, or any experiment scripts. To reproduce the paper's claims, use the local installation with `uv sync` as described above.
-
-> **No system dependencies required** — Python, uv, and all libraries are already inside the image. The only prerequisite is Docker. The download commands (`curl` on Linux/macOS, `Invoke-WebRequest` on Windows) and the secret key generators (`openssl` on Linux/macOS, `RandomNumberGenerator` on Windows) are native to each OS — nothing extra to install.
-
-**Linux / macOS** — uses `curl` and `openssl` (built-in):
-```bash
-curl -fsSL https://raw.githubusercontent.com/AnonShield/tool/main/docker/run.sh -o run.sh
 chmod +x run.sh
 export ANON_SECRET_KEY=$(openssl rand -hex 32)
 ./run.sh ./your_file.csv
 ```
 
-**Windows** — uses `Invoke-WebRequest` and `RandomNumberGenerator` (built-in PowerShell):
-```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/tool/main/docker/run.ps1 -OutFile run.ps1
-$env:ANON_SECRET_KEY = [System.BitConverter]::ToString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).Replace("-","").ToLower()
-.\run.ps1 .\your_file.csv
-```
+## Quick Start
 
-Full usage, options, and examples: [Docker Hub README](https://hub.docker.com/r/anonshield/anon)
-
----
-
-## Minimal Test
-
-~5–10 minutes. No datasets beyond what is already in the repository.
+Anonymize a file using the default settings:
 
 ```bash
-# Set a secret key
-export ANON_SECRET_KEY=$(openssl rand -hex 32)
-
-# Anonymize the included example file
-uv run anon.py examples/teste-exemplo-artigo.txt
-
-# Expected: output/anon_teste-exemplo-artigo.txt is created
-# PII tokens replaced with [TYPE_<slug>] pseudonyms — verify with:
-cat output/anon_teste-exemplo-artigo.txt
+uv run anon.py path/to/your/file.txt
 ```
 
-Run the unit test suite:
-```bash
-uv run python -m unittest discover tests/
-```
-
-Expected: the final line reads `OK` (all tests passed) or `FAILED` (one or more tests failed). Some tests intentionally exercise error paths and will print `ERROR` or warning messages during the run — this is normal and does not indicate a failure. Only the final `OK` / `FAILED` verdict matters.
-
----
-
-## Experiments
-
-
-### Claim #1 — AnonShield (`standalone`) achieves ~3×–~17× speedup over v2.0 per file on D1 (GPU); ≥3,532× (GPU) / ≥535× (CPU) at D3 scale
-
-**Paper reference:** Performance results section (D1/D2/D3).
-
-**What this claim asserts and why it has two parts:**
-
-The per-file speedup is measured on D1 (small files, 130 targets). On GPU, AnonShield benefits from accelerated NER inference, yielding ~3×–~17× over v2.0 per file (mean-based). On CPU-only hardware, AnonShield loses GPU acceleration (~5.5× slower per file) while v2.0 is already CPU-bound — so per-file speedup on CPU is ~GPU speedup ÷ 5.5, and AnonShield may be slower per file without a GPU. However, at D3 scale the advantage recovers due to AnonShield's O(n) streaming architecture vs v2.0's scaling behavior: ≥3,532× on GPU and ≥535× on CPU (D3 CPU times are measured in stored results).
-
-**Verification options (in order of time cost):**
-
-**Option A — Smoke test (~5–25 min depending on hardware):**
-Verifies the full pipeline is functional on small subsets of D1, D1C, and D3.
-```bash
-# D1C includes image-based PDF targets — install Tesseract before running:
-sudo apt install tesseract-ocr
-
-./paper_data/test_minimal/run_tests.sh --skip-d2            # with NVIDIA GPU (D2 is private — skip it)
-./paper_data/test_minimal/run_tests.sh --skip-d2 --cpu-only  # no GPU
-```
-Paper hardware (example): GPU command **313.21 s (~5.22 min)**; CPU command **700.36 s (~11.67 min)**.
-
-Expected: the final line reads `RESULT: ALL PASSED`. D2 is a private dataset not included in this repository; `--skip-d2` omits those 4 steps so the script exits cleanly. Absolute runtimes on 500-row subsets will not match the paper's full-scale numbers, but the pipeline is verified end-to-end.
-
-**Option B — Spot check (~8–20 min after setup):**
-Runs v2.0 and AnonShield on a ~512 KB subset of D3 CSV. v2.0 throughput is compute-limited and scales poorly with file size; AnonShield benefits from GPU acceleration when available, so the measured ratio varies by hardware. On first run, the script automatically sets up v2.0 and v3.0 environments and downloads model weights (~several GB) — this can take significantly longer depending on network speed. Subsequent runs skip setup entirely.
+List all supported entity types:
 
 ```bash
-./paper_data/scripts/extract_datasets.sh             # extract D3 from bundled zips (required once)
-./paper_data/scripts/spot_check_claim1.sh            # with NVIDIA GPU
-./paper_data/scripts/spot_check_claim1.sh --cpu-only  # no GPU
-```
-Paper hardware (example): GPU path (**extract + spot_check**) **248.62 s (~4.14 min)**; CPU path **282.86 s (~4.71 min)**.
-Tester — server B (AMD Ryzen 7 5800X · RTX 3060): GPU path **272.8 s (~4.55 min)**; CPU path **242.6 s (~4.04 min)**.
-Tester — server A (2× Intel Xeon E5-2650, CPU-only): GPU path skipped (no GPU); CPU path **966.0 s (~16.1 min)**.
-
-Expected output (absolute times vary by hardware; speedup is larger with GPU):
-```
-══════════════════════════════════════════════════════════════
-  Claim #1 Spot Check  (515 KB subset of D3 CSV)
-══════════════════════════════════════════════════════════════
-  v2.0  default    :    XXX.X s   (X.XX KB/s on this machine)
-  AnonShield  standalone :     XX.X s   (XXX KB/s on this machine)
-  Speedup          : XX×  (varies by hardware — larger when GPU is available)
-
-  Extrapolating to full D3 (247 MB) via measured throughputs:
-  v2.0 on full D3  : ≥ XX.X h   (lower bound — extrapolated from measured throughput)
-  AnonShield on full D3  : ≤ XXXX s   (upper bound — AnonShield cache improves at scale)
-  Projected speedup: ≥ XX×
-══════════════════════════════════════════════════════════════
+uv run anon.py --list-entities
 ```
 
-**Option C — Full D3 benchmark:**
-Runtime is hardware-dependent and cannot be estimated without knowing the evaluator's machine.
-```bash
-./paper_data/scripts/extract_datasets.sh                     # extract D3 from bundled zips (~80 MB → ~700 MB)
-./paper_data/scripts/reproduce_all_runs.sh --skip-d1 --skip-d2
-./paper_data/scripts/analyze_all.sh
-```
-Paper hardware (measured): full Option C (`reproduce_all_runs --skip-d1 --skip-d2` + `analyze_all`) completed in **22,906.43 s (~6.36 h)** on GPU; **~103,035 s (~28.62 h)** on CPU-only (derived from stored per-run `wall_clock_time_sec`).
-Tester — server B (AMD Ryzen 7 5800X · RTX 3060): full Option C **32,549.1 s (~9.04 h)** (extract **2.4 s**; reproduce **32,489.3 s (~9.02 h)**; analyze **57.5 s**).
-Tester — server A (2× Intel Xeon E5-2650, CPU-only): full Option C estimated **~326,554 s (~90.7 h ≈ 3.78 days)** — projected from 7 real D3 CSV runs (per-run avg: filtered ~6,023 s, hybrid ~6,009 s, standalone ~1,596 s, presidio ~6,137 s), extrapolated to the remaining runs and datasets using the 3.17× ratio relative to the paper hardware CPU stored results.
+## Usage & Configuration
 
-The stored `benchmark_results.csv` files under [`paper_data/results_paper/`](paper_data/results_paper/) contain the paper's original measurements and can be inspected directly without re-running.
+Detailed guides are available in the `docs/` directory:
 
-> Full dataset details and step-by-step instructions: [`paper_data/EXPERIMENTS.md`](paper_data/EXPERIMENTS.md)
+- [CLI Reference](docs/users/CLI_REFERENCE.md)
+- [Architecture Overview](docs/developers/ARCHITECTURE.md)
+- [Anonymization Strategies](docs/developers/ANONYMIZATION_STRATEGIES.md)
+- [SLM Integration Guide](docs/developers/SLM_INTEGRATION_GUIDE.md)
 
----
+## Security
 
-### Claim #2 — `filtered` and `hybrid` strategies achieve F1 = 94.2%, Recall = 96.7%
-
-**Paper reference:** Accuracy evaluation section.
-
-**What this claim asserts:** On a stratified sample of 67 OpenVAS vulnerability records annotated by three security specialists, the `filtered` and `hybrid` strategies achieve F1 = 94.2% and Recall = 96.7%. Annotation was performed by the paper authors and is **not expected to be reproduced by evaluators** — it required manual expert judgment across 13 entity types.
-
-**What evaluators can verify:**
-1. **Inspect the pre-computed annotated outputs** directly (no re-running required):
-   - [`paper_data/evaluation/3.0-filtered/filtered/`](paper_data/evaluation/3.0-filtered/filtered/) — anonymized CSV + XLSX with TP/FP/FN counts
-   - [`paper_data/evaluation/3.0-hybrid/hybrid/`](paper_data/evaluation/3.0-hybrid/hybrid/)
-   - [`paper_data/evaluation/3.0-standalone/standalone/`](paper_data/evaluation/3.0-standalone/standalone/)
-   - [`paper_data/evaluation/3.0-presidio/presidio/`](paper_data/evaluation/3.0-presidio/presidio/)
-   - [`paper_data/evaluation/1.0/`](paper_data/evaluation/1.0/) and [`paper_data/evaluation/2.0/`](paper_data/evaluation/2.0/)
-2. **Re-run the tool** on the evaluation dataset and compare the anonymized output against the reference:
-
-   > **⚠️ GPU recommended:** This command uses the `SecureModernBERT-NER` transformer model. Measured runtimes for the `filtered` strategy on the 9.2 MB evaluation file: **~4 min on GPU** (RTX 5060 Ti, 38.7 KB/s) and **~2h on CPU** (Intel i5-1035G1, 1.4 KB/s). For all 4 strategies: **~15–20 min on GPU**, **~7–8h on CPU**. **If you do not have an NVIDIA GPU, prefer Option 1 (pre-computed outputs) to avoid the long runtime.**
-   >
-   > **Note on the progress bar:** the time-remaining estimate shown in the terminal during processing is unreliable and should be ignored. During the first ~1–3 minutes the model is being compiled and loaded — throughput is near zero at this stage, causing the progress bar to project absurdly large estimates (e.g. "60h remaining" or "2h remaining"). Once the model finishes loading the speed increases sharply and the run completes well within the times shown above. **Do not interrupt the process based on the initial estimate.**
-
-```bash
-python3 benchmark/benchmark.py \
-  --benchmark \
-  --file paper_data/evaluation/vulnnet_scans_openvas_compilado.csv \
-  --versions 3.0 \
-  --strategies filtered hybrid standalone presidio \
-  --transformer-model attack-vector/SecureModernBERT-NER \
-  --entities-to-preserve TOOL,PLATFORM,FILE_PATH,THREAT_ACTOR,SERVICE,REGISTRY_KEY,CAMPAIGN,MALWARE,SECTOR \
-  --anonymization-config paper_data/configs/anonymization_config_openvas.json
-```
-
-Paper hardware (example): command completed in **983.37 s (~16.39 min)** after rebuilding the environment.
-Tester — server B (AMD Ryzen 7 5800X · RTX 3060): command completed in **1,210.6 s (~20.2 min)**.
-Tester — server A (2× Intel Xeon E5-2650, CPU-only): command completed in **15,879.4 s (~4.41 h)**.
-
-**Reference results (pre-computed, 67 records, 3 specialists, 13 entity types):**
-
-| Strategy | TP | FP | FN | Precision | Recall | F1 |
-|---|---|---|---|---|---|---|
-| `filtered` | 724 | 64 | 25 | 91.9% | **96.7%** | **94.2%** |
-| `hybrid` | 724 | 64 | 25 | 91.9% | **96.7%** | **94.2%** |
-| `standalone` | 739 | 102 | 43 | 87.9% | 94.5% | 91.1% |
-| `presidio` | 724 | 287 | 25 | 71.6% | 96.7% | 82.3% |
-
-> Annotation methodology and XLSX format details: [`paper_data/evaluation/EVALUATION_DATA.md`](paper_data/evaluation/EVALUATION_DATA.md) · [`ANNOTATION_MANUAL.md`](paper_data/evaluation/ANNOTATION_MANUAL.md)
-
----
-
-### Claim #3 — `anonymization_config` eliminates NER inference overhead, reducing D3 processing time significantly (paper hardware: ~9× GPU / ~55× CPU; actual speedup depends on GPU speed)
-
-**Paper reference:** Config gain results section.
-
-**What this claim asserts:** A schema-aware `anonymization_config` that specifies only `force_anonymize` and `exclude` directives bypasses the NER and regex pipeline entirely — no field undergoes inference. On GPU (paper hardware), this reduces D3 CSV processing from ~73 s to ~8 s (~9×). The CPU gain is larger because NER inference costs more without a GPU. The paper also reports gains on D2 (private dataset, not reproducible by evaluators).
-
-**Dataset:** D3 with [`paper_data/configs/anonymization_config_cve.json`](paper_data/configs/anonymization_config_cve.json).
-
-```bash
-./paper_data/scripts/extract_datasets.sh              # extract D3 from bundled zips (required once)
-./paper_data/scripts/spot_check_claim3.sh             # with NVIDIA GPU  (~80 s)
-./paper_data/scripts/spot_check_claim3.sh --cpu-only  # no GPU          (~490 s / ~8 min)
-```
-Paper hardware (example): GPU path (**extract + spot_check**) **83.70 s (~1.40 min)**; CPU path **504.43 s (~8.41 min)**.
-Tester — server B (AMD Ryzen 7 5800X · RTX 3060): GPU path **119.4 s (~1.99 min)**; CPU path **488.6 s (~8.14 min)**.
-Tester — server A (2× Intel Xeon E5-2650, CPU-only): GPU path skipped (no GPU); CPU path **1,670.1 s (~27.8 min)**.
-
-Expected speedup: **larger on CPU** (NER inference costs more without a GPU, so removing it saves more). Absolute times vary by hardware.
-```
-══════════════════════════════════════════════════════════════
-  Claim #3 Spot Check  (D3 CSV, AnonShield standalone)
-══════════════════════════════════════════════════════════════
-  without config  :    XXX.X s
-  with config     :      X.X s
-  Config speedup  : XX×
-
-  Note: for this specific config (only force_anonymize and
-  fields_to_exclude directives, zero fields_to_anonymize entries),
-  no field passes through the NER or regex pipeline, so GPU and
-  CPU times converge. The CPU gain is therefore larger than on GPU.
-══════════════════════════════════════════════════════════════
-```
-
-> Full reproduction steps: [`paper_data/EXPERIMENTS.md`](paper_data/EXPERIMENTS.md)
-
----
-
-## Support & Contact
-
-We welcome feedback, questions, and contributions from the community.
-
-* **Bugs & Feature Requests:** Please [open an issue](https://github.com/AnonShield/tool/issues) on our GitHub repository.
-* **Direct Contact & Inquiries:** For institutional questions, partnerships, or to report a security bug directly, reach out to our team at **[anonshield@unipampa.edu.br](mailto:anonshield@unipampa.edu.br)**.
-
----
+- **Deterministic**: Pseudonyms are derived from your `ANON_SECRET_KEY`. Keep this key safe to maintain (or regain) the ability to de-anonymize data.
+- **Local-Only**: No data leaves your machine. All detection and processing happen strictly on-premise.
 
 ## License
 
-This project is licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE) for the full text.
-
----
-
-*[CLI Reference](docs/users/CLI_REFERENCE.md) · [Architecture](docs/developers/ARCHITECTURE.md) · [Anonymization Strategies](docs/developers/ANONYMIZATION_STRATEGIES.md) · [Extensibility](docs/developers/EXTENSIBILITY.md) · [Benchmark Suite](benchmark/BENCHMARK.md) · [Experiments & Datasets](paper_data/EXPERIMENTS.md) · [Evaluation Data](paper_data/evaluation/EVALUATION_DATA.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)*
+This project is licensed under the **GNU General Public License v3.0**.

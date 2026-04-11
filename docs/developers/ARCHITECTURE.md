@@ -184,6 +184,8 @@ After batch processing, the orchestrator verifies input count == output count. O
 ├── pyproject.toml                   # Project metadata and dependencies
 ├── uv.lock                          # Dependency lock file
 ├── run.sh                           # Docker orchestration script
+├── benchmark.py                     # Performance benchmarking script
+├── .gitignore                       # Ignored files and directories
 │
 ├── examples/
 │   ├── anonymization_config.json    # Default anonymization config
@@ -217,32 +219,18 @@ After batch processing, the orchestrator verifies input count == output count. O
 │   │   ├── client.py                # OllamaClient (SLMClient protocol)
 │   │   ├── prompts.py               # PromptManager
 │   │   ├── ollama_manager.py        # Ollama process management
-│   │   ├── anonymizers/
-│   │   │   └── slm_anonymizer.py    # End-to-end SLM anonymization
-│   │   ├── detectors/
-│   │   │   └── slm_detector.py      # SLM as entity detector
-│   │   └── mappers/
-│   │       └── entity_mapper.py     # SLM entity mapping
-│   └── evaluation/                  # Evaluation support
-│       ├── ground_truth.py          # Ground truth loading
-│       ├── hash_tracker.py          # Hash tracking for evaluation
-│       └── metrics_calculator.py    # TP/FP/FN metrics
+│   ├── evaluation/                  # Evaluation support (Internal)
+│   │   ├── ground_truth.py          # Ground truth loading
+│   │   ├── hash_tracker.py          # Hash tracking for evaluation
+│   │   └── metrics_calculator.py    # TP/FP/FN metrics
 │
 ├── scripts/                         # Utility scripts
 │   ├── deanonymize.py               # Controlled de-anonymization
-│   ├── evaluate.py                  # Evaluation metrics
-│   ├── create_ground_truth.py       # Ground truth generation
-│   ├── sample.py                    # Data sampling
-│   ├── generate_cve_dataset.py      # CVE dataset generation
-│   ├── analyze_entity_map.py        # Entity map analysis
-│   ├── cluster_entities.py          # Entity clustering (HDBSCAN)
-│   ├── get_metrics.py               # Performance statistics
 │   ├── export_and_clear_db.py       # DB export/clear
+│   ├── slm_regex_generator.py       # Entity map analysis
 │   └── utils.py                     # Shared utilities
 │
-├── tests/                           # Test suite
-├── benchmark/                       # Benchmarking suite
-│   └── README.md                    # Benchmark documentation
+├── tests/                           # Unit and integration tests
 └── docs/                            # Documentation
     └── developers/
         ├── ARCHITECTURE.md
