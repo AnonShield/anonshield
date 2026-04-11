@@ -45,3 +45,25 @@ torch = { index = "pytorch-cu128" }
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
+
+[project.optional-dependencies]
+easyocr = ["easyocr>=1.7.0"]
+paddleocr = ["paddleocr>=2.8.0", "paddlepaddle>=2.6.0"]
+doctr = ["python-doctr[torch]>=0.8.0"]
+kerasocr = ["keras-ocr>=0.9.3"]
+ocr-all = ["easyocr>=1.7.0", "python-doctr[torch]>=0.8.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-timeout>=2.4.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow (deselect with '-m not slow')",
+    "slm: marks tests that require Ollama running (deselect with '-m not slm')",
+    "ocr: marks tests that require OCR engines to be installed",
+]

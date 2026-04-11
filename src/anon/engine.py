@@ -417,8 +417,8 @@ class AnonymizationOrchestrator:
         if analyzer_engine and anonymizer_engine:
             self.analyzer_engine = analyzer_engine
             self.anonymizer_engine = anonymizer_engine
-        elif strategy_name in ("slm", "standalone"):
-            # SLM and Standalone strategies don't need Presidio engines
+        elif strategy_name in ("slm", "standalone", "regex"):
+            # SLM, Standalone, and Regex-only strategies don't need Presidio engines
             self.analyzer_engine = None
             self.anonymizer_engine = None
             logging.info(f"Skipping Presidio initialization for '{strategy_name}' strategy (Presidio-free mode).")

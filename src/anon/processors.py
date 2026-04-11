@@ -103,7 +103,8 @@ def calculate_adaptive_batch_size(
         "presidio": 500,      # Full Presidio pipeline (CPU-bound)
         "filtered": 800,      # Filtered Presidio (medium)
         "hybrid": 1200,       # Hybrid with custom logic (GPU-optimized)
-        "standalone": 1500,   # Fastest (regex-only, no Presidio)
+        "standalone": 1500,   # Zero Presidio, direct model execution
+        "regex": 5000,        # Pure regex, zero ML overhead (fastest)
         "slm": 300            # SLM strategy (LLM calls)
     }
     

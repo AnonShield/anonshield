@@ -444,12 +444,21 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             slm_detector=kwargs.get("slm_detector"),
             slm_detector_mode=kwargs.get("slm_detector_mode", "hybrid")
         )
-    
+
+    elif strategy_name == "regex":
+        # Regex-only: pure regex matching, zero ML/NLP overhead (fastest possible)
+        from .standalone_strategy import RegexOnlyStrategy
+        return RegexOnlyStrategy(
+            entity_detector=kwargs["entity_detector"],
+            hash_generator=kwargs["hash_generator"],
+            cache_manager=kwargs["cache_manager"],
+            entities_to_preserve=kwargs["entities_to_preserve"],
+        )
+
     else:
         raise ValueError(
             f"Unknown anonymization strategy: {strategy_name}. "
-            f"Available strategies: 'presidio', 'filtered' (recommended), 'hybrid', 'standalone'. "
-            f"Legacy names 'fast' and 'balanced' are still supported."
+            f"Available strategies: 'presidio', 'filtered' (recommended), 'hybrid', 'standalone', 'regex'."
         )
 
 

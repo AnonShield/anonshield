@@ -38,6 +38,20 @@ class EntityDetector:
                     })
         return detected_entities
 
+    def extract_regex_entities(self, text: str) -> List[Dict]:
+        """Detect entities using only compiled regex patterns — no spaCy doc required."""
+        detected_entities = []
+        for pat in self.compiled_patterns:
+            for match in pat["regex"].finditer(text):
+                match_text = match.group()
+                if match_text in self.allow_list or pat["label"] in self.entities_to_preserve:
+                    continue
+                detected_entities.append({
+                    "start": match.start(), "end": match.end(),
+                    "label": pat["label"], "text": match_text, "score": pat["score"],
+                })
+        return detected_entities
+
     def merge_overlapping_entities(self, detected_entities: List[Dict]) -> List[Dict]:
         """Sorts and merges overlapping entities based on score and length."""
         # Sort by start position, then by inverse score (higher score first), then by inverse length (longer first)

@@ -400,3 +400,72 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
                 continue
         
         return anonymized_results, collected_entities_total
+
+
+class RegexOnlyStrategy(StandaloneAnonymizationStrategy):
+    """
+    Pure regex anonymization — zero NLP/ML overhead.
+
+    Detection: compiled regex patterns only (no spaCy, no Transformers)
+    Replacement: same slug-based logic as StandaloneStrategy
+    Performance: FASTEST of all strategies (no model loading whatsoever)
+    Use case: high-throughput pipelines where regex coverage is sufficient
+              (emails, IPs, CVEs, hashes, CPF, credit cards, etc.)
+    """
+
+    def __init__(
+        self,
+        entity_detector,
+        hash_generator,
+        cache_manager,
+        entities_to_preserve: set,
+    ):
+        super().__init__()
+        self.entity_detector = entity_detector
+        self.hash_generator = hash_generator
+        self.cache_manager = cache_manager
+        self.entities_to_preserve = entities_to_preserve
+
+    def anonymize(self, texts: List[str], operator_params: Dict) -> Tuple[List[str], List[Tuple]]:
+        self.logger.debug("Executing RegexOnlyStrategy (zero NLP dependencies)")
+        if not texts:
+            return [], []
+
+        original_texts = [str(t) if pd.notna(t) else "" for t in texts]
+        anonymized_results = [""] * len(original_texts)
+        collected_entities_total: List[Tuple] = []
+
+        slug_length = operator_params.get("custom_slug_length", 64)
+
+        for idx, text in enumerate(original_texts):
+            if not text:
+                continue
+            cached = self.cache_manager.get(text)
+            if cached:
+                anonymized_results[idx] = cached
+                continue
+            try:
+                detected = self.entity_detector.extract_regex_entities(text)
+                merged = self.entity_detector.merge_overlapping_entities(detected)
+
+                parts: List[str] = []
+                cur = 0
+                collected: List[Tuple] = []
+                for ent in merged:
+                    parts.append(text[cur:ent["start"]])
+                    clean = " ".join(ent["text"].split()).strip()
+                    display_hash, full_hash = self.hash_generator.generate_slug(clean, slug_length)
+                    collected.append((ent["label"], clean, display_hash, full_hash, slug_length > 0))
+                    parts.append(f"[{ent['label']}]" if slug_length == 0 else f"[{ent['label']}_{display_hash}]")
+                    cur = ent["end"]
+                parts.append(text[cur:])
+
+                anonymized_text = "".join(parts)
+                self.cache_manager.add(text, anonymized_text)
+                anonymized_results[idx] = anonymized_text
+                collected_entities_total.extend(collected)
+            except Exception as e:
+                self.logger.error(f"RegexOnlyStrategy failed at index {idx}: {e}")
+                anonymized_results[idx] = text
+
+        return anonymized_results, collected_entities_total

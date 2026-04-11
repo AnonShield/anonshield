@@ -278,12 +278,13 @@ def _parse_arguments():
     parser.add_argument("--min-word-length", type=int, default=DefaultSizes.DEFAULT_MIN_WORD_LENGTH, help=f"Minimum character length for a word to be processed. Default: {DefaultSizes.DEFAULT_MIN_WORD_LENGTH} (no limit).")
     parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized.")
     parser.add_argument("--anonymization-strategy", type=str, default="filtered",
-                       choices=["presidio", "filtered", "hybrid", "standalone", "slm"],
+                       choices=["presidio", "filtered", "hybrid", "standalone", "regex", "slm"],
                        help="Anonymization strategy. "
                             "'filtered': Presidio pipeline with curated recognizer scope (default, best accuracy). "
                             "'presidio': Full Presidio pipeline. "
                             "'hybrid': Presidio detection + custom replacement. "
                             "'standalone': Zero Presidio dependencies, fastest on GPU. "
+                            "'regex': Pure regex matching only, zero NLP/ML overhead (fastest). "
                             "'slm': End-to-end SLM anonymization (experimental).")
     parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
     parser.add_argument("--transformer-model", type=str, default=TRANSFORMER_MODEL, help=f"Transformer model for NER detection. Options: 'Davlan/xlm-roberta-base-ner-hrl' (default, multilingual), 'attack-vector/SecureModernBERT-NER' (cybersecurity-focused). Default: {TRANSFORMER_MODEL}.")
@@ -550,7 +551,8 @@ def main():
         db_context.initialize(synchronous=args.db_synchronous_mode)
         logging.info(f"Database initialized in '{args.db_mode}' mode with synchronous PRAGMA set to '{args.db_synchronous_mode or 'NORMAL'}'.")
 
-    models_check(args.lang, args.transformer_model)
+    if args.anonymization_strategy != "regex":
+        models_check(args.lang, args.transformer_model)
 
     allow_list = [term.strip() for term in args.allow_list.split(',') if term]
     logging.debug(f"Allow list: {allow_list}")
