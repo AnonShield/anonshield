@@ -269,6 +269,12 @@ def _parse_arguments():
     parser.add_argument("--anonymization-config", type=str, default=None, help="Path to a .json file with field-level anonymization rules for structured files (JSON, CSV, XML). See documentation for format.")
     parser.add_argument("--word-list", type=str, default=None, help="Path to a .json file mapping category names to lists of known terms that must always be anonymized (e.g. organization names, internal system names, acronyms).")
 
+    # OCR options
+    parser.add_argument("--ocr-engine", type=str, default="tesseract",
+                        choices=["tesseract", "easyocr", "paddleocr", "doctr", "kerasocr"],
+                        help="OCR engine for image/PDF text extraction. Default: tesseract. "
+                             "Others require optional dependencies — see docs/users/OCR_ENGINES.md.")
+
     # Performance & Filtering options
     parser.add_argument("--preserve-row-context", action="store_true", help="For CSV/XLSX, process all values to preserve context instead of only unique values.")
     parser.add_argument("--json-stream-threshold-mb", type=int, default=ProcessingLimits.JSON_STREAM_THRESHOLD_MB, help=f"JSON streaming threshold in MB. Files larger than this will be streamed from disk. Default: {ProcessingLimits.JSON_STREAM_THRESHOLD_MB}")
@@ -711,6 +717,15 @@ def main():
                 logging.error(f"Invalid --batch-size value: '{batch_size_value}'. Use 'auto' or an integer. Defaulting to {DefaultSizes.BATCH_SIZE}.")
                 batch_size_value = DefaultSizes.BATCH_SIZE
         
+        # --- OCR Engine ---
+        from src.anon.ocr.factory import get_ocr_engine
+        try:
+            ocr_engine = get_ocr_engine(args.ocr_engine)
+            logging.info(f"OCR engine: {args.ocr_engine}")
+        except RuntimeError as e:
+            logging.error(str(e))
+            sys.exit(1)
+
         processor_factory_args = {
             "ner_data_generation": args.generate_ner_data,
             "ner_include_all": args.ner_include_all,
@@ -729,6 +744,7 @@ def main():
             "ner_chunk_size": args.ner_chunk_size,
             "force_large_xml": args.force_large_xml,
             "use_datasets": args.use_datasets,
+            "ocr_engine": ocr_engine,
         }
         logging.debug(f"Processor factory arguments: {processor_factory_args}")
 

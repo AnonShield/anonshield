@@ -71,7 +71,7 @@ def get_output_path(original_path: str, new_ext: str, prefix: str = "anon_", out
 
 
 def extract_text_from_image(image_bytes: bytes) -> str:
-    """Extracts text from image bytes using OCR."""
+    """Extracts text from image bytes using Tesseract OCR (default/legacy path)."""
     try:
         with Image.open(io.BytesIO(image_bytes)) as img:
             return pytesseract.image_to_string(img)
@@ -209,8 +209,10 @@ class FileProcessor(ABC):
                  json_chunk_size: int = DefaultSizes.JSON_CHUNK_SIZE,
                  ner_chunk_size: int = DefaultSizes.NER_CHUNK_SIZE,
                  force_large_xml: bool = False,
-                 use_datasets: bool = False):
+                 use_datasets: bool = False,
+                 ocr_engine=None):
         self.file_path = file_path
+        self._ocr_engine = ocr_engine  # Optional[OCREngine] — injected from CLI
         self.orchestrator = orchestrator
         self.ner_data_generation = ner_data_generation
         self.ner_include_all = ner_include_all
@@ -242,6 +244,12 @@ class FileProcessor(ABC):
         self.ner_file_handle: Optional[io.TextIOWrapper] = None
         self._path_decision_cache: Dict[str, Tuple[str, Optional[Union[str, List[str]]]]] = {}
         logging.debug(f"FileProcessor initialized for '{file_path}' with: ner_data_generation={ner_data_generation}, ner_aggregate_record={ner_aggregate_record}, min_word_length={min_word_length}, skip_numeric={skip_numeric}, output_dir='{output_dir}', overwrite={overwrite}, disable_gc={disable_gc}, force_large_xml={force_large_xml}, use_datasets={use_datasets}, batch_size={self.batch_size if self.batch_size > 0 else 'auto'}.")
+
+    def _do_ocr(self, image_bytes: bytes) -> str:
+        """Extract text from image bytes using the configured OCR engine."""
+        if self._ocr_engine is not None:
+            return self._ocr_engine.extract_text(image_bytes)
+        return extract_text_from_image(image_bytes)
 
     def _get_ner_output_path(self) -> str:
         return get_output_path(self.file_path, ".jsonl", prefix="ner_data_anon_", output_dir=self.output_dir)
@@ -670,7 +678,7 @@ class ImageFileProcessor(FileProcessor):
     def _extract_texts(self) -> Iterable[str]:
         with open(self.file_path, "rb") as f:
             image_bytes = f.read()
-        extracted_text = extract_text_from_image(image_bytes)
+        extracted_text = self._do_ocr(image_bytes)
         if extracted_text:
             yield extracted_text
 
@@ -695,7 +703,7 @@ class DocxFileProcessor(FileProcessor):
                     for r_id in run._r.xpath(".//@r:embed"):
                         try:
                             image_part = doc.part.related_parts[r_id]
-                            ocr_text = extract_text_from_image(image_part.blob)
+                            ocr_text = self._do_ocr(image_part.blob)
                             if ocr_text: para_content_parts.append(ocr_text)
                         except (KeyError, AttributeError):
                             continue
@@ -728,7 +736,7 @@ class DocxFileProcessor(FileProcessor):
                         for r_id in run._r.xpath(".//@r:embed"):
                             try:
                                 image_part = doc.part.related_parts[r_id]
-                                ocr_text = extract_text_from_image(image_part.blob)
+                                ocr_text = self._do_ocr(image_part.blob)
                                 if ocr_text: para_content_parts.append(ocr_text)
                             except (KeyError, AttributeError):
                                 continue
@@ -815,7 +823,7 @@ class PdfFileProcessor(FileProcessor):
                     base_image = doc.extract_image(xref)
                     if base_image:
                         bbox = page.get_image_bbox(img)
-                        content_items.append({"bbox": bbox, "content": extract_text_from_image(base_image["image"])})
+                        content_items.append({"bbox": bbox, "content": self._do_ocr(base_image["image"])})
 
                 content_items.sort(key=lambda item: (item["bbox"][1], item["bbox"][0]))
                 
@@ -861,7 +869,7 @@ class PdfFileProcessor(FileProcessor):
                         base_image = doc.extract_image(xref)
                         if base_image:
                             bbox = page.get_image_bbox(img)
-                            ocr_text = extract_text_from_image(base_image["image"])
+                            ocr_text = self._do_ocr(base_image["image"])
                             if ocr_text:
                                 content_items.append({"bbox": bbox, "content": ocr_text})
 
