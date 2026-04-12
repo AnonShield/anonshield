@@ -1,7 +1,11 @@
 """GET /api/entities — dynamic entity list sourced from the real Presidio engine."""
+import json
+import logging
 import sys
 from pathlib import Path
 from fastapi import APIRouter, Query
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/entities", tags=["entities"])
 
@@ -58,7 +62,7 @@ _LABELS: dict[str, tuple[str, str]] = {
     "SG_NRIC_FIN":         ("SG NRIC/FIN",         "S1234567D"),
     "UK_NHS":              ("UK NHS",              "485 777 3456"),
     "UK_NINO":             ("UK NINO",             "AB 12 34 56 C"),
-    # Custom recognizers (always available)
+    # Custom recognizers (always available, independent of NER model)
     "IP_ADDRESS":          ("IP Address",          "192.168.1.1"),
     "URL":                 ("URL",                 "https://example.com"),
     "HOSTNAME":            ("Hostname / FQDN",     "server.internal.corp"),
@@ -77,6 +81,23 @@ _LABELS: dict[str, tuple[str, str]] = {
     "UUID":                ("UUID",                "550e8400-e29b-41d4-a716-446655440000"),
     "PORT":                ("Port / Protocol",     "tcp/8443"),
     "OID":                 ("OID",                 "1.2.840.113549.1.1.11"),
+    # ── Biomedical — d4data/biomedical-ner-all (MACCROBAT) ──────────────────
+    # These are custom Presidio entity types produced by the biomedical model.
+    # i2b2 model labels (PATIENT, STAFF, HOSP, LOC, PATORG, OTHERPHI) all
+    # map to existing types above (PERSON, LOCATION, ORGANIZATION, ID).
+    "DISEASE":             ("Disease / Disorder",  "Hypertension, COVID-19"),
+    "DRUG":                ("Drug / Medication",   "Aspirin, Metformin"),
+    # ── SecureModernBERT-NER specific entities ───────────────────────────────
+    "REGISTRY_KEY":        ("Registry key",        r"HKLM\Software\Microsoft"),
+    "THREAT_ACTOR":        ("Threat actor",        "APT28 / Lazarus Group"),
+    "MALWARE":             ("Malware",             "WannaCry, NotPetya"),
+    "PLATFORM":            ("Platform",            "Windows, Linux, Android"),
+    "PRODUCT":             ("Product",             "Apache, OpenSSL, Chrome"),
+    "SECTOR":              ("Sector",              "Healthcare, Finance, Energy"),
+    "TOOL":                ("Tool",                "Mimikatz, Cobalt Strike"),
+    "CAMPAIGN":            ("Campaign",            "Operation Aurora"),
+    "MITRE_TACTIC":        ("MITRE tactic",        "TA0001 Initial Access"),
+    "SERVICE":             ("Service",             "SSH, RDP, SMB"),
 }
 
 # Grouping map: entity_id → group label
@@ -89,6 +110,7 @@ _GROUPS_MAP: dict[str, str] = {
     "US_BANK_NUMBER": "Financial", "US_SSN": "Documents",
     "US_PASSPORT": "Documents", "US_DRIVER_LICENSE": "Documents",
     "US_ITIN": "Documents", "MEDICAL_LICENSE": "Healthcare",
+    "DISEASE": "Healthcare", "DRUG": "Healthcare",
     "AU_ABN": "Australia", "AU_ACN": "Australia",
     "AU_MEDICARE": "Australia", "AU_TFN": "Australia",
     "IN_AADHAAR": "India", "IN_PAN": "India", "IN_PASSPORT": "India",
@@ -102,12 +124,18 @@ _GROUPS_MAP: dict[str, str] = {
     "CVE_ID": "Security", "CPE_STRING": "Security", "CERT_SERIAL": "Security",
     "CERTIFICATE": "Security", "CRYPTOGRAPHIC_KEY": "Security",
     "PGP_BLOCK": "Security", "OID": "Security",
+    # SecureModernBERT cybersecurity entities
+    "REGISTRY_KEY": "Cybersecurity", "THREAT_ACTOR": "Cybersecurity",
+    "MALWARE": "Cybersecurity", "TOOL": "Cybersecurity",
+    "CAMPAIGN": "Cybersecurity", "MITRE_TACTIC": "Cybersecurity",
+    "PLATFORM": "Cybersecurity", "PRODUCT": "Cybersecurity",
+    "SECTOR": "Cybersecurity", "SERVICE": "Cybersecurity",
     "UUID": "Identifiers",
 }
 
 _GROUP_ORDER = [
     "Identity", "Organization", "Financial", "Documents", "Healthcare",
-    "Network", "Security", "System", "Identifiers",
+    "Network", "Security", "Cybersecurity", "System", "Identifiers",
     "Australia", "India", "Singapore", "United Kingdom",
     "Other",
 ]
@@ -140,38 +168,79 @@ def _build_response(entity_ids: list[str], strategy: str) -> dict:
     return {"groups": groups, "strategy": strategy}
 
 
+_ENTITIES_TTL = 86400  # 24h — entity list changes only on deploy
+_ENTITIES_VERSION = "v2"  # bump this to invalidate all cached entity lists on deploy
+
+
+def _redis_cache_key(strategy: str, model: str, lang: str) -> str:
+    return f"entities:{_ENTITIES_VERSION}:{strategy}:{model}:{lang}"
+
+
+def _get_from_redis(key: str) -> list[str] | None:
+    try:
+        from services.job_service import _client
+        raw = _client().get(key)
+        if raw:
+            return json.loads(raw)
+    except Exception:
+        pass
+    return None
+
+
+def _set_in_redis(key: str, entity_ids: list[str]) -> None:
+    try:
+        from services.job_service import _client
+        _client().setex(key, _ENTITIES_TTL, json.dumps(entity_ids))
+    except Exception:
+        pass  # Redis unavailable — in-memory cache in api.py still works
+
+
 @router.get("")
 def list_entities(
     strategy: str = Query("filtered"),
-    model: str = Query("Davlan/xlm-roberta-base-ner-hrl"),  # accepted for API compat, unused
+    model: str = Query("Davlan/xlm-roberta-base-ner-hrl"),
     lang: str = Query("en"),
 ) -> dict:
-    """Return entities from the real engine — dynamic, not hardcoded."""
-    import logging
-    log = logging.getLogger(__name__)
-    entity_ids: list[str] = []
+    """Return entities supported by the engine for the given strategy + model + lang.
 
-    try:
-        from src.anon.api import get_supported_entities
-        entity_ids = get_supported_entities(strategy=strategy, lang=lang)
-    except Exception as exc:
-        log.warning("Presidio entity discovery failed: %s", exc)
-        # Fallback 1: try custom recognizers only
-        try:
-            from src.anon.engine import load_custom_recognizers
-            entity_ids = [r.supported_entities[0] for r in load_custom_recognizers([lang])]
-        except Exception as exc2:
-            log.warning("Custom recognizer fallback also failed: %s", exc2)
-
-    # Fallback 2: if still empty, use the full known label set (always safe)
-    if not entity_ids:
-        log.warning("Using static label dict as ultimate fallback")
-        if strategy == "regex":
-            entity_ids = [eid for eid in _LABELS if eid not in _NER_ONLY and eid not in _NON_PII]
-        else:
-            entity_ids = [eid for eid in _LABELS if eid not in _NON_PII]
-
+    Results are cached in Redis (24h TTL) keyed by strategy:model:lang.
+    On cache miss the engine is loaded once and the result stored.
+    """
     from fastapi.responses import JSONResponse
+
+    cache_key = _redis_cache_key(strategy, model, lang)
+
+    # ── Redis cache hit ───────────────────────────────────────────────────────
+    entity_ids = _get_from_redis(cache_key)
+
+    # ── Cache miss: compute and store ────────────────────────────────────────
+    if entity_ids is None:
+        entity_ids = []
+        try:
+            from src.anon.api import get_supported_entities
+            entity_ids = get_supported_entities(strategy=strategy, lang=lang, model=model)
+        except Exception as exc:
+            log.warning("Presidio entity discovery failed: %s", exc)
+            # Fallback 1: custom recognizers + model registry (no Presidio needed)
+            try:
+                from src.anon.engine import load_custom_recognizers
+                from src.anon.model_registry import get_entity_mapping
+                custom = [r.supported_entities[0] for r in load_custom_recognizers([lang])]
+                model_entities = list(get_entity_mapping(model).values()) if strategy != "regex" else []
+                entity_ids = sorted(set(custom + model_entities))
+            except Exception as exc2:
+                log.warning("Custom recognizer fallback also failed: %s", exc2)
+
+        # Fallback 2: static label dict (always safe)
+        if not entity_ids:
+            log.warning("Using static label dict as ultimate fallback")
+            if strategy == "regex":
+                entity_ids = [eid for eid in _LABELS if eid not in _NER_ONLY and eid not in _NON_PII]
+            else:
+                entity_ids = [eid for eid in _LABELS if eid not in _NON_PII]
+
+        _set_in_redis(cache_key, entity_ids)
+
     data = _build_response(entity_ids, strategy)
     return JSONResponse(
         content=data,
