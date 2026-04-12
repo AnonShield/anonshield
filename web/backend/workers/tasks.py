@@ -13,7 +13,10 @@ from services import job_service, storage
 
 logger = get_task_logger(__name__)
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if not (_REPO_ROOT / "anon.py").exists():
+    _REPO_ROOT = Path(__file__).resolve().parents[3]
+
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
@@ -27,7 +30,9 @@ def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
         lang=meta.get("lang", "en"),
         entities=meta.get("entities") or None,
         custom_patterns=meta.get("custom_patterns") or None,
+        ocr_engine=meta.get("ocr_engine", "tesseract"),
         secret_key=key,
+        anonymization_config=meta.get("anonymization_config"),
     )
 
 

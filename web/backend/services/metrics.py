@@ -107,8 +107,18 @@ def record_job(**kw) -> None:
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 
 
+_UUID_RE = __import__('re').compile(
+    r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', __import__('re').I
+)
+
+
+def _normalize_path(path: str) -> str:
+    """Replace UUIDs in paths with {id} so routes group correctly."""
+    return _UUID_RE.sub('{id}', path)
+
+
 class MetricsMiddleware(BaseHTTPMiddleware):
-    _SKIP = {"/api/health", "/api/metrics"}
+    _SKIP = {"/api/health", "/api/metrics", "/api/config"}
 
     async def dispatch(self, request, call_next):
         if request.url.path in self._SKIP:
@@ -118,7 +128,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         ms = (time.monotonic() - t0) * 1000
         resp_b = int(response.headers.get("content-length", 0))
-        record_request(request.method, request.url.path,
+        record_request(request.method, _normalize_path(request.url.path),
                        response.status_code, ms, req_b, resp_b)
         return response
 

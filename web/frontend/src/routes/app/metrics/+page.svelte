@@ -251,6 +251,8 @@
 <style>
   .metrics-page {
     display: flex; flex-direction: column; gap: var(--space-6);
+    padding: var(--space-8);
+    max-width: 1200px; margin: 0 auto;
   }
 
   .page-header {
@@ -261,12 +263,12 @@
 
   /* KPI grid */
   .kpi-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: var(--space-4);
   }
   .kpi-card {
-    display: flex; flex-direction: column; gap: 4px;
-    padding: var(--space-5) var(--space-4);
+    display: flex; flex-direction: column; gap: 6px;
+    padding: var(--space-6) var(--space-5);
     border: 1px solid var(--color-border); border-radius: var(--radius-md);
     background: var(--color-surface-raised);
   }
@@ -285,9 +287,9 @@
   }
   @media (max-width: 720px) { .charts-row { grid-template-columns: 1fr; } }
 
-  .chart-card { display: flex; flex-direction: column; gap: var(--space-4); }
+  .chart-card { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6); }
   .chart-title {
-    margin: 0 0 var(--space-3); font-size: 0.72rem; font-weight: 700;
+    margin: 0 0 var(--space-2); font-size: 0.72rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.08em;
     color: var(--color-text-secondary);
   }

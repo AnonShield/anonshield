@@ -56,8 +56,20 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379/0
       - ANON_JOBS_DIR=/anon-jobs
+      - ANON_SECRET_KEY=${ANON_SECRET_KEY:-anonshield-prod-secret-change-me}
+      - ANON_MAX_SIZE_MB=${ANON_MAX_SIZE_MB:-10}
+      - XDG_CACHE_HOME=/app/.cache
+      - PADDLEOCR_CONFIG_DIR=/app/.cache/paddleocr
+      - EASYOCR_MODULE_PATH=/app/.cache/easyocr
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
     volumes:
       - anon-jobs:/anon-jobs
+      - model_cache:/app/.cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -70,7 +82,6 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-      - /app # For runtime pycache or logs if they are local
 
   worker-fast:
     build:
@@ -81,8 +92,14 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379/0
       - ANON_JOBS_DIR=/anon-jobs
+      - ANON_SECRET_KEY=${ANON_SECRET_KEY:-anonshield-prod-secret-change-me}
+      - XDG_CACHE_HOME=/app/.cache
+      - PADDLEOCR_CONFIG_DIR=/app/.cache/paddleocr
+      - EASYOCR_MODULE_PATH=/app/.cache/easyocr
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
     volumes:
       - anon-jobs:/anon-jobs
+      - model_cache:/app/.cache
     deploy:
       resources:
         limits:
@@ -95,12 +112,16 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-      - /app
 
   redis:
     image: redis:7-alpine
     command: redis-server --save "" --appendonly no
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         limits:
@@ -117,6 +138,7 @@ networks:
 
 volumes:
   anon-jobs:
+  model_cache:
   caddy_data:
   caddy_config:
   caddy_logs:

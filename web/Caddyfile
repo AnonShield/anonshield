@@ -7,7 +7,7 @@
 }
 
 anonshield.org, www.anonshield.org {
-    # Strict file size limit for shared server security
+    # Strict 1MB limit for shared server sandbox
     request_body {
         max_size 1MB
     }

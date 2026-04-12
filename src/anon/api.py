@@ -44,6 +44,7 @@ def anonymize_file(
     transformer_model: str = "Davlan/xlm-roberta-base-ner-hrl",
     secret_key: str = "",
     use_db: bool = False,
+    anonymization_config: dict | None = None,
 ) -> dict[str, Any]:
     """Anonymize a single file and write output to output_dir.
 
@@ -151,6 +152,7 @@ def anonymize_file(
         output_dir=str(output_dir),
         ocr_engine=ocr_eng,
         overwrite=True,
+        anonymization_config=anonymization_config,
     )
     if processor is None:
         raise ValueError(f"No processor available for file type: {input_path.suffix}")
@@ -235,83 +237,33 @@ def preview_structured_file(path: str | Path, max_rows: int = 5) -> dict:
             "row_count": 1000,
         }
     """
-    import json
-    import csv
-
+    from .utils import detect_fields_from_stream
     path = Path(path)
     ext = path.suffix.lower().lstrip(".")
 
-    def _truncate(v: object) -> str:
-        s = str(v) if v is not None else ""
-        return s[:80] + "…" if len(s) > 80 else s
-
-    if ext == "csv":
-        rows: list[dict] = []
-        with path.open(encoding="utf-8", errors="replace") as f:
-            reader = csv.DictReader(f)
-            for i, row in enumerate(reader):
-                if i >= max_rows:
-                    break
-                rows.append(row)
-        if not rows:
-            return {"type": "csv", "fields": [], "row_count": 0}
-        fields = [
-            {"name": k, "sample_values": [_truncate(r.get(k)) for r in rows]}
-            for k in rows[0]
-        ]
-        return {"type": "csv", "fields": fields, "row_count": None}
-
+    # Handle XLSX separately as it needs a full engine
     if ext in ("xls", "xlsx"):
         import openpyxl
-        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-        ws = wb.active
-        rows_raw = list(ws.iter_rows(values_only=True))
-        if len(rows_raw) < 2:
-            return {"type": "xlsx", "fields": [], "row_count": 0}
-        headers = [str(h) if h is not None else f"col_{i}" for i, h in enumerate(rows_raw[0])]
-        data_rows = rows_raw[1: 1 + max_rows]
-        fields = [
-            {"name": h, "sample_values": [_truncate(r[i]) for r in data_rows if i < len(r)]}
-            for i, h in enumerate(headers)
-        ]
-        return {"type": "xlsx", "fields": fields, "row_count": len(rows_raw) - 1}
+        try:
+            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+            ws = wb.active
+            if ws is None: return {"type": "xlsx", "fields": [], "row_count": 0}
+            rows_raw = list(ws.iter_rows(max_row=max_rows + 1, values_only=True))
+            if len(rows_raw) < 1: return {"type": "xlsx", "fields": [], "row_count": 0}
+            headers = [str(h) if h is not None else f"col_{i}" for i, h in enumerate(rows_raw[0])]
+            fields = [{"name": h} for h in headers]
+            return {"type": "xlsx", "fields": fields, "row_count": None}
+        except Exception as e:
+            return {"type": "xlsx", "fields": [], "error": str(e)}
 
-    if ext in ("json", "jsonl"):
-        with path.open(encoding="utf-8", errors="replace") as f:
-            first_char = f.read(1)
-            f.seek(0)
-            if ext == "jsonl" or first_char == "{":
-                # JSONL or single object per line
-                records = []
-                for i, line in enumerate(f):
-                    if i >= max_rows:
-                        break
-                    line = line.strip()
-                    if line:
-                        try:
-                            records.append(json.loads(line))
-                        except json.JSONDecodeError:
-                            pass
-            else:
-                data = json.load(f)
-                if isinstance(data, list):
-                    records = data[:max_rows]
-                else:
-                    return {"type": "json", "fields": [], "row_count": 1}
-
-        if not records or not isinstance(records[0], dict):
-            return {"type": ext, "fields": [], "row_count": len(records)}
-
-        all_keys: list[str] = []
-        for r in records:
-            for k in r:
-                if k not in all_keys:
-                    all_keys.append(k)
-
-        fields = [
-            {"name": k, "sample_values": [_truncate(r.get(k)) for r in records]}
-            for k in all_keys
-        ]
-        return {"type": ext, "fields": fields, "row_count": None}
-
-    return {"type": ext, "fields": [], "row_count": None}
+    # Use unified detection for text-based formats
+    try:
+        with path.open("rb") as f:
+            field_names = detect_fields_from_stream(f, ext)
+            return {
+                "type": ext,
+                "fields": [{"name": n} for n in field_names],
+                "row_count": None
+            }
+    except Exception as e:
+        return {"type": ext, "fields": [], "error": str(e)}

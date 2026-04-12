@@ -5,7 +5,10 @@ from fastapi import APIRouter, Query
 
 router = APIRouter(prefix="/api/entities", tags=["entities"])
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if not (_REPO_ROOT / "anon.py").exists():
+    _REPO_ROOT = Path(__file__).resolve().parents[3]
+
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 

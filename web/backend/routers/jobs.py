@@ -14,10 +14,15 @@ from fastapi.responses import FileResponse, StreamingResponse
 from services import job_service, storage
 from services.profile import validate_profile
 
+from services.limiter import limiter
+
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
-LIMIT_NO_KEY = 1 * 1024 * 1024        # 1 MB
-LIMIT_WITH_KEY = 10 * 1024 ** 3       # 10 GB
+# Limits are configurable via env vars (values in MB)
+# ANON_MAX_SIZE_MB      — without key (default: 1 MB)
+# ANON_MAX_SIZE_KEY_MB  — with key     (default: 1 MB)
+LIMIT_NO_KEY  = int(os.getenv("ANON_MAX_SIZE_MB",     "1"))  * 1024 * 1024
+LIMIT_WITH_KEY = int(os.getenv("ANON_MAX_SIZE_KEY_MB", "1")) * 1024 * 1024
 
 _GPU_STRATEGIES = {"filtered", "standalone", "hybrid", "presidio"}
 
@@ -27,6 +32,7 @@ def _queue_for(strategy: str) -> str:
 
 
 @router.post("", status_code=202)
+@limiter.limit("5/minute")
 async def create_job(
     request: Request,
     file: UploadFile,
@@ -35,6 +41,8 @@ async def create_job(
     lang: Annotated[str, Form()] = "en",
     entities: Annotated[str, Form()] = "",
     config: Annotated[str, Form()] = "",
+    ocr_engine: Annotated[str, Form()] = "tesseract",
+    fields: Annotated[str, Form()] = "",
 ) -> dict:
     limit = LIMIT_WITH_KEY if key else LIMIT_NO_KEY
 
@@ -79,21 +87,34 @@ async def create_job(
             entities_list = [e.strip() for e in entities.split(",") if e.strip()]
 
     # Parse inline YAML config if provided
-    custom_patterns: list[dict] = []
+    anon_config: dict = {}
     if config:
         result = validate_profile(config)
         if not result["valid"]:
             storage.delete_job(job_id)
             raise HTTPException(status_code=422, detail=result["error"])
         import yaml
-        cfg_data = yaml.safe_load(config) or {}
-        custom_patterns = cfg_data.get("custom_patterns", [])
+        anon_config = yaml.safe_load(config) or {}
         if not strategy or strategy == "filtered":
-            strategy = cfg_data.get("strategy", strategy)
+            strategy = anon_config.get("strategy", strategy)
         if not lang or lang == "en":
-            lang = cfg_data.get("lang", lang)
+            lang = anon_config.get("lang", lang)
         if not entities_list:
-            entities_list = cfg_data.get("entities", [])
+            entities_list = anon_config.get("entities", [])
+
+    # Handle UI-selected fields (mapping to anonymization_config)
+    if fields:
+        try:
+            parsed_fields = json.loads(fields)
+            if isinstance(parsed_fields, dict):
+                # Full Anonymization Config object
+                anon_config.update(parsed_fields)
+            elif isinstance(parsed_fields, list):
+                # Legacy / simple field list
+                anon_config["fields_to_anonymize"] = parsed_fields
+        except json.JSONDecodeError:
+            # Fallback for comma-separated string
+            anon_config["fields_to_anonymize"] = [f.strip() for f in fields.split(",") if f.strip()]
 
     meta = {
         "filename": file.filename,
@@ -102,15 +123,16 @@ async def create_job(
         "strategy": strategy,
         "lang": lang,
         "entities": entities_list,
-        "custom_patterns": custom_patterns,
+        "anonymization_config": anon_config,
+        "ocr_engine": ocr_engine or "tesseract",
     }
     job_service.store_meta(job_id, meta)
     job_service.set_status(job_id, "queued")
     if key:
         job_service.store_key(job_id, key)
 
-    queue = _queue_for(strategy)
-    task_name = "workers.tasks.process_job" if queue == "gpu" else "workers.tasks.process_job_fast"
+    queue = "fast"
+    task_name = "workers.tasks.process_job_fast"
 
     from workers.celery_app import app as celery_app
     celery_app.send_task(task_name, args=[job_id], queue=queue)
@@ -139,7 +161,11 @@ async def download_job(job_id: str) -> StreamingResponse:
         raise HTTPException(status_code=404, detail="Output file not found")
 
     meta = job_service.get_meta(job_id) or {}
-    filename = f"anon_{meta.get('filename', 'output')}"
+    original_filename = meta.get('filename', 'output')
+    name_part = Path(original_filename).stem
+    actual_ext = out_file.suffix
+    filename = f"anon_{name_part}{actual_ext}"
+    
     media_type = mimetypes.guess_type(str(out_file))[0] or "application/octet-stream"
 
     async def _stream_and_delete():
