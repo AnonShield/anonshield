@@ -459,25 +459,6 @@ Action items:
   }
   .hero-inner { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
 
-  .hero-badge {
-    display: inline-flex; align-items: center; gap: 8px;
-    font-size: 0.72rem; font-family: var(--font-mono);
-    color: var(--color-text-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: 999px; padding: 5px 14px;
-    width: fit-content;
-    background: var(--color-surface-raised);
-  }
-  .badge-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #4ade80;
-    box-shadow: 0 0 8px #4ade80;
-    animation: pulse-dot 2s ease-in-out infinite;
-  }
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; box-shadow: 0 0 8px #4ade80; }
-    50% { opacity: 0.5; box-shadow: 0 0 2px #4ade80; }
-  }
 
   .hero-title {
     margin: 0; display: flex; flex-direction: column; gap: 4px;

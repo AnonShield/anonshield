@@ -1,0 +1,122 @@
+# Production Docker Compose for AnonShield
+# Optimized for Sandbox security, 32GB RAM, and 8 vCPUs.
+
+services:
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+    networks:
+      - anon-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE # Required for 80/443
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - PUBLIC_API_URL=/api
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 4G
+    networks:
+      - anon-net
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  backend:
+    build:
+      context: ..
+      dockerfile: web/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - ANON_JOBS_DIR=/anon-jobs
+    volumes:
+      - anon-jobs:/anon-jobs
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 6G
+    networks:
+      - anon-net
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app # For runtime pycache or logs if they are local
+
+  worker-fast:
+    build:
+      context: ..
+      dockerfile: web/backend/Dockerfile
+    command: celery -A workers.celery_app worker -Q fast --concurrency 6 --loglevel=warning
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - ANON_JOBS_DIR=/anon-jobs
+    volumes:
+      - anon-jobs:/anon-jobs
+    deploy:
+      resources:
+        limits:
+          cpus: '4.5'
+          memory: 20G
+    networks:
+      - anon-net
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+    networks:
+      - anon-net
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  anon-net:
+    driver: bridge
+
+volumes:
+  anon-jobs:
+  caddy_data:
+  caddy_config:
+  caddy_logs:
