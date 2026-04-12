@@ -43,6 +43,7 @@ def anonymize_file(
     ocr_engine: str = "tesseract",
     transformer_model: str = "Davlan/xlm-roberta-base-ner-hrl",
     secret_key: str = "",
+    use_db: bool = False,
 ) -> dict[str, Any]:
     """Anonymize a single file and write output to output_dir.
 
@@ -54,7 +55,7 @@ def anonymize_file(
     from src.anon.entity_detector import EntityDetector
     from src.anon.hash_generator import HashGenerator
     from src.anon.cache_manager import CacheManager
-    from src.anon.db import DatabaseContext
+    from src.anon.database import DatabaseContext
     from src.anon.processors import ProcessorRegistry
     from src.anon.model_registry import get_entity_mapping
     from src.anon.ocr.factory import get_ocr_engine
@@ -67,8 +68,7 @@ def anonymize_file(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # --- supported entities ---
-    from src.anon.engine import get_supported_entities
-    supported_upper = {s.upper() for s in get_supported_entities(strategy, transformer_model)}
+    supported_upper = {s.upper() for s in get_supported_entities(strategy, lang=lang)}
 
     # Entity selection / preservation
     if entities:
@@ -81,8 +81,10 @@ def anonymize_file(
     allow_list = [t.strip() for t in (allow_list or []) if t.strip()]
 
     # --- DB context ---
-    db_context = DatabaseContext(mode="in-memory", db_dir=None)
-    db_context.initialize()
+    db_context = None
+    if use_db:
+        db_context = DatabaseContext(mode="in-memory", db_dir=None)
+        db_context.initialize()
 
     # --- Entity detector ---
     entity_mapping = get_entity_mapping(transformer_model) if transformer_model else dict(ENTITY_MAPPING)
