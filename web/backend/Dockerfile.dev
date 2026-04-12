@@ -1,0 +1,22 @@
+FROM python:3.12-slim
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+# System deps: Tesseract + OpenCV runtime libs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    libmagic1 libgl1 libglib2.0-0 libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python deps from lockfile — no heavy OCR engines, no cupy
+# --group web: FastAPI, Celery, Redis and web-only deps
+# --no-install-project: source is mounted at runtime
+COPY pyproject.toml uv.lock ./
+ENV UV_SYSTEM_PYTHON=1 \
+    UV_NO_CACHE=1
+RUN uv sync --frozen --no-install-project --group web
+
+# Source is mounted at runtime via docker-compose volumes
+ENV PYTHONPATH="/app"
