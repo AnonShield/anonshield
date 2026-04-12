@@ -61,7 +61,7 @@ services:
       - XDG_CACHE_HOME=/app/.cache
       - PADDLEOCR_CONFIG_DIR=/app/.cache/paddleocr
       - EASYOCR_MODULE_PATH=/app/.cache/easyocr
-      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+      - HF_HOME=/app/.cache/huggingface
     volumes:
       - anon-jobs:/anon-jobs
       - model_cache:/app/.cache
@@ -87,7 +87,7 @@ services:
     build:
       context: ..
       dockerfile: web/backend/Dockerfile
-    command: celery -A workers.celery_app worker -Q fast --concurrency 6 --loglevel=warning
+    command: celery -A workers.celery_app worker -Q fast --pool=solo --loglevel=warning
     restart: unless-stopped
     environment:
       - REDIS_URL=redis://redis:6379/0
@@ -96,7 +96,7 @@ services:
       - XDG_CACHE_HOME=/app/.cache
       - PADDLEOCR_CONFIG_DIR=/app/.cache/paddleocr
       - EASYOCR_MODULE_PATH=/app/.cache/easyocr
-      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+      - HF_HOME=/app/.cache/huggingface
     volumes:
       - anon-jobs:/anon-jobs
       - model_cache:/app/.cache
