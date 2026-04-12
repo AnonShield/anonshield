@@ -46,6 +46,8 @@
     const key = entityFetchKey; // subscribe only to this derived
     const [strategy, model, lang] = key.split('||');
     groups = []; // clear while loading
+    // Reset entity selection when model/strategy/lang changes — old IDs may not exist in new model
+    config.update(c => ({ ...c, selected_entities: null }));
     fetchEntities(strategy, model, lang)
       .then(r => { groups = r.groups; })
       .catch(() => {});
@@ -67,21 +69,23 @@
     errorMsg = '';
 
     try {
-      // null = all selected (no entity filter sent to backend)
+      // null = all (no filter); empty Set = none; non-empty Set = specific selection
       const sel = $config.selected_entities;
-      const entities = (sel !== null && sel.size > 0) ? [...sel] : undefined;
+      const entities = sel === null ? undefined : [...sel];
 
       const yamlConfig = $config.custom_patterns.length > 0
         ? toYaml($config, groups)
         : undefined;
 
+      const preprocessSteps = effectivePreprocessSteps();
       const job = await createJob(selectedFile, {
-        key:        $config.key || undefined,
-        strategy:   $config.strategy,
-        lang:       $config.lang,
+        key:            $config.key || undefined,
+        strategy:       $config.strategy,
+        lang:           $config.lang,
         entities,
-        config:     yamlConfig,
-        ocr_engine: $config.ocr_engine !== 'tesseract' ? $config.ocr_engine : undefined,
+        config:         yamlConfig,
+        ocr_engine:     $config.ocr_engine !== 'tesseract' ? $config.ocr_engine : undefined,
+        ocr_preprocess: preprocessSteps.length > 0 ? preprocessSteps : undefined,
         anonymization_config: $config.anonymization_config,
       });
 
@@ -221,6 +225,7 @@
   const MODELS = [
     { v: 'Davlan/xlm-roberta-base-ner-hrl',                  lk: 'model.xlm'       },
     { v: 'attack-vector/SecureModernBERT-NER',               lk: 'model.smbert'    },
+    { v: 'lakshyakh93/deberta_finetuned_pii',                lk: 'model.deberta_pii'},
     { v: 'dslim/bert-base-NER',                              lk: 'model.bert_fast' },
     { v: 'Jean-Baptiste/roberta-large-ner-english',          lk: 'model.roberta_en'},
     { v: 'obi/deid_roberta_i2b2',                            lk: 'model.clinical'  },
@@ -242,6 +247,57 @@
     { v: 'paddleocr', name: 'PaddleOCR', badge_key: 'tables'  },
     { v: 'doctr',     name: 'DocTR',     badge_key: 'docs'    },
   ] as const;
+
+  const OCR_PREPROCESS_PRESETS = [
+    { v: 'none',   lk: 'preprocess.preset.none'   },
+    { v: 'scan',   lk: 'preprocess.preset.scan'   },
+    { v: 'photo',  lk: 'preprocess.preset.photo'  },
+    { v: 'fax',    lk: 'preprocess.preset.fax'    },
+    { v: 'custom', lk: 'preprocess.preset.custom' },
+  ] as const;
+
+  // Short human-readable labels for step pills (language-independent technical terms)
+  const STEP_SHORT: Record<string, string> = {
+    grayscale:  'Grayscale',
+    upscale:    'Upscale',
+    clahe:      'Contrast',
+    denoise:    'Denoise',
+    deskew:     'Deskew',
+    binarize:   'Binarize',
+    morph_open: 'Cleanup',
+    border:     'Border',
+  };
+
+  const PREPROCESS_STEPS = [
+    { v: 'grayscale',  lk: 'preprocess.step.grayscale',  dlk: 'preprocess.step.grayscale.desc'  },
+    { v: 'upscale',    lk: 'preprocess.step.upscale',    dlk: 'preprocess.step.upscale.desc'    },
+    { v: 'clahe',      lk: 'preprocess.step.clahe',      dlk: 'preprocess.step.clahe.desc'      },
+    { v: 'denoise',    lk: 'preprocess.step.denoise',    dlk: 'preprocess.step.denoise.desc'    },
+    { v: 'deskew',     lk: 'preprocess.step.deskew',     dlk: 'preprocess.step.deskew.desc'     },
+    { v: 'binarize',   lk: 'preprocess.step.binarize',   dlk: 'preprocess.step.binarize.desc'   },
+    { v: 'morph_open', lk: 'preprocess.step.morph_open', dlk: 'preprocess.step.morph_open.desc' },
+    { v: 'border',     lk: 'preprocess.step.border',     dlk: 'preprocess.step.border.desc'     },
+  ] as const;
+
+  // Resolve the effective preprocessing step list to send to the API
+  const PRESET_STEPS: Record<string, string[]> = {
+    none:   [],
+    scan:   ['grayscale', 'upscale', 'clahe', 'denoise', 'deskew', 'binarize', 'border'],
+    photo:  ['grayscale', 'upscale', 'clahe', 'denoise', 'deskew', 'binarize', 'morph_open', 'border'],
+    fax:    ['grayscale', 'upscale', 'clahe', 'denoise', 'binarize', 'morph_open', 'border'],
+  };
+
+  function effectivePreprocessSteps(): string[] {
+    const preset = $config.ocr_preprocess_preset;
+    if (preset === 'custom') return $config.ocr_preprocess;
+    return PRESET_STEPS[preset] ?? [];
+  }
+
+  function togglePreprocessStep(step: string) {
+    const current = $config.ocr_preprocess;
+    const next = current.includes(step) ? current.filter(s => s !== step) : [...current, step];
+    config.update(c => ({ ...c, ocr_preprocess: next }));
+  }
 
   // ── Batch queue (task #8) ─────────────────────────────────────────────────
   interface BatchItem {
@@ -274,10 +330,12 @@
         const sel = $config.selected_entities;
         const entities = (sel !== null && sel.size > 0) ? [...sel] : undefined;
         const yamlConfig = $config.custom_patterns.length > 0 ? toYaml($config, groups) : undefined;
+        const batchPreprocessSteps = effectivePreprocessSteps();
         const job = await createJob(item.file, {
           key: $config.key || undefined, strategy: $config.strategy,
           lang: $config.lang, entities, config: yamlConfig,
           ocr_engine: $config.ocr_engine !== 'tesseract' ? $config.ocr_engine : undefined,
+          ocr_preprocess: batchPreprocessSteps.length > 0 ? batchPreprocessSteps : undefined,
           anonymization_config: $config.anonymization_config,
         });
         // poll until done
@@ -489,6 +547,49 @@
               </select>
               <p class="ocr-hint">{$t(`ocr.badge.${OCR_ENGINES.find(e => e.v === $config.ocr_engine)?.badge_key ?? 'default'}` as any)}</p>
             </section>
+
+            <!-- Image Preprocessing (shown only for image/PDF files or when no file selected) -->
+            {#if !selectedFile || isImageOrPdf}
+              <section class="card preprocess-card">
+                <h2 class="panel-title">{$t('preprocess.title')}</h2>
+                <p class="ocr-hint">{$t('preprocess.hint')}</p>
+
+                <div class="preprocess-preset-grid">
+                  {#each OCR_PREPROCESS_PRESETS as p}
+                    <label class="preset-card" class:selected={$config.ocr_preprocess_preset === p.v}>
+                      <input type="radio" name="ocr_preprocess_preset" value={p.v}
+                             bind:group={$config.ocr_preprocess_preset} />
+                      <span class="preset-card-name">{$t(p.lk)}</span>
+                      {#if p.v === 'none'}
+                        <span class="preset-card-hint">pass-through</span>
+                      {:else if p.v === 'custom'}
+                        <span class="preset-card-hint">choose below →</span>
+                      {:else}
+                        <div class="preset-card-pills">
+                          {#each PRESET_STEPS[p.v] ?? [] as s}
+                            <span class="step-pill">{STEP_SHORT[s] ?? s}</span>
+                          {/each}
+                        </div>
+                      {/if}
+                    </label>
+                  {/each}
+                </div>
+
+                {#if $config.ocr_preprocess_preset === 'custom'}
+                  <div class="preprocess-steps">
+                    {#each PREPROCESS_STEPS as step}
+                      <label class="step-item" title={$t(step.dlk as any)}>
+                        <input type="checkbox"
+                               checked={$config.ocr_preprocess.includes(step.v)}
+                               onchange={() => togglePreprocessStep(step.v)} />
+                        <span class="step-name">{$t(step.lk as any)}</span>
+                        <span class="step-desc">{$t(step.dlk as any)}</span>
+                      </label>
+                    {/each}
+                  </div>
+                {/if}
+              </section>
+            {/if}
 
             <!-- Slug length -->
             <section class="card">
@@ -1021,4 +1122,85 @@
   .error-box p { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
 
   .mt { margin-top: var(--space-2); }
+
+  /* ── Image preprocessing ── */
+  .preprocess-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+  .preset-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: border-color 150ms, background 150ms;
+    min-height: 4.5rem;
+  }
+  .preset-card input { display: none; }
+  .preset-card.selected {
+    border-color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  }
+  .preset-card:not(.selected):hover {
+    border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+    background: var(--color-surface-hover);
+  }
+  .preset-card-name {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    line-height: 1.2;
+  }
+  .preset-card.selected .preset-card-name { color: var(--color-accent); }
+  .preset-card-hint {
+    font-size: 0.7rem;
+    color: var(--color-text-secondary);
+    font-style: italic;
+  }
+  .preset-card-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.1rem;
+  }
+  .step-pill {
+    font-size: 0.65rem;
+    font-weight: 500;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+    color: var(--color-accent);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+    white-space: nowrap;
+  }
+  .preset-card:not(.selected) .step-pill {
+    background: color-mix(in srgb, var(--color-text-secondary) 8%, transparent);
+    color: var(--color-text-secondary);
+    border-color: color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
+  }
+  /* custom step checklist */
+  .preprocess-steps {
+    display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3);
+  }
+  .step-item {
+    display: grid;
+    grid-template-columns: 1rem 1fr;
+    grid-template-rows: auto auto;
+    column-gap: var(--space-2);
+    align-items: start;
+    cursor: pointer;
+    padding: var(--space-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    transition: border-color 120ms, background 120ms;
+  }
+  .step-item:hover { background: var(--color-surface-hover); border-color: var(--color-border); }
+  .step-item input { grid-row: 1; grid-column: 1; margin-top: 2px; accent-color: var(--color-accent); }
+  .step-name { grid-row: 1; grid-column: 2; font-size: var(--text-sm); font-weight: 500; }
+  .step-desc { grid-row: 2; grid-column: 2; font-size: 0.7rem; color: var(--color-text-secondary); line-height: 1.35; }
 </style>
