@@ -50,6 +50,59 @@ SUPPORTED_LANGUAGES = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Module-level engine cache — keyed by (transformer_model, lang).
+# TransformersNlpEngine takes 30-60 s to load; caching it means the second
+# job with the same model is near-instant. Safe to share because
+# BatchAnalyzerEngine and AnonymizerEngine are stateless inference objects.
+# ---------------------------------------------------------------------------
+_ENGINE_CACHE: dict[str, tuple["BatchAnalyzerEngine", "AnonymizerEngine"]] = {}
+
+
+def warm_up_model(
+    transformer_model: str = "Davlan/xlm-roberta-base-ner-hrl",
+    lang: str = "en",
+) -> None:
+    """Pre-load a transformer model into the engine cache.
+
+    Call this at worker startup (Celery worker_ready signal) so the model is
+    already in memory before the first job arrives.
+    """
+    import logging as _log
+    logger = _log.getLogger(__name__)
+    cache_key = f"{transformer_model}:{lang}"
+    if cache_key in _ENGINE_CACHE:
+        logger.info("warm_up_model: '%s' already cached — skipping.", transformer_model)
+        return
+    logger.info("warm_up_model: loading '%s' (lang=%s) …", transformer_model, lang)
+    try:
+        lang_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
+        effective_lang = lang if lang in lang_model_map else "en"
+        spacy_model_name = lang_model_map.get(effective_lang, f"{effective_lang}_core_news_lg")
+        trf_model_config = [
+            {"lang_code": effective_lang,
+             "model_name": {"spacy": spacy_model_name, "transformers": transformer_model}}
+        ]
+        from .model_registry import get_entity_mapping
+        entity_mapping = get_entity_mapping(transformer_model)
+        ner_config = NerModelConfiguration(
+            model_to_presidio_entity_mapping=entity_mapping,
+            aggregation_strategy="max",
+            labels_to_ignore=["O"],
+        )
+        nlp_engine = TransformersNlpEngine(models=trf_model_config, ner_model_configuration=ner_config)
+        core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en", "pt"])
+        for recognizer in load_custom_recognizers(langs=[effective_lang]):
+            core_analyzer.registry.add_recognizer(recognizer)
+        batch_analyzer = BatchAnalyzerEngine(analyzer_engine=core_analyzer)
+        anonymizer = AnonymizerEngine()
+        anonymizer.add_anonymizer(CustomSlugAnonymizer)
+        _ENGINE_CACHE[cache_key] = (batch_analyzer, anonymizer)
+        logger.info("warm_up_model: '%s' ready.", transformer_model)
+    except Exception as exc:
+        logger.warning("warm_up_model: failed for '%s': %s", transformer_model, exc)
+
+
 # =============================================================================
 # SHARED REGEX PATTERNS - DRY PRINCIPLE
 # Used by both Presidio-based strategies and Standalone strategy
@@ -474,46 +527,61 @@ class AnonymizationOrchestrator:
 
 
     def _setup_engines(self) -> tuple[BatchAnalyzerEngine, AnonymizerEngine]:
-        """Initializes the Presidio engines, switching between models based on `ner_data_generation`."""
+        """Initializes the Presidio engines, switching between models based on `ner_data_generation`.
+
+        Results are cached at module level keyed by (transformer_model, lang) so that
+        subsequent jobs with the same model skip the 30-60 s load time entirely.
+        NER data generation mode is never cached (rare, spaCy-only path).
+        """
         logging.info("Setting up Presidio analyzer and anonymizer engines.")
         lang_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
-        
-        # Determine the effective language for model loading, prioritizing self.lang
-        effective_lang = self.lang if self.lang in lang_model_map else 'en'
-        
+
+        effective_lang = self.lang if self.lang in lang_model_map else "en"
         spacy_model_name = lang_model_map.get(effective_lang, f"{effective_lang}_core_news_lg")
 
         if self.ner_data_generation:
-            logging.info(f"NER data generation mode: Initializing SpacyNlpEngine for '{effective_lang}'.")
+            logging.info("NER data generation mode: Initializing SpacyNlpEngine for '%s'.", effective_lang)
             nlp_engine = SpacyNlpEngine(models=[{"lang_code": effective_lang, "model_name": spacy_model_name}])
-            core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=[effective_lang])
-        else:
-            logging.info(f"Anonymization mode: Initializing TransformersNlpEngine for '{effective_lang}'.")
-            trf_model_config = [
-                {"lang_code": effective_lang, "model_name": {"spacy": spacy_model_name, "transformers": self.transformer_model}}
-            ]
-            
-            # Choose entity mapping via registry (supports user-registered models)
-            from .model_registry import get_entity_mapping
-            entity_mapping = get_entity_mapping(self.transformer_model)
-                
-            ner_config = NerModelConfiguration(
-                model_to_presidio_entity_mapping=entity_mapping, 
-                aggregation_strategy="max", 
-                labels_to_ignore=["O"]
-            )
-            nlp_engine = TransformersNlpEngine(models=trf_model_config, ner_model_configuration=ner_config)
-            core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=[effective_lang])
-        
-        # Load custom recognizers only for the effective_lang
+            core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en", "pt"])
+            for recognizer in load_custom_recognizers(langs=[effective_lang], regex_priority=self.regex_priority):
+                core_analyzer.registry.add_recognizer(recognizer)
+            batch_analyzer = BatchAnalyzerEngine(analyzer_engine=core_analyzer)
+            anonymizer = AnonymizerEngine()
+            anonymizer.add_anonymizer(CustomSlugAnonymizer)
+            return batch_analyzer, anonymizer
+
+        # --- Transformer path — check module-level cache first ---
+        cache_key = f"{self.transformer_model}:{effective_lang}"
+        if cache_key in _ENGINE_CACHE:
+            logging.info("Engine cache hit for '%s' (lang=%s) — skipping model load.", self.transformer_model, effective_lang)
+            return _ENGINE_CACHE[cache_key]
+
+        logging.info("Engine cache miss — loading TransformersNlpEngine for '%s' (lang=%s).", self.transformer_model, effective_lang)
+        trf_model_config = [
+            {"lang_code": effective_lang,
+             "model_name": {"spacy": spacy_model_name, "transformers": self.transformer_model}}
+        ]
+
+        from .model_registry import get_entity_mapping
+        entity_mapping = get_entity_mapping(self.transformer_model)
+
+        ner_config = NerModelConfiguration(
+            model_to_presidio_entity_mapping=entity_mapping,
+            aggregation_strategy="max",
+            labels_to_ignore=["O"],
+        )
+        nlp_engine = TransformersNlpEngine(models=trf_model_config, ner_model_configuration=ner_config)
+        core_analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en", "pt"])
+
         for recognizer in load_custom_recognizers(langs=[effective_lang], regex_priority=self.regex_priority):
             core_analyzer.registry.add_recognizer(recognizer)
-        
+
         batch_analyzer = BatchAnalyzerEngine(analyzer_engine=core_analyzer)
         anonymizer = AnonymizerEngine()
         anonymizer.add_anonymizer(CustomSlugAnonymizer)
-        
-        logging.info("Presidio engines setup complete.")
+
+        _ENGINE_CACHE[cache_key] = (batch_analyzer, anonymizer)
+        logging.info("Presidio engines ready and cached for '%s'.", self.transformer_model)
         return batch_analyzer, anonymizer
 
     def anonymize_text(self, text: str, forced_entity_type: Optional[Union[str, List[str]]] = None) -> str:
