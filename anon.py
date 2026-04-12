@@ -198,15 +198,15 @@ def get_supported_entities(
     """Return a sorted list of entity types detectable for a given strategy + model combination.
 
     Args:
-        strategy_name: One of presidio / filtered / hybrid / standalone / slm.
+        strategy_name: One of presidio / filtered / hybrid / standalone / regex / slm.
         transformer_model: HuggingFace model ID used for NER.
 
     Entity sources per strategy:
         presidio / filtered / hybrid  → custom regex + Presidio built-ins + NER model labels
-        standalone                    → custom regex + NER model labels  (no Presidio engine)
+        standalone / regex            → custom regex + NER model labels  (no Presidio engine)
         slm                           → custom regex + NER model labels  (SLM output is open-ended)
     """
-    from src.anon.config import SECURE_MODERNBERT_ENTITY_MAPPING
+    from src.anon.model_registry import get_entity_mapping
     from presidio_analyzer import RecognizerRegistry  # type: ignore
 
     supported: set[str] = set()
@@ -219,9 +219,6 @@ def get_supported_entities(
         logging.warning(f"Failed to load custom recognizers: {exc}")
 
     # 2. Presidio built-in recognizers — only for the full Presidio strategy.
-    #    filtered/hybrid/standalone all use _get_core_entities() which limits scope to
-    #    NER model labels + custom regex only (same entity set as standalone).
-    #    RecognizerRegistry loads the full predefined set without instantiating NLP engines.
     if strategy_name == "presidio":
         try:
             registry = RecognizerRegistry()
@@ -231,11 +228,9 @@ def get_supported_entities(
         except Exception as exc:
             logging.warning(f"Failed to load Presidio built-in recognizers: {exc}")
 
-    # 3. NER model entity labels (transformer model → Presidio entity mapping values)
-    if "SecureModernBERT-NER" in transformer_model:
-        supported.update(SECURE_MODERNBERT_ENTITY_MAPPING.values())
-    else:
-        supported.update(ENTITY_MAPPING.values())
+    # 3. NER model entity labels — sourced from the model registry (single source of truth)
+    if strategy_name != "regex":
+        supported.update(get_entity_mapping(transformer_model).values())
 
     return sorted(supported)
 
@@ -283,6 +278,20 @@ def _parse_arguments():
                         choices=["tesseract", "easyocr", "paddleocr", "doctr", "kerasocr"],
                         help="OCR engine for image/PDF text extraction. Default: tesseract. "
                              "Others require optional dependencies — see docs/users/OCR_ENGINES.md.")
+    parser.add_argument("--ocr-preprocess-preset", type=str, default="none",
+                        choices=["none", "scan", "photo", "fax"],
+                        help="Image preprocessing preset applied before OCR. "
+                             "'scan' — scanned documents (CLAHE, deskew, adaptive threshold). "
+                             "'photo' — camera-captured pages (noise removal, morph cleanup). "
+                             "'fax' — fax / dot-matrix prints (aggressive binarization). "
+                             "'none' — no preprocessing (default). "
+                             "Overridden by --ocr-preprocess when both are specified.")
+    parser.add_argument("--ocr-preprocess", type=str, default="",
+                        metavar="STEPS",
+                        help="Comma-separated list of preprocessing steps to apply before OCR. "
+                             "Valid steps (run in given order): "
+                             "grayscale, upscale, clahe, denoise, deskew, binarize, morph_open, border. "
+                             "Example: --ocr-preprocess grayscale,upscale,binarize,border")
 
     # Performance & Filtering options
     parser.add_argument("--preserve-row-context", action="store_true", help="For CSV/XLSX, process all values to preserve context instead of only unique values.")
@@ -818,12 +827,22 @@ def main():
         
         # --- OCR Engine ---
         from src.anon.ocr.factory import get_ocr_engine
+        from src.anon.ocr.preprocessor import PRESETS as _OCR_PRESETS, VALID_STEPS as _OCR_VALID_STEPS
         try:
             ocr_engine = get_ocr_engine(args.ocr_engine)
             logging.info(f"OCR engine: {args.ocr_engine}")
         except RuntimeError as e:
             logging.error(str(e))
             sys.exit(1)
+
+        # --- OCR Preprocessing ---
+        ocr_preprocess_steps: list[str] = []
+        if args.ocr_preprocess:
+            ocr_preprocess_steps = [s.strip() for s in args.ocr_preprocess.split(",") if s.strip() in _OCR_VALID_STEPS]
+        elif args.ocr_preprocess_preset and args.ocr_preprocess_preset != "none":
+            ocr_preprocess_steps = list(_OCR_PRESETS[args.ocr_preprocess_preset])
+        if ocr_preprocess_steps:
+            logging.info(f"OCR preprocessing steps: {ocr_preprocess_steps}")
 
         processor_factory_args = {
             "ner_data_generation": args.generate_ner_data,
@@ -844,6 +863,7 @@ def main():
             "force_large_xml": args.force_large_xml,
             "use_datasets": args.use_datasets,
             "ocr_engine": ocr_engine,
+            "preprocess_steps": ocr_preprocess_steps,
         }
         logging.debug(f"Processor factory arguments: {processor_factory_args}")
 
