@@ -42,6 +42,7 @@ async def create_job(
     entities: Annotated[str, Form()] = "",
     config: Annotated[str, Form()] = "",
     ocr_engine: Annotated[str, Form()] = "tesseract",
+    ocr_preprocess: Annotated[str, Form()] = "",
     fields: Annotated[str, Form()] = "",
 ) -> dict:
     limit = LIMIT_WITH_KEY if key else LIMIT_NO_KEY
@@ -125,6 +126,7 @@ async def create_job(
         "entities": entities_list,
         "anonymization_config": anon_config,
         "ocr_engine": ocr_engine or "tesseract",
+        "ocr_preprocess": json.loads(ocr_preprocess) if ocr_preprocess else [],
     }
     job_service.store_meta(job_id, meta)
     job_service.set_status(job_id, "queued")
