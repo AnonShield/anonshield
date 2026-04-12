@@ -99,7 +99,7 @@ Action items:
 
 <svelte:head>
   <title>AnonShield — On-premise PII anonymization</title>
-  <meta name="description" content="Research-grade PII redaction. Zero cloud, zero persistence. Built at UNIPAMPA — published at SBSeg 2025, WRSeg 2025, SBRC 2026." />
+  <meta name="description" content="Research-grade sensitive entities redaction. Zero cloud, zero persistence. Built at UNIPAMPA — published at SBSeg 2025, ERRC 2025, SBRC 2026." />
 </svelte:head>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -107,19 +107,15 @@ Action items:
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <section class="hero">
   <div class="hero-inner">
-    <div class="hero-badge">
-      <span class="badge-dot"></span>
-      {pt ? 'Pesquisa peer-reviewed · UNIPAMPA' : 'Peer-reviewed research · UNIPAMPA'}
-    </div>
 
     <h1 class="hero-title">
       <span class="brand">AnonShield</span>
-      <span class="hero-rule">{pt ? 'Anonimização de PII on-premise.' : 'On-premise PII anonymization.'}</span>
+      <span class="hero-rule">{pt ? 'Anonimização de entidades on-premise.' : 'On-premise entities anonymization.'}</span>
     </h1>
     <p class="hero-sub">
       {pt
-        ? 'Redação de dados sensíveis de nível acadêmico. Zero nuvem, zero persistência. Publicado no SBSeg 2025, WRSeg 2025 e SBRC 2026.'
-        : 'Research-grade sensitive data redaction. Zero cloud, zero persistence. Published at SBSeg 2025, WRSeg 2025, and SBRC 2026.'}
+        ? 'Redação de dados sensíveis de nível acadêmico. Zero nuvem, zero persistência. Publicado no SBSeg 2025, ERRC 2025 e SBRC 2026.'
+        : 'Research-grade sensitive data redaction. Zero cloud, zero persistence. Published at SBSeg 2025, ERRC 2025, and SBRC 2026.'}
     </p>
 
     <!-- ── LIVE DEMO ── -->
@@ -195,7 +191,7 @@ Action items:
 <section class="pipeline">
   <div class="pipeline-inner">
     <p class="section-label">{pt ? 'Como funciona' : 'How it works'}</p>
-    <h2 class="section-title">{pt ? 'Dados transitam. Nada fica.' : 'Data passes through. Nothing stays.'}</h2>
+    <h2 class="section-title">{pt ? 'Privacidade garantida: processamos tudo sem salvar nada.' : 'Privacy guaranteed: we process everything without saving anything.'}</h2>
 
     <div class="pipe-flow">
       <!-- Node 1: Upload -->
@@ -291,8 +287,8 @@ Action items:
 
     <p class="pipe-note">
       {pt
-        ? 'Chave armazenada apenas no Redis (TTL 1h) · Deletada pelo worker imediatamente após uso · Modo DB: somente em memória'
-        : 'Key stored only in Redis (1h TTL) · Deleted by worker immediately after use · DB mode: in-memory only'}
+        ? 'Chave armazenada apenas no Redis (TTL 1h) · Deletada pelo worker imediatamente após o processamento'
+        : 'Key stored only in Redis (1h TTL) · Deleted by worker immediately after processing'}
     </p>
   </div>
 </section>
@@ -353,63 +349,43 @@ Action items:
       <!-- Paper 1: SBSeg 2025 -->
       <div class="paper-card">
         <div class="paper-venue">SBSeg 2025</div>
-        <h3 class="paper-title">AnonShield: Pseudonymization and Anonymization of Sensitive Entities in CTI Documents</h3>
-        <p class="paper-authors">Cristhian Kapelinski, Douglas Lautert, Beatriz Machado, Isadora G. Ferrão, Diego Kreutz</p>
+        <h3 class="paper-title">Anonimização de Incidentes de Segurança com Reidentificação Controlada</h3>
+        <p class="paper-authors">C. Bandel, J. P. R. Esteves, K. P. Guerra, L. M. Bertholdo, D. Kreutz, R. S. Miani</p>
         <div class="paper-metrics">
-          <span class="pm">94.2% F1</span>
-          <span class="pm">96.7% Recall</span>
-          <span class="pm">738× speedup</span>
+          <span class="pm">100% Prec.</span>
+          <span class="pm">97.38% Rec.</span>
+          <span class="pm">763 Incidents</span>
         </div>
+        <a href="https://doi.org/10.5753/sbseg.2025.11433" target="_blank" class="paper-link">DOI Link ↗</a>
       </div>
 
-      <!-- Paper 2: WRSeg 2025 -->
+      <!-- Paper 2: ERRC 2025 -->
       <div class="paper-card">
-        <div class="paper-venue">WRSeg 2025</div>
-        <h3 class="paper-title">Anonimização de Dados Sensíveis em Documentos de Inteligência de Ameaças</h3>
-        <p class="paper-authors">Cristhian Kapelinski, Douglas Lautert, Beatriz Machado, Diego Kreutz</p>
+        <div class="paper-venue">ERRC 2025 (WRSeg)</div>
+        <h3 class="paper-title">AnonLFI 2.0: Extensible Architecture for PII Pseudonymization in CSIRTs with OCR and Technical Recognizers</h3>
+        <p class="paper-authors">C. Kapelinski, D. Lautert, B. Machado, D. Kreutz</p>
         <div class="paper-metrics">
-          <span class="pm">550 MB &lt;10 min</span>
-          <span class="pm">1,250 KB/s</span>
+          <span class="pm">100% Precision</span>
+          <span class="pm">92.1% F1 (XML)</span>
           <span class="pm">On-premise</span>
         </div>
+        <a href="https://doi.org/10.5753/errc.2025.17784" target="_blank" class="paper-link">DOI Link ↗</a>
       </div>
 
       <!-- Paper 3: SBRC 2026 -->
       <div class="paper-card">
-        <div class="paper-venue">SBRC 2026</div>
-        <h3 class="paper-title">AnonShield: Scalable On-Premise Anonymization for Threat Intelligence Sharing</h3>
-        <p class="paper-authors">Cristhian Kapelinski, Douglas Lautert, Beatriz Machado, Isadora G. Ferrão, Diego Kreutz</p>
+        <div class="paper-venue">SBRC 2026 (Salão de Ferramentas)</div>
+        <h3 class="paper-title">AnonShield: Scalable On-Premise Pseudonymization for CSIRT Vulnerability Data</h3>
+        <p class="paper-authors">C. Kapelinski, D. Lautert, B. Machado, I. G. Ferrão, D. Kreutz</p>
         <div class="paper-metrics">
-          <span class="pm">Multi-format</span>
-          <span class="pm">5 strategies</span>
-          <span class="pm">50+ entities</span>
+          <span class="pm">94.2% F1</span>
+          <span class="pm">96.7% Recall</span>
+          <span class="pm">738× Speedup</span>
         </div>
+        <a href="https://github.com/AnonShield/tool" target="_blank" class="paper-link">GitHub Repo ↗</a>
       </div>
     </div>
 
-    <!-- AnonLFI 1.0 highlight -->
-    <div class="anonlfi-card">
-      <div class="anonlfi-label">AnonLFI 1.0 — Bandel et al., SBSeg 2025</div>
-      <h3 class="anonlfi-title">{pt ? 'Validado em 763 incidentes de segurança reais' : 'Validated on 763 real-world security incidents'}</h3>
-      <div class="anonlfi-stats">
-        <div class="als">
-          <span class="als-v">100%</span>
-          <span class="als-l">Precision</span>
-        </div>
-        <div class="als">
-          <span class="als-v">97.38%</span>
-          <span class="als-l">Recall</span>
-        </div>
-        <div class="als">
-          <span class="als-v">763</span>
-          <span class="als-l">{pt ? 'Incidentes' : 'Incidents'}</span>
-        </div>
-        <div class="als">
-          <span class="als-v">LFI</span>
-          <span class="als-l">{pt ? 'Dataset público' : 'Public dataset'}</span>
-        </div>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -445,7 +421,7 @@ Action items:
     </div>
 
     <p class="team-affil">
-      Universidade Federal do Pampa (UNIPAMPA) · Universidade de Brasília (UBO)
+      Universidade Federal do Pampa (UNIPAMPA) · Université de Bretagne Occidentale (UBO)
     </p>
   </div>
 </section>
@@ -896,35 +872,17 @@ Action items:
     background: rgba(74,222,128,0.06);
   }
 
-  /* AnonLFI card */
-  .anonlfi-card {
-    padding: 32px;
-    border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
-    border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--color-accent) 4%, var(--color-surface-raised));
-    display: flex; flex-direction: column; gap: 20px;
+  .paper-link {
+    font-size: 0.72rem; font-family: var(--font-mono); font-weight: 700;
+    color: var(--color-accent); text-decoration: none;
+    margin-top: 8px; display: inline-flex; align-items: center;
+    gap: 4px; transition: color 150ms, transform 150ms;
   }
-  .anonlfi-label {
-    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--color-accent);
-    font-family: var(--font-mono);
+  .paper-link:hover {
+    color: var(--color-accent-hover);
+    transform: translateX(3px);
   }
-  .anonlfi-title {
-    margin: 0; font-size: clamp(1rem, 2.5vw, 1.3rem); font-weight: 700;
-    color: var(--color-text-primary); letter-spacing: -0.02em;
-  }
-  .anonlfi-stats {
-    display: flex; flex-wrap: wrap; gap: 32px;
-  }
-  .als { display: flex; flex-direction: column; gap: 4px; }
-  .als-v {
-    font-size: 1.8rem; font-weight: 900; letter-spacing: -0.04em;
-    color: var(--color-text-primary); font-variant-numeric: tabular-nums;
-  }
-  .als-l {
-    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--color-text-secondary);
-  }
+
 
   /* ══════════════ TEAM ══════════════ */
   .team {
