@@ -28,6 +28,8 @@ _KEY_TO_ARG = {
     "lang": "lang",
     "output_dir": "output_dir",
     "ocr_engine": "ocr_engine",
+    "ocr_preprocess": "ocr_preprocess",
+    "ocr_preprocess_preset": "ocr_preprocess_preset",
     "entities": "entities",
     "word_list": "word_list",
     "custom_patterns": "custom_patterns",
@@ -53,6 +55,8 @@ class RunConfig:
     transformer_model: str = ""
     slug_length: int | None = None
     ocr_engine: str = "tesseract"
+    ocr_preprocess: list[str] = field(default_factory=list)
+    ocr_preprocess_preset: str = "none"
     entities: list[str] = field(default_factory=list)
     preserve_entities: list[str] = field(default_factory=list)
     allow_list: list[str] = field(default_factory=list)
@@ -124,6 +128,8 @@ def merge_with_args(config: RunConfig, args) -> None:
         "lang": "lang",
         "output_dir": "output_dir",
         "ocr_engine": "ocr_engine",
+        "ocr_preprocess": "ocr_preprocess",
+        "ocr_preprocess_preset": "ocr_preprocess_preset",
         "word_list": "word_list",
         "custom_patterns": "custom_patterns",
         "anonymization_config": "anonymization_config",
