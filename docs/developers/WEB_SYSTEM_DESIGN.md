@@ -619,7 +619,7 @@ tool/                          ← repo existente (CLI)
         ├── workers/
         │   ├── celery_app.py
         │   └── tasks.py       ← process_job()
-        └── requirements.txt
+        └── Dockerfile          ← uv sync --group web (deps via pyproject.toml)
 ```
 
 ---
