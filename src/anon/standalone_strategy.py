@@ -14,6 +14,10 @@ from typing import List, Dict, TYPE_CHECKING, Optional, Set, Tuple
 import logging
 import pandas as pd
 
+# Module-level pipeline cache — keyed by (model_id, device).
+# Avoids reloading the transformer model on every job.
+_PIPELINE_CACHE: dict[str, object] = {}
+
 if TYPE_CHECKING:
     from .core.protocols import CacheStrategy, HashingStrategy
     from .entity_detector import EntityDetector
@@ -91,20 +95,26 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
             self.logger.info("No GPU detected, using CPU")
         
         self.logger.info(f"Loading Transformer model directly: {self.transformer_model}")
-        
-        try:
-            # Load transformer NER pipeline with GPU support
-            self.ner_pipeline = pipeline(
-                "ner",
-                model=self.transformer_model,
-                tokenizer=self.transformer_model,
-                aggregation_strategy="simple",
-                device=device
-            )
-            self.logger.info(f"Transformer model loaded successfully on {'GPU' if device >= 0 else 'CPU'}")
-        except Exception as e:
-            self.logger.error(f"Failed to load transformer model: {e}")
-            raise
+
+        cache_key = f"{self.transformer_model}:{device}"
+        if cache_key in _PIPELINE_CACHE:
+            self.logger.info("Pipeline cache hit for '%s' — skipping model load.", self.transformer_model)
+            self.ner_pipeline = _PIPELINE_CACHE[cache_key]
+        else:
+            try:
+                # Load transformer NER pipeline with GPU support
+                self.ner_pipeline = pipeline(
+                    "ner",
+                    model=self.transformer_model,
+                    tokenizer=self.transformer_model,
+                    aggregation_strategy="simple",
+                    device=device
+                )
+                _PIPELINE_CACHE[cache_key] = self.ner_pipeline
+                self.logger.info(f"Transformer model loaded successfully on {'GPU' if device >= 0 else 'CPU'}")
+            except Exception as e:
+                self.logger.error(f"Failed to load transformer model: {e}")
+                raise
         
         # Load spaCy for tokenization/sentence splitting if needed
         try:
