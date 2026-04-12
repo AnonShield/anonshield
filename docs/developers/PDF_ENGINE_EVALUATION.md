@@ -85,6 +85,42 @@ The **only friction** is the Java 11+ runtime dependency. This is manageable for
 
 ---
 
+## Image Preprocessing Integration (implemented)
+
+A preprocessing pipeline has been implemented in `src/anon/ocr/preprocessor.py` and wired into `FileProcessor._do_ocr()`. It runs **before** any OCR engine receives the image bytes, improving recognition quality on low-quality inputs.
+
+### How it interacts with PyMuPDF
+
+The current `PdfFileProcessor` extracts embedded images using `doc.extract_image(xref)`, which returns the image at its native embedded resolution. For scanned PDFs (where the page itself is a raster image), the embedded image DPI matches the scanner DPI — typically 150–300 DPI. Preprocessing steps like `upscale` bring sub-1000 px images up to the 300 DPI range that Tesseract is optimised for.
+
+**Critical note for future work:** When rendering full pages via `page.get_pixmap()` (e.g. if a fallback to full-page rasterisation is added), always use:
+
+```python
+mat = fitz.Matrix(300 / 72, 300 / 72)  # 300 DPI
+pix = page.get_pixmap(matrix=mat)
+```
+
+The PyMuPDF default of 72 DPI will produce degraded OCR results regardless of which engine is used.
+
+### Preprocessing steps available
+
+| Step | OpenCV | Pillow fallback |
+|------|--------|----------------|
+| `grayscale` | ✓ | ✓ |
+| `upscale` | ✓ | ✓ |
+| `clahe` | ✓ | equalize (approximate) |
+| `denoise` | ✓ | GaussianBlur (approximate) |
+| `deskew` | ✓ | — |
+| `binarize` | ✓ | — |
+| `morph_open` | ✓ | — |
+| `border` | ✓ | ✓ |
+
+### Impact on opendataloader-pdf evaluation
+
+If opendataloader-pdf is integrated, its built-in scanned-PDF OCR already handles multi-language extraction internally. The preprocessing pipeline would apply only to the `extract_image` fallback path, not to the opendataloader-pdf path. The two are orthogonal: preprocessing improves Tesseract/EasyOCR quality; opendataloader-pdf replaces the extraction architecture entirely.
+
+---
+
 ## References
 
 - [opendataloader-pdf GitHub](https://github.com/opendataloader-project/opendataloader-pdf)
