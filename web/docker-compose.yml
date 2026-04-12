@@ -1,0 +1,83 @@
+services:
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on: [frontend, backend]
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    expose: ["3000"]
+    environment:
+      - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost/api}
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    expose: ["8000"]
+    volumes:
+      - anon-jobs:/anon-jobs
+      - ../src:/repo/src:ro          # mounts CLI source (read-only)
+      - ../anon.py:/repo/anon.py:ro
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - ANON_JOBS_DIR=/anon-jobs
+    depends_on: [redis]
+    restart: unless-stopped
+
+  worker-fast:
+    build: ./backend
+    command: celery -A workers.celery_app worker -Q fast --concurrency 4 --loglevel=warning
+    volumes:
+      - anon-jobs:/anon-jobs
+      - ../src:/repo/src:ro
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - ANON_JOBS_DIR=/anon-jobs
+    depends_on: [redis]
+    restart: unless-stopped
+
+  worker-gpu:
+    build: ./backend
+    command: celery -A workers.celery_app worker -Q gpu --concurrency 1 --pool=solo --loglevel=warning
+    volumes:
+      - anon-jobs:/anon-jobs
+      - ../src:/repo/src:ro
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - ANON_JOBS_DIR=/anon-jobs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on: [redis]
+    restart: unless-stopped
+
+  beat:
+    build: ./backend
+    command: celery -A workers.celery_app beat --loglevel=warning
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - ANON_JOBS_DIR=/anon-jobs
+    depends_on: [redis]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --bind 0.0.0.0 --save "" --appendonly no
+    expose: ["6379"]
+    restart: unless-stopped
+
+volumes:
+  anon-jobs:
+    # Docker-managed volume. No dedicated partition needed.
+    # Override via .env: ANON_JOBS_DIR=/your/path (then use bind mount instead)

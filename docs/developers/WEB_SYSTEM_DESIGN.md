@@ -163,19 +163,28 @@ Arquivos não suportados dentro do ZIP: ignorados com log no summary.
 
 ## 5. Gestão de Disco
 
+**Constraint:** O servidor é compartilhado. Sem partição dedicada, sem modificações no SO.
+
 ```
+Caminho configurável via variável de ambiente:
+  ANON_JOBS_DIR=/home/user/anon-jobs   ← padrão se não definido: /tmp/anon/jobs
+
 Worst case (demo, 1 usuário):
   input:  10 GB
-  output: ~10 GB (pode ser maior se PDF gera texto extenso)
+  output: ~10 GB
   ZIP extract: + 10 GB
-  Total peak: ~30 GB
+  Total peak: ~30 GB no diretório ANON_JOBS_DIR
 
-Recomendação: partição dedicada /data/anon com 60 GB mínimo
-  Montar: /tmp/anon → /data/anon (bind mount ou symlink)
-  Monitoramento: alerta se uso > 80%
+Controle de disco — sem partição dedicada:
+  1. Worker verifica espaço livre antes de aceitar job:
+       shutil.disk_usage(ANON_JOBS_DIR).free < required_bytes → rejeita com 507
+  2. Celery Beat limpa jobs > 2h a cada 15 min (nenhum arquivo acumula)
+  3. Input deletado imediatamente após leitura
+  4. Output deletado logo após o download
+  5. Limite de 1 job simultâneo na fila gpu (concurrency=1) — sem sobreposição de picos
 ```
 
-**Por que não tmpfs?** 10 GB em RAM não é viável. Usar disco dedicado separado do sistema.
+**Por que não tmpfs?** 10 GB em RAM não é viável — e tmpfs usaria RAM compartilhada do servidor. O diretório configurável via `ANON_JOBS_DIR` é a solução adequada para servidor compartilhado.
 
 ---
 
@@ -639,29 +648,32 @@ services:
     build: ./backend
     expose: ["8000"]
     volumes:
-      - anon-tmp:/tmp/anon
+      - anon-tmp:/anon-jobs
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - ANON_JOBS_DIR=/anon-jobs   # diretório configurável — sem partição dedicada
     depends_on: [redis]
 
   worker-fast:
     build: ./backend
     command: celery -A workers.celery_app worker -Q fast --concurrency 4 --loglevel=warning
     volumes:
-      - anon-tmp:/tmp/anon
+      - anon-tmp:/anon-jobs
       - ../../src:/app/src   # monta o código anon existente
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - ANON_JOBS_DIR=/anon-jobs
     depends_on: [redis]
 
   worker-gpu:
     build: ./backend
     command: celery -A workers.celery_app worker -Q gpu --concurrency 1 --pool=solo --loglevel=warning
     volumes:
-      - anon-tmp:/tmp/anon
+      - anon-tmp:/anon-jobs
       - ../../src:/app/src
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - ANON_JOBS_DIR=/anon-jobs
     deploy:
       resources:
         reservations:
@@ -674,6 +686,8 @@ services:
   beat:
     build: ./backend
     command: celery -A workers.celery_app beat --loglevel=warning
+    environment:
+      - ANON_JOBS_DIR=/anon-jobs
     depends_on: [redis]
 
   redis:
@@ -683,11 +697,9 @@ services:
 
 volumes:
   anon-tmp:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /data/anon   # partição dedicada
+    # Volume Docker gerenciado — sem bind mount para /data/anon
+    # Para servidor compartilhado: defina ANON_JOBS_DIR no .env
+    # Exemplo: ANON_JOBS_DIR=/home/seuuser/anon-jobs
 ```
 
 ---
