@@ -12,9 +12,12 @@ AnonShield is a pseudonymization framework designed for secure and compliant dat
 - **On-Premise**: Process sensitive data entirely locally without external API dependencies.
 - **Multiple Anonymization Strategies**: `filtered`, `presidio`, `hybrid`, `standalone`, and `regex` (zero NLP overhead — pure regex, fastest of all).
 - **Multi-Engine OCR**: Choose from Tesseract, EasyOCR, PaddleOCR, DocTR, or Keras-OCR via `--ocr-engine`.
+- **Image Preprocessing**: Apply a configurable pipeline before OCR — grayscale, 300-DPI upscale, CLAHE contrast, Gaussian denoise, auto-deskew, adaptive binarization, morphological cleanup, and border padding. Pre-built presets for scanned documents, camera photos, and fax/low-quality images.
 - **YAML Config Profiles**: Persist all run settings in a YAML file (`--config`); pre-built profiles for banking documents.
 - **Custom Regex Patterns**: Add domain-specific detectors (CPF, CNPJ, IBAN, employee IDs…) without modifying source code (`--custom-patterns`).
 - **Entity Selection**: Anonymize only the exact types you specify (`--entities`), complementing the existing exclusion list (`--preserve-entities`).
+- **Web Interface**: Full-featured browser UI with drag-and-drop upload, real-time progress, batch processing, and per-session entity selection.
+- **Specialized NER Models**: Choose from 8 pre-configured transformer models covering general, clinical, financial, biomedical, and cybersecurity domains.
 
 ## Installation
 
@@ -64,6 +67,17 @@ uv run anon.py ./banking_docs/ \
   --entities "CPF,EMAIL_ADDRESS,CREDIT_CARD"
 ```
 
+Apply preprocessing before OCR (scanned documents):
+
+```bash
+# Use a named preset
+uv run anon.py ./scanned_invoice.pdf --ocr-preprocess-preset scan
+
+# Or select steps explicitly
+uv run anon.py ./photo.jpg \
+  --ocr-preprocess "grayscale,upscale,clahe,denoise,deskew,binarize,border"
+```
+
 Use a pre-configured profile:
 
 ```bash
@@ -76,10 +90,25 @@ List all supported entity types:
 uv run anon.py --list-entities
 ```
 
+## Web Interface
+
+AnonShield includes a full-featured web application (SvelteKit + FastAPI) for browser-based processing.
+
+**Quick start (production):**
+```bash
+cd web
+echo "ANON_SECRET_KEY=$(openssl rand -hex 32)" > .env
+# Edit web/Caddyfile — set your domain
+docker compose -f docker-compose.prod.yml up -d
+```
+
+See [docs/web/SETUP.md](docs/web/SETUP.md) for the complete guide (production + development, environment variables, model download sizes, data privacy guarantees).
+
 ## Usage & Configuration
 
 Detailed guides are available in the `docs/` directory:
 
+- [Web Setup](docs/web/SETUP.md) — production deploy (Docker + Caddy) and local dev mode
 - [CLI Reference](docs/users/CLI_REFERENCE.md) — every flag, with examples
 - [Configuration File](docs/users/CONFIGURATION_FILE.md) — YAML config file schema and profiles
 - [OCR Engines](docs/users/OCR_ENGINES.md) — comparison of all five OCR engines
