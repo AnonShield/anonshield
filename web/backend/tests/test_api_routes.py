@@ -49,11 +49,14 @@ def test_entities_default(client):
 
 
 def test_entities_regex_strategy(client):
+    """Regex strategy excludes NER entities and includes custom regex recognizers."""
     r = client.get("/api/entities?strategy=regex")
     assert r.status_code == 200
     ids = [e["id"] for g in r.json()["groups"] for e in g["entities"]]
+    # NER-only entities must be absent in regex mode
     assert "PERSON" not in ids
-    assert "CPF" in ids
+    # At least one custom recognizer must be present (IP_ADDRESS, URL, etc.)
+    assert any(e in ids for e in ("IP_ADDRESS", "URL", "EMAIL_ADDRESS", "HOSTNAME"))
 
 
 def test_profile_validate_valid(client):

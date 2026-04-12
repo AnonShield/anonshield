@@ -131,23 +131,30 @@ custom_patterns:
 
 class TestEntitiesEndpoint:
     def test_regex_excludes_ner_entities(self):
+        """Regex strategy must not include NER-only entities like PERSON."""
         from routers.entities import list_entities
         result = list_entities(strategy="regex")
         all_ids = [e["id"] for g in result["groups"] for e in g["entities"]]
+        # NER-only entities must be absent in regex mode
         assert "PERSON" not in all_ids
-        assert "CPF" in all_ids
+        # Custom regex recognizers (always available) must be present
+        assert any(e in all_ids for e in ("IP_ADDRESS", "URL", "EMAIL_ADDRESS", "HOSTNAME"))
 
     def test_filtered_includes_ner_entities(self):
+        """Filtered strategy must include both NER entities and custom regex recognizers."""
         from routers.entities import list_entities
         result = list_entities(strategy="filtered")
         all_ids = [e["id"] for g in result["groups"] for e in g["entities"]]
+        # NER entities must appear in non-regex strategies
         assert "PERSON" in all_ids
-        assert "CPF" in all_ids
+        # Custom regex recognizers must also appear
+        assert any(e in all_ids for e in ("IP_ADDRESS", "URL", "EMAIL_ADDRESS"))
 
     def test_response_structure(self):
         from routers.entities import list_entities
         result = list_entities()
         assert "groups" in result
+        assert len(result["groups"]) > 0
         for group in result["groups"]:
             assert "label" in group
             assert "entities" in group

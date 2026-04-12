@@ -1,5 +1,9 @@
 """
-Python API for AnonShield — callable from web workers without going through anon.py CLI.
+Python API for AnonShield — callable from web workers and the web backend.
+
+Provides:
+  - anonymize_file(): run anonymization programmatically
+  - get_supported_entities(): real entity list from Presidio + custom recognizers
 
 Usage:
     from src.anon.api import anonymize_file
@@ -155,3 +159,157 @@ def anonymize_file(
         "entity_count": orchestrator.total_entities_processed,
         "entity_counts": dict(orchestrator.entity_counts),
     }
+
+
+# ── Entity discovery ───────────────────────────────────────────────────────────
+
+_ENTITY_CACHE: dict[str, list[str]] = {}
+
+
+def get_supported_entities(strategy: str = "filtered", lang: str = "en") -> list[str]:
+    """Return the real entity types supported by the engine for the given strategy/lang.
+
+    Results are cached per (strategy, lang) key so the first call (slow) is
+    the only one that loads the NLP engine.
+    """
+    cache_key = f"{strategy}:{lang}"
+    if cache_key in _ENTITY_CACHE:
+        return _ENTITY_CACHE[cache_key]
+
+    from src.anon.engine import load_custom_recognizers
+
+    # Custom regex recognizers are always available
+    custom = [r.supported_entities[0] for r in load_custom_recognizers([lang])]
+
+    if strategy == "regex":
+        # Regex-only: only custom recognizers, no Presidio NLP
+        result = sorted(set(custom))
+    else:
+        # NER strategies: Presidio built-ins + custom recognizers
+        try:
+            from presidio_analyzer import AnalyzerEngine
+            from presidio_analyzer.nlp_engine import NlpEngineProvider
+
+            provider = NlpEngineProvider(
+                nlp_configuration={
+                    "nlp_engine_name": "spacy",
+                    "models": [{"lang_code": lang, "model_name": _spacy_model(lang)}],
+                }
+            )
+            nlp_engine = provider.create_engine()
+            ae = AnalyzerEngine(nlp_engine=nlp_engine)
+            for r in load_custom_recognizers([lang]):
+                ae.registry.add_recognizer(r)
+            presidio_entities = ae.get_supported_entities(language=lang)
+            result = sorted(set(list(presidio_entities) + custom))
+        except Exception as exc:
+            logger.warning("Could not load Presidio for entity list (%s) — using custom only", exc)
+            result = sorted(set(custom))
+
+    _ENTITY_CACHE[cache_key] = result
+    return result
+
+
+def _spacy_model(lang: str) -> str:
+    _MODELS = {
+        "en": "en_core_web_lg",
+        "pt": "pt_core_news_lg",
+        "es": "es_core_news_lg",
+        "fr": "fr_core_news_lg",
+        "de": "de_core_news_lg",
+        "it": "it_core_news_lg",
+        "nl": "nl_core_news_lg",
+    }
+    return _MODELS.get(lang, "en_core_web_lg")
+
+
+def preview_structured_file(path: str | Path, max_rows: int = 5) -> dict:
+    """Analyze a structured file (CSV, XLSX, JSON, JSONL) and return fields + samples.
+
+    Returns:
+        {
+            "type": "csv" | "xlsx" | "json" | "jsonl",
+            "fields": [{"name": "email", "sample_values": ["a@b.com", ...]}],
+            "row_count": 1000,
+        }
+    """
+    import json
+    import csv
+
+    path = Path(path)
+    ext = path.suffix.lower().lstrip(".")
+
+    def _truncate(v: object) -> str:
+        s = str(v) if v is not None else ""
+        return s[:80] + "…" if len(s) > 80 else s
+
+    if ext == "csv":
+        rows: list[dict] = []
+        with path.open(encoding="utf-8", errors="replace") as f:
+            reader = csv.DictReader(f)
+            for i, row in enumerate(reader):
+                if i >= max_rows:
+                    break
+                rows.append(row)
+        if not rows:
+            return {"type": "csv", "fields": [], "row_count": 0}
+        fields = [
+            {"name": k, "sample_values": [_truncate(r.get(k)) for r in rows]}
+            for k in rows[0]
+        ]
+        return {"type": "csv", "fields": fields, "row_count": None}
+
+    if ext in ("xls", "xlsx"):
+        import openpyxl
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        ws = wb.active
+        rows_raw = list(ws.iter_rows(values_only=True))
+        if len(rows_raw) < 2:
+            return {"type": "xlsx", "fields": [], "row_count": 0}
+        headers = [str(h) if h is not None else f"col_{i}" for i, h in enumerate(rows_raw[0])]
+        data_rows = rows_raw[1: 1 + max_rows]
+        fields = [
+            {"name": h, "sample_values": [_truncate(r[i]) for r in data_rows if i < len(r)]}
+            for i, h in enumerate(headers)
+        ]
+        return {"type": "xlsx", "fields": fields, "row_count": len(rows_raw) - 1}
+
+    if ext in ("json", "jsonl"):
+        with path.open(encoding="utf-8", errors="replace") as f:
+            first_char = f.read(1)
+            f.seek(0)
+            if ext == "jsonl" or first_char == "{":
+                # JSONL or single object per line
+                records = []
+                for i, line in enumerate(f):
+                    if i >= max_rows:
+                        break
+                    line = line.strip()
+                    if line:
+                        try:
+                            records.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            pass
+            else:
+                data = json.load(f)
+                if isinstance(data, list):
+                    records = data[:max_rows]
+                else:
+                    return {"type": "json", "fields": [], "row_count": 1}
+
+        if not records or not isinstance(records[0], dict):
+            return {"type": ext, "fields": [], "row_count": len(records)}
+
+        all_keys: list[str] = []
+        for r in records:
+            for k in r:
+                if k not in all_keys:
+                    all_keys.append(k)
+
+        fields = [
+            {"name": k, "sample_values": [_truncate(r.get(k)) for r in records]}
+            for k in all_keys
+        ]
+        return {"type": ext, "fields": fields, "row_count": None}
+
+    return {"type": ext, "fields": [], "row_count": None}

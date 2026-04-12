@@ -2,6 +2,7 @@
 import shutil
 import sys
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 
@@ -84,6 +85,7 @@ def _execute(job_id: str) -> dict:
 
     input_file = storage.input_path(job_id, meta["ext"])
     out_dir = storage.output_dir(job_id)
+    t0 = time.monotonic()
 
     try:
         if meta["ext"] == "zip":
@@ -91,10 +93,31 @@ def _execute(job_id: str) -> dict:
         else:
             result = _anonymize(input_file, out_dir, meta, key)
 
+        ms = (time.monotonic() - t0) * 1000
         storage.delete_input(job_id)
         out_file = storage.get_output_file(job_id)
         output_size = out_file.stat().st_size if out_file else 0
         job_service.set_status(job_id, "done", output_size_bytes=output_size, result=result)
+
+        # Record job metrics (best-effort, never blocks)
+        try:
+            import json
+            from services.metrics import record_job
+            queue = "gpu" if meta.get("strategy", "filtered") in {"filtered", "standalone", "hybrid", "presidio"} else "fast"
+            record_job(
+                job_id=job_id,
+                file_ext=meta.get("ext"),
+                file_b=meta.get("size"),
+                strategy=meta.get("strategy"),
+                lang=meta.get("lang"),
+                queue=queue,
+                entity_cnt=result.get("entity_count"),
+                entity_counts=result.get("entity_counts"),
+                ms=ms,
+            )
+        except Exception:
+            pass
+
         return result
     except Exception as exc:
         storage.delete_input(job_id)

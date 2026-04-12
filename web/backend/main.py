@@ -2,7 +2,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import jobs, entities
+from routers import jobs, entities, metrics
+from services.metrics import MetricsMiddleware, init_db
 
 app = FastAPI(
     title="AnonShield Web API",
@@ -11,15 +12,20 @@ app = FastAPI(
     redoc_url=None,
 )
 
+# Initialize metrics DB on startup (no-op if already exists)
+init_db()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(MetricsMiddleware)
 
 app.include_router(jobs.router)
 app.include_router(entities.router)
+app.include_router(metrics.router)
 
 
 @app.get("/api/health")
