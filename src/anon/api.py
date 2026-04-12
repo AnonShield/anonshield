@@ -41,6 +41,7 @@ def anonymize_file(
     custom_patterns: list[dict] | None = None,
     slug_length: int = 8,
     ocr_engine: str = "tesseract",
+    ocr_preprocess: list[str] | None = None,
     transformer_model: str = "Davlan/xlm-roberta-base-ner-hrl",
     secret_key: str = "",
     use_db: bool = False,
@@ -72,7 +73,8 @@ def anonymize_file(
     supported_upper = {s.upper() for s in get_supported_entities(strategy, lang=lang)}
 
     # Entity selection / preservation
-    if entities:
+    if entities is not None:
+        # Explicit selection: preserve everything NOT requested (empty list = preserve all = anonymize nothing)
         valid = {e.upper() for e in entities if e.upper() in supported_upper}
         entities_to_preserve = list(Global.NON_PII_ENTITIES | (supported_upper - valid))
     else:
@@ -151,6 +153,7 @@ def anonymize_file(
         orchestrator,
         output_dir=str(output_dir),
         ocr_engine=ocr_eng,
+        preprocess_steps=ocr_preprocess or [],
         overwrite=True,
         anonymization_config=anonymization_config,
     )
@@ -170,26 +173,36 @@ def anonymize_file(
 _ENTITY_CACHE: dict[str, list[str]] = {}
 
 
-def get_supported_entities(strategy: str = "filtered", lang: str = "en") -> list[str]:
-    """Return the real entity types supported by the engine for the given strategy/lang.
+def get_supported_entities(
+    strategy: str = "filtered",
+    lang: str = "en",
+    model: str = "Davlan/xlm-roberta-base-ner-hrl",
+) -> list[str]:
+    """Return the real entity types supported by the engine for the given strategy/lang/model.
 
-    Results are cached per (strategy, lang) key so the first call (slow) is
+    Results are cached per (strategy, lang, model) key so the first call (slow) is
     the only one that loads the NLP engine.
     """
-    cache_key = f"{strategy}:{lang}"
+    cache_key = f"{strategy}:{lang}:{model}"
     if cache_key in _ENTITY_CACHE:
         return _ENTITY_CACHE[cache_key]
 
     from src.anon.engine import load_custom_recognizers
+    from src.anon.model_registry import get_entity_mapping
 
-    # Custom regex recognizers are always available
+    # Custom regex recognizers are always available (independent of NER model)
     custom = [r.supported_entities[0] for r in load_custom_recognizers([lang])]
+
+    # NER entities this specific model can produce (values of its entity mapping)
+    model_ner_entities: set[str] = set()
+    if strategy != "regex":
+        model_ner_entities = set(get_entity_mapping(model).values())
 
     if strategy == "regex":
         # Regex-only: only custom recognizers, no Presidio NLP
         result = sorted(set(custom))
-    else:
-        # NER strategies: Presidio built-ins + custom recognizers
+    elif strategy == "presidio":
+        # Full Presidio pipeline: include ALL built-in recognizers
         try:
             from presidio_analyzer import AnalyzerEngine
             from presidio_analyzer.nlp_engine import NlpEngineProvider
@@ -205,10 +218,15 @@ def get_supported_entities(strategy: str = "filtered", lang: str = "en") -> list
             for r in load_custom_recognizers([lang]):
                 ae.registry.add_recognizer(r)
             presidio_entities = ae.get_supported_entities(language=lang)
-            result = sorted(set(list(presidio_entities) + custom))
+            result = sorted(set(list(presidio_entities) + custom + list(model_ner_entities)))
         except Exception as exc:
-            logger.warning("Could not load Presidio for entity list (%s) — using custom only", exc)
-            result = sorted(set(custom))
+            logger.warning("Could not load Presidio for entity list (%s) — using custom + model entities", exc)
+            result = sorted(set(custom) | model_ner_entities)
+    else:
+        # filtered / standalone / hybrid — curated set: custom regex + NER model entities only.
+        # These strategies do NOT use Presidio's broad built-in recognizers (CREDIT_CARD,
+        # IBAN, US_DRIVER_LICENSE, etc.) — those generate many false positives in practice.
+        result = sorted(set(custom) | model_ner_entities)
 
     _ENTITY_CACHE[cache_key] = result
     return result
