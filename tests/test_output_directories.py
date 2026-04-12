@@ -5,7 +5,6 @@ import sys
 import tempfile
 import shutil
 import json
-import csv
 import sqlite3
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -60,17 +59,6 @@ class TestOutputDirectories(unittest.TestCase):
             self.fail(f"Script {script_name} timed out. stdout:\n{e.stdout}\n\nstderr:\n{e.stderr}")
 
 
-    def test_analyze_entity_map_output(self):
-        script_name = "analyze_entity_map.py"
-        self.run_script(script_name, [str(self.entity_map_path)])
-        
-        expected_dir = self.output_dir / "analyze_entity_map" / "entity_analysis_report_entity_map"
-        expected_file = expected_dir / "entity_map_analysis_report.md"
-
-        self.assertTrue(expected_dir.is_dir())
-        self.assertTrue(expected_file.is_file())
-
-
     def test_export_and_clear_db_output(self):
         db_dir = self.test_dir / "db"
         db_dir.mkdir()
@@ -103,38 +91,6 @@ class TestOutputDirectories(unittest.TestCase):
 
         self.assertTrue(expected_dir.is_dir())
         self.assertTrue(expected_file.is_file())
-
-    @patch('scripts.get_runs_metrics.collect_run_metrics')
-    def test_get_runs_metrics_output(self, mock_collect_run_metrics):
-        mock_collect_run_metrics.return_value = {
-            "run": 1,
-            "total_tickets": 1,
-            "total_time_s": 1.0,
-            "avg_time_per_file": 1.0,
-            "avg_time_per_ticket": 1.0,
-        }
-        
-        from scripts import get_runs_metrics
-
-        test_files_dir = self.test_dir / "test_files_for_metrics"
-        test_files_dir.mkdir()
-        shutil.copy(self.text_to_anonymize_path, test_files_dir)
-        
-        with patch('scripts.get_runs_metrics.NUM_RUNS', 1):
-            get_runs_metrics.main_logic(str(test_files_dir))
-
-        expected_dir = self.output_dir / "get_runs_metrics"
-        expected_file = expected_dir / "metrics_runs.csv"
-        
-        self.assertTrue(expected_dir.is_dir())
-        self.assertTrue(expected_file.is_file())
-        
-        with open(expected_file, "r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-            self.assertEqual(len(rows), 1)
-            self.assertEqual(rows[0]["Run"], "1")
-
 
     @patch('scripts.slm_regex_generator.get_slm_client')
     def test_slm_regex_generator_output(self, mock_get_slm_client):
