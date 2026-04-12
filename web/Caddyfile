@@ -7,6 +7,11 @@
 }
 
 anonshield.org, www.anonshield.org {
+    # Strict file size limit for shared server security
+    request_body {
+        max_size 1MB
+    }
+
     # Reverse proxy for Backend API
     handle /api/* {
         reverse_proxy backend:8000
@@ -20,6 +25,8 @@ anonshield.org, www.anonshield.org {
     # Content Security Policy and Security Headers
     header {
         # Security headers
+        LIMIT_NO_KEY = 1 * 1024 * 1024        # 1 MB
+        LIMIT_WITH_KEY = 1 * 1024 * 1024      # 1 MB
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
