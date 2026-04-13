@@ -394,6 +394,21 @@ def _parse_arguments():
         args.use_cache = True
         if args.min_word_length == 0:
             args.min_word_length = 3
+
+    # Auto-select a language-specific NER model when the user kept the default.
+    # Portuguese docs benefit from a PT-BR fine-tuned model (better person-name
+    # recall on certidões, extratos, cheques). CLI and config file can still
+    # override by setting transformer_model explicitly.
+    user_set_model = "--transformer-model" in sys.argv
+    if not user_set_model and args.transformer_model == TRANSFORMER_MODEL:
+        from src.anon.model_registry import default_transformer_for_lang
+        lang_default = default_transformer_for_lang(args.lang)
+        if lang_default != args.transformer_model:
+            logging.info(
+                "Auto-selected NER model for lang='%s': %s (override with --transformer-model)",
+                args.lang, lang_default,
+            )
+            args.transformer_model = lang_default
     return args
 
 
