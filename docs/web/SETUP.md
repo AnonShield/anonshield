@@ -142,7 +142,7 @@ npm install
 cd ../..
 ```
 
-> **About dev deps**: The `web` group installs only what's needed for the web server. The heavy OCR engines (EasyOCR, PaddleOCR, DocTR, Keras-OCR) are installed only in production via `--all-extras`, saving ~5 GB of disk space. Tesseract (system package) covers all dev OCR needs.
+> **About dev deps**: The `web` group installs only what's needed for the web server. The heavy OCR engines (EasyOCR, PaddleOCR, DocTR, OnnxTR, Surya, RapidOCR, PaddleOCR-VL, DeepSeek-OCR, MonkeyOCR) are installed only in production via `--all-extras`, saving ~10 GB of disk space. Tesseract (system package) covers all dev OCR needs. See [users/OCR_ENGINES.md](../users/OCR_ENGINES.md) for the full list of 13 supported engines.
 
 ### 2. Environment
 
@@ -196,8 +196,8 @@ If you want to test a specific engine, install it individually:
 # EasyOCR only (no PaddleOCR)
 pip install easyocr
 
-# DocTR only (PyTorch backend)
-pip install "python-doctr[torch]"
+# DocTR only (PyTorch is the default backend in v1.0+)
+pip install "python-doctr>=1.0"
 ```
 
 ---

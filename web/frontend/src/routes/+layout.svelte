@@ -6,9 +6,14 @@
 
   let { children } = $props();
 
-  let isApp     = $derived(page.url.pathname.startsWith('/app'));
-  let isMetrics = $derived(page.url.pathname === '/app/metrics');
-  let appClass  = $derived(isApp ? (isMetrics ? 'app-main metrics-main' : 'app-main') : '');
+  let isApp       = $derived(page.url.pathname.startsWith('/app'));
+  let isMetrics   = $derived(page.url.pathname === '/app/metrics');
+  let isBenchmark = $derived(page.url.pathname === '/app/benchmark');
+  let appClass    = $derived(
+    isApp
+      ? (isMetrics || isBenchmark ? 'app-main metrics-main' : 'app-main')
+      : '',
+  );
 </script>
 
 <svelte:head>
@@ -32,6 +37,9 @@
         {#if !isMetrics}
           <a href="/app/metrics" class="nav-link metrics-link">Metrics</a>
         {/if}
+        {#if !isBenchmark}
+          <a href="/app/benchmark" class="nav-link metrics-link">Benchmark</a>
+        {/if}
       {/if}
       <button class="lang-btn" onclick={toggleLocale} aria-label="Switch language">
         {$t('nav.lang_toggle')}
@@ -52,7 +60,9 @@
     height: 56px;
     border-bottom: 1px solid var(--color-border);
     position: sticky; top: 0;
-    background: rgba(8, 9, 13, 0.85);
+    /* Translucent sticky chrome: 85% of surface token + 15% transparent
+       so the backdrop-filter blur reads through. */
+    background: color-mix(in srgb, var(--color-surface) 85%, transparent);
     backdrop-filter: blur(12px);
     z-index: 100;
   }
@@ -63,50 +73,71 @@
   }
 
   .logo {
-    display: flex; align-items: center; gap: 8px;
-    font-weight: 700; font-size: 1rem;
+    display: flex; align-items: center; gap: var(--space-2);
+    font-weight: 700; font-size: var(--text-base);
     color: var(--color-text-primary);
     text-decoration: none;
     letter-spacing: -0.02em;
   }
-  .logo-mark { color: var(--color-accent); font-size: 1.1rem; }
+  .logo:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+  }
+  .logo-mark { color: var(--color-accent); font-size: var(--text-lg); }
 
-  .nav { display: flex; align-items: center; gap: 12px; }
+  .nav { display: flex; align-items: center; gap: var(--space-3); }
 
   .nav-link {
     font-size: var(--text-sm); color: var(--color-text-secondary);
     text-decoration: none;
-    transition: color var(--duration-fast);
+    transition: color var(--duration-fast) var(--ease-out);
   }
   .nav-link:hover { color: var(--color-text-primary); }
+  .nav-link:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+  }
   .metrics-link {
-    padding: 5px 10px;
-    border: 1px solid var(--color-border); border-radius: 6px;
-    font-size: 0.75rem;
-    transition: border-color var(--duration-fast), color var(--duration-fast);
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    transition: border-color var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
   }
   .metrics-link:hover { border-color: var(--color-accent); color: var(--color-text-primary); }
 
   .nav-cta {
-    padding: 7px 16px;
+    padding: var(--space-2) var(--space-4);
     background: var(--color-accent); color: #fff;
-    border-radius: 8px; font-size: var(--text-sm); font-weight: 600;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm); font-weight: 600;
     text-decoration: none;
-    transition: background var(--duration-fast);
+    transition: background var(--duration-fast) var(--ease-out);
   }
   .nav-cta:hover { background: var(--color-accent-hover); color: #fff; }
+  .nav-cta:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+  }
 
   .lang-btn {
-    padding: 6px 12px;
+    padding: var(--space-1) var(--space-3);
     border: 1px solid var(--color-border);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--color-text-secondary);
-    font-size: 0.78rem; font-weight: 600;
+    font-size: var(--text-xs); font-weight: 600;
     cursor: pointer;
-    transition: border-color var(--duration-fast), color var(--duration-fast);
+    transition: border-color var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
   }
   .lang-btn:hover { border-color: var(--color-accent); color: var(--color-text-primary); }
+  .lang-btn:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
 
   /* App page: more compact main container */
   main {

@@ -104,21 +104,37 @@ Central coordinator. Responsibilities:
 
 ### 3. OCR Abstraction Layer (`src/anon/ocr/`)
 
-All OCR operations go through a factory and a shared ABC, making it trivial to add new engines without touching processor code.
+All OCR operations go through a factory and a shared ABC, making it trivial to add new engines without touching processor code. **13 engines** are registered, grouped into three families:
 
 ```
 src/anon/ocr/
-├── __init__.py            # exports get_ocr_engine()
-├── base.py                # OCREngine ABC (extract_text, is_available, name)
-├── tesseract_engine.py    # pytesseract wrapper (default)
-├── easyocr_engine.py      # EasyOCR (lazy Reader init)
-├── paddleocr_engine.py    # PaddleOCR (lazy pipeline init)
-├── doctr_engine.py        # DocTR torch backend (lazy predictor)
-├── kerasocr_engine.py     # Keras-OCR (lazy pipeline)
-└── factory.py             # get_ocr_engine(name) → OCREngine
+├── __init__.py             # exports get_ocr_engine()
+├── base.py                 # OCREngine ABC (extract_text, is_available, name)
+├── factory.py              # _REGISTRY dict + get_ocr_engine(name)
+│
+│ # Classical
+├── tesseract_engine.py     # pytesseract wrapper (default, CPU-only)
+│
+│ # Deep-learning detectors+recognizers
+├── easyocr_engine.py       # EasyOCR (CRAFT+CRNN, auto-GPU)
+├── paddleocr_engine.py     # PaddleOCR v5 (PP-OCRv5, explicit GPU)
+├── doctr_engine.py         # DocTR PyTorch (.cuda() applied explicitly)
+├── onnxtr_engine.py        # OnnxTR — ONNX port of DocTR (~2× faster)
+├── kerasocr_engine.py      # Keras-OCR (legacy English)
+├── surya_engine.py         # Surya transformer (TORCH_DEVICE env)
+├── rapidocr_engine.py      # PaddleOCR in ONNX (CPU-only by design)
+│
+│ # Vision-language models (VLM, GPU required)
+├── paddle_vl_engine.py     # PaddleOCR-VL-1.5 (~2 GB)
+├── deepseek_ocr_engine.py  # DeepSeek-OCR-2 (3B MoE, ~6 GB + flash-attn)
+├── monkey_ocr_engine.py    # MonkeyOCR-pro-1.2B (~2.4 GB)
+├── glm_ocr_engine.py       # GLM-OCR (experimental)
+└── lighton_ocr_engine.py   # LightOn-OCR (experimental)
 ```
 
 `FileProcessor._do_ocr(image_bytes)` dispatches to the injected engine (falls back to Tesseract if none is set). All four OCR call sites in image/DOCX/PDF processors use this single method.
+
+GPU placement is engine-specific: `easyocr` auto-detects, `doctr` calls `.cuda()` after model creation, `surya` reads `TORCH_DEVICE`, `onnxtr` passes `providers=["CUDAExecutionProvider"]`, VLMs call `.to("cuda")` on load. See [users/OCR_ENGINES.md](../users/OCR_ENGINES.md) for the full GPU configuration table.
 
 ### 4. Model Registry (`src/anon/model_registry.py`)
 
@@ -260,15 +276,23 @@ After batch processing, the orchestrator verifies input count == output count. O
 │   │   ├── config_loader.py         # Configuration loading
 │   │   ├── run_config.py            # YAML run config loader + CLI merger
 │   │   └── protocols.py             # Protocol interfaces
-│   ├── ocr/                         # OCR abstraction layer
+│   ├── ocr/                         # OCR abstraction layer (13 engines)
 │   │   ├── __init__.py
 │   │   ├── base.py                  # OCREngine ABC
-│   │   ├── tesseract_engine.py
-│   │   ├── easyocr_engine.py
+│   │   ├── factory.py               # get_ocr_engine(name) factory
+│   │   ├── tesseract_engine.py      # Classical (default)
+│   │   ├── easyocr_engine.py        # Detectors+recognizers
 │   │   ├── paddleocr_engine.py
 │   │   ├── doctr_engine.py
+│   │   ├── onnxtr_engine.py
 │   │   ├── kerasocr_engine.py
-│   │   └── factory.py               # get_ocr_engine(name) factory
+│   │   ├── surya_engine.py
+│   │   ├── rapidocr_engine.py
+│   │   ├── paddle_vl_engine.py      # VLM engines (GPU required)
+│   │   ├── deepseek_ocr_engine.py
+│   │   ├── monkey_ocr_engine.py
+│   │   ├── glm_ocr_engine.py
+│   │   └── lighton_ocr_engine.py
 │   ├── slm/                         # Small Language Model integration
 │   │   ├── client.py                # OllamaClient (SLMClient protocol)
 │   │   ├── prompts.py               # PromptManager

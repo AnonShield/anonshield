@@ -44,6 +44,10 @@ async def create_job(
     ocr_engine: Annotated[str, Form()] = "tesseract",
     ocr_preprocess: Annotated[str, Form()] = "",
     fields: Annotated[str, Form()] = "",
+    model: Annotated[str, Form()] = "",
+    ner_score_threshold: Annotated[float | None, Form()] = None,
+    ner_aggregation_strategy: Annotated[str | None, Form()] = None,
+    slug_length: Annotated[int | None, Form()] = None,
 ) -> dict:
     limit = LIMIT_WITH_KEY if key else LIMIT_NO_KEY
 
@@ -123,10 +127,14 @@ async def create_job(
         "size": size,
         "strategy": strategy,
         "lang": lang,
+        "model": model or None,
         "entities": entities_list,
         "anonymization_config": anon_config,
         "ocr_engine": ocr_engine or "tesseract",
         "ocr_preprocess": json.loads(ocr_preprocess) if ocr_preprocess else [],
+        "ner_score_threshold": ner_score_threshold,
+        "ner_aggregation_strategy": ner_aggregation_strategy,
+        "slug_length": slug_length if slug_length is not None else anon_config.get("slug_length"),
     }
     job_service.store_meta(job_id, meta)
     job_service.set_status(job_id, "queued")

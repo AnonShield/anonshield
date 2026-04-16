@@ -94,3 +94,11 @@ benchmark/orchestrated_results/*
 benchmark/converted_datasets/
 benchmark/dataset_statistics/
 Vulnerabilidades-CAIS/
+*.png 
+*.svg 
+*.jpeg
+*.jpg 
+*.txt 
+*.json 
+test/test_data_integration/*
+*.zip

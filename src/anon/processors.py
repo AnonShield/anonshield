@@ -252,9 +252,15 @@ class FileProcessor(ABC):
         if self._preprocess_steps:
             from src.anon.ocr.preprocessor import apply as preprocess
             image_bytes = preprocess(image_bytes, self._preprocess_steps)
-        if self._ocr_engine is not None:
-            return self._ocr_engine.extract_text(image_bytes)
-        return extract_text_from_image(image_bytes)
+        from src.anon.ocr import _timer
+        import time as _time
+        t0 = _time.monotonic()
+        try:
+            if self._ocr_engine is not None:
+                return self._ocr_engine.extract_text(image_bytes)
+            return extract_text_from_image(image_bytes)
+        finally:
+            _timer.add((_time.monotonic() - t0) * 1000)
 
     def _get_ner_output_path(self) -> str:
         return get_output_path(self.file_path, ".jsonl", prefix="ner_data_anon_", output_dir=self.output_dir)

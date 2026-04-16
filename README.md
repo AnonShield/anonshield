@@ -90,6 +90,26 @@ List all supported entity types:
 uv run anon.py --list-entities
 ```
 
+## Reproducing the Paper Experiments
+
+A single script provisions the environment, downloads the datasets (XFUND-pt, BID Sample), runs the full OCR preprocess ablation sweep, and prints the consolidated ranking:
+
+```bash
+./run_experiments.sh            # full run (100 samples × 9 preprocess configs × 5 engines)
+./run_experiments.sh --quick    # fast smoke test (20 samples, 4 classical engines)
+./run_experiments.sh --web      # same as full, and also launches the web UI
+```
+
+Outputs:
+
+- `benchmark/ocr/results/<config>/ocr_benchmark_summary.csv` — per-config metrics
+- `benchmark/ocr/results/ablation_consolidated.csv` — engine × preprocess pivot
+- `benchmark/ocr/REPORT.md` — narrative summary with headline ranking
+- `benchmark/ocr/METHODOLOGY.md` — metrics, statistical tests, normalization
+- `benchmark/ocr/RESULTS_AUDIT.md` — fairness audit and sample I/O pairs
+
+Partial results are usable mid-run: each configuration is independently resumable (per-doc keys in `run_state.json`), so stopping/restarting the script picks up where it left off.
+
 ## Web Interface
 
 AnonShield includes a full-featured web application (SvelteKit + FastAPI) for browser-based processing.
@@ -111,7 +131,7 @@ Detailed guides are available in the `docs/` directory:
 - [Web Setup](docs/web/SETUP.md) — production deploy (Docker + Caddy) and local dev mode
 - [CLI Reference](docs/users/CLI_REFERENCE.md) — every flag, with examples
 - [Configuration File](docs/users/CONFIGURATION_FILE.md) — YAML config file schema and profiles
-- [OCR Engines](docs/users/OCR_ENGINES.md) — comparison of all five OCR engines
+- [OCR Engines](docs/users/OCR_ENGINES.md) — comparison of all 13 OCR engines (classical, deep-learning, VLM)
 - [Architecture Overview](docs/developers/ARCHITECTURE.md)
 - [Extensibility Guide](docs/developers/EXTENSIBILITY.md) — how to add strategies, OCR engines, models, patterns
 - [Anonymization Strategies](docs/developers/ANONYMIZATION_STRATEGIES.md)

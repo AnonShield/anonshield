@@ -11,12 +11,23 @@ from .base import OCREngine
 logger = logging.getLogger(__name__)
 
 
-class EasyOCREngine(OCREngine):
-    """EasyOCR backend. Lazy-loads the Reader on first use."""
+def _cuda_available() -> bool:
+    try:
+        import torch
+        return bool(torch.cuda.is_available())
+    except ImportError:
+        return False
 
-    def __init__(self, langs: list[str] | None = None, gpu: bool = False):
+
+class EasyOCREngine(OCREngine):
+    """EasyOCR backend. Lazy-loads the Reader on first use.
+
+    `gpu=None` (default) auto-detects CUDA availability. Pass True/False to force.
+    """
+
+    def __init__(self, langs: list[str] | None = None, gpu: bool | None = None):
         self._langs = langs or ["en"]
-        self._gpu = gpu
+        self._gpu = _cuda_available() if gpu is None else gpu
         self._reader = None
 
     @property

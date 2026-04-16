@@ -21,7 +21,7 @@ No programming knowledge required. Start here if you want to anonymize files fro
 |----------|---------------|
 | [users/CLI_REFERENCE.md](users/CLI_REFERENCE.md) | **Every command-line option explained with examples.** Start here. |
 | [users/CONFIGURATION_FILE.md](users/CONFIGURATION_FILE.md) | YAML config file schema and pre-built profiles (banking, medical, CVE). |
-| [users/OCR_ENGINES.md](users/OCR_ENGINES.md) | Comparison of Tesseract, EasyOCR, PaddleOCR, DocTR, and Keras-OCR. |
+| [users/OCR_ENGINES.md](users/OCR_ENGINES.md) | Comparison of 16 OCR engines: Tesseract, EasyOCR, PaddleOCR, DocTR, OnnxTR, Surya, RapidOCR, Keras-OCR, PaddleOCR-VL, DeepSeek-OCR, MonkeyOCR, GLM-OCR, LightOn-OCR, Chandra, DotsOCR, Qwen2.5-VL. GPU configuration included. |
 
 ---
 
@@ -36,3 +36,15 @@ Internal architecture, strategy internals, evaluation, and helper scripts.
 | [developers/EXTENSIBILITY.md](developers/EXTENSIBILITY.md) | How to add new strategies, OCR engines, NER models, and custom patterns. |
 | [developers/UTILITY_SCRIPTS_GUIDE.md](developers/UTILITY_SCRIPTS_GUIDE.md) | Helper scripts in `scripts/`: de-anonymization and DB management. |
 | [developers/SLM_INTEGRATION_GUIDE.md](developers/SLM_INTEGRATION_GUIDE.md) | SLM/Ollama integration, prompt design, and experimental features. |
+
+---
+
+## OCR Evaluation
+
+Formal benchmark suite for the OCR engines (targets ICDAR/SIBGRAPI/IJDAR venues).
+
+| Document | What it covers |
+|----------|---------------|
+| [../benchmark/ocr/METHODOLOGY.md](../benchmark/ocr/METHODOLOGY.md) | Metrics (CER, WER, Field-F1, ANLS), statistical tests, and normalization pipeline. |
+| [../benchmark/ocr/REPORT.md](../benchmark/ocr/REPORT.md) | Consolidated results — headline ranking, preprocess ablation, engine inventory. |
+| [../benchmark/ocr/RESULTS_AUDIT.md](../benchmark/ocr/RESULTS_AUDIT.md) | Fairness audit — sample I/O pairs, known biases per engine, out-of-scope items. |

@@ -43,7 +43,8 @@ class FullPresidioStrategy(AnonymizationStrategy):
                  lang: str,
                  entities_to_preserve: Set[str],
                  allow_list: Set[str],
-                 nlp_batch_size: int = 8):
+                 nlp_batch_size: int = 8,
+                 score_threshold: Optional[float] = None):
         super().__init__()
         self.analyzer_engine = analyzer_engine
         self.anonymizer_engine = anonymizer_engine
@@ -52,6 +53,8 @@ class FullPresidioStrategy(AnonymizationStrategy):
         self.nlp_batch_size = nlp_batch_size
         self.entities_to_preserve = entities_to_preserve
         self.allow_list = allow_list
+        from .config import NerDefaults
+        self.score_threshold = score_threshold if score_threshold is not None else NerDefaults.SCORE_THRESHOLD
 
     def _get_entities_to_anonymize(self, entities: Optional[List[str]] = None) -> List[str]:
         """Determines the list of entities to be analyzed."""
@@ -112,7 +115,7 @@ class FullPresidioStrategy(AnonymizationStrategy):
         # PHASE 2: Analyze only uncached texts
         analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
             texts_to_process, language=self.lang,
-            entities=entities_to_use, score_threshold=0.6,
+            entities=entities_to_use, score_threshold=self.score_threshold,
             allow_list=self.allow_list,
             batch_size=self.nlp_batch_size
         )
@@ -161,7 +164,8 @@ class HybridPresidioStrategy(AnonymizationStrategy):
                  transformer_model: str,
                  entities_to_preserve: Set[str],
                  slm_detector: Optional['SLMEntityDetector'] = None,
-                 slm_detector_mode: str = "hybrid"):
+                 slm_detector_mode: str = "hybrid",
+                 score_threshold: Optional[float] = None):
         super().__init__()
         self.nlp_engine = nlp_engine
         self.entity_detector = entity_detector
@@ -173,6 +177,8 @@ class HybridPresidioStrategy(AnonymizationStrategy):
         self.entities_to_preserve = entities_to_preserve
         self.slm_detector = slm_detector
         self.slm_detector_mode = slm_detector_mode
+        from .config import NerDefaults
+        self.score_threshold = score_threshold if score_threshold is not None else NerDefaults.SCORE_THRESHOLD
         self.core_entities = self._get_core_entities()
     
     def _get_core_entities(self) -> List[str]:
@@ -266,7 +272,7 @@ class HybridPresidioStrategy(AnonymizationStrategy):
         # Now with entity filtering to reduce unnecessary processing
         analyzer_results_iterator = self.nlp_engine.analyze_iterator(
             texts_to_process_in_batch, language=self.lang,
-            entities=entities_to_use, score_threshold=0.6,
+            entities=entities_to_use, score_threshold=self.score_threshold,
             batch_size=self.nlp_batch_size
         )
         
@@ -390,9 +396,10 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             lang=kwargs["lang"],
             entities_to_preserve=kwargs["entities_to_preserve"],
             allow_list=kwargs["allow_list"],
-            nlp_batch_size=kwargs["nlp_batch_size"]
+            nlp_batch_size=kwargs["nlp_batch_size"],
+            score_threshold=kwargs.get("score_threshold"),
         )
-    
+
     elif strategy_name == "filtered":
         # Filtered Presidio: Complete pipeline with filtered entity scope (RECOMMENDED)
         return FilteredPresidioStrategy(
@@ -403,9 +410,10 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             lang=kwargs["lang"],
             entities_to_preserve=kwargs["entities_to_preserve"],
             allow_list=kwargs["allow_list"],
-            nlp_batch_size=kwargs["nlp_batch_size"]
+            nlp_batch_size=kwargs["nlp_batch_size"],
+            score_threshold=kwargs.get("score_threshold"),
         )
-    
+
     elif strategy_name == "hybrid":
         # Hybrid: Presidio detection + manual text replacement
         return HybridPresidioStrategy(
@@ -418,7 +426,8 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             lang=kwargs["lang"],
             nlp_batch_size=kwargs["nlp_batch_size"],
             transformer_model=kwargs["transformer_model"],
-            entities_to_preserve=kwargs["entities_to_preserve"]
+            entities_to_preserve=kwargs["entities_to_preserve"],
+            score_threshold=kwargs.get("score_threshold"),
         )
     
     elif strategy_name == "standalone":

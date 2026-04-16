@@ -24,6 +24,12 @@ app.conf.update(
     enable_utc=True,
     worker_prefetch_multiplier=1,
     task_acks_late=True,
+    # Recycle worker after N tasks to release VRAM held by VLM OCR engines
+    # (models stay cached on the engine instance + PyTorch allocator keeps
+    # VRAM even after `del`). 1 = kill after every job (safe on small GPUs,
+    # ~5-30s reload latency per job). 0 = never recycle (keep warm; right for
+    # big-RAM servers where latency matters more than memory churn).
+    worker_max_tasks_per_child=int(os.getenv("WORKER_MAX_TASKS_PER_CHILD", "1")) or None,
     task_routes={
         "workers.tasks.process_job": {"queue": "gpu"},
         "workers.tasks.process_job_fast": {"queue": "fast"},

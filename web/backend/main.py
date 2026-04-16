@@ -2,7 +2,7 @@
 from fastapi import FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import jobs, entities, metrics
+from routers import jobs, entities, metrics, ocr_benchmark
 from services.metrics import MetricsMiddleware, init_db
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -33,6 +33,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(jobs.router)
 app.include_router(entities.router)
 app.include_router(metrics.router)
+app.include_router(ocr_benchmark.router)
 
 
 @app.get("/api/health")
@@ -44,9 +45,15 @@ def health() -> dict:
 def get_config() -> dict:
     """Public configuration for the frontend (file size limits, etc.)."""
     import os
+    from src.anon.config import NerDefaults
     return {
         "limit_no_key_mb":   int(os.getenv("ANON_MAX_SIZE_MB",     "1")),
         "limit_with_key_mb": int(os.getenv("ANON_MAX_SIZE_KEY_MB", "1")),
+        "ner_defaults": {
+            "score_threshold": NerDefaults.SCORE_THRESHOLD,
+            "aggregation_strategy": NerDefaults.AGGREGATION_STRATEGY,
+            "aggregation_choices": list(NerDefaults.AGGREGATION_CHOICES),
+        },
     }
 
 

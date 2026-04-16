@@ -1,0 +1,359 @@
+
+════════════════════════════════════════════════════════════════
+ [01:10:36] grayscale  (preprocess: grayscale)
+════════════════════════════════════════════════════════════════
+01:10:37 [INFO] ocr_benchmark — Downloading dataset: xfund_pt
+01:10:37 [INFO] benchmark.ocr.datasets — xfund_pt already downloaded.
+01:10:37 [INFO] ocr_benchmark — Loading samples from /home/kapelinski/Documents/tool/benchmark/ocr/data/xfund_pt…
+01:10:37 [INFO] ocr_benchmark —   100 samples loaded
+01:10:38 [INFO] benchmark.ocr.runner — === Engine: tesseract ===
+01:10:38 [INFO] src.anon.ocr.factory — OCR engine loaded: tesseract
+01:10:39 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_0 | CER=0.2394 WER=0.4014 lat=0.67s
+01:10:41 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_1 | CER=0.1571 WER=0.2949 lat=1.18s
+01:10:50 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_2 | CER=0.0593 WER=0.1771 lat=2.18s
+01:10:52 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_3 | CER=0.4762 WER=0.6390 lat=0.87s
+01:10:57 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_4 | CER=0.3201 WER=0.4000 lat=1.91s
+01:10:58 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_5 | CER=0.3661 WER=0.5301 lat=0.81s
+01:11:00 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_6 | CER=0.6377 WER=0.7570 lat=0.93s
+01:11:02 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_7 | CER=0.5044 WER=0.6372 lat=1.22s
+01:11:04 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_8 | CER=0.3574 WER=0.5775 lat=0.96s
+01:11:04 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_9 | CER=0.2914 WER=0.4320 lat=0.51s
+01:11:06 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_10 | CER=0.2570 WER=0.4847 lat=0.83s
+01:11:08 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_11 | CER=0.5900 WER=0.8050 lat=0.97s
+01:11:21 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_12 | CER=0.1235 WER=0.2399 lat=2.49s
+01:11:22 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_13 | CER=0.3694 WER=0.4758 lat=0.95s
+01:11:24 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_14 | CER=0.3416 WER=0.3784 lat=0.94s
+01:11:27 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_15 | CER=0.8311 WER=0.8684 lat=1.50s
+01:11:29 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_16 | CER=0.8798 WER=0.7509 lat=1.16s
+01:11:30 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_17 | CER=0.2070 WER=0.3789 lat=0.81s
+01:11:32 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_18 | CER=0.1442 WER=0.2691 lat=1.06s
+01:11:37 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_19 | CER=0.1492 WER=0.2848 lat=1.40s
+01:11:40 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_20 | CER=0.3364 WER=0.4427 lat=1.19s
+01:11:44 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_21 | CER=0.3080 WER=0.5163 lat=1.46s
+01:11:46 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_22 | CER=0.2425 WER=0.4838 lat=0.94s
+01:11:50 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_23 | CER=0.2979 WER=0.4447 lat=1.24s
+01:11:52 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_24 | CER=0.2256 WER=0.3630 lat=1.08s
+01:11:53 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_25 | CER=0.5706 WER=0.9313 lat=0.82s
+01:11:55 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_26 | CER=0.1389 WER=0.3018 lat=1.24s
+01:11:57 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_27 | CER=0.2815 WER=0.3980 lat=0.78s
+01:11:57 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_28 | CER=0.4912 WER=0.5204 lat=0.51s
+01:12:00 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_29 | CER=0.0872 WER=0.2528 lat=1.31s
+01:12:02 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_30 | CER=0.6163 WER=0.7273 lat=0.90s
+01:12:02 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_31 | CER=0.4105 WER=0.6522 lat=0.46s
+01:12:04 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_32 | CER=0.2286 WER=0.3441 lat=0.72s
+01:12:06 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_33 | CER=0.1998 WER=0.4171 lat=1.16s
+01:12:09 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_34 | CER=0.6618 WER=0.8599 lat=0.98s
+01:12:12 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_35 | CER=0.3182 WER=0.4988 lat=1.40s
+01:12:13 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_36 | CER=0.2306 WER=0.4182 lat=0.73s
+01:12:14 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_37 | CER=0.3926 WER=0.6181 lat=0.68s
+01:12:21 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_38 | CER=0.3384 WER=0.4729 lat=1.94s
+01:12:25 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_39 | CER=0.1674 WER=0.3101 lat=1.63s
+01:12:28 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_40 | CER=0.4544 WER=0.5931 lat=1.22s
+01:12:30 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_41 | CER=0.3902 WER=0.5435 lat=0.99s
+01:12:32 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_42 | CER=0.1402 WER=0.3094 lat=0.96s
+01:12:33 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_43 | CER=0.2955 WER=0.5214 lat=0.71s
+01:12:33 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_44 | CER=0.2460 WER=0.4688 lat=0.39s
+01:12:36 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_45 | CER=0.6301 WER=0.7733 lat=0.99s
+01:12:37 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_46 | CER=0.6630 WER=0.8303 lat=0.69s
+01:12:38 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_47 | CER=0.4913 WER=0.7376 lat=0.79s
+01:12:40 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_48 | CER=0.2112 WER=0.2915 lat=0.93s
+01:12:44 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_49 | CER=0.2572 WER=0.4893 lat=1.53s
+01:12:46 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_50 | CER=0.8391 WER=0.9590 lat=0.81s
+01:12:48 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_51 | CER=0.3695 WER=0.4923 lat=1.22s
+01:12:49 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_52 | CER=0.1054 WER=0.3354 lat=0.64s
+01:12:51 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_53 | CER=0.2442 WER=0.4789 lat=0.88s
+01:12:54 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_54 | CER=0.2722 WER=0.4005 lat=1.18s
+01:12:55 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_55 | CER=0.2192 WER=0.3620 lat=0.67s
+01:12:57 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_56 | CER=0.4298 WER=0.6399 lat=1.02s
+01:13:00 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_57 | CER=0.3376 WER=0.5350 lat=1.11s
+01:13:02 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_58 | CER=0.5304 WER=0.7861 lat=1.04s
+01:13:05 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_59 | CER=0.3744 WER=0.5403 lat=1.03s
+01:13:07 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_60 | CER=0.1874 WER=0.3615 lat=1.00s
+01:13:10 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_61 | CER=0.2189 WER=0.3457 lat=1.13s
+01:13:11 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_62 | CER=0.1350 WER=0.3284 lat=0.90s
+01:13:13 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_63 | CER=0.2197 WER=0.4427 lat=0.90s
+01:13:24 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_64 | CER=0.0832 WER=0.2557 lat=1.89s
+01:13:28 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_65 | CER=0.0978 WER=0.2525 lat=1.17s
+01:13:29 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_66 | CER=0.4169 WER=0.7235 lat=0.63s
+01:13:31 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_67 | CER=0.6561 WER=0.7709 lat=1.01s
+01:13:37 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_68 | CER=0.1016 WER=0.2581 lat=1.53s
+01:13:39 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_69 | CER=0.5357 WER=0.7197 lat=0.95s
+01:13:40 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_70 | CER=0.6552 WER=0.7586 lat=0.63s
+01:13:41 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_71 | CER=0.2229 WER=0.3306 lat=0.82s
+01:13:51 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_72 | CER=0.7374 WER=1.0464 lat=2.11s
+01:14:02 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_73 | CER=0.1168 WER=0.4303 lat=1.78s
+01:14:03 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_74 | CER=0.3375 WER=0.6012 lat=0.67s
+01:14:05 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_75 | CER=0.5503 WER=0.6988 lat=0.85s
+01:14:06 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_76 | CER=0.1517 WER=0.2796 lat=0.67s
+01:14:08 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_77 | CER=0.1042 WER=0.2289 lat=0.77s
+01:14:08 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_78 | CER=0.2457 WER=0.4354 lat=0.57s
+01:14:09 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_79 | CER=0.6223 WER=0.7094 lat=0.61s
+01:14:11 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_80 | CER=0.4795 WER=0.6641 lat=0.89s
+01:14:12 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_81 | CER=0.6512 WER=0.8522 lat=0.87s
+01:14:13 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_82 | CER=0.2014 WER=0.3519 lat=0.56s
+01:14:14 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_83 | CER=0.4566 WER=0.6879 lat=0.63s
+01:14:15 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_84 | CER=0.4472 WER=0.5094 lat=0.66s
+01:14:22 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_85 | CER=0.2624 WER=0.3826 lat=1.73s
+01:14:24 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_86 | CER=0.5481 WER=0.6667 lat=1.01s
+01:14:25 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_87 | CER=0.2429 WER=0.3949 lat=0.59s
+01:14:31 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_88 | CER=0.2137 WER=0.3408 lat=1.59s
+01:14:33 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_89 | CER=0.2787 WER=0.4922 lat=0.91s
+01:14:34 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_90 | CER=0.3804 WER=0.4983 lat=0.99s
+01:14:35 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_91 | CER=0.1408 WER=0.2921 lat=0.48s
+01:14:38 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_92 | CER=0.3554 WER=0.5116 lat=1.30s
+01:14:40 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_93 | CER=0.5661 WER=0.7833 lat=1.17s
+01:14:43 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_94 | CER=0.2645 WER=0.4469 lat=1.16s
+01:14:44 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_95 | CER=0.4847 WER=0.6927 lat=0.95s
+01:14:48 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_96 | CER=0.2336 WER=0.4220 lat=1.35s
+01:14:49 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_97 | CER=0.5995 WER=0.7704 lat=0.63s
+01:14:50 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_98 | CER=0.2960 WER=0.4311 lat=0.61s
+01:14:53 [INFO] benchmark.ocr.runner — tesseract | xfund_train_pt_train_99 | CER=0.2834 WER=0.4818 lat=1.26s
+01:14:53 [INFO] benchmark.ocr.runner — === Engine: easyocr ===
+01:14:54 [INFO] src.anon.ocr.factory — OCR engine loaded: easyocr
+01:14:57 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_0 | CER=0.1940 WER=0.3732 lat=2.34s
+01:15:01 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_1 | CER=0.1697 WER=0.3109 lat=2.55s
+01:15:10 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_2 | CER=0.0846 WER=0.2592 lat=4.11s
+01:15:12 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_3 | CER=0.4008 WER=0.5512 lat=1.84s
+01:15:21 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_4 | CER=0.3766 WER=0.6393 lat=4.67s
+01:15:23 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_5 | CER=0.3938 WER=0.6928 lat=1.75s
+01:15:26 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_6 | CER=0.4995 WER=0.5670 lat=1.88s
+01:15:29 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_7 | CER=0.3554 WER=0.5349 lat=2.75s
+01:15:31 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_8 | CER=0.3188 WER=0.5508 lat=1.77s
+01:15:33 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_9 | CER=0.3022 WER=0.4880 lat=1.31s
+01:15:36 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_10 | CER=0.3078 WER=0.5721 lat=2.07s
+01:15:39 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_11 | CER=0.3708 WER=0.5270 lat=2.24s
+01:15:53 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_12 | CER=0.1316 WER=0.3025 lat=5.38s
+01:15:57 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_13 | CER=0.2591 WER=0.4758 lat=2.60s
+01:15:59 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_14 | CER=0.5801 WER=0.7189 lat=1.79s
+01:16:03 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_15 | CER=0.5541 WER=0.7436 lat=2.47s
+01:16:06 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_16 | CER=0.4505 WER=0.6679 lat=2.40s
+01:16:08 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_17 | CER=0.2352 WER=0.4410 lat=1.89s
+01:16:11 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_18 | CER=0.1713 WER=0.3673 lat=2.37s
+01:16:17 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_19 | CER=0.1515 WER=0.3289 lat=3.10s
+01:16:21 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_20 | CER=0.3214 WER=0.4193 lat=3.07s
+01:16:27 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_21 | CER=0.2678 WER=0.4980 lat=3.25s
+01:16:30 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_22 | CER=0.2288 WER=0.4585 lat=2.32s
+01:16:36 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_23 | CER=0.3088 WER=0.5160 lat=3.21s
+01:16:38 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_24 | CER=0.1175 WER=0.3111 lat=1.91s
+01:16:41 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_25 | CER=0.5968 WER=1.1000 lat=2.15s
+01:16:45 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_26 | CER=0.1299 WER=0.3354 lat=2.47s
+01:16:47 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_27 | CER=0.2906 WER=0.4229 lat=2.03s
+01:16:49 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_28 | CER=0.5075 WER=0.5612 lat=1.37s
+01:16:53 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_29 | CER=0.1284 WER=0.2889 lat=2.74s
+01:16:55 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_30 | CER=0.2993 WER=0.5407 lat=1.82s
+01:16:57 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_31 | CER=0.3682 WER=0.6630 lat=1.19s
+01:16:59 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_32 | CER=0.2416 WER=0.4892 lat=1.55s
+01:17:02 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_33 | CER=0.2717 WER=0.4751 lat=2.21s
+01:17:06 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_34 | CER=0.5627 WER=0.7471 lat=2.71s
+01:17:11 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_35 | CER=0.2714 WER=0.5035 lat=3.11s
+01:17:13 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_36 | CER=0.2419 WER=0.4606 lat=1.54s
+01:17:15 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_37 | CER=0.3588 WER=0.6042 lat=1.90s
+01:17:24 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_38 | CER=0.3762 WER=0.9015 lat=4.27s
+01:17:30 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_39 | CER=0.1835 WER=0.3483 lat=2.99s
+01:17:33 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_40 | CER=0.3997 WER=0.5793 lat=2.04s
+01:17:37 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_41 | CER=0.3861 WER=0.5471 lat=3.16s
+01:17:40 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_42 | CER=0.1491 WER=0.3208 lat=2.54s
+01:17:42 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_43 | CER=0.1430 WER=0.4143 lat=1.86s
+01:17:43 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_44 | CER=0.2138 WER=0.5000 lat=1.05s
+01:17:48 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_45 | CER=0.5297 WER=0.6335 lat=3.16s
+01:17:50 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_46 | CER=0.6010 WER=0.7939 lat=1.95s
+01:17:53 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_47 | CER=0.4068 WER=0.8168 lat=2.78s
+01:17:57 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_48 | CER=0.1891 WER=0.3395 lat=2.46s
+01:18:03 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_49 | CER=0.2621 WER=0.5087 lat=3.41s
+01:18:05 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_50 | CER=0.5870 WER=0.8770 lat=1.53s
+01:18:11 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_51 | CER=0.3886 WER=0.5590 lat=3.99s
+01:18:13 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_52 | CER=0.0919 WER=0.3851 lat=1.81s
+01:18:16 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_53 | CER=0.2053 WER=0.4176 lat=2.74s
+01:18:21 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_54 | CER=0.2217 WER=0.4129 lat=2.71s
+01:18:23 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_55 | CER=0.2286 WER=0.4072 lat=1.85s
+01:18:27 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_56 | CER=0.4221 WER=0.5852 lat=2.49s
+01:18:30 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_57 | CER=0.3518 WER=0.5987 lat=2.10s
+01:18:34 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_58 | CER=0.4765 WER=0.6495 lat=2.64s
+01:18:38 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_59 | CER=0.3165 WER=0.5108 lat=2.53s
+01:18:42 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_60 | CER=0.1786 WER=0.3732 lat=2.60s
+01:18:46 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_61 | CER=0.1885 WER=0.3486 lat=2.54s
+01:18:49 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_62 | CER=0.1630 WER=0.3806 lat=1.94s
+01:18:52 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_63 | CER=0.1753 WER=0.3874 lat=2.44s
+01:19:06 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_64 | CER=0.6824 WER=0.8792 lat=4.90s
+01:19:12 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_65 | CER=0.0741 WER=0.2546 lat=3.19s
+01:19:14 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_66 | CER=0.3912 WER=0.6941 lat=2.02s
+01:19:19 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_67 | CER=0.5943 WER=0.7305 lat=3.62s
+01:19:27 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_68 | CER=0.1182 WER=0.3601 lat=3.73s
+01:19:31 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_69 | CER=0.5467 WER=0.7348 lat=2.71s
+01:19:33 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_70 | CER=0.5894 WER=0.6839 lat=1.94s
+01:19:36 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_71 | CER=0.2299 WER=0.3790 lat=1.89s
+01:19:49 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_72 | CER=0.6793 WER=0.9049 lat=5.94s
+01:20:03 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_73 | CER=0.3413 WER=0.8315 lat=5.12s
+01:20:05 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_74 | CER=0.2819 WER=0.5780 lat=2.22s
+01:20:09 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_75 | CER=0.5250 WER=0.6602 lat=2.62s
+01:20:11 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_76 | CER=0.1378 WER=0.2796 lat=1.94s
+01:20:14 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_77 | CER=0.1102 WER=0.2691 lat=2.29s
+01:20:16 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_78 | CER=0.2630 WER=0.4966 lat=1.19s
+01:20:17 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_79 | CER=0.6067 WER=0.6581 lat=1.39s
+01:20:20 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_80 | CER=0.5032 WER=0.6565 lat=1.98s
+01:20:22 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_81 | CER=0.6535 WER=0.7565 lat=1.83s
+01:20:23 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_82 | CER=0.1456 WER=0.3333 lat=1.13s
+01:20:25 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_83 | CER=0.5179 WER=0.7801 lat=1.64s
+01:20:28 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_84 | CER=0.3255 WER=0.5220 lat=2.23s
+01:20:38 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_85 | CER=0.2877 WER=0.4658 lat=4.90s
+01:20:42 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_86 | CER=0.4561 WER=0.5833 lat=2.45s
+01:20:43 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_87 | CER=0.2486 WER=0.3758 lat=1.51s
+01:20:52 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_88 | CER=0.1807 WER=0.3758 lat=3.92s
+01:20:56 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_89 | CER=0.3129 WER=0.5891 lat=2.58s
+01:20:59 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_90 | CER=0.3709 WER=0.5470 lat=2.57s
+01:21:01 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_91 | CER=0.0724 WER=0.2809 lat=1.21s
+01:21:04 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_92 | CER=0.3598 WER=0.5674 lat=2.31s
+01:21:08 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_93 | CER=0.5399 WER=0.7183 lat=2.35s
+01:21:13 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_94 | CER=0.2843 WER=0.4959 lat=3.08s
+01:21:15 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_95 | CER=0.3853 WER=0.5183 lat=2.15s
+01:21:20 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_96 | CER=0.2417 WER=0.4154 lat=2.60s
+01:21:22 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_97 | CER=0.3933 WER=0.6173 lat=1.77s
+01:21:24 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_98 | CER=0.2840 WER=0.4731 lat=1.69s
+01:21:30 [INFO] benchmark.ocr.runner — easyocr | xfund_train_pt_train_99 | CER=0.2648 WER=0.4864 lat=3.23s
+01:21:30 [INFO] benchmark.ocr.runner — === Engine: doctr ===
+01:21:30 [INFO] src.anon.ocr.factory — OCR engine loaded: doctr
+01:21:30 [INFO] root — Using downloaded & verified file: /home/kapelinski/.cache/doctr/models/fast_base-688a8b34.pt
+01:21:31 [INFO] root — Using downloaded & verified file: /home/kapelinski/.cache/doctr/models/crnn_vgg16_bn-0417f351.pt
+01:21:31 [INFO] src.anon.ocr.doctr_engine — DocTR model moved to CUDA.
+01:21:32 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_0 | CER=0.1765 WER=0.3451 lat=1.45s
+01:21:33 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_1 | CER=0.1370 WER=0.2821 lat=0.33s
+01:21:39 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_2 | CER=0.0490 WER=0.2252 lat=0.51s
+01:21:40 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_3 | CER=0.4554 WER=0.5951 lat=0.26s
+01:21:44 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_4 | CER=0.3872 WER=0.6838 lat=0.59s
+01:21:45 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_5 | CER=0.3447 WER=0.4639 lat=0.24s
+01:21:46 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_6 | CER=0.4493 WER=0.5358 lat=0.35s
+01:21:47 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_7 | CER=0.4039 WER=0.7070 lat=0.22s
+01:21:48 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_8 | CER=0.2638 WER=0.4332 lat=0.29s
+01:21:48 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_9 | CER=0.2806 WER=0.4560 lat=0.24s
+01:21:49 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_10 | CER=0.2939 WER=0.4760 lat=0.27s
+01:21:50 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_11 | CER=0.2705 WER=0.4481 lat=0.29s
+01:22:01 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_12 | CER=0.1058 WER=0.2643 lat=0.77s
+01:22:02 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_13 | CER=0.2624 WER=0.4229 lat=0.29s
+01:22:02 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_14 | CER=0.5836 WER=0.7297 lat=0.26s
+01:22:04 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_15 | CER=0.5686 WER=0.7598 lat=0.41s
+01:22:05 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_16 | CER=0.3451 WER=0.5509 lat=0.28s
+01:22:06 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_17 | CER=0.1749 WER=0.3354 lat=0.24s
+01:22:07 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_18 | CER=0.0936 WER=0.2255 lat=0.32s
+01:22:09 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_19 | CER=0.1204 WER=0.3333 lat=0.34s
+01:22:11 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_20 | CER=0.2925 WER=0.4062 lat=0.32s
+01:22:14 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_21 | CER=0.2441 WER=0.4837 lat=0.38s
+01:22:16 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_22 | CER=0.2283 WER=0.4152 lat=0.27s
+01:22:18 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_23 | CER=0.2787 WER=0.4791 lat=0.43s
+01:22:19 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_24 | CER=0.1093 WER=0.2593 lat=0.30s
+01:22:20 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_25 | CER=0.4819 WER=1.0188 lat=0.27s
+01:22:21 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_26 | CER=0.0977 WER=0.2561 lat=0.33s
+01:22:22 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_27 | CER=0.2309 WER=0.3234 lat=0.23s
+01:22:22 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_28 | CER=0.4721 WER=0.5408 lat=0.17s
+01:22:24 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_29 | CER=0.0563 WER=0.1500 lat=0.31s
+01:22:25 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_30 | CER=0.2206 WER=0.4115 lat=0.26s
+01:22:25 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_31 | CER=0.3300 WER=0.5978 lat=0.15s
+01:22:26 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_32 | CER=0.1951 WER=0.3387 lat=0.22s
+01:22:28 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_33 | CER=0.1389 WER=0.3785 lat=0.47s
+01:22:29 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_34 | CER=0.6243 WER=0.7743 lat=0.36s
+01:22:32 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_35 | CER=0.2264 WER=0.4565 lat=0.43s
+01:22:32 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_36 | CER=0.2096 WER=0.3818 lat=0.25s
+01:22:33 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_37 | CER=0.3027 WER=0.4583 lat=0.23s
+01:22:38 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_38 | CER=0.4336 WER=0.8177 lat=0.63s
+01:22:41 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_39 | CER=0.1461 WER=0.2854 lat=0.52s
+01:22:42 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_40 | CER=0.4363 WER=0.6621 lat=0.34s
+01:22:43 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_41 | CER=0.3405 WER=0.4601 lat=0.32s
+01:22:44 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_42 | CER=0.1230 WER=0.2528 lat=0.32s
+01:22:45 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_43 | CER=0.1089 WER=0.3071 lat=0.23s
+01:22:45 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_44 | CER=0.1885 WER=0.4219 lat=0.16s
+01:22:47 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_45 | CER=0.7013 WER=0.8292 lat=0.36s
+01:22:47 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_46 | CER=0.6248 WER=0.8121 lat=0.24s
+01:22:48 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_47 | CER=0.3825 WER=0.7426 lat=0.30s
+01:22:49 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_48 | CER=0.1189 WER=0.2103 lat=0.32s
+01:22:53 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_49 | CER=0.2227 WER=0.4214 lat=0.50s
+01:22:53 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_50 | CER=0.5786 WER=0.8361 lat=0.22s
+01:22:55 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_51 | CER=0.3477 WER=0.5026 lat=0.40s
+01:22:56 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_52 | CER=0.0577 WER=0.2919 lat=0.20s
+01:22:57 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_53 | CER=0.1839 WER=0.3755 lat=0.24s
+01:22:59 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_54 | CER=0.2340 WER=0.3582 lat=0.34s
+01:23:00 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_55 | CER=0.1945 WER=0.3394 lat=0.24s
+01:23:01 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_56 | CER=0.3314 WER=0.5016 lat=0.28s
+01:23:03 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_57 | CER=0.3087 WER=0.5064 lat=0.33s
+01:23:04 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_58 | CER=0.4696 WER=0.6959 lat=0.34s
+01:23:06 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_59 | CER=0.2869 WER=0.4543 lat=0.36s
+01:23:08 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_60 | CER=0.1424 WER=0.2799 lat=0.36s
+01:23:10 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_61 | CER=0.1926 WER=0.3486 lat=0.37s
+01:23:11 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_62 | CER=0.1024 WER=0.3619 lat=0.36s
+01:23:12 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_63 | CER=0.1182 WER=0.3478 lat=0.27s
+01:23:22 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_64 | CER=0.6854 WER=0.8640 lat=0.67s
+01:23:25 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_65 | CER=0.0820 WER=0.2261 lat=0.49s
+01:23:26 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_66 | CER=0.3333 WER=0.6294 lat=0.25s
+01:23:27 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_67 | CER=0.6115 WER=0.7709 lat=0.41s
+01:23:33 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_68 | CER=0.0841 WER=0.2767 lat=0.59s
+01:23:34 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_69 | CER=0.5192 WER=0.7348 lat=0.30s
+01:23:34 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_70 | CER=0.5766 WER=0.6897 lat=0.26s
+01:23:36 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_71 | CER=0.2072 WER=0.3226 lat=0.33s
+01:23:44 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_72 | CER=0.6863 WER=0.9479 lat=0.83s
+01:23:48 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_73 | CER=0.6760 WER=0.8955 lat=0.27s
+01:23:49 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_74 | CER=0.2558 WER=0.4971 lat=0.31s
+01:23:50 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_75 | CER=0.4815 WER=0.6100 lat=0.38s
+01:23:51 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_76 | CER=0.1142 WER=0.2312 lat=0.25s
+01:23:52 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_77 | CER=0.0800 WER=0.2088 lat=0.29s
+01:23:52 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_78 | CER=0.1862 WER=0.3265 lat=0.22s
+01:23:53 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_79 | CER=0.5888 WER=0.5897 lat=0.20s
+01:23:53 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_80 | CER=0.3763 WER=0.5153 lat=0.29s
+01:23:54 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_81 | CER=0.6116 WER=0.7522 lat=0.27s
+01:23:55 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_82 | CER=0.1102 WER=0.2500 lat=0.19s
+01:23:55 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_83 | CER=0.4283 WER=0.6383 lat=0.19s
+01:23:56 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_84 | CER=0.3519 WER=0.3962 lat=0.20s
+01:24:01 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_85 | CER=0.2507 WER=0.3866 lat=0.52s
+01:24:03 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_86 | CER=0.3979 WER=0.5530 lat=0.27s
+01:24:03 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_87 | CER=0.2010 WER=0.3376 lat=0.20s
+01:24:09 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_88 | CER=0.1448 WER=0.2834 lat=0.47s
+01:24:10 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_89 | CER=0.2516 WER=0.4109 lat=0.31s
+01:24:11 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_90 | CER=0.3148 WER=0.4774 lat=0.39s
+01:24:11 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_91 | CER=0.0181 WER=0.0899 lat=0.21s
+01:24:13 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_92 | CER=0.3133 WER=0.4605 lat=0.51s
+01:24:15 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_93 | CER=0.4874 WER=0.6285 lat=0.34s
+01:24:17 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_94 | CER=0.2334 WER=0.3569 lat=0.36s
+01:24:17 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_95 | CER=0.2884 WER=0.5000 lat=0.24s
+01:24:20 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_96 | CER=0.1678 WER=0.3231 lat=0.40s
+01:24:21 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_97 | CER=0.3717 WER=0.5714 lat=0.25s
+01:24:21 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_98 | CER=0.2590 WER=0.4012 lat=0.23s
+01:24:24 [INFO] benchmark.ocr.runner — doctr | xfund_train_pt_train_99 | CER=0.2293 WER=0.4227 lat=0.40s
+01:24:24 [INFO] benchmark.ocr.runner — === Engine: surya ===
+01:24:25 [INFO] src.anon.ocr.factory — OCR engine loaded: surya
+01:24:25 [INFO] src.anon.ocr.surya_engine — Loading Surya foundation + detection + recognition predictors…
+01:24:25 [INFO] src.anon.ocr.surya_engine — Surya predictors loaded.
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:01<00:00,  1.43s/it]Detecting bboxes: 100%|██████████| 1/1 [00:01<00:00,  1.43s/it]
+Recognizing Text:   0%|          | 0/27 [00:00<?, ?it/s]Recognizing Text:   4%|▎         | 1/27 [00:01<00:31,  1.21s/it]Recognizing Text:   7%|▋         | 2/27 [00:01<00:16,  1.55it/s]Recognizing Text:  15%|█▍        | 4/27 [00:01<00:06,  3.30it/s]Recognizing Text:  30%|██▉       | 8/27 [00:01<00:02,  7.18it/s]Recognizing Text:  56%|█████▌    | 15/27 [00:02<00:00, 14.80it/s]Recognizing Text:  67%|██████▋   | 18/27 [00:02<00:00, 10.31it/s]Recognizing Text:  74%|███████▍  | 20/27 [00:02<00:00, 10.68it/s]Recognizing Text:  81%|████████▏ | 22/27 [00:02<00:00,  9.66it/s]Recognizing Text:  89%|████████▉ | 24/27 [00:03<00:00,  9.11it/s]Recognizing Text: 100%|██████████| 27/27 [00:03<00:00,  8.20it/s]
+01:24:30 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_0 | CER=0.2229 WER=0.2535 lat=5.38s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.10it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.10it/s]
+Recognizing Text:   0%|          | 0/48 [00:00<?, ?it/s]Recognizing Text:   2%|▏         | 1/48 [00:01<00:48,  1.03s/it]Recognizing Text:  10%|█         | 5/48 [00:01<00:08,  5.33it/s]Recognizing Text:  15%|█▍        | 7/48 [00:01<00:05,  7.19it/s]Recognizing Text:  19%|█▉        | 9/48 [00:01<00:04,  7.98it/s]Recognizing Text:  29%|██▉       | 14/48 [00:01<00:02, 14.54it/s]Recognizing Text:  35%|███▌      | 17/48 [00:01<00:01, 16.76it/s]Recognizing Text:  44%|████▍     | 21/48 [00:01<00:01, 19.17it/s]Recognizing Text:  50%|█████     | 24/48 [00:02<00:01, 17.67it/s]Recognizing Text:  56%|█████▋    | 27/48 [00:02<00:01, 15.48it/s]Recognizing Text:  60%|██████    | 29/48 [00:02<00:01, 12.98it/s]Recognizing Text:  65%|██████▍   | 31/48 [00:03<00:02,  7.10it/s]Recognizing Text:  69%|██████▉   | 33/48 [00:03<00:02,  5.64it/s]Recognizing Text:  73%|███████▎  | 35/48 [00:04<00:02,  6.13it/s]Recognizing Text:  77%|███████▋  | 37/48 [00:04<00:01,  6.75it/s]Recognizing Text:  81%|████████▏ | 39/48 [00:04<00:01,  7.93it/s]Recognizing Text:  96%|█████████▌| 46/48 [00:04<00:00, 15.02it/s]Recognizing Text: 100%|██████████| 48/48 [00:05<00:00, 10.82it/s]Recognizing Text: 100%|██████████| 48/48 [00:05<00:00,  9.52it/s]
+01:24:37 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_1 | CER=0.1403 WER=0.1571 lat=5.65s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.23it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.23it/s]
+Recognizing Text:   0%|          | 0/64 [00:00<?, ?it/s]Recognizing Text:   2%|▏         | 1/64 [00:02<02:15,  2.16s/it]Recognizing Text:   5%|▍         | 3/64 [00:02<00:37,  1.65it/s]Recognizing Text:  11%|█         | 7/64 [00:02<00:13,  4.09it/s]Recognizing Text:  14%|█▍        | 9/64 [00:02<00:10,  5.08it/s]Recognizing Text:  17%|█▋        | 11/64 [00:03<00:09,  5.84it/s]Recognizing Text:  20%|██        | 13/64 [00:03<00:06,  7.36it/s]Recognizing Text:  23%|██▎       | 15/64 [00:03<00:05,  8.98it/s]Recognizing Text:  27%|██▋       | 17/64 [00:03<00:04, 10.44it/s]Recognizing Text:  31%|███▏      | 20/64 [00:04<00:06,  6.89it/s]Recognizing Text:  34%|███▍      | 22/64 [00:04<00:06,  6.54it/s]Recognizing Text:  36%|███▌      | 23/64 [00:04<00:06,  6.19it/s]Recognizing Text:  38%|███▊      | 24/64 [00:04<00:07,  5.30it/s]Recognizing Text:  44%|████▍     | 28/64 [00:05<00:04,  8.52it/s]Recognizing Text:  48%|████▊     | 31/64 [00:05<00:02, 11.03it/s]Recognizing Text:  52%|█████▏    | 33/64 [00:06<00:08,  3.59it/s]Recognizing Text:  56%|█████▋    | 36/64 [00:06<00:05,  5.12it/s]Recognizing Text:  61%|██████    | 39/64 [00:07<00:03,  6.74it/s]Recognizing Text:  66%|██████▌   | 42/64 [00:07<00:02,  8.90it/s]Recognizing Text:  75%|███████▌  | 48/64 [00:07<00:01, 14.75it/s]Recognizing Text:  86%|████████▌ | 55/64 [00:07<00:00, 22.39it/s]Recognizing Text:  92%|█████████▏| 59/64 [00:07<00:00, 22.48it/s]Recognizing Text:  98%|█████████▊| 63/64 [00:09<00:00,  5.69it/s]Recognizing Text: 100%|██████████| 64/64 [00:09<00:00,  6.48it/s]
+01:24:53 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_2 | CER=0.0466 WER=0.0524 lat=10.47s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.52it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.52it/s]
+Recognizing Text:   0%|          | 0/65 [00:00<?, ?it/s]Recognizing Text:   2%|▏         | 1/65 [00:00<01:01,  1.03it/s]Recognizing Text:   3%|▎         | 2/65 [00:01<00:28,  2.17it/s]Recognizing Text:   5%|▍         | 3/65 [00:01<00:18,  3.31it/s]Recognizing Text:   9%|▉         | 6/65 [00:01<00:07,  7.84it/s]Recognizing Text:  22%|██▏       | 14/65 [00:01<00:02, 20.31it/s]Recognizing Text:  26%|██▌       | 17/65 [00:01<00:02, 21.59it/s]Recognizing Text:  34%|███▍      | 22/65 [00:01<00:01, 24.70it/s]Recognizing Text:  45%|████▍     | 29/65 [00:01<00:01, 30.76it/s]Recognizing Text:  54%|█████▍    | 35/65 [00:01<00:00, 36.53it/s]Recognizing Text:  66%|██████▌   | 43/65 [00:02<00:00, 41.78it/s]Recognizing Text:  74%|███████▍  | 48/65 [00:02<00:00, 38.17it/s]Recognizing Text:  82%|████████▏ | 53/65 [00:02<00:00, 40.21it/s]Recognizing Text:  89%|████████▉ | 58/65 [00:02<00:00, 36.93it/s]Recognizing Text:  95%|█████████▌| 62/65 [00:03<00:00, 12.01it/s]Recognizing Text: 100%|██████████| 65/65 [00:04<00:00,  6.49it/s]Recognizing Text: 100%|██████████| 65/65 [00:04<00:00, 13.32it/s]
+01:24:59 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_3 | CER=0.4408 WER=0.4976 lat=5.40s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  1.91it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  1.91it/s]
+Recognizing Text:   0%|          | 0/208 [00:00<?, ?it/s]Recognizing Text:   0%|          | 1/208 [00:02<09:54,  2.87s/it]Recognizing Text:  42%|████▏     | 88/208 [00:03<00:03, 39.93it/s]Recognizing Text:  56%|█████▌    | 116/208 [00:03<00:02, 43.14it/s]Recognizing Text:  64%|██████▍   | 134/208 [00:03<00:01, 45.34it/s]Recognizing Text:  71%|███████   | 147/208 [00:04<00:01, 47.50it/s]Recognizing Text:  77%|███████▋  | 161/208 [00:04<00:00, 55.32it/s]Recognizing Text:  83%|████████▎ | 173/208 [00:04<00:00, 46.87it/s]Recognizing Text:  88%|████████▊ | 182/208 [00:05<00:00, 36.83it/s]Recognizing Text:  91%|█████████ | 189/208 [00:06<00:01, 15.58it/s]Recognizing Text:  93%|█████████▎| 194/208 [00:10<00:02,  5.92it/s]Recognizing Text:  95%|█████████▌| 198/208 [00:20<00:04,  2.02it/s]Recognizing Text:  98%|█████████▊| 203/208 [00:20<00:02,  2.49it/s]Recognizing Text:  99%|█████████▉| 206/208 [00:20<00:00,  2.88it/s]Recognizing Text: 100%|██████████| 208/208 [00:20<00:00, 10.11it/s]
+01:25:24 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_4 | CER=0.3980 WER=0.4598 lat=21.27s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.74it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.74it/s]
+Recognizing Text:   0%|          | 0/66 [00:00<?, ?it/s]Recognizing Text:   2%|▏         | 1/66 [00:01<01:39,  1.53s/it]Recognizing Text:  15%|█▌        | 10/66 [00:01<00:07,  7.77it/s]Recognizing Text:  27%|██▋       | 18/66 [00:01<00:03, 14.02it/s]Recognizing Text:  33%|███▎      | 22/66 [00:02<00:02, 15.62it/s]Recognizing Text:  42%|████▏     | 28/66 [00:02<00:01, 19.44it/s]Recognizing Text:  48%|████▊     | 32/66 [00:02<00:01, 21.97it/s]Recognizing Text:  55%|█████▍    | 36/66 [00:02<00:01, 24.38it/s]Recognizing Text:  61%|██████    | 40/66 [00:02<00:00, 26.54it/s]Recognizing Text:  67%|██████▋   | 44/66 [00:02<00:00, 24.80it/s]Recognizing Text:  71%|███████   | 47/66 [00:02<00:00, 24.92it/s]Recognizing Text:  76%|███████▌  | 50/66 [00:03<00:01, 13.91it/s]Recognizing Text:  80%|████████  | 53/66 [00:04<00:01,  9.35it/s]Recognizing Text:  85%|████████▍ | 56/66 [00:04<00:00, 11.32it/s]Recognizing Text:  88%|████████▊ | 58/66 [00:04<00:01,  7.29it/s]Recognizing Text:  91%|█████████ | 60/66 [00:04<00:00,  7.86it/s]Recognizing Text:  94%|█████████▍| 62/66 [00:05<00:00,  6.29it/s]Recognizing Text:  97%|█████████▋| 64/66 [00:06<00:00,  3.24it/s]Recognizing Text:  98%|█████████▊| 65/66 [00:07<00:00,  3.53it/s]Recognizing Text: 100%|██████████| 66/66 [00:07<00:00,  3.80it/s]Recognizing Text: 100%|██████████| 66/66 [00:07<00:00,  9.07it/s]
+01:25:32 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_5 | CER=0.3946 WER=0.4036 lat=7.75s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.13it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.13it/s]
+Recognizing Text:   0%|          | 0/73 [00:00<?, ?it/s]Recognizing Text:   1%|▏         | 1/73 [00:01<02:06,  1.76s/it]Recognizing Text:  10%|▉         | 7/73 [00:01<00:13,  4.99it/s]Recognizing Text:  15%|█▌        | 11/73 [00:01<00:07,  8.22it/s]Recognizing Text:  21%|██        | 15/73 [00:02<00:04, 11.81it/s]Recognizing Text:  26%|██▌       | 19/73 [00:02<00:03, 14.34it/s]Recognizing Text:  30%|███       | 22/73 [00:02<00:03, 16.39it/s]Recognizing Text:  36%|███▌      | 26/73 [00:02<00:02, 19.87it/s]Recognizing Text:  44%|████▍     | 32/73 [00:02<00:01, 26.75it/s]Recognizing Text:  49%|████▉     | 36/73 [00:02<00:01, 28.55it/s]Recognizing Text:  55%|█████▍    | 40/73 [00:03<00:01, 18.26it/s]Recognizing Text:  59%|█████▉    | 43/73 [00:03<00:02, 14.32it/s]Recognizing Text:  63%|██████▎   | 46/73 [00:03<00:01, 16.05it/s]Recognizing Text:  67%|██████▋   | 49/73 [00:03<00:01, 14.85it/s]Recognizing Text:  70%|██████▉   | 51/73 [00:04<00:01, 13.99it/s]Recognizing Text:  73%|███████▎  | 53/73 [00:04<00:02,  7.79it/s]Recognizing Text:  75%|███████▌  | 55/73 [00:04<00:02,  8.42it/s]Recognizing Text:  78%|███████▊  | 57/73 [00:04<00:01,  9.69it/s]Recognizing Text:  82%|████████▏ | 60/73 [00:05<00:01, 12.39it/s]Recognizing Text:  85%|████████▍ | 62/73 [00:05<00:00, 13.03it/s]Recognizing Text:  89%|████████▉ | 65/73 [00:05<00:00, 14.00it/s]Recognizing Text:  92%|█████████▏| 67/73 [00:05<00:00, 12.77it/s]Recognizing Text:  95%|█████████▍| 69/73 [00:05<00:00, 13.64it/s]Recognizing Text:  97%|█████████▋| 71/73 [00:06<00:00,  9.09it/s]Recognizing Text: 100%|██████████| 73/73 [00:06<00:00,  5.61it/s]Recognizing Text: 100%|██████████| 73/73 [00:06<00:00, 10.63it/s]
+01:25:41 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_6 | CER=0.4521 WER=0.4642 lat=7.42s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.23it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.23it/s]
+Recognizing Text:   0%|          | 0/83 [00:00<?, ?it/s]Recognizing Text:   1%|          | 1/83 [00:01<02:13,  1.62s/it]Recognizing Text:   5%|▍         | 4/83 [00:01<00:27,  2.85it/s]Recognizing Text:  14%|█▍        | 12/83 [00:01<00:07,  9.78it/s]Recognizing Text:  19%|█▉        | 16/83 [00:02<00:05, 13.00it/s]Recognizing Text:  34%|███▎      | 28/83 [00:02<00:02, 27.22it/s]Recognizing Text:  43%|████▎     | 36/83 [00:02<00:01, 34.67it/s]Recognizing Text:  51%|█████     | 42/83 [00:02<00:01, 31.43it/s]Recognizing Text:  58%|█████▊    | 48/83 [00:02<00:01, 34.87it/s]Recognizing Text:  66%|██████▋   | 55/83 [00:02<00:00, 40.05it/s]Recognizing Text:  73%|███████▎  | 61/83 [00:02<00:00, 37.64it/s]Recognizing Text:  80%|███████▉  | 66/83 [00:03<00:00, 34.13it/s]Recognizing Text:  84%|████████▍ | 70/83 [00:03<00:00, 30.83it/s]Recognizing Text:  89%|████████▉ | 74/83 [00:03<00:00, 18.58it/s]Recognizing Text:  93%|█████████▎| 77/83 [00:04<00:00, 15.80it/s]Recognizing Text:  96%|█████████▋| 80/83 [00:05<00:00,  7.64it/s]Recognizing Text:  99%|█████████▉| 82/83 [00:06<00:00,  4.85it/s]Recognizing Text: 100%|██████████| 83/83 [00:06<00:00, 12.09it/s]
+01:25:49 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_7 | CER=0.4552 WER=0.4698 lat=7.43s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.55it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.55it/s]
+Recognizing Text:   0%|          | 0/58 [00:00<?, ?it/s]Recognizing Text:   2%|▏         | 1/58 [00:01<01:05,  1.16s/it]Recognizing Text:   9%|▊         | 5/58 [00:01<00:10,  5.11it/s]Recognizing Text:  14%|█▍        | 8/58 [00:01<00:05,  8.35it/s]Recognizing Text:  19%|█▉        | 11/58 [00:01<00:04, 11.62it/s]Recognizing Text:  26%|██▌       | 15/58 [00:01<00:02, 16.48it/s]Recognizing Text:  33%|███▎      | 19/58 [00:01<00:02, 18.75it/s]Recognizing Text:  41%|████▏     | 24/58 [00:01<00:01, 24.49it/s]Recognizing Text:  48%|████▊     | 28/58 [00:01<00:01, 27.30it/s]Recognizing Text:  57%|█████▋    | 33/58 [00:02<00:00, 32.01it/s]Recognizing Text:  64%|██████▍   | 37/58 [00:02<00:00, 29.14it/s]Recognizing Text:  71%|███████   | 41/58 [00:02<00:00, 24.74it/s]Recognizing Text:  76%|███████▌  | 44/58 [00:02<00:00, 20.63it/s]Recognizing Text:  83%|████████▎ | 48/58 [00:02<00:00, 19.81it/s]Recognizing Text:  88%|████████▊ | 51/58 [00:03<00:00, 19.32it/s]Recognizing Text:  93%|█████████▎| 54/58 [00:03<00:00, 16.00it/s]Recognizing Text:  97%|█████████▋| 56/58 [00:03<00:00, 15.06it/s]Recognizing Text: 100%|██████████| 58/58 [00:04<00:00,  5.27it/s]Recognizing Text: 100%|██████████| 58/58 [00:04<00:00, 12.16it/s]
+01:25:55 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_8 | CER=0.3057 WER=0.3797 lat=5.27s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.50it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.50it/s]
+Recognizing Text:   0%|          | 0/33 [00:00<?, ?it/s]Recognizing Text:   3%|▎         | 1/33 [00:00<00:13,  2.31it/s]Recognizing Text:  33%|███▎      | 11/33 [00:00<00:00, 26.50it/s]Recognizing Text:  55%|█████▍    | 18/33 [00:00<00:00, 35.92it/s]Recognizing Text:  73%|███████▎  | 24/33 [00:00<00:00, 27.86it/s]Recognizing Text:  88%|████████▊ | 29/33 [00:01<00:00, 16.93it/s]Recognizing Text: 100%|██████████| 33/33 [00:01<00:00, 15.60it/s]Recognizing Text: 100%|██████████| 33/33 [00:01<00:00, 18.11it/s]
+01:25:57 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_9 | CER=0.2974 WER=0.4080 lat=2.29s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.75it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.75it/s]
+Recognizing Text:   0%|          | 0/65 [00:00<?, ?it/s]Recognizing Text:   2%|▏         | 1/65 [00:00<00:56,  1.14it/s]Recognizing Text:  17%|█▋        | 11/65 [00:00<00:03, 14.73it/s]Recognizing Text:  40%|████      | 26/65 [00:01<00:01, 36.21it/s]Recognizing Text:  54%|█████▍    | 35/65 [00:01<00:00, 45.29it/s]Recognizing Text:  68%|██████▊   | 44/65 [00:01<00:00, 53.28it/s]Recognizing Text:  82%|████████▏ | 53/65 [00:02<00:00, 14.88it/s]Recognizing Text:  91%|█████████ | 59/65 [00:03<00:00, 11.37it/s]Recognizing Text:  98%|█████████▊| 64/65 [00:05<00:00,  6.48it/s]Recognizing Text: 100%|██████████| 65/65 [00:06<00:00,  9.99it/s]
+01:26:05 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_10 | CER=0.4004 WER=0.4541 lat=6.99s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.54it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.54it/s]
+Recognizing Text:   0%|          | 0/66 [00:00<?, ?it/s]Recognizing Text:   2%|▏         | 1/66 [00:01<01:25,  1.32s/it]Recognizing Text:  12%|█▏        | 8/66 [00:01<00:07,  7.38it/s]Recognizing Text:  30%|███       | 20/66 [00:01<00:02, 19.87it/s]Recognizing Text:  41%|████      | 27/66 [00:01<00:01, 23.46it/s]Recognizing Text:  48%|████▊     | 32/66 [00:01<00:01, 26.88it/s]Recognizing Text:  59%|█████▉    | 39/66 [00:02<00:00, 29.23it/s]Recognizing Text:  67%|██████▋   | 44/66 [00:02<00:00, 30.70it/s]Recognizing Text:  74%|███████▍  | 49/66 [00:02<00:00, 30.12it/s]Recognizing Text:  80%|████████  | 53/66 [00:02<00:00, 26.71it/s]Recognizing Text:  86%|████████▋ | 57/66 [00:03<00:00, 16.16it/s]Recognizing Text:  91%|█████████ | 60/66 [00:03<00:00, 13.33it/s]Recognizing Text:  94%|█████████▍| 62/66 [00:04<00:00,  7.71it/s]Recognizing Text:  97%|█████████▋| 64/66 [00:06<00:00,  3.69it/s]Recognizing Text: 100%|██████████| 66/66 [00:08<00:00,  1.98it/s]Recognizing Text: 100%|██████████| 66/66 [00:08<00:00,  7.57it/s]
+01:26:15 [INFO] benchmark.ocr.runner — surya | xfund_train_pt_train_11 | CER=0.4458 WER=0.5519 lat=9.20s
+Detecting bboxes:   0%|          | 0/1 [00:00<?, ?it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.30it/s]Detecting bboxes: 100%|██████████| 1/1 [00:00<00:00,  2.30it/s]
+Recognizing Text:   0%|          | 0/80 [00:00<?, ?it/s]Recognizing Text:   1%|▏         | 1/80 [00:02<02:40,  2.03s/it]Recognizing Text:   2%|▎         | 2/80 [00:02<01:15,  1.03it/s]Recognizing Text:   6%|▋         | 5/80 [00:02<00:24,  3.09it/s]Recognizing Text:  11%|█▏        | 9/80 [00:02<00:10,  6.58it/s]Recognizing Text:  15%|█▌        | 12/80 [00:02<00:08,  7.85it/s]Recognizing Text:  21%|██▏       | 17/80 [00:02<00:04, 13.08it/s]Recognizing Text:  25%|██▌       | 20/80 [00:03<00:04, 14.34it/s]Recognizing Text:  29%|██▉       | 23/80 [00:03<00:03, 14.35it/s]Recognizing Text:  32%|███▎      | 26/80 [00:03<00:03, 14.29it/s]Recognizing Text:  35%|███▌      | 28/80 [00:03<00:04, 11.81it/s]Recognizing Text:  38%|███▊      | 30/80 [00:03<00:04, 11.17it/s]Recognizing Text:  40%|████      | 32/80 [00:04<00:04,  9.98it/s]Recognizing Text:  42%|████▎     | 34/80 [00:04<00:04, 10.31it/s]Recognizing Text:  45%|████▌     | 36/80 [00:04<00:04,  8.93it/s]Recognizing Text:  48%|████▊     | 38/80 [00:05<00:06,  6.59it/s]Recognizing Text:  49%|████▉     | 39/80 [00:05<00:09,  4.11it/s]Recognizing Text:  50%|█████     | 40/80 [00:06<00:11,  3.56it/s]Recognizing Text:  51%|█████▏    | 41/80 [00:06<00:11,  3.30it/s]Recognizing Text:  52%|█████▎    | 42/80 [00:06<00:10,  3.66it/s]Recognizing Text:  54%|█████▍    | 43/80 [00:07<00:10,  3.70it/s]Recognizing Text:  55%|█████▌    | 44/80 [00:07<00:11,  3.17it/s]Recognizing Text:  56%|█████▋    | 45/80 [00:08<00:12,  2.87it/s]Recognizing Text:  57%|█████▊    | 46/80 [00:08<00:15,  2.23it/s]Recognizing Text:  61%|██████▏   | 49/80 [00:09<00:07,  3.99it/s]Recognizing Text:  62%|██████▎   | 50/80 [00:09<00:08,  3.48it/s]Recognizing Text:  64%|██████▍   | 51/80 [00:09<00:09,  3.12it/s]Recognizing Text:  66%|██████▋   | 53/80 [00:10<00:06,  4.06it/s]Recognizing Text:  69%|██████▉   | 55/80 [00:10<00:05,  4.89it/s]Recognizing Text:  70%|███████   | 56/80 [00:10<00:05,  4.63it/s]Recognizing Text:  71%|███████▏  | 57/80 [00:10<00:05,  4.41it/s]Recognizing Text:  72%|███████▎  | 58/80 [00:11<00:07,  2.77it/s]Recognizing Text:  75%|███████▌  | 60/80 [00:11<00:05,  3.86it/s]Recognizing Text:  79%|███████▉  | 63/80 [00:12<00:02,  6.43it/s]Recognizing Text:  82%|████████▎ | 66/80 [00:12<00:01,  8.09it/s]Recognizing Text:  85%|████████▌ | 68/80 [00:12<00:01,  8.35it/s]Recognizing Text:  89%|████████▉ | 71/80 [00:12<00:00, 10.44it/s]Recognizing Text:  91%|█████████▏| 73/80 [00:12<00:00, 10.87it/s]Recognizing Text:  94%|█████████▍| 75/80 [00:13<00:00,  7.97it/s]Recognizing Text:  99%|█████████▉| 79/80 [00:13<00:00, 10.13it/s]Recognizing Text: 100%|██████████| 80/80 [00:13<00:00,  5.83it/s]

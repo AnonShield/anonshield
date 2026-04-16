@@ -139,6 +139,39 @@ _DEBERTA_PII_ENTITY_MAPPING: dict[str, str] = {
     # ORDINALDIRECTION are not PII — intentionally omitted
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  PT-BR NER models
+# ─────────────────────────────────────────────────────────────────────────────
+
+# LeNER-Br (legal-Portuguese) label set used by pierreguillou/ner-bert-*-pt-lenerbr
+# and dominguesm/ner-bertimbau-large-pt-legal-br.
+# Source dataset: https://github.com/peluz/lener-br
+# Legal-reference labels (LEGISLACAO, JURISPRUDENCIA) are preserved as dedicated
+# entity types so they can be either redacted or selectively kept.
+_LENERBR_ENTITY_MAPPING: dict[str, str] = {
+    "PESSOA": "PERSON",
+    "ORGANIZACAO": "ORGANIZATION",
+    "LOCAL": "LOCATION",
+    "TEMPO": "DATE_TIME",
+    "LEGISLACAO": "LAW_REFERENCE",
+    "JURISPRUDENCIA": "CASE_REFERENCE",
+}
+
+# HAREM / Portuguese classic NER (monilouise/ner_pt_br, lfcc/bert-portuguese-ner,
+# marquesafonso/bertimbau-*-ner-selective).
+# Covers both uppercase (HAREM canonical) and title-case (some variants) labels.
+_HAREM_PT_ENTITY_MAPPING: dict[str, str] = {
+    "PESSOA": "PERSON",       "Pessoa": "PERSON",
+    "LOCAL": "LOCATION",      "Localizacao": "LOCATION", "Local": "LOCATION",
+    "ORGANIZACAO": "ORGANIZATION", "Organizacao": "ORGANIZATION",
+    "TEMPO": "DATE_TIME",     "Tempo": "DATE_TIME",
+    "VALOR": "MONEY",         "Valor": "MONEY",
+    # Also accept the 3-letter abbreviations used by some checkpoints
+    "PER": "PERSON",
+    "LOC": "LOCATION",
+    "ORG": "ORGANIZATION",
+}
+
 _SECURE_MODERNBERT_ENTITY_MAPPING: dict[str, str] = {
     "ORG": "ORGANIZATION",
     "LOC": "LOCATION",
@@ -176,6 +209,27 @@ class ModelEntry:
 # ---------------------------------------------------------------------------
 # Registry — add new models here only
 # ---------------------------------------------------------------------------
+
+# Default transformer model IDs per language.
+# Used by default_transformer_for_lang() to auto-select the best NER model
+# when the user hasn't explicitly picked one via --transformer-model.
+DEFAULT_MODEL = "Davlan/xlm-roberta-base-ner-hrl"
+
+_LANG_DEFAULT_MODEL: dict[str, str] = {
+    "pt": "pierreguillou/ner-bert-base-cased-pt-lenerbr",
+}
+
+
+def default_transformer_for_lang(lang: str) -> str:
+    """Return the recommended default NER model for *lang*.
+
+    Falls back to the multilingual default for languages with no dedicated
+    registered model. Called from CLI/API entry points after lang is known
+    so Portuguese documents automatically use a PT-BR fine-tuned model
+    (better on PT-BR person names, legal/financial docs).
+    """
+    return _LANG_DEFAULT_MODEL.get(lang, DEFAULT_MODEL)
+
 
 MODEL_REGISTRY: dict[str, ModelEntry] = {
     # ── Multilingual general-purpose ─────────────────────────────────────────
@@ -222,6 +276,40 @@ MODEL_REGISTRY: dict[str, ModelEntry] = {
         entity_mapping=_SECURE_MODERNBERT_ENTITY_MAPPING,
         description="Cybersecurity-focused NER — extracts CVE, malware, threat actors, hashes, IPs",
         languages=["en"],
+    ),
+    # ── Portuguese (PT-BR) ──────────────────────────────────────────────────
+    # Recommended default for Brazilian documents (certidões, contratos, etc.).
+    # LeNER-Br fine-tune — best on formal/legal Portuguese.
+    "pierreguillou/ner-bert-large-cased-pt-lenerbr": ModelEntry(
+        entity_mapping=_LENERBR_ENTITY_MAPPING,
+        description="PT-BR NER (BERT-large / LeNER-Br) — highest F1 on formal/legal Brazilian Portuguese. Recommended for certidões, contratos, decisões.",
+        languages=["pt"],
+    ),
+    "pierreguillou/ner-bert-base-cased-pt-lenerbr": ModelEntry(
+        entity_mapping=_LENERBR_ENTITY_MAPPING,
+        description="PT-BR NER (BERT-base / LeNER-Br) — ~3x faster than the large variant with ~2% F1 drop. Same label set.",
+        languages=["pt"],
+    ),
+    # Generic PT-BR NER (HAREM-style labels) — good for free-text docs
+    "monilouise/ner_pt_br": ModelEntry(
+        entity_mapping=_HAREM_PT_ENTITY_MAPPING,
+        description="PT-BR NER (BERT-base / HAREM+LeNER-Br) — general-purpose Brazilian Portuguese with PESSOA, LOCAL, ORGANIZACAO, TEMPO, VALOR.",
+        languages=["pt"],
+    ),
+    "marquesafonso/bertimbau-large-ner-selective": ModelEntry(
+        entity_mapping=_HAREM_PT_ENTITY_MAPPING,
+        description="PT-BR NER (BERTimbau-large / HAREM Selective) — strong on Brazilian Portuguese, 5 entity types.",
+        languages=["pt"],
+    ),
+    "lfcc/bert-portuguese-ner": ModelEntry(
+        entity_mapping=_CONLL_EN_ENTITY_MAPPING,  # uses 3-letter CoNLL labels (PER, ORG, LOC)
+        description="PT-BR NER (Portuguese-BERT / CoNLL-style) — simple PER, ORG, LOC labels.",
+        languages=["pt"],
+    ),
+    "dominguesm/ner-bertimbau-large-pt-legal-br": ModelEntry(
+        entity_mapping=_LENERBR_ENTITY_MAPPING,
+        description="PT-BR NER (BERTimbau-large on LeNER-Br) — alternative legal-Portuguese model from the BERTimbau family.",
+        languages=["pt"],
     ),
 }
 

@@ -681,27 +681,44 @@ JSON format is also accepted (same fields, wrapped in an array).
 
 **Default:** `tesseract`
 
-**What it does:** Selects the OCR engine used to extract text from image-based inputs (PNG, JPG, TIFF, etc.) and scanned PDF pages.
+**What it does:** Selects the OCR engine used to extract text from image-based inputs (PNG, JPG, TIFF, etc.) and scanned PDF pages. AnonShield supports 13 engines across three families — classical, deep-learning detectors, and vision-language models. All run **100% locally** — no cloud calls.
 
-| Engine | Accuracy | Speed | Languages | Notes |
-|--------|----------|-------|-----------|-------|
-| `tesseract` | Good | Fast | 100+ | Default; requires `tesseract` system package |
-| `easyocr` | Very good | Medium | 80+ | Best for noisy/rotated images; install: `pip install easyocr` |
-| `paddleocr` | Excellent | Fast | 80+ | Strongest on Chinese/Japanese/Korean; install: `pip install paddleocr paddlepaddle` |
-| `doctr` | Excellent | Medium | 60+ | Best layout preservation; install: `pip install "python-doctr[torch]"` |
-| `kerasocr` | Good | Slow | English | Keras-based; install: `pip install keras-ocr` |
+**Classical and deep-learning engines:**
 
-All non-default engines are optional dependencies — install only what you need.
+| Engine | Accuracy | Speed | GPU | Notes |
+|--------|----------|-------|-----|-------|
+| `tesseract` | Good | Fast (CPU) | — | Default; requires `tesseract` system package |
+| `easyocr` | Very good | Medium | auto | Best for noisy/rotated images; install: `pip install easyocr` |
+| `paddleocr` | Excellent | Fast | explicit | PP-OCRv5 — strong on PT-BR forms, checks, IDs, CJK |
+| `doctr` | Excellent | Medium | `.cuda()` | PyTorch — best layout preservation |
+| `onnxtr` | ≈ DocTR | ~2× faster | CUDAExecutionProvider | ONNX port of DocTR — drop-in faster alternative |
+| `surya` | Very good | Medium GPU | `TORCH_DEVICE=cuda` | Multilingual transformer foundation |
+| `rapidocr` | Good | Fastest CPU | — (CPU-only) | PaddleOCR models in ONNX — lightweight CPU deploy |
+| `kerasocr` | Good | Slow | auto | Legacy English-only Keras pipeline |
+
+**Vision-language model (VLM) engines** — SOTA accuracy, GPU required, slower generation:
+
+| Engine | Model size | Best for |
+|--------|-----------|----------|
+| `paddle_vl` | ~2 GB | Best open-source all-rounder (OmniDocBench 94.50) |
+| `deepseek_ocr` | ~6 GB | Complex layouts, markdown grounding (requires flash-attn) |
+| `monkey_ocr` | ~2.4 GB | Compact VLM alternative |
+| `glm_ocr`, `lighton_ocr` | — | Experimental |
+
+All non-default engines are optional dependencies — install only what you need (`uv sync --extra <engine>`).
 
 ```bash
 # Use EasyOCR for a noisy scanned document
 ./docker/run.sh ./scanned_invoice.pdf --ocr-engine easyocr
 
-# Use PaddleOCR for Asian-language documents
-./docker/run.sh ./japanese_report.pdf --ocr-engine paddleocr --lang ja
+# Use PaddleOCR v5 for a Brazilian form (CPF, RG, checks)
+./docker/run.sh ./formulario.pdf --ocr-engine paddleocr --lang pt
+
+# Use PaddleOCR-VL for maximum accuracy on a complex invoice
+./docker/run.sh ./invoice.png --ocr-engine paddle_vl
 ```
 
-> **See also:** [`docs/users/OCR_ENGINES.md`](OCR_ENGINES.md) — detailed comparison, installation instructions, and benchmarks for all five engines.
+> **See also:** [`docs/users/OCR_ENGINES.md`](OCR_ENGINES.md) — detailed comparison, installation instructions, GPU configuration, and benchmarks for all 13 engines.
 
 ---
 
@@ -1128,7 +1145,7 @@ These options control how the tool manages the Ollama service that runs the loca
 | `--force-large-xml` | off | Override XML memory safety limits |
 | `--disable-gc` | off | Disable Python garbage collection |
 | `--anonymization-strategy` | `filtered` | Detection engine: `filtered` `presidio` `hybrid` `standalone` `regex` `slm` |
-| `--ocr-engine` | `tesseract` | OCR engine: `tesseract` `easyocr` `paddleocr` `doctr` `kerasocr` |
+| `--ocr-engine` | `tesseract` | OCR engine — 13 options (see [OCR_ENGINES.md](OCR_ENGINES.md)) |
 | `--transformer-model` | `Davlan/xlm-roberta-base-ner-hrl` | NER model to use |
 | `--db-mode` | `persistent` | Database mode: `persistent` or `in-memory` |
 | `--db-dir` | `db` | Directory for the database file |

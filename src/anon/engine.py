@@ -59,6 +59,77 @@ SUPPORTED_LANGUAGES = {
 _ENGINE_CACHE: dict[str, tuple["BatchAnalyzerEngine", "AnonymizerEngine"]] = {}
 
 
+# Some PT-BR NER tokenizers (e.g. pierreguillou/ner-bert-large-cased-pt-lenerbr)
+# publish no model_max_length in tokenizer_config.json, so HF defaults to ~1e20.
+# transformers 5.x pipeline.preprocess trusts that value and skips truncation;
+# any doc >512 tokens then crashes BERT's positional embedding. spaCy's
+# hf_token_pipe catches the exception and silently returns zero entities, so
+# the anonymizer appears to "succeed" with everything passed through untouched.
+# Monkey-patch _get_annotations to tokenize once, slide a 400-token window
+# with 50-token overlap, and stitch char offsets back to the original doc.
+_HF_TOKEN_PIPE_PATCHED = False
+
+
+def _patch_hf_token_pipe_for_long_docs() -> None:
+    global _HF_TOKEN_PIPE_PATCHED
+    if _HF_TOKEN_PIPE_PATCHED:
+        return
+    try:
+        from spacy_huggingface_pipelines.token_classification import HFTokenPipe
+    except ImportError:
+        return
+
+    def _chunked_ner(hf_pipeline, text: str, chunk_tokens: int = 400, overlap: int = 50):
+        tok = hf_pipeline.tokenizer
+        enc = tok(text, return_offsets_mapping=True, add_special_tokens=False, truncation=False)
+        offsets = enc["offset_mapping"]
+        if len(offsets) <= chunk_tokens:
+            return hf_pipeline(text)
+        results, seen = [], set()
+        stride = chunk_tokens - overlap
+        i = 0
+        while i < len(offsets):
+            end = min(i + chunk_tokens, len(offsets))
+            char_start = offsets[i][0]
+            char_end = offsets[end - 1][1]
+            chunk = text[char_start:char_end]
+            for ent in hf_pipeline(chunk):
+                gs, ge = ent["start"] + char_start, ent["end"] + char_start
+                key = (gs, ge, ent["entity_group"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                results.append({**ent, "start": gs, "end": ge})
+            if end >= len(offsets):
+                break
+            i += stride
+        return results
+
+    def _patched_get_annotations(self, docs):
+        import warnings as _w
+        if len(docs) > 1:
+            try:
+                return [_chunked_ner(self.hf_pipeline, d.text) for d in docs]
+            except Exception:
+                _w.warn("Unable to process texts as batch, backing off individually")
+        out = []
+        for d in docs:
+            try:
+                out.append(_chunked_ner(self.hf_pipeline, d.text))
+            except Exception as exc:
+                excerpt = d.text if len(d.text) < 100 else d.text[:100] + "..."
+                _w.warn(f"Unable to process, skipping annotation for doc '{excerpt}': {exc}")
+                out.append([])
+        return out
+
+    HFTokenPipe._get_annotations = _patched_get_annotations
+    _HF_TOKEN_PIPE_PATCHED = True
+    logging.info("Patched spacy_huggingface_pipelines.HFTokenPipe with sliding-window chunker.")
+
+
+_patch_hf_token_pipe_for_long_docs()
+
+
 def warm_up_model(
     transformer_model: str = "Davlan/xlm-roberta-base-ner-hrl",
     lang: str = "en",
@@ -177,9 +248,27 @@ class RegexPatterns:
     
     # File System
     USER_PATH = r"(?:/home/|/Users/|C:\\Users\\)([^/\\]+)"
-    
+
     # PGP
     PGP_BLOCK = r"-----BEGIN PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----[\s\S]{10,8000}?-----END PGP (?:SIGNATURE|PUBLIC KEY BLOCK)-----"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Brazilian documents (PT-BR)
+    #
+    # Patterns match only the canonical formatted versions of each ID. Matching
+    # raw digit sequences would create too many false positives on random text
+    # (account numbers, line numbers, SKUs, etc.). The NER model complements
+    # these by catching unformatted IDs in context.
+    # ─────────────────────────────────────────────────────────────────────────
+    CNPJ            = r"\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b"
+    RG_SP           = r"\b\d{1,2}\.\d{3}\.\d{3}-[0-9Xx]\b"
+    CEP             = r"\b\d{5}-\d{3}\b"
+    PIS_PASEP       = r"\b\d{3}\.\d{5}\.\d{2}-\d\b"
+    TITULO_ELEITOR  = r"\b\d{4}\s\d{4}\s\d{4}\b"
+    MONEY_BRL       = r"R\$\s?\d{1,3}(?:\.\d{3})*(?:,\d{2})?"
+    DATE_BR         = r"\b(?:0?[1-9]|[12]\d|3[01])/(?:0?[1-9]|1[0-2])/\d{4}\b"
+    BANK_AGENCY     = r"(?i)(?:ag[êe]ncia|ag\.?)\s*:?\s*\d{4,5}[-\s]?\d?\b"
+    BANK_ACCOUNT    = r"(?i)(?:conta(?:\s+corrente|\s+poupan[çc]a)?|c/c|cc)\s*:?\s*\d{4,10}[-\s]?\d?\b"
 
 
 class CustomSlugAnonymizer(Operator):
@@ -391,7 +480,19 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
         regex=RegexPatterns.PGP_BLOCK,
         score=0.95 + SCORE_BOOST
     )
-    
+
+    # ── Brazilian documents (PT-BR only) ────────────────────────────────────
+    br_cpf_pattern       = Pattern(name="BR CPF",        regex=RegexPatterns.CPF,            score=0.95 + SCORE_BOOST)
+    br_cnpj_pattern      = Pattern(name="BR CNPJ",       regex=RegexPatterns.CNPJ,           score=0.95 + SCORE_BOOST)
+    br_rg_pattern        = Pattern(name="BR RG (SP)",    regex=RegexPatterns.RG_SP,          score=0.80 + SCORE_BOOST)
+    br_cep_pattern       = Pattern(name="BR CEP",        regex=RegexPatterns.CEP,            score=0.85 + SCORE_BOOST)
+    br_pis_pattern       = Pattern(name="BR PIS/PASEP",  regex=RegexPatterns.PIS_PASEP,      score=0.90 + SCORE_BOOST)
+    br_titulo_pattern    = Pattern(name="BR Título Eleitoral", regex=RegexPatterns.TITULO_ELEITOR, score=0.80 + SCORE_BOOST)
+    br_money_pattern     = Pattern(name="BR BRL Amount", regex=RegexPatterns.MONEY_BRL,      score=0.90 + SCORE_BOOST)
+    br_date_pattern      = Pattern(name="BR Date",       regex=RegexPatterns.DATE_BR,        score=0.60 + SCORE_BOOST)
+    br_agency_pattern    = Pattern(name="BR Bank Agency",  regex=RegexPatterns.BANK_AGENCY,  score=0.80 + SCORE_BOOST)
+    br_account_pattern   = Pattern(name="BR Bank Account", regex=RegexPatterns.BANK_ACCOUNT, score=0.80 + SCORE_BOOST)
+
     recognizers = []
     for lang in langs:
         recognizers.extend([
@@ -417,6 +518,19 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
             PatternRecognizer(supported_entity="PORT", patterns=[port_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="OID", patterns=[oid_pattern], supported_language=lang),
         ])
+        if lang == "pt":
+            recognizers.extend([
+                PatternRecognizer(supported_entity="BR_CPF",       patterns=[br_cpf_pattern],     supported_language=lang),
+                PatternRecognizer(supported_entity="BR_CNPJ",      patterns=[br_cnpj_pattern],    supported_language=lang),
+                PatternRecognizer(supported_entity="BR_RG",        patterns=[br_rg_pattern],      supported_language=lang),
+                PatternRecognizer(supported_entity="BR_CEP",       patterns=[br_cep_pattern],     supported_language=lang),
+                PatternRecognizer(supported_entity="BR_PIS",       patterns=[br_pis_pattern],     supported_language=lang),
+                PatternRecognizer(supported_entity="BR_TITULO_ELEITORAL", patterns=[br_titulo_pattern], supported_language=lang),
+                PatternRecognizer(supported_entity="MONEY",        patterns=[br_money_pattern],   supported_language=lang),
+                PatternRecognizer(supported_entity="DATE_TIME",    patterns=[br_date_pattern],    supported_language=lang),
+                PatternRecognizer(supported_entity="BR_BANK_AGENCY",  patterns=[br_agency_pattern],  supported_language=lang),
+                PatternRecognizer(supported_entity="BR_BANK_ACCOUNT", patterns=[br_account_pattern], supported_language=lang),
+            ])
     return recognizers
 
 class AnonymizationOrchestrator:
@@ -445,7 +559,9 @@ class AnonymizationOrchestrator:
                  slm_detector_mode: str = "hybrid",
                  ner_data_generation: bool = False,
                  transformer_model: str = "Davlan/xlm-roberta-base-ner-hrl",
-                 parallel_workers: int = 1):
+                 parallel_workers: int = 1,
+                 ner_score_threshold: Optional[float] = None,
+                 ner_aggregation_strategy: Optional[str] = None):
 
         self.lang = lang
         self.db_context = db_context
@@ -457,6 +573,9 @@ class AnonymizationOrchestrator:
         self.ner_data_generation = ner_data_generation
         self.transformer_model = transformer_model
         self.parallel_workers = parallel_workers
+        from .config import NerDefaults
+        self.ner_score_threshold = ner_score_threshold if ner_score_threshold is not None else NerDefaults.SCORE_THRESHOLD
+        self.ner_aggregation_strategy = ner_aggregation_strategy or NerDefaults.AGGREGATION_STRATEGY
 
         self.total_entities_processed = 0
         self.entity_counts: Dict[str, int] = {}
@@ -521,7 +640,8 @@ class AnonymizationOrchestrator:
                 lang=self.lang,
                 entities_to_preserve=self.entities_to_preserve,
                 allow_list=self.allow_list,
-                nlp_batch_size=self.nlp_batch_size
+                nlp_batch_size=self.nlp_batch_size,
+                score_threshold=self.ner_score_threshold,
             )
             logging.info(f"Anonymization strategy '{strategy_name}' initialized via factory.")
 
@@ -551,7 +671,7 @@ class AnonymizationOrchestrator:
             return batch_analyzer, anonymizer
 
         # --- Transformer path — check module-level cache first ---
-        cache_key = f"{self.transformer_model}:{effective_lang}"
+        cache_key = f"{self.transformer_model}:{effective_lang}:{self.ner_aggregation_strategy}"
         if cache_key in _ENGINE_CACHE:
             logging.info("Engine cache hit for '%s' (lang=%s) — skipping model load.", self.transformer_model, effective_lang)
             return _ENGINE_CACHE[cache_key]
@@ -567,7 +687,7 @@ class AnonymizationOrchestrator:
 
         ner_config = NerModelConfiguration(
             model_to_presidio_entity_mapping=entity_mapping,
-            aggregation_strategy="max",
+            aggregation_strategy=self.ner_aggregation_strategy,
             labels_to_ignore=["O"],
         )
         nlp_engine = TransformersNlpEngine(models=trf_model_config, ner_model_configuration=ner_config)

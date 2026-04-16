@@ -1,22 +1,92 @@
-FROM python:3.12-slim
+# Dev image — GPU-enabled, all 16 OCR engines installed.
+#
+# Built on CUDA 12.8 to match torch 2.11 cu128 in pyproject.toml.
+# Covers the full engine matrix (src/anon/ocr/factory.py):
+#   Classical (8): tesseract, easyocr, paddleocr, doctr, onnxtr, kerasocr,
+#                  surya, rapidocr
+#   VLM       (8): glm_ocr, paddle_vl, deepseek_ocr, monkey_ocr, lighton_ocr,
+#                  chandra_ocr, dots_ocr, qwen_vl
+#
+# transformers 5.3+ is in the lockfile, which unlocks glm_ocr, paddle_vl,
+# lighton_ocr (new model classes) alongside the 4.x-era VLMs.
+#
+# Source is mounted at runtime (hot-reload) via docker-compose.dev.yml.
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+ARG CUDA=12.8.0
+# cudnn-devel (vs runtime) brings nvcc + headers — required so flash-attn can
+# JIT/build for deepseek_ocr. Adds ~3GB but unlocks the 13th engine in-image.
+FROM nvidia/cuda:${CUDA}-cudnn-devel-ubuntu22.04
 
-# System deps: Tesseract + OpenCV runtime libs
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/app/.cache/huggingface \
+    XDG_CACHE_HOME=/app/.cache \
+    PADDLEOCR_CONFIG_DIR=/app/.cache/paddleocr \
+    EASYOCR_MODULE_PATH=/app/.cache/easyocr \
+    TORCH_DEVICE=cuda
+
+# System deps: Tesseract + PT/ES/FR/IT/DE, OpenCV runtime, libmagic
+# (uv fetches its own Python 3.12 below — no python apt package required)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tesseract-ocr \
-    libmagic1 libgl1 libglib2.0-0 libgomp1 \
+        tesseract-ocr tesseract-ocr-por tesseract-ocr-spa tesseract-ocr-fra \
+        tesseract-ocr-ita tesseract-ocr-deu \
+        libmagic1 libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1 \
+        build-essential git curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# uv (official binary)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 WORKDIR /app
 
-# Install Python deps from lockfile — no heavy OCR engines, no cupy
-# --group web: FastAPI, Celery, Redis and web-only deps
-# --no-install-project: source is mounted at runtime
-COPY pyproject.toml uv.lock ./
-ENV UV_SYSTEM_PYTHON=1 \
-    UV_NO_CACHE=1
-RUN uv sync --frozen --no-install-project --group web
+# Create venv pinned to 3.12 and put it on PATH
+RUN uv venv --python 3.12 /app/.venv
+ENV VIRTUAL_ENV=/app/.venv \
+    PATH="/app/.venv/bin:$PATH"
 
-# Source is mounted at runtime via docker-compose volumes
-ENV PYTHONPATH="/app"
+# Install dependencies — web stack + every OCR extra.
+# deepseek-ocr needs flash-attn (built JIT against CUDA from the cudnn-devel
+# base above). monkey-ocr / paddle-vl pin transformers==4.51 — incompatible
+# with our 5.x main image, so they live in the legacy_vlm sidecar instead.
+# kerasocr needs TensorFlow which conflicts with torch+cu128 — that runs in
+# the kerasocr sidecar.
+COPY pyproject.toml uv.lock ./
+ENV UV_NO_CACHE=1
+RUN uv sync --frozen --no-install-project \
+        --group web \
+        --extra ocr-all \
+        --extra paddle-ocr \
+        --extra deepseek-ocr \
+        --extra glm-ocr \
+        --extra lighton-ocr
+
+# Re-add spacy-huggingface-pipelines (needed by Presidio TransformersNlpEngine).
+# Its pin is transformers<5.0 but the 3 APIs it uses (pipeline, AutoTokenizer,
+# AutoModelForTokenClassification) are stable in 5.x, so install --no-deps.
+# MonkeyOCR's magic_pdf package also needs loguru at import time.
+# botocore/boto3: accelerate.utils.bnb transitively imports boto3 via sagemaker
+# config; without botocore present, `from transformers import pipeline` raises,
+# spacy-huggingface-pipelines swallows it silently, and NER returns zero entities.
+RUN uv pip install --python /app/.venv/bin/python --no-deps \
+        "spacy-huggingface-pipelines==0.0.4" \
+    && uv pip install --python /app/.venv/bin/python loguru botocore boto3
+
+# flash-attn (optional): only needed by deepseek_ocr. JIT compiling from source
+# requires ~25GB RAM and ~1h on a consumer CPU — will OOM a 32GB host. Skipped
+# by default. glm_ocr / chandra_ocr / paddle_vl / qwen_vl work without it at
+# ~1.5× slower attention (acceptable trade-off).
+# To enable: `--build-arg INSTALL_FLASH_ATTN=1` (needs ≥64GB RAM).
+ARG INSTALL_FLASH_ATTN=0
+ARG MAX_JOBS=2
+ARG TORCH_CUDA_ARCH_LIST="12.0"
+ENV TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}
+RUN if [ "$INSTALL_FLASH_ATTN" = "1" ]; then \
+        MAX_JOBS=${MAX_JOBS} uv pip install --python /app/.venv/bin/python --no-build-isolation "flash-attn>=2.5.0" ; \
+    else \
+        echo "Skipping flash-attn (INSTALL_FLASH_ATTN=0); deepseek_ocr will not work." ; \
+    fi
+
+# Source is mounted at runtime via docker-compose volumes.
+# /app/src is ahead of /app so the `anon` package (not the anon.py module) resolves.
+ENV PYTHONPATH="/app/src:/app"

@@ -1,0 +1,466 @@
+doc_id,engine,quality_tier,doc_type,cer,wer,cer_no_diac,latency_s,field_f1,anls_score,_ref,_hyp
+xfund_train_pt_train_0,tesseract,degraded,form,0.239422084623323,0.4014084507042254,0.21775025799793601,0.7170616249932209,"{""em_caso_de_aplica\u00e7\u00e3o_de_medida_de_interna\u00e7\u00e3o_acautelamento_o_adolescente"": 0.0, ""\u00e9_encaminhado_para_cela_especial_do_pres\u00eddio_aguardando_transfer\u00eancia_em_caso_de_encaminhamento_do_adolescente_para_cela_especial_do_pres\u00eddio_qual_tempo_m\u00e1ximo_tem_sido_aguardado_para_transfer\u00eancia_a_estabelecimento"": 1.0, ""cep"": 0.0, ""vagas"": 0.0, ""lota\u00e7\u00e3o_atual"": 0.0, ""respons\u00e1vel"": 1.0, ""forma\u00e7\u00e3o_acad\u00eamica_do_respons\u00e1vel"": 1.0, ""quantidade_de_agentes_socioeducativos"": 1.0, ""e_mail"": 0.0, ""telefone"": 1.0, ""bairro"": 0.0, ""endere\u00e7o"": 1.0, ""nome"": 1.0, ""macro_f1"": 0.5384615384615384}",0.5384615384615384,"Poder Judiciário do Estado de Minas Gerais
+FORMULÁRIO QUANTO À APLICAÇÃO DAS
+MEDIDAS SOCIOEDUCATIVAS
+COMARCA:
+I - Considerações iniciais
+Em caso de aplicação de medida de internação/acautelamento, o adolescente:
+(V ) é encaminhado para unidade da própria comarca
+( ) é encaminhado para unidade de outra comarca
+( ) é encaminhado para cela especial do presídio aguardando transferência Em caso de encaminhamento do adolescente para cela especial do presídio, qual tempo máximo tem sido aguardado para transferência a estabelecimento
+adequado?
+II - Da Internação
+a) Quanto ao estabelecimento
+(responder os itens ""a"" a ""d"" caso a comarca possua estabelecimento próprio)
+Anna C Rocha
+Vila Coelho Xavier 1973
+Jardim São Paulo
+CEP:
+(11) 3995-9796
+oy93@payspun.com
+Vagas:
+3 internos
+Lotação atual:
+4 internos
+Responsável:
+Ana Correia
+Formação acadêmica do responsável:
+Quantidade de agentes socioeducativos:
+4
+3 dias
+E-mail:
+15800-3401
+mestre
+Telefone:
+Bairro:
+Endereço:
+Nome:","f Poder Judiciario do Estado de Minas Gerais
+
+FORMULARIO QUANTO A APLICAGAO DAS
+MEDIDAS SOCIOEDUCATIVAS
+
+COMARCA:
+
+I -— Consideracoes iniciais
+
+Em caso de aplicacdo de medida de internagao/acautelamento, o adolescente:
+(V ) é encaminhado para unidade da prépria comarca
+
+(_ ) @ encaminhado para unidade de outra comarca
+
+( ) € encaminhado para cela especial do presidio aguardando transferéncia
+Em caso de encaminhamento do adolescente para cela especial do presidio,
+qual tempo maximo tem sido aguardado para transferéncia a estabelecimento
+
+adequado? _ 3 dias
+
+II -— Da Internacao
+
+a) Quanto ao estabelecimento
+
+(responder os itens “a” a “d” caso a comarca possua estabelecimento prdprio)
+
+Nome: Anna C Rocha
+
+Endereco: Vila Coelho Xavier 1973
+
+Bairro: Jardim Sado Paulo CEP: _15800 -3401_
+
+Telefone: (11) 3995-9796 E-mail: sves@ipayepuneont
+Vagas: 3 ___ internos | Lotacdo atual: 4 | items Oo
+Responsavel:. Ana Correia __
+
+Formac&o académica do responsavel: _mestre
+
+Quantidade de agentes socioeducativos: _4"
+xfund_train_pt_train_1,tesseract,degraded,form,0.1570827489481066,0.2948717948717949,0.13697989714820008,0.9837342550017638,"{""n\u00ba_de_funcion\u00e1rios"": 1.0, ""cnpj_mf"": 1.0, ""cnae"": 1.0, ""munic\u00edpio"": 1.0, ""gr"": 1.0, ""n\u00ba"": 1.0, ""uf"": 1.0, ""n\u00ba_de_trabalhadores_acidentados"": 1.0, ""data_do_acidente"": 1.0, ""hora_aproximada"": 1.0, ""local_do_acidente"": 1.0, ""tipo_de_acidente"": 0.0, ""bairro"": 1.0, ""end"": 0.0, ""raz\u00e3o_social"": 1.0, ""macro_f1"": 0.8666666666666667}",0.8666666666666667,"Modelo de Análise e Prevenção de Acidentes de Trabalho - M.A.P.A.
+1. Análise de Acidente do Trabalho
+1.1 Objetivos
+• Prevenir acidentes do trabalho
+• Difundir a compreensão de acidentes do trabalho como fenômenos resultantes de rede de fatores
+em interação, superando a visão dicotômica (atos/ condições inseguras)
+• Identificação de rede de fatores de acidentes, cuja interação levou ao evento, sobretudo os mais
+a montante da lesão relacionados a aspectos organizacionais e gerenciais do sistema em questão
+• Investigação da situação de trabalho habitual e de origens das mudanças e alterações que ocor-
+reram, contribuindo para o evento, bem como a análise de barreiras existentes e de seu efetivo
+funcionamento
+• A partir do caso específico, avaliar fatores relacionados ao gerenciamento de riscos adotado na
+organização de forma a contribuir com a prevenção de novos eventos. Subsidiar ações de outros
+órgãos e instituições.
+1.2 Metodologia
+Inspeções no local do acidente, com coleta de informações (croquis, filmagens e fotografias; entrevis-
+tas individuais ou coletivas com trabalhadores e supervisores direta e indiretamente envolvidos com
+o acidente; análises de documentos; sistematização das informações obtidas, visando a compreensão
+de como o acidente ocorreu; emissão de parecer conclusivo e recomendações de intervenção.
+2. Identificação de Vítimas, Empresas, Empreendimentos ou outros Envolvidos no Acidente
+2.1. Informações da Empresa Contratante
+SERVICOS E ALIMENTACAO LTDA
+Nº de funcionários:
+CNPJ/MF:
+CNAE:
+Rua Tutoia, 119
+VILA MARIANA
+Município:
+GR:
+Nº
+UF:
+Em caso de empresa terceira inserir novo quadro com os dados da empresa principal
+2.2. Informações Preliminares sobre o Acidente de Trabalho
+Nº de trabalhadores acidentados:
+Data do Acidente:
+12-12-2020
+29942
+Hora aproximada:
+Local do Acidente:
+Viela Arcoverde895
+Tipo de Acidente:
+Entrevistados que contribuíram para a análise (Não registrar nomes, indique funções
+e, caso tenha realizado encontro de validação, indique local, dia, hora e
+participantes.)
+12
+Acidente típico
+16h00
+SP
+SP
+3
+5017618
+04007-000
+Bairro:
+End:
+01.70-9
+02.905.110/0001-28
+Razão Social:","Modelo de Anilise e Prevencao de Acidentes de Trabalho — M.A.P.A.
+
+1. Analise de Acidente do Trabalho
+
+1.1 Objetivos
+
+- Prevenir acidentes do trabalho
+
+- Difundir a compreensao de acidentes do trabalho como fenémenos resultantes de rede de fatores
+em intera¢ao, superando a visao dicotémica (atos/ condicdes inseguras)
+
+- Identificacao de rede de fatores de acidentes, cuja interagao levou ao evento, sobretudo os mais
+a montante da lesao relacionados a aspectos organizacionais e gerenciais do sistema em questao
+
+* _ Investigacao da situacao de trabalho habitual e de origens das mudangas e alteragdes que ocor-
+reram, contribuindo para o evento, bem como a analise de barreiras existentes e de seu efetivo
+funcionamento
+
+- A partir do caso especifico, avaliar fatores relacionados ao gerenciamento de riscos adotado na
+organizagao de forma a contribuir com a prevengao de novos eventos. Subsidiar acdes de outros
+Orgaos e institui¢gdes.
+
+1.2 Metodologia
+
+Inspecoes no local do acidente, com coleta de informagées (croquis, filmagens e fotografias; entrevis-
+tas individuais ou coletivas com trabalhadores e supervisores direta e indiretamente envolvidos com
+o acidente; analises de documentos; sistematizacdo das informagées obtidas, visando a compreensao
+de como 0 acidente ocorreu; emissao de parecer conclusivo e recomendacées de intervencao.
+
+2. Identificagao de Vitimas, Empresas, Empreendimentos ou outros Envolvidos no Acidente
+
+2.1. Informacoes da Empresa Contratante
+
+Razdo Social: SERVICOS E ALIMENTACAO LTDA NO de funcionarios: 5017618
+CNPJ/MF: 02.905.110/0001-28 GR: 3
+
+CNAE: 01.70-9
+
+End: Rua Tutoia,119 No. 04007-000
+Bairro: VILA MARIANA Municipio: SP UF: SP
+
+Em caso de empresa terceira inserir novo quadro com os dados da empresa principal
+
+2.2. Informacées Preliminares sobre o Acidente de Trabalho
+
+N° de trabalhadores acidentados: 29942
+
+Data do Acidente; = 12-12-2020 Hora aproximada: 16h00
+Local do Acidente: Viela Arcoverde895
+
+Tipo de Acidente: Acidente tipico
+Entrevistados que contribuiram para a analise (Nao registrar nomes, indique funcdes
+e, caso tenha realizado encontro de validacgdo, indique local, dia, hora e
+participantes. )
+
+12"
+xfund_train_pt_train_0,chandra_ocr,degraded,form,1.0,1.0,1.0,7.078618218001793,"{""em_caso_de_aplica\u00e7\u00e3o_de_medida_de_interna\u00e7\u00e3o_acautelamento_o_adolescente"": 0.0, ""\u00e9_encaminhado_para_cela_especial_do_pres\u00eddio_aguardando_transfer\u00eancia_em_caso_de_encaminhamento_do_adolescente_para_cela_especial_do_pres\u00eddio_qual_tempo_m\u00e1ximo_tem_sido_aguardado_para_transfer\u00eancia_a_estabelecimento"": 0.0, ""cep"": 0.0, ""vagas"": 0.0, ""lota\u00e7\u00e3o_atual"": 0.0, ""respons\u00e1vel"": 0.0, ""forma\u00e7\u00e3o_acad\u00eamica_do_respons\u00e1vel"": 0.0, ""quantidade_de_agentes_socioeducativos"": 0.0, ""e_mail"": 0.0, ""telefone"": 0.0, ""bairro"": 0.0, ""endere\u00e7o"": 0.0, ""nome"": 0.0, ""macro_f1"": 0.0}",0.0,"Poder Judiciário do Estado de Minas Gerais
+FORMULÁRIO QUANTO À APLICAÇÃO DAS
+MEDIDAS SOCIOEDUCATIVAS
+COMARCA:
+I - Considerações iniciais
+Em caso de aplicação de medida de internação/acautelamento, o adolescente:
+(V ) é encaminhado para unidade da própria comarca
+( ) é encaminhado para unidade de outra comarca
+( ) é encaminhado para cela especial do presídio aguardando transferência Em caso de encaminhamento do adolescente para cela especial do presídio, qual tempo máximo tem sido aguardado para transferência a estabelecimento
+adequado?
+II - Da Internação
+a) Quanto ao estabelecimento
+(responder os itens ""a"" a ""d"" caso a comarca possua estabelecimento próprio)
+Anna C Rocha
+Vila Coelho Xavier 1973
+Jardim São Paulo
+CEP:
+(11) 3995-9796
+oy93@payspun.com
+Vagas:
+3 internos
+Lotação atual:
+4 internos
+Responsável:
+Ana Correia
+Formação acadêmica do responsável:
+Quantidade de agentes socioeducativos:
+4
+3 dias
+E-mail:
+15800-3401
+mestre
+Telefone:
+Bairro:
+Endereço:
+Nome:",
+xfund_train_pt_train_1,chandra_ocr,degraded,form,1.0,1.0,1.0,3.7036351489950903,"{""n\u00ba_de_funcion\u00e1rios"": 0.0, ""cnpj_mf"": 0.0, ""cnae"": 0.0, ""munic\u00edpio"": 0.0, ""gr"": 0.0, ""n\u00ba"": 0.0, ""uf"": 0.0, ""n\u00ba_de_trabalhadores_acidentados"": 0.0, ""data_do_acidente"": 0.0, ""hora_aproximada"": 0.0, ""local_do_acidente"": 0.0, ""tipo_de_acidente"": 0.0, ""bairro"": 0.0, ""end"": 0.0, ""raz\u00e3o_social"": 0.0, ""macro_f1"": 0.0}",0.0,"Modelo de Análise e Prevenção de Acidentes de Trabalho - M.A.P.A.
+1. Análise de Acidente do Trabalho
+1.1 Objetivos
+• Prevenir acidentes do trabalho
+• Difundir a compreensão de acidentes do trabalho como fenômenos resultantes de rede de fatores
+em interação, superando a visão dicotômica (atos/ condições inseguras)
+• Identificação de rede de fatores de acidentes, cuja interação levou ao evento, sobretudo os mais
+a montante da lesão relacionados a aspectos organizacionais e gerenciais do sistema em questão
+• Investigação da situação de trabalho habitual e de origens das mudanças e alterações que ocor-
+reram, contribuindo para o evento, bem como a análise de barreiras existentes e de seu efetivo
+funcionamento
+• A partir do caso específico, avaliar fatores relacionados ao gerenciamento de riscos adotado na
+organização de forma a contribuir com a prevenção de novos eventos. Subsidiar ações de outros
+órgãos e instituições.
+1.2 Metodologia
+Inspeções no local do acidente, com coleta de informações (croquis, filmagens e fotografias; entrevis-
+tas individuais ou coletivas com trabalhadores e supervisores direta e indiretamente envolvidos com
+o acidente; análises de documentos; sistematização das informações obtidas, visando a compreensão
+de como o acidente ocorreu; emissão de parecer conclusivo e recomendações de intervenção.
+2. Identificação de Vítimas, Empresas, Empreendimentos ou outros Envolvidos no Acidente
+2.1. Informações da Empresa Contratante
+SERVICOS E ALIMENTACAO LTDA
+Nº de funcionários:
+CNPJ/MF:
+CNAE:
+Rua Tutoia, 119
+VILA MARIANA
+Município:
+GR:
+Nº
+UF:
+Em caso de empresa terceira inserir novo quadro com os dados da empresa principal
+2.2. Informações Preliminares sobre o Acidente de Trabalho
+Nº de trabalhadores acidentados:
+Data do Acidente:
+12-12-2020
+29942
+Hora aproximada:
+Local do Acidente:
+Viela Arcoverde895
+Tipo de Acidente:
+Entrevistados que contribuíram para a análise (Não registrar nomes, indique funções
+e, caso tenha realizado encontro de validação, indique local, dia, hora e
+participantes.)
+12
+Acidente típico
+16h00
+SP
+SP
+3
+5017618
+04007-000
+Bairro:
+End:
+01.70-9
+02.905.110/0001-28
+Razão Social:",
+xfund_train_pt_train_0,dots_ocr,degraded,form,1.0,1.0,1.0,4.762071840988938,"{""em_caso_de_aplica\u00e7\u00e3o_de_medida_de_interna\u00e7\u00e3o_acautelamento_o_adolescente"": 0.0, ""\u00e9_encaminhado_para_cela_especial_do_pres\u00eddio_aguardando_transfer\u00eancia_em_caso_de_encaminhamento_do_adolescente_para_cela_especial_do_pres\u00eddio_qual_tempo_m\u00e1ximo_tem_sido_aguardado_para_transfer\u00eancia_a_estabelecimento"": 0.0, ""cep"": 0.0, ""vagas"": 0.0, ""lota\u00e7\u00e3o_atual"": 0.0, ""respons\u00e1vel"": 0.0, ""forma\u00e7\u00e3o_acad\u00eamica_do_respons\u00e1vel"": 0.0, ""quantidade_de_agentes_socioeducativos"": 0.0, ""e_mail"": 0.0, ""telefone"": 0.0, ""bairro"": 0.0, ""endere\u00e7o"": 0.0, ""nome"": 0.0, ""macro_f1"": 0.0}",0.0,"Poder Judiciário do Estado de Minas Gerais
+FORMULÁRIO QUANTO À APLICAÇÃO DAS
+MEDIDAS SOCIOEDUCATIVAS
+COMARCA:
+I - Considerações iniciais
+Em caso de aplicação de medida de internação/acautelamento, o adolescente:
+(V ) é encaminhado para unidade da própria comarca
+( ) é encaminhado para unidade de outra comarca
+( ) é encaminhado para cela especial do presídio aguardando transferência Em caso de encaminhamento do adolescente para cela especial do presídio, qual tempo máximo tem sido aguardado para transferência a estabelecimento
+adequado?
+II - Da Internação
+a) Quanto ao estabelecimento
+(responder os itens ""a"" a ""d"" caso a comarca possua estabelecimento próprio)
+Anna C Rocha
+Vila Coelho Xavier 1973
+Jardim São Paulo
+CEP:
+(11) 3995-9796
+oy93@payspun.com
+Vagas:
+3 internos
+Lotação atual:
+4 internos
+Responsável:
+Ana Correia
+Formação acadêmica do responsável:
+Quantidade de agentes socioeducativos:
+4
+3 dias
+E-mail:
+15800-3401
+mestre
+Telefone:
+Bairro:
+Endereço:
+Nome:",
+xfund_train_pt_train_1,dots_ocr,degraded,form,1.0,1.0,1.0,3.2727170290017966,"{""n\u00ba_de_funcion\u00e1rios"": 0.0, ""cnpj_mf"": 0.0, ""cnae"": 0.0, ""munic\u00edpio"": 0.0, ""gr"": 0.0, ""n\u00ba"": 0.0, ""uf"": 0.0, ""n\u00ba_de_trabalhadores_acidentados"": 0.0, ""data_do_acidente"": 0.0, ""hora_aproximada"": 0.0, ""local_do_acidente"": 0.0, ""tipo_de_acidente"": 0.0, ""bairro"": 0.0, ""end"": 0.0, ""raz\u00e3o_social"": 0.0, ""macro_f1"": 0.0}",0.0,"Modelo de Análise e Prevenção de Acidentes de Trabalho - M.A.P.A.
+1. Análise de Acidente do Trabalho
+1.1 Objetivos
+• Prevenir acidentes do trabalho
+• Difundir a compreensão de acidentes do trabalho como fenômenos resultantes de rede de fatores
+em interação, superando a visão dicotômica (atos/ condições inseguras)
+• Identificação de rede de fatores de acidentes, cuja interação levou ao evento, sobretudo os mais
+a montante da lesão relacionados a aspectos organizacionais e gerenciais do sistema em questão
+• Investigação da situação de trabalho habitual e de origens das mudanças e alterações que ocor-
+reram, contribuindo para o evento, bem como a análise de barreiras existentes e de seu efetivo
+funcionamento
+• A partir do caso específico, avaliar fatores relacionados ao gerenciamento de riscos adotado na
+organização de forma a contribuir com a prevenção de novos eventos. Subsidiar ações de outros
+órgãos e instituições.
+1.2 Metodologia
+Inspeções no local do acidente, com coleta de informações (croquis, filmagens e fotografias; entrevis-
+tas individuais ou coletivas com trabalhadores e supervisores direta e indiretamente envolvidos com
+o acidente; análises de documentos; sistematização das informações obtidas, visando a compreensão
+de como o acidente ocorreu; emissão de parecer conclusivo e recomendações de intervenção.
+2. Identificação de Vítimas, Empresas, Empreendimentos ou outros Envolvidos no Acidente
+2.1. Informações da Empresa Contratante
+SERVICOS E ALIMENTACAO LTDA
+Nº de funcionários:
+CNPJ/MF:
+CNAE:
+Rua Tutoia, 119
+VILA MARIANA
+Município:
+GR:
+Nº
+UF:
+Em caso de empresa terceira inserir novo quadro com os dados da empresa principal
+2.2. Informações Preliminares sobre o Acidente de Trabalho
+Nº de trabalhadores acidentados:
+Data do Acidente:
+12-12-2020
+29942
+Hora aproximada:
+Local do Acidente:
+Viela Arcoverde895
+Tipo de Acidente:
+Entrevistados que contribuíram para a análise (Não registrar nomes, indique funções
+e, caso tenha realizado encontro de validação, indique local, dia, hora e
+participantes.)
+12
+Acidente típico
+16h00
+SP
+SP
+3
+5017618
+04007-000
+Bairro:
+End:
+01.70-9
+02.905.110/0001-28
+Razão Social:",
+xfund_train_pt_train_0,qwen_vl,degraded,form,1.0,1.0,1.0,4.944361658999696,"{""em_caso_de_aplica\u00e7\u00e3o_de_medida_de_interna\u00e7\u00e3o_acautelamento_o_adolescente"": 0.0, ""\u00e9_encaminhado_para_cela_especial_do_pres\u00eddio_aguardando_transfer\u00eancia_em_caso_de_encaminhamento_do_adolescente_para_cela_especial_do_pres\u00eddio_qual_tempo_m\u00e1ximo_tem_sido_aguardado_para_transfer\u00eancia_a_estabelecimento"": 0.0, ""cep"": 0.0, ""vagas"": 0.0, ""lota\u00e7\u00e3o_atual"": 0.0, ""respons\u00e1vel"": 0.0, ""forma\u00e7\u00e3o_acad\u00eamica_do_respons\u00e1vel"": 0.0, ""quantidade_de_agentes_socioeducativos"": 0.0, ""e_mail"": 0.0, ""telefone"": 0.0, ""bairro"": 0.0, ""endere\u00e7o"": 0.0, ""nome"": 0.0, ""macro_f1"": 0.0}",0.0,"Poder Judiciário do Estado de Minas Gerais
+FORMULÁRIO QUANTO À APLICAÇÃO DAS
+MEDIDAS SOCIOEDUCATIVAS
+COMARCA:
+I - Considerações iniciais
+Em caso de aplicação de medida de internação/acautelamento, o adolescente:
+(V ) é encaminhado para unidade da própria comarca
+( ) é encaminhado para unidade de outra comarca
+( ) é encaminhado para cela especial do presídio aguardando transferência Em caso de encaminhamento do adolescente para cela especial do presídio, qual tempo máximo tem sido aguardado para transferência a estabelecimento
+adequado?
+II - Da Internação
+a) Quanto ao estabelecimento
+(responder os itens ""a"" a ""d"" caso a comarca possua estabelecimento próprio)
+Anna C Rocha
+Vila Coelho Xavier 1973
+Jardim São Paulo
+CEP:
+(11) 3995-9796
+oy93@payspun.com
+Vagas:
+3 internos
+Lotação atual:
+4 internos
+Responsável:
+Ana Correia
+Formação acadêmica do responsável:
+Quantidade de agentes socioeducativos:
+4
+3 dias
+E-mail:
+15800-3401
+mestre
+Telefone:
+Bairro:
+Endereço:
+Nome:",
+xfund_train_pt_train_1,qwen_vl,degraded,form,1.0,1.0,1.0,3.6683516320044873,"{""n\u00ba_de_funcion\u00e1rios"": 0.0, ""cnpj_mf"": 0.0, ""cnae"": 0.0, ""munic\u00edpio"": 0.0, ""gr"": 0.0, ""n\u00ba"": 0.0, ""uf"": 0.0, ""n\u00ba_de_trabalhadores_acidentados"": 0.0, ""data_do_acidente"": 0.0, ""hora_aproximada"": 0.0, ""local_do_acidente"": 0.0, ""tipo_de_acidente"": 0.0, ""bairro"": 0.0, ""end"": 0.0, ""raz\u00e3o_social"": 0.0, ""macro_f1"": 0.0}",0.0,"Modelo de Análise e Prevenção de Acidentes de Trabalho - M.A.P.A.
+1. Análise de Acidente do Trabalho
+1.1 Objetivos
+• Prevenir acidentes do trabalho
+• Difundir a compreensão de acidentes do trabalho como fenômenos resultantes de rede de fatores
+em interação, superando a visão dicotômica (atos/ condições inseguras)
+• Identificação de rede de fatores de acidentes, cuja interação levou ao evento, sobretudo os mais
+a montante da lesão relacionados a aspectos organizacionais e gerenciais do sistema em questão
+• Investigação da situação de trabalho habitual e de origens das mudanças e alterações que ocor-
+reram, contribuindo para o evento, bem como a análise de barreiras existentes e de seu efetivo
+funcionamento
+• A partir do caso específico, avaliar fatores relacionados ao gerenciamento de riscos adotado na
+organização de forma a contribuir com a prevenção de novos eventos. Subsidiar ações de outros
+órgãos e instituições.
+1.2 Metodologia
+Inspeções no local do acidente, com coleta de informações (croquis, filmagens e fotografias; entrevis-
+tas individuais ou coletivas com trabalhadores e supervisores direta e indiretamente envolvidos com
+o acidente; análises de documentos; sistematização das informações obtidas, visando a compreensão
+de como o acidente ocorreu; emissão de parecer conclusivo e recomendações de intervenção.
+2. Identificação de Vítimas, Empresas, Empreendimentos ou outros Envolvidos no Acidente
+2.1. Informações da Empresa Contratante
+SERVICOS E ALIMENTACAO LTDA
+Nº de funcionários:
+CNPJ/MF:
+CNAE:
+Rua Tutoia, 119
+VILA MARIANA
+Município:
+GR:
+Nº
+UF:
+Em caso de empresa terceira inserir novo quadro com os dados da empresa principal
+2.2. Informações Preliminares sobre o Acidente de Trabalho
+Nº de trabalhadores acidentados:
+Data do Acidente:
+12-12-2020
+29942
+Hora aproximada:
+Local do Acidente:
+Viela Arcoverde895
+Tipo de Acidente:
+Entrevistados que contribuíram para a análise (Não registrar nomes, indique funções
+e, caso tenha realizado encontro de validação, indique local, dia, hora e
+participantes.)
+12
+Acidente típico
+16h00
+SP
+SP
+3
+5017618
+04007-000
+Bairro:
+End:
+01.70-9
+02.905.110/0001-28
+Razão Social:",

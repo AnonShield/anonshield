@@ -58,6 +58,17 @@ TRANSFORMER_MODEL = "Davlan/xlm-roberta-base-ner-hrl"
 MODELS_DIR = "models"
 TRF_MODEL_PATH = os.path.join(MODELS_DIR, TRANSFORMER_MODEL)
 
+
+class NerDefaults:
+    """Single source of truth for tunable NER parameters.
+
+    Surfaced via CLI (--ner-score-threshold, --ner-aggregation-strategy),
+    YAML config, web API form fields, and frontend Advanced panel.
+    """
+    SCORE_THRESHOLD: float = 0.4
+    AGGREGATION_STRATEGY: str = "max"
+    AGGREGATION_CHOICES: tuple[str, ...] = ("simple", "first", "average", "max")
+
 # Entity mappings between the transformer model's labels and Presidio's entities
 ENTITY_MAPPING = dict(
     LOC="LOCATION",

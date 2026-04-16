@@ -1,0 +1,53 @@
+# Sidecar image — TensorFlow-only, for the kerasocr engine.
+#
+# keras-ocr pins to the TF/Keras 2.x stack, which conflicts with torch cu128
+# + transformers 5.x in the main image. Isolating it here keeps both ecosystems
+# working side-by-side.
+#
+# TF is installed with bundled CUDA libraries (tensorflow[and-cuda]) so the
+# CRAFT detector + CRNN recognizer run on GPU. Base is the same CUDA 12.8
+# runtime as the main image to avoid driver mismatch.
+
+ARG CUDA=12.8.0
+FROM nvidia/cuda:${CUDA}-cudnn-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/app/.cache/huggingface \
+    XDG_CACHE_HOME=/app/.cache \
+    KERAS_OCR_CACHE_DIR=/app/.cache/keras-ocr \
+    TF_CPP_MIN_LOG_LEVEL=2
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libmagic1 libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1 \
+        build-essential git curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+WORKDIR /app
+RUN uv venv --python 3.11 /app/.venv
+ENV VIRTUAL_ENV=/app/.venv \
+    PATH="/app/.venv/bin:$PATH"
+
+# TF 2.17 is the last release that ships Python 3.11 wheels with bundled CUDA.
+# keras-ocr's pin is keras<3 so we stay on the tf.keras 2.x path.
+# numpy<2: TF 2.17's _pywrap_checkpoint_reader was compiled against the numpy 1
+# C-API and SystemErrors at import on numpy 2.x.
+# No uv sync — the main lockfile pins torch cu128, which conflicts with TF's
+# bundled CUDA; install directly with uv pip instead.
+RUN uv pip install --python /app/.venv/bin/python \
+        "tensorflow[and-cuda]==2.17.0" \
+        "keras-ocr>=0.9.3" \
+        "numpy<2" \
+        "Pillow" "opencv-python-headless" "PyMuPDF" "pypdfium2" \
+        "fastapi>=0.115.0" "uvicorn[standard]>=0.32.0" python-multipart
+
+# Shared FastAPI wrapper — same file as the legacy_vlm sidecar.
+COPY web/backend/sidecar/app.py /app/sidecar.py
+
+ENV PYTHONPATH="/app/src:/app"
+
+EXPOSE 8002
+CMD ["uvicorn", "sidecar:app", "--host", "0.0.0.0", "--port", "8002"]

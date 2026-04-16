@@ -1,0 +1,72 @@
+# Sidecar image — transformers==4.51 for VLMs that pin to the 4.x series.
+#
+# Hosts:
+#   paddle_vl    (PaddleOCR-VL-1.5: trust_remote_code baked against 4.51 —
+#                 rope_type='default', cache_position in generate(), and
+#                 RotaryEmbedding.compute_default_rope_parameters all
+#                 disappeared in transformers 5.x)
+#   monkey_ocr   (MonkeyOCR-pro-1.2B: vendored magic_pdf + LayoutLMv3 use
+#                 4.x-only internal APIs; their requirements.txt hard-pins
+#                 transformers==4.51)
+#
+# The main Dockerfile.dev runs transformers 5.3+ for the 13 modern engines.
+# These two cannot coexist in the same venv, so they live here and are
+# called via /ocr/{engine} HTTP from the main backend, and benchmarked
+# directly via `docker exec`.
+#
+# CUDA runtime base (no nvcc) — neither engine needs to JIT-build kernels.
+
+ARG CUDA=12.8.0
+FROM nvidia/cuda:${CUDA}-cudnn-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/app/.cache/huggingface \
+    XDG_CACHE_HOME=/app/.cache \
+    MONKEY_OCR_ROOT=/opt/MonkeyOCR \
+    TORCH_DEVICE=cuda
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libmagic1 libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1 \
+        build-essential git curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# MonkeyOCR vendors its own magic_pdf (not on PyPI) — needs the source tree.
+RUN git clone --depth 1 https://github.com/Yuliang-Liu/MonkeyOCR /opt/MonkeyOCR
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+WORKDIR /app
+RUN uv venv --python 3.12 /app/.venv
+ENV VIRTUAL_ENV=/app/.venv \
+    PATH="/app/.venv/bin:$PATH"
+
+# Pin transformers to 4.51 + the deps both legacy VLMs need. We deliberately
+# do NOT use uv sync here — the lockfile assumes 5.3+. Direct `uv pip install`
+# instead so the resolver picks 4.51-compatible versions of accelerate, etc.
+# torch/torchvision come from the pytorch cu128 index. --index-strategy
+# unsafe-best-match lets uv consult PyPI too (needed since torch-2.6 isn't on
+# cu128 but everything else is on PyPI).
+# numpy<2 is required by MonkeyOCR's vendored magic_pdf (pdfminer/doclayout_yolo
+# were compiled against the numpy 1.x C-API).
+RUN uv pip install --python /app/.venv/bin/python \
+        --extra-index-url https://download.pytorch.org/whl/cu128 \
+        --index-strategy unsafe-best-match \
+        torch torchvision \
+        "transformers==4.51.3" \
+        Pillow opencv-python-headless PyMuPDF pypdfium2 \
+        sentencepiece einops addict easydict huggingface_hub loguru \
+        "fastapi>=0.115.0" "uvicorn[standard]>=0.32.0" python-multipart \
+        accelerate \
+        "numpy<2" qwen-vl-utils openai pdfminer.six doclayout_yolo \
+        click Brotli pycocotools fast-langdetect dill pydantic \
+        protobuf tiktoken
+
+# Tiny HTTP wrapper — POST /ocr/{engine} with multipart image, returns text.
+COPY web/backend/sidecar/app.py /app/sidecar.py
+
+ENV PYTHONPATH="/app/src:/app:/opt/MonkeyOCR"
+
+EXPOSE 8001
+CMD ["uvicorn", "sidecar:app", "--host", "0.0.0.0", "--port", "8001"]

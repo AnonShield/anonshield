@@ -26,7 +26,8 @@ from src.anon.config import (
     ProcessingLimits,
     DefaultSizes,
     Global,
-    LLM_CONFIG
+    LLM_CONFIG,
+    NerDefaults
 )
 from src.anon.database import DatabaseContext
 from src.anon.engine import AnonymizationOrchestrator, load_custom_recognizers, SUPPORTED_LANGUAGES
@@ -313,6 +314,8 @@ def _parse_arguments():
                             "'slm': End-to-end SLM anonymization (experimental).")
     parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
     parser.add_argument("--transformer-model", type=str, default=TRANSFORMER_MODEL, help=f"Transformer model for NER detection. Options: 'Davlan/xlm-roberta-base-ner-hrl' (default, multilingual), 'attack-vector/SecureModernBERT-NER' (cybersecurity-focused). Default: {TRANSFORMER_MODEL}.")
+    parser.add_argument("--ner-score-threshold", type=float, default=NerDefaults.SCORE_THRESHOLD, help=f"Minimum confidence score (0.0-1.0) for a transformer NER detection to be kept. Lower values increase recall (catch more entities like surnames) at the cost of more false positives. Default: {NerDefaults.SCORE_THRESHOLD}.")
+    parser.add_argument("--ner-aggregation-strategy", type=str, default=NerDefaults.AGGREGATION_STRATEGY, choices=list(NerDefaults.AGGREGATION_CHOICES), help=f"HuggingFace aggregation strategy for merging BILOU subword tokens into entities. Default: {NerDefaults.AGGREGATION_STRATEGY}.")
     parser.add_argument("--db-mode", type=str, default="persistent", choices=["persistent", "in-memory"], help="Database mode ('persistent' to save to disk, 'in-memory' for a temporary DB).")
     parser.add_argument("--db-dir", type=str, default="db", help="Directory for the database file.")
     parser.add_argument("--disable-gc", action="store_true", help="Disable automatic garbage collection during processing. May boost speed for single large files but increases memory usage.")
@@ -827,7 +830,9 @@ def main():
             slm_detector=slm_detector_instance,
             slm_detector_mode=args.slm_detector_mode,
             ner_data_generation=args.generate_ner_data,
-            transformer_model=args.transformer_model
+            transformer_model=args.transformer_model,
+            ner_score_threshold=args.ner_score_threshold,
+            ner_aggregation_strategy=args.ner_aggregation_strategy,
         )
         
         # --- Processing ---

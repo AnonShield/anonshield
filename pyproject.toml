@@ -8,12 +8,12 @@ dependencies = [
     "email-validator>=2.2.0",
     "openpyxl>=3.1.5",
     "pandas>=2.2.3",
-    "presidio-analyzer[transformers]>=2.2.357",
+    "presidio-analyzer>=2.2.357",
     "presidio-anonymizer>=2.2.357",
     "protobuf>=6.30.1",
     "python-docx>=1.1.2",
     "sentencepiece>=0.2.0",
-    "transformers>=4.49.0",
+    "transformers>=5.3.0",
     "pytesseract>=0.3.10",
     "Pillow>=10.4.0",
     "opencv-python-headless>=4.10.0",
@@ -51,9 +51,37 @@ explicit = true
 [project.optional-dependencies]
 easyocr = ["easyocr>=1.7.0"]
 paddleocr = ["paddleocr>=2.8.0", "paddlepaddle>=2.6.0"]
-doctr = ["python-doctr[torch]>=0.8.0"]
+doctr = ["python-doctr>=1.0.0"]
+onnxtr = ["onnxtr[gpu]>=0.6.0"]
+onnxtr-cpu = ["onnxtr[cpu]>=0.6.0"]
 kerasocr = ["keras-ocr>=0.9.3"]
-ocr-all = ["easyocr>=1.7.0", "python-doctr[torch]>=0.8.0"]
+surya = ["surya-ocr>=0.6.0"]
+rapidocr = ["rapidocr-onnxruntime>=1.3.0"]
+glm-ocr = ["torch>=2.0.0"]
+lighton-ocr = ["torch>=2.0.0", "pypdfium2>=4.0.0"]
+paddle-vl = ["torch>=2.0.0"]
+deepseek-ocr = ["einops>=0.8.0", "addict>=2.4.0", "easydict>=1.13"]
+monkey-ocr = ["huggingface_hub>=0.24.0"]
+chandra-ocr = ["transformers>=5.3.0"]
+dots-ocr = ["transformers>=5.3.0"]
+qwen-vl = ["transformers>=5.3.0", "qwen-vl-utils>=0.0.8", "accelerate>=0.30.0"]
+ocr-all = [
+    "easyocr>=1.7.0",
+    "python-doctr>=1.0.0",
+    "onnxtr[gpu]>=0.6.0",
+    "surya-ocr>=0.6.0",
+    "rapidocr-onnxruntime>=1.3.0",
+    "torch>=2.0.0",
+    "pypdfium2>=4.0.0",
+    "einops>=0.8.0",
+    "huggingface_hub>=0.24.0",
+    "qwen-vl-utils>=0.0.8",
+    "accelerate>=0.30.0",
+]
+paddle-ocr = [
+    "paddleocr>=3.4.0",
+    "paddlepaddle>=3.3.1",
+]
 
 [dependency-groups]
 dev = [

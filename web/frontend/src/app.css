@@ -18,15 +18,17 @@
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-  --text-xs:   0.75rem;
-  --text-sm:   0.875rem;
-  --text-base: 1rem;
-  --text-lg:   1.125rem;
+  --text-xs:   0.75rem;   /* 12px — meta, pills, tracked labels */
+  --text-sm:   0.875rem;  /* 14px — body-small, form hints, table cells */
+  --text-base: 1rem;      /* 16px — body default */
+  --text-lg:   1.125rem;  /* 18px — dialog titles, emphasised body */
+  --text-xl:   1.25rem;   /* 20px — section headings inside surfaces (h2) */
+  --text-2xl:  1.5rem;    /* 24px — status icons, page-level headings */
   --line-height: 1.6;
 
   --space-1: 4px;  --space-2: 8px;   --space-3: 12px;
-  --space-4: 16px; --space-6: 24px;  --space-8: 32px;
-  --space-12: 48px;
+  --space-4: 16px; --space-5: 20px;  --space-6: 24px;
+  --space-8: 32px; --space-12: 48px; --space-16: 64px;
 
   --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px;
 

@@ -10,6 +10,7 @@ VALID_KEYS = {
     "strategy", "lang", "slug_length", "ocr_engine", "entities",
     "preserve_entities", "allow_list", "custom_patterns", "word_list",
     "anonymization_config", "transformer_model", "custom_models",
+    "ner_score_threshold", "ner_aggregation_strategy",
 }
 
 

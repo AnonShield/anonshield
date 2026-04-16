@@ -267,7 +267,7 @@ ProcessorRegistry.register([".yaml", ".yml"], YamlFileProcessor)
 
 **Files:** `src/anon/ocr/base.py`, `src/anon/ocr/factory.py`
 
-All OCR engines implement the `OCREngine` ABC and are instantiated via `get_ocr_engine(name)`.
+All OCR engines implement the `OCREngine` ABC and are instantiated via `get_ocr_engine(name)`. The registry currently holds 13 engines; see [users/OCR_ENGINES.md](../users/OCR_ENGINES.md) for a comparison.
 
 ### Interface
 
@@ -291,6 +291,21 @@ class MyOCREngine(OCREngine):
         return myengine_lib.ocr(image_bytes)
 ```
 
+### GPU support
+
+If the engine uses PyTorch, place the model on CUDA **explicitly** in `_load()`:
+
+```python
+def _load(self):
+    import torch
+    from myengine_lib import Model
+    self._model = Model.from_pretrained(_ID)
+    if torch.cuda.is_available():
+        self._model = self._model.to("cuda")
+```
+
+Do **not** assume `ocr_predictor()` / `from_pretrained()` auto-places on CUDA — many libraries default to CPU even when PyTorch detects a GPU. For ONNX-based engines, pass `providers=["CUDAExecutionProvider", "CPUExecutionProvider"]` at session creation. For Surya-style engines that read env vars, document the required var (e.g. `TORCH_DEVICE=cuda`) in the engine's module docstring.
+
 ### Register in the factory
 
 Add one entry to `_REGISTRY` in `src/anon/ocr/factory.py`:
@@ -310,7 +325,7 @@ Add the CLI choice in `anon.py`:
 
 ```python
 parser.add_argument("--ocr-engine",
-    choices=["tesseract", "easyocr", "paddleocr", "doctr", "kerasocr", "myengine"],
+    choices=list(AVAILABLE_ENGINES) + ["myengine"],
     ...)
 ```
 
@@ -320,6 +335,16 @@ Add an optional extra in `pyproject.toml` if the engine has a separate install:
 [project.optional-dependencies]
 myengine = ["myengine-lib>=1.0"]
 ```
+
+### Benchmarking a new engine
+
+Add the engine name to the engines argument in `benchmark/ocr/run_ablation.sh`:
+
+```bash
+bash benchmark/ocr/run_ablation.sh 100 tesseract,easyocr,myengine
+```
+
+Results are written to `benchmark/ocr/results/<preprocess>/` with CER/WER/latency/field-F1/ANLS metrics per document. The consolidated CSV is produced by `benchmark.ocr.consolidate` and can be visualised with the `benchmark.ocr.report` module.
 
 ---
 

@@ -1,4 +1,5 @@
 """Celery tasks — anonymization jobs."""
+import os
 import shutil
 import sys
 import tempfile
@@ -34,6 +35,10 @@ def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
         ocr_preprocess=meta.get("ocr_preprocess") or None,
         secret_key=key,
         anonymization_config=meta.get("anonymization_config"),
+        slug_length=meta["slug_length"] if meta.get("slug_length") is not None else 8,
+        transformer_model=meta.get("model") or "Davlan/xlm-roberta-base-ner-hrl",
+        ner_score_threshold=meta.get("ner_score_threshold"),
+        ner_aggregation_strategy=meta.get("ner_aggregation_strategy"),
     )
 
 
@@ -81,6 +86,20 @@ def _process_zip(zip_path: Path, out_dir: Path, meta: dict, key: str) -> dict:
     return stats
 
 
+def _release_vram() -> None:
+    """Best-effort VRAM release between jobs (only runs when VLM engines were used).
+    PyTorch's caching allocator keeps freed tensors in a pool; empty_cache returns
+    that pool to the driver so the next engine swap doesn't stack models."""
+    try:
+        import gc, torch
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+    except Exception:
+        pass
+
+
 def _execute(job_id: str) -> dict:
     meta = job_service.get_meta(job_id)
     if not meta:
@@ -93,6 +112,14 @@ def _execute(job_id: str) -> dict:
     out_dir = storage.output_dir(job_id)
     t0 = time.monotonic()
 
+    # Reset OCR timer so we can attribute elapsed OCR time to the engine
+    # used for this specific job (thread-local; clean under Celery prefork).
+    try:
+        from src.anon.ocr import _timer as _ocr_timer
+        _ocr_timer.reset()
+    except Exception:
+        _ocr_timer = None  # type: ignore
+
     try:
         if meta["ext"] == "zip":
             result = _process_zip(input_file, out_dir, meta, key)
@@ -100,6 +127,7 @@ def _execute(job_id: str) -> dict:
             result = _anonymize(input_file, out_dir, meta, key)
 
         ms = (time.monotonic() - t0) * 1000
+        ocr_stats = _ocr_timer.snapshot() if _ocr_timer else {"ms": 0.0, "calls": 0}
         storage.delete_input(job_id)
         out_file = storage.get_output_file(job_id)
         output_size = out_file.stat().st_size if out_file else 0
@@ -107,19 +135,21 @@ def _execute(job_id: str) -> dict:
 
         # Record job metrics (best-effort, never blocks)
         try:
-            import json
             from services.metrics import record_job
-            queue = "gpu" if meta.get("strategy", "filtered") in {"filtered", "standalone", "hybrid", "presidio"} else "fast"
             record_job(
                 job_id=job_id,
                 file_ext=meta.get("ext"),
                 file_b=meta.get("size"),
                 strategy=meta.get("strategy"),
                 lang=meta.get("lang"),
-                queue=queue,
+                model=meta.get("model"),
+                queue="fast",
                 entity_cnt=result.get("entity_count"),
                 entity_counts=result.get("entity_counts"),
                 ms=ms,
+                ocr_engine=meta.get("ocr_engine") if ocr_stats["calls"] > 0 else None,
+                ocr_ms=ocr_stats["ms"] if ocr_stats["calls"] > 0 else None,
+                ocr_calls=ocr_stats["calls"] if ocr_stats["calls"] > 0 else None,
             )
         except Exception:
             pass
@@ -129,6 +159,12 @@ def _execute(job_id: str) -> dict:
         storage.delete_input(job_id)
         job_service.set_status(job_id, "error", message=str(exc))
         raise
+    finally:
+        # Release VRAM held by cached VLM engines. No-op when no GPU / no VLM
+        # was used. Runs even when WORKER_MAX_TASKS_PER_CHILD=0 (warm mode) so
+        # switching engines between jobs doesn't stack models in VRAM.
+        if os.getenv("ANON_RELEASE_VRAM_PER_JOB", "1") == "1":
+            _release_vram()
 
 
 @app.task(bind=True, name="workers.tasks.process_job", queue="gpu")

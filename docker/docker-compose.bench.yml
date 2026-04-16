@@ -1,0 +1,99 @@
+# OCR benchmark — runs VLM engines in isolated Docker containers.
+#
+# Each service uses a different transformers version so that conflicting
+# engines can be benchmarked side by side without dependency clashes.
+#
+# Volumes (created on first run, on the NTFS loopfile via /var/lib/docker):
+#   hf-cache:     shared HuggingFace model cache (one download per model)
+#   bench-data:   benchmark datasets (XFUND-pt, BID) — shared across services
+#   bench-results: benchmark output (CSV / JSON / run_state) — shared
+#
+# Usage (from repo root):
+#   docker compose -f docker/docker-compose.bench.yml build vlm-v5
+#   docker compose -f docker/docker-compose.bench.yml run --rm vlm-v5
+#
+#   # Run everything end-to-end (sequential, shares cache):
+#   docker compose -f docker/docker-compose.bench.yml run --rm vlm-v4
+#   docker compose -f docker/docker-compose.bench.yml run --rm vlm-v5
+#
+# Results land in ./benchmark/ocr/results/ on the host (bind-mount).
+
+services:
+
+  # transformers 4.57 — chandra_ocr, dots_ocr, qwen_vl, monkey_ocr
+  vlm-v4:
+    build:
+      context: ..
+      dockerfile: docker/ocr-vlm-v4.Dockerfile
+    image: anonshield/ocr-vlm-v4:latest
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_HOME=/models/hf-cache
+      - TORCH_DEVICE=cuda
+      - PYTHONPATH=/app
+    volumes:
+      - hf-cache:/models/hf-cache
+      - ../benchmark:/app/benchmark
+      - ../benchmark/ocr/results:/results
+    command: >
+      python -m benchmark.ocr
+      --datasets xfund
+      --engines qwen_vl,chandra_ocr,dots_ocr
+      --max-samples 2
+      --out-dir /results/vlm_v4_smoke
+      --store-texts
+
+  # transformers 5.3+ — paddle_vl, glm_ocr, lighton_ocr
+  vlm-v5:
+    build:
+      context: ..
+      dockerfile: docker/ocr-vlm-v5.Dockerfile
+    image: anonshield/ocr-vlm-v5:latest
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_HOME=/models/hf-cache
+      - TORCH_DEVICE=cuda
+      - PYTHONPATH=/app
+    volumes:
+      - hf-cache:/models/hf-cache
+      - ../benchmark:/app/benchmark
+      - ../benchmark/ocr/results:/results
+    command: >
+      python -m benchmark.ocr
+      --datasets xfund
+      --engines paddle_vl,glm_ocr,lighton_ocr
+      --max-samples 2
+      --out-dir /results/vlm_v5_smoke
+      --store-texts
+
+  # vLLM-accelerated GLM-OCR — local OpenAI-compat server on :8000.
+  # 100% local, zero cloud. Run alongside a benchmark client:
+  #   docker compose -f docker/docker-compose.bench.yml up -d vllm-glm
+  #   ANON_VLLM_URL_GLM=http://localhost:8000 python -m benchmark.ocr \
+  #       --datasets xfund --engines glm_vllm --max-samples 100
+  vllm-glm:
+    build:
+      context: ..
+      dockerfile: docker/ocr-vllm.Dockerfile
+    image: anonshield/ocr-vllm:latest
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_HOME=/models/hf-cache
+      - MODEL_ID=zai-org/GLM-4.1V-9B-Thinking-FP8
+      # MTP speculative decoding (3 draft tokens); --enforce-eager while warming up.
+      - VLLM_ARGS=--max-model-len 8192 --gpu-memory-utilization 0.90 --speculative-config {"method":"ngram","num_speculative_tokens":3,"prompt_lookup_max":4}
+    ports:
+      - "8000:8000"
+    volumes:
+      - hf-cache:/models/hf-cache
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/v1/models"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  hf-cache:

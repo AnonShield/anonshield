@@ -73,6 +73,8 @@ class RunConfig:
     batch_size: str | None = None
     overwrite: bool | None = None
     custom_models: list[dict] = field(default_factory=list)
+    ner_score_threshold: float | None = None
+    ner_aggregation_strategy: str | None = None
 
 
 def load_run_config(path: str) -> RunConfig:
@@ -117,6 +119,7 @@ def merge_with_args(config: RunConfig, args) -> None:
         "anonymization_config", "word_list", "db_mode", "log_level",
         "regex_priority", "min_word_length", "skip_numeric", "use_cache",
         "max_cache_size", "batch_size", "overwrite",
+        "ner_score_threshold", "ner_aggregation_strategy",
     }
 
     mappings = {
@@ -143,6 +146,8 @@ def merge_with_args(config: RunConfig, args) -> None:
         "max_cache_size": "max_cache_size",
         "batch_size": "batch_size",
         "overwrite": "overwrite",
+        "ner_score_threshold": "ner_score_threshold",
+        "ner_aggregation_strategy": "ner_aggregation_strategy",
     }
 
     for cfg_key, arg_key in mappings.items():

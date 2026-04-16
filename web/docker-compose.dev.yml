@@ -1,9 +1,21 @@
-# Development Docker Compose — hot-reload, no heavy OCR engines.
+# Development Docker Compose — hot-reload, GPU, all OCR engines installed.
+#
+# Docker root lives on the Windows partition (loopfile /var/lib/docker), so
+# images + model cache volume consume space on /mnt/win_ssd, not /.
+#
 # Usage (from web/):
 #   docker compose -f docker-compose.dev.yml up --build
 #
-# Frontend: http://localhost:5173
-# Backend API docs: http://localhost:8000/api/docs
+# Frontend:       http://localhost:5173
+# Backend API:    http://localhost:8000/api/docs
+# Benchmark UI:   http://localhost:5173/app/benchmark
+#
+# The worker uses the nvidia runtime (default on this host) so torch/OCR engines
+# can see the GPU. Main image runs 14 of 16 engines (transformers 5.x + cuda-devel
+# for flash-attn/deepseek_ocr). Two sidecars cover engines with conflicting deps:
+#   legacy_vlm (8001): paddle_vl + monkey_ocr — pinned to transformers 4.51
+#   kerasocr   (8002): kerasocr — needs TensorFlow 2.x
+# Backend routes requests to the right sidecar via POST /ocr/{engine}.
 
 services:
 
@@ -17,6 +29,7 @@ services:
     build:
       context: ..
       dockerfile: web/backend/Dockerfile.dev
+    image: anonshield/web-dev:latest
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
@@ -27,19 +40,29 @@ services:
       - ./backend/routers:/app/routers:ro
       - ./backend/services:/app/services:ro
       - ./backend/workers:/app/workers:ro
+      - ../benchmark:/app/benchmark:ro
       - /tmp/anon-jobs:/anon-jobs
+      - model-cache:/app/.cache
     environment:
       - REDIS_URL=redis://redis:6379/0
       - ANON_JOBS_DIR=/anon-jobs
+      - ANON_METRICS_DB=/anon-jobs/metrics.db
       - ANON_SECRET_KEY=${ANON_SECRET_KEY:-dev-insecure-key-change-for-prod}
       - PYTHONPATH=/app
+      - HF_HOME=/app/.cache/huggingface
+      - XDG_CACHE_HOME=/app/.cache
+      - PADDLEOCR_CONFIG_DIR=/app/.cache/paddleocr
+      - EASYOCR_MODULE_PATH=/app/.cache/easyocr
+      - TORCH_DEVICE=cuda
     depends_on: [redis]
 
   worker:
     build:
       context: ..
       dockerfile: web/backend/Dockerfile.dev
-    command: celery -A workers.celery_app worker -Q fast,gpu --concurrency 2 --loglevel=info
+    image: anonshield/web-dev:latest
+    command: celery -A workers.celery_app worker -Q fast,gpu --concurrency 1 --loglevel=info
+    runtime: nvidia
     volumes:
       - ../src:/app/src:ro
       - ../anon.py:/app/anon.py:ro
@@ -47,13 +70,58 @@ services:
       - ./backend/routers:/app/routers:ro
       - ./backend/services:/app/services:ro
       - ./backend/workers:/app/workers:ro
+      - ../benchmark:/app/benchmark:ro
       - /tmp/anon-jobs:/anon-jobs
+      - model-cache:/app/.cache
     environment:
+      - NVIDIA_VISIBLE_DEVICES=all
       - REDIS_URL=redis://redis:6379/0
       - ANON_JOBS_DIR=/anon-jobs
+      - ANON_METRICS_DB=/anon-jobs/metrics.db
       - ANON_SECRET_KEY=${ANON_SECRET_KEY:-dev-insecure-key-change-for-prod}
       - PYTHONPATH=/app
+      - HF_HOME=/app/.cache/huggingface
+      - XDG_CACHE_HOME=/app/.cache
+      - PADDLEOCR_CONFIG_DIR=/app/.cache/paddleocr
+      - EASYOCR_MODULE_PATH=/app/.cache/easyocr
+      - TORCH_DEVICE=cuda
     depends_on: [redis]
+
+  legacy_vlm:
+    build:
+      context: ..
+      dockerfile: web/backend/Dockerfile.legacy_vlm
+    image: anonshield/sidecar-legacy-vlm:latest
+    command: uvicorn sidecar:app --host 0.0.0.0 --port 8001
+    runtime: nvidia
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../src:/app/src:ro
+      - model-cache:/app/.cache
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_HOME=/app/.cache/huggingface
+      - XDG_CACHE_HOME=/app/.cache
+      - TORCH_DEVICE=cuda
+
+  kerasocr:
+    build:
+      context: ..
+      dockerfile: web/backend/Dockerfile.kerasocr
+    image: anonshield/sidecar-kerasocr:latest
+    command: uvicorn sidecar:app --host 0.0.0.0 --port 8002
+    runtime: nvidia
+    ports:
+      - "8002:8002"
+    volumes:
+      - ../src:/app/src:ro
+      - model-cache:/app/.cache
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_HOME=/app/.cache/huggingface
+      - XDG_CACHE_HOME=/app/.cache
+      - KERAS_OCR_CACHE_DIR=/app/.cache/keras-ocr
 
   frontend:
     image: node:22-alpine
@@ -63,7 +131,10 @@ services:
       - "5173:5173"
     volumes:
       - ./frontend:/app
-      - /app/node_modules          # isolate node_modules inside container
+      - /app/node_modules
     environment:
       - BACKEND_URL=http://backend:8000
     depends_on: [backend]
+
+volumes:
+  model-cache:

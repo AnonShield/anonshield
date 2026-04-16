@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { locale } from '$lib/i18n';
+  import { t } from '$lib/i18n';
 
   // ── Client-side regex demo ────────────────────────────────────────────────
   const SAMPLE = `Meeting notes — Q4 Security Review
@@ -56,13 +56,18 @@ Action items:
     return out;
   }
 
-  function buildHtml(text: string, hits: Hit[]): string {
+  type Mode = 'pseudo' | 'anon';
+
+  function buildHtml(text: string, hits: Hit[], mode: Mode): string {
     let html = '';
     let pos = 0;
     for (const h of hits) {
       html += esc(text.slice(pos, h.start));
-      const sl = slugify(h.raw, h.type);
-      html += `<mark class="ent" style="color:${h.color};--c:${h.color}" title="${h.type}: ${esc(h.raw)}">[${h.type.replace(/_/g,'·')}-${sl}]</mark>`;
+      const label = h.type.replace(/_/g, '·');
+      const body = mode === 'pseudo'
+        ? `[${label}-<span class="ent-token">${slugify(h.raw, h.type)}</span>]`
+        : `[${label}]`;
+      html += `<mark class="ent ent-${mode}" style="color:${h.color};--c:${h.color}" title="${h.type}: ${esc(h.raw)}">${body}</mark>`;
       pos = h.end;
     }
     html += esc(text.slice(pos));
@@ -70,8 +75,9 @@ Action items:
   }
 
   let input = $state(SAMPLE);
+  let mode = $state<Mode>('pseudo');
   let hits = $derived(findHits(input));
-  let outputHtml = $derived(buildHtml(input, hits));
+  let outputHtml = $derived(buildHtml(input, hits, mode));
   let legend = $derived.by(() => {
     const m = new Map<string, { color: string; n: number }>();
     for (const h of hits) {
@@ -119,7 +125,6 @@ Action items:
     return () => { statsObs.disconnect(); revealObs.disconnect(); };
   });
 
-  const pt = $derived($locale === 'pt');
 </script>
 
 <svelte:head>
@@ -135,36 +140,63 @@ Action items:
 
     <h1 class="hero-title">
       <span class="brand">AnonShield</span>
-      <span class="hero-rule">{pt ? 'Anonimização de entidades on-premise.' : 'On-premise entities anonymization.'}</span>
+      <span class="hero-rule">{$t('landing.hero.rule')}</span>
     </h1>
-    <p class="hero-sub">
-      {pt
-        ? 'Redação de dados sensíveis de nível acadêmico. Zero nuvem, zero persistência. Publicado no SBSeg 2025, ERRC 2025 e SBRC 2026.'
-        : 'Research-grade sensitive data redaction. Zero cloud, zero persistence. Published at SBSeg 2025, ERRC 2025, and SBRC 2026.'}
-    </p>
+    <p class="hero-sub">{$t('landing.hero.sub')}</p>
 
     <!-- ── LIVE DEMO ── -->
     <div class="demo-wrap">
       <div class="demo-label">
         <span class="demo-live">
           <span class="live-dot"></span>
-          {pt ? 'Demo ao vivo — edite o texto' : 'Live demo — edit the text'}
+          {$t('landing.hero.demo.live')}
         </span>
-        <span class="demo-hint">{pt ? 'executa no browser, sem servidor' : 'runs in-browser, no server'}</span>
+        <span class="demo-hint">{$t('landing.hero.demo.hint')}</span>
+      </div>
+
+      <!-- ── MODE TOGGLE ── -->
+      <div class="mode-toggle" role="radiogroup" aria-label={$t('landing.hero.mode.label')}>
+        <span class="mode-label">{$t('landing.hero.mode.label')}</span>
+        <div class="mode-switch" class:is-anon={mode === 'anon'}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={mode === 'pseudo'}
+            class="mode-opt"
+            class:active={mode === 'pseudo'}
+            onclick={() => (mode = 'pseudo')}
+          >
+            <span class="mode-opt-title">{$t('landing.hero.mode.pseudo')}</span>
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={mode === 'anon'}
+            class="mode-opt"
+            class:active={mode === 'anon'}
+            onclick={() => (mode = 'anon')}
+          >
+            <span class="mode-opt-title">{$t('landing.hero.mode.anon')}</span>
+          </button>
+          <span class="mode-thumb" aria-hidden="true"></span>
+        </div>
+        <p class="mode-desc" aria-live="polite">
+          {mode === 'pseudo' ? $t('landing.hero.mode.pseudo.desc') : $t('landing.hero.mode.anon.desc')}
+        </p>
       </div>
 
       <div class="editor">
         <div class="panel panel-in">
           <header class="panel-head">
-            <span class="panel-label">input</span>
-            <span class="panel-hint">editable</span>
+            <span class="panel-label">{$t('landing.hero.panel.input')}</span>
+            <span class="panel-hint">{$t('landing.hero.panel.editable')}</span>
           </header>
           <textarea
             class="panel-body"
             spellcheck="false"
             autocomplete="off"
             bind:value={input}
-            aria-label="Input text"
+            aria-label={$t('landing.hero.panel.input')}
           ></textarea>
         </div>
 
@@ -178,9 +210,9 @@ Action items:
 
         <div class="panel panel-out">
           <header class="panel-head">
-            <span class="panel-label">anonymized</span>
+            <span class="panel-label">{$t('landing.hero.panel.output')}</span>
             <span class="panel-count" class:has-hits={hits.length > 0}>
-              {hits.length} {hits.length === 1 ? (pt ? 'entidade' : 'entity') : (pt ? 'entidades' : 'entities')} {pt ? 'redigidas' : 'redacted'}
+              {hits.length} {hits.length === 1 ? $t('landing.hero.panel.entity_sg') : $t('landing.hero.panel.entity_pl')} {$t('landing.hero.panel.redacted')}
             </span>
           </header>
           <div class="panel-body output-body" aria-live="polite">
@@ -201,11 +233,36 @@ Action items:
           {/each}
         </div>
       {/if}
+
+      <!-- ── TRADEOFFS GRID ── -->
+      <div class="tradeoffs" aria-label={$t('landing.hero.tradeoff.title')}>
+        <h3 class="tradeoffs-title">{$t('landing.hero.tradeoff.title')}</h3>
+        <div class="tradeoff-grid">
+          <div class="tradeoff-row">
+            <span class="tradeoff-axis">{$t('landing.hero.tradeoff.reversible')}</span>
+            <span class="tradeoff-val val-neutral">
+              {mode === 'pseudo' ? $t('landing.hero.tradeoff.yes_with_key') : $t('landing.hero.tradeoff.no')}
+            </span>
+          </div>
+          <div class="tradeoff-row">
+            <span class="tradeoff-axis">{$t('landing.hero.tradeoff.correlation')}</span>
+            <span class="tradeoff-val val-neutral">
+              {mode === 'pseudo' ? $t('landing.hero.tradeoff.preserved') : $t('landing.hero.tradeoff.broken')}
+            </span>
+          </div>
+          <div class="tradeoff-row">
+            <span class="tradeoff-axis">{$t('landing.hero.tradeoff.privacy')}</span>
+            <span class="tradeoff-val val-pos">
+              {mode === 'pseudo' ? $t('landing.hero.tradeoff.high') : $t('landing.hero.tradeoff.maximum')}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="hero-actions">
-      <a href="/app" class="cta-primary">{pt ? 'Abrir AnonShield →' : 'Launch AnonShield →'}</a>
-      <span class="hero-meta">{pt ? 'Sem cadastro. Sem nuvem. Self-hostable.' : 'No sign-up. No cloud. Self-hostable.'}</span>
+      <a href="/app" class="cta-primary">{$t('landing.hero.cta')}</a>
+      <span class="hero-meta">{$t('landing.hero.meta')}</span>
     </div>
   </div>
 </section>
@@ -221,10 +278,10 @@ Action items:
   </div>
 
   <div class="pipeline-inner">
-    <p class="section-label">{pt ? 'Como funciona' : 'How it works'}</p>
+    <p class="section-label">{$t('landing.pipe.label')}</p>
     <h2 class="section-title pipe-heading">
-      {pt ? 'Privacidade garantida.' : 'Privacy guaranteed.'}
-      <span class="pipe-sub-head">{pt ? 'Processamos tudo — sem guardar nada.' : 'We process everything — without keeping anything.'}</span>
+      {$t('landing.pipe.title')}
+      <span class="pipe-sub-head">{$t('landing.pipe.subtitle')}</span>
     </h2>
 
     <div class="pipe-flow">
@@ -240,25 +297,25 @@ Action items:
             <line x1="15" y1="15" x2="12" y2="12"/>
           </svg>
         </button>
-        <span class="node-name">{pt ? 'Entrada' : 'Input'}</span>
-        <span class="node-note">TXT · PDF · DOCX · ZIP</span>
+        <span class="node-name">{$t('landing.n1.name')}</span>
+        <span class="node-note">{$t('landing.n1.note')}</span>
         {#if activeNode === 1}
           <div class="node-detail">
             <div class="nd-header" style="--nc:#60a5fa">
               <span class="nd-icon" style="--nc:#60a5fa">↑</span>
-              <span class="nd-title">{pt ? 'Entrada de arquivo' : 'File Input'}</span>
+              <span class="nd-title">{$t('landing.n1.title')}</span>
             </div>
             <div class="nd-stats">
-              <span class="nd-stat">10+ {pt ? 'formatos' : 'formats'}</span>
-              <span class="nd-stat">Streaming I/O</span>
-              <span class="nd-stat">{pt ? 'Sem limite RAM' : 'No RAM limit'}</span>
+              <span class="nd-stat">{$t('landing.n1.stat.formats')}</span>
+              <span class="nd-stat">{$t('landing.n1.stat.stream')}</span>
+              <span class="nd-stat">{$t('landing.n1.stat.ram')}</span>
             </div>
             <div class="nd-formats">
               {#each ['TXT','CSV','JSON','PDF','DOCX','XLSX','XML','ZIP','PNG','JPG'] as f}
                 <span class="nd-fmt">{f}</span>
               {/each}
             </div>
-            <p class="nd-desc">{pt ? 'Processamento incremental via streaming — arquivos de qualquer tamanho sem carregar na RAM.' : 'Incremental streaming — files of any size without loading into RAM.'}</p>
+            <p class="nd-desc">{$t('landing.n1.desc')}</p>
           </div>
         {/if}
       </div>
@@ -283,30 +340,30 @@ Action items:
             <line x1="12" y1="21" x2="12" y2="19"/>
           </svg>
         </button>
-        <span class="node-name">{pt ? 'Detecção NER' : 'NER Detection'}</span>
-        <span class="node-note">{pt ? 'Transformer + regex' : 'Transformer + regex'}</span>
+        <span class="node-name">{$t('landing.n2.name')}</span>
+        <span class="node-note">{$t('landing.n2.note')}</span>
         {#if activeNode === 2}
           <div class="node-detail">
             <div class="nd-header" style="--nc:#a78bfa">
               <span class="nd-icon" style="--nc:#a78bfa">◎</span>
-              <span class="nd-title">NER Detection</span>
+              <span class="nd-title">{$t('landing.n2.title')}</span>
             </div>
             <div class="nd-stats">
-              <span class="nd-stat">50+ {pt ? 'entidades' : 'entities'}</span>
-              <span class="nd-stat">GPU · LRU cache</span>
-              <span class="nd-stat">21 regex</span>
+              <span class="nd-stat">{$t('landing.n2.stat.entities')}</span>
+              <span class="nd-stat">{$t('landing.n2.stat.cache')}</span>
+              <span class="nd-stat">{$t('landing.n2.stat.regex')}</span>
             </div>
             <div class="nd-transform">
               <span class="nd-src">"John Doe"</span>
               <span class="nd-arrow">→</span>
-              <span class="nd-tag" style="color:#a78bfa;border-color:rgba(167,139,250,0.3)">[PERSON]</span>
+              <span class="nd-tag" style="color:#a78bfa;border-color:color-mix(in srgb, #a78bfa 30%, transparent)">[PERSON]</span>
             </div>
             <div class="nd-transform">
               <span class="nd-src">CVE-2024-3400</span>
               <span class="nd-arrow">→</span>
-              <span class="nd-tag" style="color:#f87171;border-color:rgba(248,113,113,0.3)">[CVE_ID]</span>
+              <span class="nd-tag" style="color:#f87171;border-color:color-mix(in srgb, #f87171 30%, transparent)">[CVE_ID]</span>
             </div>
-            <p class="nd-desc">xlm-roberta multilingual + regex {pt ? 'para IPs, hashes, certificados e credenciais.' : 'for IPs, hashes, certs and credentials.'}</p>
+            <p class="nd-desc">{$t('landing.n2.desc')}</p>
           </div>
         {/if}
       </div>
@@ -329,24 +386,24 @@ Action items:
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
         </button>
-        <span class="node-name">HMAC-SHA256</span>
-        <span class="node-note">{pt ? 'Hash determinístico' : 'Deterministic hash'}</span>
+        <span class="node-name">{$t('landing.n3.name')}</span>
+        <span class="node-note">{$t('landing.n3.note')}</span>
         {#if activeNode === 3}
           <div class="node-detail">
             <div class="nd-header" style="--nc:#fbbf24">
               <span class="nd-icon" style="--nc:#fbbf24">⬡</span>
-              <span class="nd-title">HMAC-SHA256</span>
+              <span class="nd-title">{$t('landing.n3.title')}</span>
             </div>
             <div class="nd-stats">
-              <span class="nd-stat">0–256 bits</span>
-              <span class="nd-stat">{pt ? 'Determinístico' : 'Deterministic'}</span>
-              <span class="nd-stat">{pt ? 'Chave opcional' : 'Optional key'}</span>
+              <span class="nd-stat">{$t('landing.n3.stat.bits')}</span>
+              <span class="nd-stat">{$t('landing.n3.stat.det')}</span>
+              <span class="nd-stat">{$t('landing.n3.stat.key')}</span>
             </div>
             <div class="nd-code">
               <span class="nd-code-line"><span class="nd-kw">key</span> + entity → <span class="nd-val">48624b5c</span></span>
-              <span class="nd-code-line nd-muted">{pt ? 'sem chave → aleatório por run' : 'no key → random per run'}</span>
+              <span class="nd-code-line nd-muted">{$t('landing.n3.code_note')}</span>
             </div>
-            <p class="nd-desc">{pt ? 'Mesmo input + chave = mesmo token entre runs. Correlação entre documentos sem expor o dado original.' : 'Same input + key = same token across runs. Cross-document correlation without exposing raw data.'}</p>
+            <p class="nd-desc">{$t('landing.n3.desc')}</p>
           </div>
         {/if}
       </div>
@@ -368,18 +425,18 @@ Action items:
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
         </button>
-        <span class="node-name">{pt ? 'Pseudonimização' : 'Pseudonymization'}</span>
-        <span class="node-note">{pt ? 'Token HMAC substituído' : 'HMAC token replaced'}</span>
+        <span class="node-name">{$t('landing.n4.name')}</span>
+        <span class="node-note">{$t('landing.n4.note')}</span>
         {#if activeNode === 4}
           <div class="node-detail">
             <div class="nd-header" style="--nc:#34d399">
               <span class="nd-icon" style="--nc:#34d399">◈</span>
-              <span class="nd-title">{pt ? 'Pseudonimização' : 'Pseudonymization'}</span>
+              <span class="nd-title">{$t('landing.n4.title')}</span>
             </div>
             <div class="nd-stats">
-              <span class="nd-stat">50+ {pt ? 'tipos' : 'types'}</span>
-              <span class="nd-stat">{pt ? 'Schema intacto' : 'Schema intact'}</span>
-              <span class="nd-stat">6 {pt ? 'categorias' : 'categories'}</span>
+              <span class="nd-stat">{$t('landing.n4.stat.types')}</span>
+              <span class="nd-stat">{$t('landing.n4.stat.schema')}</span>
+              <span class="nd-stat">{$t('landing.n4.stat.cats')}</span>
             </div>
             <div class="nd-replace-demo">
               <div class="nd-replace-row">
@@ -391,7 +448,7 @@ Action items:
                 <span class="nd-replace-after">[EMAIL_ADDRESS_<span style="color:#34d399">9fc2a1</span>]</span>
               </div>
             </div>
-            <p class="nd-desc">{pt ? 'Prefixo do tipo preservado. Estrutura XML/JSON/CSV mantida — só os valores mudam.' : 'Type prefix preserved. XML/JSON/CSV structure kept — only values change.'}</p>
+            <p class="nd-desc">{$t('landing.n4.desc')}</p>
           </div>
         {/if}
       </div>
@@ -413,43 +470,39 @@ Action items:
             <polyline points="20 6 9 17 4 12"/>
           </svg>
         </button>
-        <span class="node-name">{pt ? 'Saída' : 'Output'}</span>
-        <span class="node-note">{pt ? 'Deletado após download' : 'Deleted after download'}</span>
+        <span class="node-name">{$t('landing.n5.name')}</span>
+        <span class="node-note">{$t('landing.n5.note')}</span>
         {#if activeNode === 5}
           <div class="node-detail">
             <div class="nd-header" style="--nc:#2dd4bf">
               <span class="nd-icon" style="--nc:#2dd4bf">↓</span>
-              <span class="nd-title">{pt ? 'Saída' : 'Output'}</span>
+              <span class="nd-title">{$t('landing.n5.title')}</span>
             </div>
             <div class="nd-stats">
-              <span class="nd-stat">{pt ? 'Download imediato' : 'Instant download'}</span>
-              <span class="nd-stat">0 bytes {pt ? 'retidos' : 'retained'}</span>
+              <span class="nd-stat">{$t('landing.n5.stat.instant')}</span>
+              <span class="nd-stat">{$t('landing.n5.stat.retained')}</span>
             </div>
             <div class="nd-zero">
               <div class="nd-zero-row">
-                <span class="nd-zero-label">{pt ? 'arquivo original' : 'original file'}</span>
-                <span class="nd-zero-val nd-deleted">— {pt ? 'deletado' : 'deleted'}</span>
+                <span class="nd-zero-label">{$t('landing.n5.zero.original')}</span>
+                <span class="nd-zero-val nd-deleted">— {$t('landing.n5.zero.deleted')}</span>
               </div>
               <div class="nd-zero-row">
-                <span class="nd-zero-label">{pt ? 'arquivo anonimizado' : 'anonymized file'}</span>
-                <span class="nd-zero-val nd-ok">↓ {pt ? 'baixar' : 'download'}</span>
+                <span class="nd-zero-label">{$t('landing.n5.zero.anon')}</span>
+                <span class="nd-zero-val nd-ok">↓ {$t('landing.n5.zero.download')}</span>
               </div>
               <div class="nd-zero-row">
-                <span class="nd-zero-label">{pt ? 'após download' : 'after download'}</span>
-                <span class="nd-zero-val nd-deleted">— {pt ? 'deletado' : 'deleted'}</span>
+                <span class="nd-zero-label">{$t('landing.n5.zero.after')}</span>
+                <span class="nd-zero-val nd-deleted">— {$t('landing.n5.zero.deleted')}</span>
               </div>
             </div>
-            <p class="nd-desc">{pt ? 'Nada fica no servidor. 0 bytes de dados sensíveis em disco após o ciclo completo.' : 'Nothing stays on the server. 0 bytes of sensitive data on disk after the full cycle.'}</p>
+            <p class="nd-desc">{$t('landing.n5.desc')}</p>
           </div>
         {/if}
       </div>
     </div>
 
-    <p class="pipe-note">
-      {pt
-        ? 'Chave nunca armazenada no servidor — usada apenas em memória para computar HMAC · Arquivo de saída deletado imediatamente após download'
-        : 'Key never stored server-side — used only in-memory for HMAC computation · Output file deleted immediately after download'}
-    </p>
+    <p class="pipe-note">{$t('landing.pipe.note')}</p>
   </div>
 </section>
 
@@ -460,27 +513,27 @@ Action items:
   <div class="stats-inner">
     <div class="stat-block">
       <span class="stat-val" class:animated={statsVisible}>738<span class="stat-unit">×</span></span>
-      <span class="stat-desc">{pt ? 'mais rápido que AnonLFI v2.0' : 'faster than AnonLFI v2.0'}</span>
+      <span class="stat-desc">{$t('landing.stat.faster')}</span>
     </div>
     <div class="stat-block">
       <span class="stat-val" class:animated={statsVisible}>94.2<span class="stat-unit">%</span></span>
-      <span class="stat-desc">F1 {pt ? 'em dataset OpenVAS' : 'on OpenVAS dataset'}</span>
+      <span class="stat-desc">{$t('landing.stat.f1')}</span>
     </div>
     <div class="stat-block">
       <span class="stat-val" class:animated={statsVisible}>96.7<span class="stat-unit">%</span></span>
-      <span class="stat-desc">{pt ? 'recall (filtered/hybrid, OpenVAS)' : 'Recall (filtered/hybrid, OpenVAS)'}</span>
+      <span class="stat-desc">{$t('landing.stat.recall')}</span>
     </div>
     <div class="stat-block">
       <span class="stat-val" class:animated={statsVisible}>550<span class="stat-unit">MB</span></span>
-      <span class="stat-desc">{pt ? 'em menos de 10 min (GPU)' : 'in under 10 min (GPU)'}</span>
+      <span class="stat-desc">{$t('landing.stat.throughput')}</span>
     </div>
     <div class="stat-block">
       <span class="stat-val" class:animated={statsVisible}>0</span>
-      <span class="stat-desc">{pt ? 'chamadas à nuvem' : 'cloud calls'}</span>
+      <span class="stat-desc">{$t('landing.stat.cloud')}</span>
     </div>
     <div class="stat-block">
       <span class="stat-val" class:animated={statsVisible}>1<span class="stat-unit">MB</span></span>
-      <span class="stat-desc">{pt ? 'limite demo (configurável)' : 'demo limit (configurable)'}</span>
+      <span class="stat-desc">{$t('landing.stat.demo_limit')}</span>
     </div>
   </div>
 </section>
@@ -489,7 +542,7 @@ Action items:
 <!-- FORMATS                                                                -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <div class="formats-bar reveal">
-  <span class="formats-lbl">{pt ? 'Formatos suportados' : 'Supported formats'}</span>
+  <span class="formats-lbl">{$t('landing.fmt.label')}</span>
   <div class="formats-tags">
     {#each ['TXT','CSV','JSON','JSONL','PDF','DOCX','XLSX','XML','ZIP','PNG','JPG','TIFF','BMP','WEBP'] as fmt}
       <code class="fmt-tag">{fmt}</code>
@@ -502,15 +555,9 @@ Action items:
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <section class="research reveal">
   <div class="research-inner">
-    <p class="section-label">{pt ? 'Linha de pesquisa' : 'Research lineage'}</p>
-    <h2 class="section-title">
-      {pt ? '3 gerações. 738× mais rápido.' : '3 generations. 738× faster.'}
-    </h2>
-    <p class="research-sub">
-      {pt
-        ? 'AnonShield é a terceira geração de uma linha de pesquisa peer-reviewed sobre anonimização on-premise para CSIRTs, iniciada pelo AnonLFI v1.0.'
-        : 'AnonShield is the third generation of a peer-reviewed research line on on-premise anonymization for CSIRTs, started by AnonLFI v1.0.'}
-    </p>
+    <p class="section-label">{$t('landing.research.label')}</p>
+    <h2 class="section-title">{$t('landing.research.title')}</h2>
+    <p class="research-sub">{$t('landing.research.sub')}</p>
 
     <div class="timeline">
       <!-- Gen 1 -->
@@ -526,15 +573,11 @@ Action items:
           </div>
           <h3 class="paper-title">Anonimização de Incidentes de Segurança com Reidentificação Controlada</h3>
           <p class="paper-authors">C. T. Bandel, J. P. R. Esteves, K. P. Guerra, L. M. Bertholdo, D. Kreutz, R. S. Miani</p>
-          <p class="paper-context">
-            {pt
-              ? 'Focado em incidentes de segurança (não vulnerabilidades). NER híbrido + RegEx. Validado em 763 incidentes reais.'
-              : 'Focused on security incidents (not vulnerability data). Hybrid NER + RegEx. Validated on 763 real incidents.'}
-          </p>
+          <p class="paper-context">{$t('landing.research.gen1.ctx')}</p>
           <div class="paper-metrics">
             <span class="pm pm-good">100% Precision</span>
             <span class="pm pm-good">97.38% Recall</span>
-            <span class="pm pm-info">763 {pt ? 'Incidentes' : 'Incidents'}</span>
+            <span class="pm pm-info">763 {$t('landing.research.gen1.incidents')}</span>
             <span class="pm pm-info">On-premise</span>
           </div>
         </div>
@@ -553,11 +596,7 @@ Action items:
           </div>
           <h3 class="paper-title">AnonLFI 2.0: Extensible Architecture for PII Pseudonymization in CSIRTs with OCR and Technical Recognizers</h3>
           <p class="paper-authors">C. Kapelinski, D. Lautert, B. Machado, D. Kreutz</p>
-          <p class="paper-context">
-            {pt
-              ? 'PoC para dados de vulnerabilidades. Adicionou HMAC-SHA256, XML/JSON e OCR. F1 92.1% (XML).'
-              : 'PoC for vulnerability data. Added HMAC-SHA256, XML/JSON and OCR. F1 92.1% (XML).'}
-          </p>
+          <p class="paper-context">{$t('landing.research.gen2.ctx')}</p>
           <div class="paper-metrics">
             <span class="pm pm-good">92.1% F1 (XML)</span>
             <span class="pm pm-info">On-premise</span>
@@ -573,21 +612,17 @@ Action items:
         <div class="paper-card current-paper">
           <div class="paper-venue-row">
             <span class="paper-venue accent-venue">SBRC 2026</span>
-            <span class="paper-gen accent-gen">AnonShield ← {pt ? 'você está aqui' : 'you are here'}</span>
+            <span class="paper-gen accent-gen">AnonShield ← {$t('landing.research.gen3.here')}</span>
           </div>
           <h3 class="paper-title">AnonShield: Scalable On-Premise Pseudonymization for CSIRT Vulnerability Data</h3>
           <p class="paper-authors">C. Kapelinski, D. Lautert, B. Machado, I. G. Ferrão, D. Kreutz · UNIPAMPA / UBO</p>
-          <p class="paper-context">
-            {pt
-              ? 'GPU-NER acelerado + cache LRU + streaming I/O + anonymization_config. 70.951 registros (550 MB) em <10 min. 94.2% F1, 96.7% Recall.'
-              : 'GPU-accelerated NER + LRU cache + streaming I/O + anonymization_config. 70,951 records (550 MB) in <10 min. 94.2% F1, 96.7% Recall.'}
-          </p>
+          <p class="paper-context">{$t('landing.research.gen3.ctx')}</p>
           <div class="paper-metrics">
             <span class="pm pm-good">94.2% F1</span>
             <span class="pm pm-good">96.7% Recall</span>
-            <span class="pm pm-hero">738× {pt ? 'mais rápido' : 'faster'}</span>
+            <span class="pm pm-hero">738× {$t('landing.research.gen3.faster')}</span>
             <span class="pm pm-hero">&lt;10 min / 550 MB</span>
-            <span class="pm pm-info">70,951 {pt ? 'registros' : 'records'}</span>
+            <span class="pm pm-info">70,951 {$t('landing.research.gen3.records')}</span>
             <span class="pm pm-info">On-premise</span>
           </div>
           <a href="https://github.com/AnonShield/tool" target="_blank" class="paper-link">GitHub ↗</a>
@@ -602,8 +637,8 @@ Action items:
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <section class="team reveal">
   <div class="team-inner">
-    <p class="section-label">{pt ? 'Equipe' : 'Team'}</p>
-    <h2 class="section-title">{pt ? 'Construído por pesquisadores' : 'Built by researchers'}</h2>
+    <p class="section-label">{$t('landing.team.label')}</p>
+    <h2 class="section-title">{$t('landing.team.title')}</h2>
 
     <div class="members">
       <div class="member">
@@ -628,9 +663,7 @@ Action items:
       </div>
     </div>
 
-    <p class="team-affil">
-      Universidade Federal do Pampa (UNIPAMPA) · Université de Bretagne Occidentale (UBO)
-    </p>
+    <p class="team-affil">{$t('landing.team.affil')}</p>
   </div>
 </section>
 
@@ -639,9 +672,9 @@ Action items:
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <section class="cta-section reveal">
   <div class="cta-inner">
-    <h2 class="cta-title">{pt ? 'Pronto para começar?' : 'Ready to get started?'}</h2>
-    <p class="cta-sub">{pt ? 'Sem cadastro, sem nuvem, auto-hospedável.' : 'No sign-up, no cloud, self-hostable.'}</p>
-    <a href="/app" class="cta-btn">{pt ? 'Abrir AnonShield →' : 'Launch AnonShield →'}</a>
+    <h2 class="cta-title">{$t('landing.cta.title')}</h2>
+    <p class="cta-sub">{$t('landing.cta.sub')}</p>
+    <a href="/app" class="cta-btn">{$t('landing.cta.btn')}</a>
     <a href="mailto:anonshield@unipampa.edu.br" class="cta-email">anonshield@unipampa.edu.br</a>
   </div>
 </section>
@@ -649,12 +682,12 @@ Action items:
 <style>
   /* ── Shared ── */
   .section-label {
-    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em;
+    font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.12em;
     text-transform: uppercase; color: var(--color-accent);
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-3);
   }
   .section-title {
-    margin: 0 0 48px; font-size: clamp(1.4rem, 3vw, 2rem);
+    margin: 0 0 var(--space-12); font-size: clamp(1.4rem, 3vw, 2rem);
     font-weight: 800; letter-spacing: -0.035em;
     color: var(--color-text-primary);
   }
@@ -662,7 +695,9 @@ Action items:
   /* ══════════════ HERO ══════════════ */
   .hero {
     padding: 56px 24px 48px;
-    background: radial-gradient(ellipse 80% 60% at 50% -20%, rgba(99,102,241,0.12) 0%, transparent 70%);
+    background: radial-gradient(ellipse 80% 60% at 50% -20%,
+      color-mix(in srgb, var(--color-accent) 12%, transparent) 0%,
+      transparent 70%);
     border-bottom: 1px solid var(--color-border);
     overflow-x: hidden;
   }
@@ -683,29 +718,29 @@ Action items:
 
   .hero-sub {
     margin: 0; max-width: 640px;
-    font-size: 0.95rem; line-height: 1.7;
+    font-size: var(--text-base); line-height: 1.7;
     color: var(--color-text-secondary);
   }
 
   /* ── Demo ── */
-  .demo-wrap { display: flex; flex-direction: column; gap: 12px; }
+  .demo-wrap { display: flex; flex-direction: column; gap: var(--space-3); }
 
   .demo-label {
     display: flex; align-items: center; justify-content: space-between;
-    flex-wrap: wrap; gap: 8px;
+    flex-wrap: wrap; gap: var(--space-2);
   }
   .demo-live {
-    display: flex; align-items: center; gap: 7px;
-    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em;
+    display: flex; align-items: center; gap: var(--space-2);
+    font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.05em;
     text-transform: uppercase; color: var(--color-text-primary);
   }
   .live-dot {
     width: 7px; height: 7px; border-radius: 50%;
-    background: #4ade80;
+    background: var(--color-success);
     animation: pulse-dot 1.5s ease-in-out infinite;
   }
   .demo-hint {
-    font-size: 0.7rem; font-family: var(--font-mono);
+    font-size: var(--text-xs); font-family: var(--font-mono);
     color: var(--color-text-secondary);
   }
 
@@ -728,20 +763,20 @@ Action items:
     flex-shrink: 0;
   }
   .panel-label {
-    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em;
+    font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em;
     text-transform: uppercase; color: var(--color-text-secondary);
     font-family: var(--font-mono);
   }
-  .panel-hint { font-size: 0.65rem; color: var(--color-border); font-family: var(--font-mono); }
+  .panel-hint { font-size: var(--text-xs); color: var(--color-border); font-family: var(--font-mono); }
   .panel-count {
-    font-size: 0.65rem; font-family: var(--font-mono);
-    color: var(--color-text-secondary); transition: color 150ms;
+    font-size: var(--text-xs); font-family: var(--font-mono);
+    color: var(--color-text-secondary); transition: color var(--duration-fast) var(--ease-out);
   }
-  .panel-count.has-hits { color: #4ade80; }
+  .panel-count.has-hits { color: var(--color-success); }
 
   .panel-body {
-    flex: 1; padding: 14px;
-    font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.75;
+    flex: 1; padding: var(--space-4);
+    font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.75;
     color: var(--color-text-secondary);
     white-space: pre-wrap; word-break: break-word; overflow-y: auto;
   }
@@ -750,15 +785,18 @@ Action items:
     background: transparent; width: 100%;
   }
   textarea.panel-body:focus { color: var(--color-text-primary); }
-  .output-body { color: #4a4e6a; }
+  .output-body {
+    /* deliberately muted "ghost" tone — below --color-text-secondary to indicate non-primary output */
+    color: color-mix(in srgb, var(--color-text-secondary) 55%, var(--color-surface));
+  }
 
   :global(.ent) {
     background: color-mix(in srgb, var(--c) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
-    border-radius: 4px; padding: 0 4px; margin: 0 1px;
-    font-style: normal; font-size: 0.75rem;
+    border-radius: var(--radius-sm); padding: 0 var(--space-1); margin: 0 1px;
+    font-style: normal; font-size: var(--text-xs);
     white-space: nowrap; cursor: default;
-    transition: background 100ms;
+    transition: background var(--duration-fast) var(--ease-out);
   }
   :global(.ent:hover) { background: color-mix(in srgb, var(--c) 22%, transparent); }
 
@@ -808,14 +846,147 @@ Action items:
     .hero { padding: 32px 16px 32px; }
   }
 
-  /* Legend */
+  /* Mode toggle — segmented control with sliding thumb (Fitts: large targets; Miller: 2 options)
+     Thumb animates between positions to imply state change is causal, not magical. */
+  .mode-toggle {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: 'label switch' 'desc desc';
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-2) 0;
+  }
+  .mode-label {
+    grid-area: label;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .mode-switch {
+    grid-area: switch;
+    position: relative;
+    display: inline-flex;
+    padding: 3px;
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    justify-self: start;
+    isolation: isolate;
+  }
+  .mode-opt {
+    position: relative;
+    z-index: 2;
+    padding: var(--space-2) var(--space-5);
+    background: none;
+    border: none;
+    border-radius: 999px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .mode-opt:hover { color: var(--color-text-primary); }
+  .mode-opt.active { color: #fff; }
+  .mode-opt:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  .mode-thumb {
+    position: absolute;
+    z-index: 1;
+    top: 3px; bottom: 3px; left: 3px;
+    width: calc(50% - 3px);
+    background: var(--color-accent);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 40%, transparent);
+    transition: transform var(--duration-slow) var(--ease-out),
+                background var(--duration-slow) var(--ease-out);
+  }
+  .mode-switch.is-anon .mode-thumb {
+    transform: translateX(100%);
+    background: #a78bfa;
+    box-shadow: 0 2px 8px color-mix(in srgb, #a78bfa 50%, transparent);
+  }
+  .mode-desc {
+    grid-area: desc;
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    animation: fade-up var(--duration-slow) var(--ease-out);
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Token span inside .ent — dims the hashed slug slightly so the type label reads as primary */
+  :global(.ent-token) {
+    opacity: 0.72;
+    font-weight: 500;
+  }
+
+  /* Tradeoffs — three-axis grid that re-renders on mode change.
+     Axis labels stay constant (Gestalt: common region); values animate to cue the change. */
+  .tradeoffs {
+    display: flex; flex-direction: column; gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--color-surface-raised) 40%, transparent);
+  }
+  .tradeoffs-title {
+    margin: 0;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .tradeoff-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+  }
+  @media (max-width: 680px) {
+    .tradeoff-grid { grid-template-columns: 1fr; gap: var(--space-2); }
+  }
+  .tradeoff-row {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: var(--space-2) var(--space-3);
+    border-left: 2px solid var(--color-border);
+    transition: border-color var(--duration-fast) var(--ease-out);
+  }
+  .tradeoff-axis {
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .tradeoff-val {
+    font-size: var(--text-base);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    animation: val-swap var(--duration-slow) var(--ease-out);
+  }
+  @keyframes val-swap {
+    from { opacity: 0; transform: translateY(-3px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .val-pos { color: var(--color-success); }
+  .val-neg { color: var(--color-warning); }
+  .val-neutral { color: var(--color-text); }
+  .tradeoff-row:has(.val-pos) { border-left-color: var(--color-success); }
+  .tradeoff-row:has(.val-neg) { border-left-color: var(--color-warning); }
+
+  /* Legend — inline chip strip, monospaced for alignment */
   .legend {
-    display: flex; flex-wrap: wrap; gap: 6px 14px;
+    display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4);
     padding: 2px 0;
   }
   .legend-item {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 0.72rem; font-family: var(--font-mono);
+    display: flex; align-items: center; gap: var(--space-2);
+    font-size: var(--text-xs); font-family: var(--font-mono);
   }
   .legend-dot {
     width: 7px; height: 7px; border-radius: 50%;
@@ -825,29 +996,37 @@ Action items:
   .legend-type { color: var(--color-text-secondary); }
   .legend-n {
     color: var(--c); font-weight: 700;
-    padding: 0 5px;
+    padding: 0 var(--space-2);
     background: color-mix(in srgb, var(--c) 12%, transparent);
     border-radius: 999px;
   }
 
-  /* Hero actions */
-  .hero-actions { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  /* Hero actions — primary CTA uses accent token; glow shadow derived from accent via color-mix
+     so it stays in sync with the palette (no hex literal of 99,102,241). */
+  .hero-actions { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
   .cta-primary {
     display: inline-flex; align-items: center;
-    padding: 13px 32px;
+    padding: var(--space-3) var(--space-8);
     background: var(--color-accent); color: #fff;
-    border-radius: 8px; font-size: 0.95rem; font-weight: 700;
+    border-radius: var(--radius-md);
+    font-size: var(--text-base); font-weight: 700;
     text-decoration: none; letter-spacing: -0.01em;
-    transition: background 120ms, transform 100ms, box-shadow 120ms;
-    box-shadow: 0 0 24px rgba(99,102,241,0.3);
+    transition: background var(--duration-fast) var(--ease-out),
+                transform var(--duration-fast) var(--ease-out),
+                box-shadow var(--duration-fast) var(--ease-out);
+    box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 30%, transparent);
   }
   .cta-primary:hover {
     background: var(--color-accent-hover); color: #fff;
     transform: translateY(-2px);
-    box-shadow: 0 6px 32px rgba(99,102,241,0.45);
+    box-shadow: 0 6px 32px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  }
+  .cta-primary:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
   }
   .hero-meta {
-    font-size: 0.78rem; font-family: var(--font-mono);
+    font-size: var(--text-xs); font-family: var(--font-mono);
     color: var(--color-text-secondary);
   }
 
@@ -875,7 +1054,10 @@ Action items:
   .scan-beam {
     position: absolute; top: 0; bottom: 0;
     width: 120px;
-    background: linear-gradient(90deg, transparent, rgba(99,102,241,0.06), transparent);
+    background: linear-gradient(90deg,
+      transparent,
+      color-mix(in srgb, var(--color-accent) 6%, transparent),
+      transparent);
     animation: scan-sweep 6s ease-in-out infinite;
     pointer-events: none; z-index: 0;
   }
@@ -887,7 +1069,9 @@ Action items:
   /* Dot grid behind the flow */
   .dot-grid {
     position: absolute; inset: 0; z-index: 0; pointer-events: none;
-    background-image: radial-gradient(circle, rgba(99,102,241,0.15) 1px, transparent 1px);
+    background-image: radial-gradient(circle,
+      color-mix(in srgb, var(--color-accent) 15%, transparent) 1px,
+      transparent 1px);
     background-size: 32px 32px;
     mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
   }
@@ -974,8 +1158,8 @@ Action items:
     border-radius: 14px;
     overflow: hidden;
     box-shadow:
-      0 24px 64px rgba(0,0,0,0.75),
-      0 0 0 1px rgba(255,255,255,0.03),
+      0 24px 64px color-mix(in srgb, #000 75%, transparent),
+      0 0 0 1px color-mix(in srgb, #fff 3%, transparent),
       0 0 40px color-mix(in srgb, var(--nc) 10%, transparent);
     z-index: 500;
     animation: detail-in 220ms cubic-bezier(0.34,1.4,0.64,1) both;
@@ -1003,161 +1187,171 @@ Action items:
     border-bottom: 1px solid color-mix(in srgb, var(--nc) 14%, transparent);
   }
   .nd-icon {
-    font-size: 1rem; color: var(--nc);
+    font-size: var(--text-base); color: var(--nc);
     width: 24px; height: 24px;
     display: flex; align-items: center; justify-content: center;
     background: color-mix(in srgb, var(--nc) 14%, transparent);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     flex-shrink: 0;
   }
   .nd-title {
-    font-size: 0.78rem; font-weight: 700;
-    color: #e8eaf0; letter-spacing: 0.01em;
+    font-size: var(--text-sm); font-weight: 700;
+    color: var(--color-text-primary); letter-spacing: 0.01em;
   }
 
-  /* Stat pills */
+  /* Stat pills — neutral chips on tinted glass surface */
   .nd-stats {
-    display: flex; flex-wrap: wrap; gap: 5px;
-    padding: 10px 16px 8px;
+    display: flex; flex-wrap: wrap; gap: var(--space-1);
+    padding: var(--space-3) var(--space-4) var(--space-2);
   }
   .nd-stat {
-    font-size: 0.66rem; font-weight: 600;
-    padding: 2px 8px;
+    font-size: var(--text-xs); font-weight: 600;
+    padding: 2px var(--space-2);
     border-radius: 100px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.09);
-    color: #a0a4be;
+    background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent);
+    color: color-mix(in srgb, var(--color-text-secondary) 80%, var(--color-text-primary));
     letter-spacing: 0.03em;
     white-space: nowrap;
   }
 
-  /* Format tags (node 1) */
+  /* Format tags (node 1) — syntax-coloured blue for "file format" domain */
   .nd-formats {
-    display: flex; flex-wrap: wrap; gap: 4px;
-    padding: 2px 16px 10px;
+    display: flex; flex-wrap: wrap; gap: var(--space-1);
+    padding: 2px var(--space-4) var(--space-3);
   }
   .nd-fmt {
-    font-size: 0.62rem; font-weight: 700;
+    --fmt-blue: #60a5fa;
+    font-size: var(--text-xs); font-weight: 700;
     font-family: var(--font-mono);
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: color-mix(in srgb, #60a5fa 10%, transparent);
-    border: 1px solid color-mix(in srgb, #60a5fa 22%, transparent);
-    color: #60a5fa;
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--fmt-blue) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fmt-blue) 22%, transparent);
+    color: var(--fmt-blue);
     letter-spacing: 0.04em;
   }
 
   /* Entity transform rows (node 2) */
   .nd-transform {
-    display: flex; align-items: center; gap: 6px;
-    padding: 3px 16px;
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: 3px var(--space-4);
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: var(--text-xs);
   }
-  .nd-src { color: #9498b0; }
-  .nd-arrow { color: #4b5268; }
+  .nd-src { color: var(--color-text-secondary); }
+  .nd-arrow { color: color-mix(in srgb, var(--color-text-secondary) 60%, var(--color-surface)); }
   .nd-tag {
-    padding: 1px 6px; border-radius: 4px;
+    padding: 1px var(--space-2);
+    border-radius: var(--radius-sm);
     border: 1px solid;
-    font-weight: 600; font-size: 0.63rem;
+    font-weight: 600; font-size: var(--text-xs);
   }
 
-  /* Code block (node 3) */
+  /* Code block (node 3) — darker recessed surface to feel like a terminal/code snippet */
   .nd-code {
-    margin: 4px 16px 8px;
-    background: rgba(0,0,0,0.4);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 8px;
-    padding: 8px 10px;
-    display: flex; flex-direction: column; gap: 4px;
+    margin: var(--space-1) var(--space-4) var(--space-2);
+    background: color-mix(in srgb, #000 40%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    display: flex; flex-direction: column; gap: var(--space-1);
   }
   .nd-code-line {
     font-family: var(--font-mono);
-    font-size: 0.67rem; color: #c8cae0;
+    font-size: var(--text-xs);
+    color: color-mix(in srgb, var(--color-text-primary) 85%, var(--color-text-secondary));
   }
-  .nd-kw { color: #fbbf24; font-weight: 600; }
-  .nd-val { color: #fbbf24; }
-  .nd-muted { color: #5a5f7a; font-style: italic; }
+  /* Syntax highlight — keyword amber matches --color-warning; muted italics for comments */
+  .nd-kw { color: var(--color-warning); font-weight: 600; }
+  .nd-val { color: var(--color-warning); }
+  .nd-muted {
+    color: color-mix(in srgb, var(--color-text-secondary) 65%, var(--color-surface));
+    font-style: italic;
+  }
 
   /* Before/after replace demo (node 4) */
   .nd-replace-demo {
-    margin: 4px 16px 8px;
-    background: rgba(0,0,0,0.3);
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 8px;
-    padding: 8px 10px;
-    display: flex; flex-direction: column; gap: 6px;
+    margin: var(--space-1) var(--space-4) var(--space-2);
+    background: color-mix(in srgb, #000 30%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    display: flex; flex-direction: column; gap: var(--space-2);
   }
   .nd-replace-row {
     display: flex; flex-direction: column; gap: 2px;
   }
   .nd-replace-before {
     font-family: var(--font-mono);
-    font-size: 0.67rem;
-    color: #f87171;
+    font-size: var(--text-xs);
+    color: var(--color-error);
     text-decoration: line-through;
-    text-decoration-color: rgba(248,113,113,0.4);
+    text-decoration-color: color-mix(in srgb, var(--color-error) 40%, transparent);
   }
   .nd-replace-after {
     font-family: var(--font-mono);
-    font-size: 0.67rem;
-    color: #c8cae0;
+    font-size: var(--text-xs);
+    color: color-mix(in srgb, var(--color-text-primary) 85%, var(--color-text-secondary));
   }
 
   /* Zero-retention table (node 5) */
   .nd-zero {
-    margin: 4px 16px 8px;
-    display: flex; flex-direction: column; gap: 4px;
+    margin: var(--space-1) var(--space-4) var(--space-2);
+    display: flex; flex-direction: column; gap: var(--space-1);
   }
   .nd-zero-row {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    font-size: 0.67rem;
+    padding: var(--space-1) 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+    font-size: var(--text-xs);
   }
   .nd-zero-row:last-child { border-bottom: none; }
-  .nd-zero-label { color: #6b7099; font-family: var(--font-mono); }
+  .nd-zero-label {
+    color: color-mix(in srgb, var(--color-text-secondary) 80%, var(--color-text-primary));
+    font-family: var(--font-mono);
+  }
   .nd-zero-val { font-weight: 600; font-family: var(--font-mono); }
-  .nd-deleted { color: #f87171; }
-  .nd-ok { color: #4ade80; }
+  .nd-deleted { color: var(--color-error); }
+  .nd-ok { color: var(--color-success); }
 
   /* Description text */
   .nd-desc {
     margin: 0;
-    padding: 8px 16px 14px;
-    font-size: 0.7rem; line-height: 1.6;
-    color: #6b7099;
-    border-top: 1px solid rgba(255,255,255,0.04);
+    padding: var(--space-2) var(--space-4) var(--space-4);
+    font-size: var(--text-xs); line-height: 1.6;
+    color: color-mix(in srgb, var(--color-text-secondary) 80%, var(--color-text-primary));
+    border-top: 1px solid color-mix(in srgb, var(--color-text-primary) 4%, transparent);
   }
 
   /* Description-only fallback (old style) */
   .node-detail > p:only-child {
     margin: 0;
-    padding: 14px 16px;
-    font-size: 0.72rem; line-height: 1.65;
-    color: #9498b0;
+    padding: var(--space-4);
+    font-size: var(--text-xs); line-height: 1.65;
+    color: var(--color-text-secondary);
     font-family: var(--font-mono);
   }
   @keyframes detail-in {
     from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
     to   { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
-  /* hint to click */
+  /* Affordance hint — shows on hover to signal interactivity without clutter */
   .pipe-node::after {
     content: '↕';
     position: absolute; bottom: -4px; right: -4px;
-    font-size: 0.55rem; color: color-mix(in srgb, var(--nc) 60%, transparent);
-    opacity: 0; transition: opacity 200ms;
+    font-size: var(--text-xs); color: color-mix(in srgb, var(--nc) 60%, transparent);
+    opacity: 0; transition: opacity var(--duration-normal) var(--ease-out);
     pointer-events: none;
   }
   .pipe-node:hover::after { opacity: 1; }
 
   .node-name {
-    font-size: 0.78rem; font-weight: 700; color: var(--color-text-primary);
+    font-size: var(--text-sm); font-weight: 700; color: var(--color-text-primary);
     letter-spacing: -0.01em; line-height: 1.3; position: relative; z-index: 1;
   }
   .node-note {
-    font-size: 0.64rem; font-family: var(--font-mono);
+    font-size: var(--text-xs); font-family: var(--font-mono);
     color: var(--color-text-secondary); position: relative; z-index: 1;
     line-height: 1.4;
   }
@@ -1195,13 +1389,13 @@ Action items:
   }
 
   .pipe-note {
-    text-align: center; font-size: 0.72rem; font-family: var(--font-mono);
+    text-align: center; font-size: var(--text-xs); font-family: var(--font-mono);
     color: var(--color-text-secondary); line-height: 1.8;
     max-width: 640px; margin: 0 auto;
-    padding: 16px 24px;
+    padding: var(--space-4) var(--space-6);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background: rgba(255,255,255,0.02);
+    background: color-mix(in srgb, var(--color-text-primary) 3%, transparent);
   }
 
   @media (max-width: 900px) {
@@ -1262,41 +1456,44 @@ Action items:
   .stat-block:nth-child(4) .stat-val { transition-delay: 240ms; }
   .stat-block:nth-child(5) .stat-val { transition-delay: 320ms; }
   .stat-block:nth-child(6) .stat-val { transition-delay: 400ms; }
-  .stat-unit { font-size: 1.1rem; font-weight: 600; opacity: 0.6; }
+  .stat-unit { font-size: var(--text-lg); font-weight: 600; opacity: 0.6; }
   .stat-desc {
-    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
+    font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em;
     color: var(--color-text-secondary); max-width: 120px;
   }
 
   /* ══════════════ FORMATS BAR ══════════════ */
   .formats-bar {
-    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
-    padding: 20px 24px; max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap;
+    padding: var(--space-5) var(--space-6);
+    max-width: 1200px; margin: 0 auto;
     border-bottom: 1px solid var(--color-border);
   }
   .formats-lbl {
-    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
+    font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em;
     text-transform: uppercase; color: var(--color-text-secondary);
     white-space: nowrap; flex-shrink: 0;
   }
-  .formats-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .formats-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
   .fmt-tag {
-    font-family: var(--font-mono); font-size: 0.72rem;
+    font-family: var(--font-mono); font-size: var(--text-xs);
     color: var(--color-text-secondary);
-    border: 1px solid var(--color-border); border-radius: 4px;
-    padding: 2px 8px; background: var(--color-surface-raised);
-    transition: border-color 100ms, color 100ms;
+    border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+    padding: 2px var(--space-2); background: var(--color-surface-raised);
+    transition: border-color var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
   }
   .fmt-tag:hover { border-color: var(--color-accent); color: var(--color-text-primary); }
 
   /* ══════════════ RESEARCH ══════════════ */
   .research {
-    padding: 80px 24px;
+    padding: var(--space-16) var(--space-6);
     border-bottom: 1px solid var(--color-border);
   }
   .research-inner { max-width: 900px; margin: 0 auto; }
   .research-sub {
-    margin: -32px 0 48px; font-size: 0.88rem; line-height: 1.7;
+    margin: calc(var(--space-8) * -1) 0 var(--space-12);
+    font-size: var(--text-sm); line-height: 1.7;
     color: var(--color-text-secondary); max-width: 640px;
   }
 
@@ -1305,13 +1502,10 @@ Action items:
 
   .tl-item {
     display: grid; grid-template-columns: 48px 24px 1fr;
-    gap: 0 16px; align-items: start;
+    gap: 0 var(--space-4); align-items: start;
     min-width: 0;
   }
-  /* Gen 3 has no connector div — make its card span cols 2+3 */
-  .tl-item.tl-current .paper-card {
-    grid-column: 2 / -1;
-  }
+  .tl-item.tl-current .paper-card { grid-column: 2 / -1; }
 
   .tl-marker {
     display: flex; align-items: center; justify-content: center;
@@ -1319,38 +1513,40 @@ Action items:
     border: 2px solid var(--color-border);
     background: var(--color-surface-raised);
     flex-shrink: 0; position: relative; z-index: 1;
-    margin-top: 20px;
+    margin-top: var(--space-5);
   }
   .tl-marker.current {
     border-color: var(--color-accent);
     background: color-mix(in srgb, var(--color-accent) 15%, var(--color-surface));
-    box-shadow: 0 0 16px rgba(99,102,241,0.3);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent) 30%, transparent);
     animation: pulse-glow 2s ease-in-out infinite;
   }
   @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 16px rgba(99,102,241,0.3); }
-    50%       { box-shadow: 0 0 28px rgba(99,102,241,0.55); }
+    0%, 100% { box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent) 30%, transparent); }
+    50%       { box-shadow: 0 0 28px color-mix(in srgb, var(--color-accent) 55%, transparent); }
   }
   .tl-gen {
-    font-size: 0.75rem; font-weight: 800; font-family: var(--font-mono);
+    font-size: var(--text-xs); font-weight: 800; font-family: var(--font-mono);
     color: var(--color-text-secondary);
   }
   .tl-marker.current .tl-gen { color: var(--color-accent); }
 
   .tl-connector {
     width: 2px; background: var(--color-border);
-    margin-left: 17px; /* center on marker = 48/2 - 1 */
+    margin-left: 17px;
     min-height: 32px;
     align-self: stretch;
   }
   .tl-item:last-child .tl-connector { display: none; }
 
   .paper-card {
-    padding: 20px 24px; border: 1px solid var(--color-border);
+    padding: var(--space-5) var(--space-6);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-md); background: var(--color-surface-raised);
-    display: flex; flex-direction: column; gap: 10px;
-    margin-bottom: 24px;
-    transition: border-color 200ms, box-shadow 200ms;
+    display: flex; flex-direction: column; gap: var(--space-3);
+    margin-bottom: var(--space-6);
+    transition: border-color var(--duration-normal) var(--ease-out),
+                box-shadow var(--duration-normal) var(--ease-out);
   }
   .paper-card:hover {
     border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
@@ -1361,124 +1557,161 @@ Action items:
   }
 
   .paper-venue-row {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
   }
   .paper-venue {
-    font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em;
+    font-size: var(--text-xs); font-weight: 800; letter-spacing: 0.1em;
     text-transform: uppercase; color: var(--color-accent);
     font-family: var(--font-mono);
   }
-  .accent-venue { color: #a5b4fc; }
+  .accent-venue { color: var(--color-accent-hover); }
   .paper-gen {
-    font-size: 0.65rem; font-family: var(--font-mono);
+    font-size: var(--text-xs); font-family: var(--font-mono);
     color: var(--color-text-secondary); opacity: 0.7;
   }
   .accent-gen { color: var(--color-accent); opacity: 1; }
 
   .paper-title {
-    margin: 0; font-size: 0.88rem; font-weight: 600;
+    margin: 0; font-size: var(--text-sm); font-weight: 600;
     color: var(--color-text-primary); line-height: 1.4;
   }
   .paper-authors {
-    margin: 0; font-size: 0.75rem; color: var(--color-text-secondary);
+    margin: 0; font-size: var(--text-xs); color: var(--color-text-secondary);
     font-family: var(--font-mono);
   }
   .paper-context {
-    margin: 0; font-size: 0.8rem; color: var(--color-text-secondary);
+    margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary);
     line-height: 1.6;
   }
   .paper-metrics {
-    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;
+    display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1);
   }
   .pm {
-    font-size: 0.68rem; font-weight: 700; font-family: var(--font-mono);
+    font-size: var(--text-xs); font-weight: 700; font-family: var(--font-mono);
     color: var(--color-text-secondary);
     border: 1px solid var(--color-border);
-    border-radius: 4px; padding: 2px 8px;
+    border-radius: var(--radius-sm); padding: 2px var(--space-2);
     background: var(--color-surface);
   }
-  .pm-good { color: #4ade80; border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.06); }
-  .pm-hero { color: #a5b4fc; border-color: rgba(165,180,252,0.3); background: rgba(165,180,252,0.08); font-size: 0.72rem; }
-  .pm-info { color: #38bdf8; border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.06); }
+  .pm-good {
+    color: var(--color-success);
+    border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+    background: color-mix(in srgb, var(--color-success) 6%, transparent);
+  }
+  .pm-hero {
+    --hero-lilac: #a5b4fc;
+    color: var(--hero-lilac);
+    border-color: color-mix(in srgb, var(--hero-lilac) 30%, transparent);
+    background: color-mix(in srgb, var(--hero-lilac) 8%, transparent);
+    font-size: var(--text-xs);
+  }
+  .pm-info {
+    --info-sky: #38bdf8;
+    color: var(--info-sky);
+    border-color: color-mix(in srgb, var(--info-sky) 30%, transparent);
+    background: color-mix(in srgb, var(--info-sky) 6%, transparent);
+  }
 
   .paper-link {
-    font-size: 0.72rem; font-family: var(--font-mono); font-weight: 700;
+    font-size: var(--text-xs); font-family: var(--font-mono); font-weight: 700;
     color: var(--color-accent); text-decoration: none;
-    margin-top: 4px; width: fit-content;
-    transition: color 150ms, transform 150ms;
+    margin-top: var(--space-1); width: fit-content;
+    transition: color var(--duration-fast) var(--ease-out),
+                transform var(--duration-fast) var(--ease-out);
     display: inline-block;
   }
   .paper-link:hover { color: var(--color-accent-hover); transform: translateX(3px); }
+  .paper-link:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+  }
 
 
   /* ══════════════ TEAM ══════════════ */
   .team {
-    padding: 80px 24px;
+    padding: var(--space-16) var(--space-6);
     border-bottom: 1px solid var(--color-border);
     background: var(--color-surface-raised);
   }
   .team-inner { max-width: 1200px; margin: 0 auto; }
 
   .members {
-    display: flex; flex-wrap: wrap; gap: 12px;
-    margin-bottom: 24px;
+    display: flex; flex-wrap: wrap; gap: var(--space-3);
+    margin-bottom: var(--space-6);
   }
   .member {
-    display: flex; flex-direction: column; gap: 4px;
-    padding: 16px 24px;
+    display: flex; flex-direction: column; gap: var(--space-1);
+    padding: var(--space-4) var(--space-6);
     border: 1px solid var(--color-border); border-radius: var(--radius-md);
     background: var(--color-surface);
     min-width: 180px;
-    transition: border-color 200ms;
+    transition: border-color var(--duration-normal) var(--ease-out);
   }
   .member:hover { border-color: var(--color-accent); }
   .member-name {
-    font-size: 0.9rem; font-weight: 600; color: var(--color-text-primary);
+    font-size: var(--text-sm); font-weight: 600; color: var(--color-text-primary);
   }
   .member-role {
-    font-size: 0.72rem; font-family: var(--font-mono);
+    font-size: var(--text-xs); font-family: var(--font-mono);
     color: var(--color-accent);
   }
   .team-affil {
-    margin: 0; font-size: 0.78rem; font-family: var(--font-mono);
+    margin: 0; font-size: var(--text-xs); font-family: var(--font-mono);
     color: var(--color-text-secondary); line-height: 1.6;
   }
 
   /* ══════════════ CTA ══════════════ */
   .cta-section {
-    padding: 80px 24px;
+    padding: var(--space-16) var(--space-6);
     text-align: center;
-    background: radial-gradient(ellipse 60% 80% at 50% 100%, rgba(99,102,241,0.1) 0%, transparent 70%);
+    background: radial-gradient(ellipse 60% 80% at 50% 100%,
+      color-mix(in srgb, var(--color-accent) 10%, transparent) 0%,
+      transparent 70%);
   }
-  .cta-inner { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .cta-inner {
+    max-width: 480px; margin: 0 auto;
+    display: flex; flex-direction: column; align-items: center; gap: var(--space-4);
+  }
   .cta-title {
     margin: 0; font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800;
     letter-spacing: -0.035em; color: var(--color-text-primary);
   }
   .cta-sub {
-    margin: 0; font-size: 0.85rem; font-family: var(--font-mono);
+    margin: 0; font-size: var(--text-sm); font-family: var(--font-mono);
     color: var(--color-text-secondary);
   }
   .cta-btn {
     display: inline-flex; align-items: center;
-    padding: 15px 40px;
+    padding: var(--space-4) var(--space-12);
     background: var(--color-accent); color: #fff;
-    border-radius: 10px; font-size: 1rem; font-weight: 700;
+    border-radius: var(--radius-md); font-size: var(--text-base); font-weight: 700;
     text-decoration: none; letter-spacing: -0.01em;
-    transition: background 120ms, transform 100ms, box-shadow 120ms;
-    box-shadow: 0 0 32px rgba(99,102,241,0.3);
+    transition: background var(--duration-fast) var(--ease-out),
+                transform var(--duration-fast) var(--ease-out),
+                box-shadow var(--duration-fast) var(--ease-out);
+    box-shadow: 0 0 32px color-mix(in srgb, var(--color-accent) 30%, transparent);
   }
   .cta-btn:hover {
     background: var(--color-accent-hover); color: #fff;
     transform: translateY(-2px);
-    box-shadow: 0 8px 40px rgba(99,102,241,0.45);
+    box-shadow: 0 8px 40px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  }
+  .cta-btn:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
   }
   .cta-email {
-    font-size: 0.82rem; font-family: var(--font-mono);
+    font-size: var(--text-xs); font-family: var(--font-mono);
     color: var(--color-text-secondary); text-decoration: none;
-    transition: color 150ms;
+    transition: color var(--duration-fast) var(--ease-out);
   }
   .cta-email:hover { color: var(--color-accent); }
+  .cta-email:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+  }
 
   /* ══════════════ SCROLL REVEAL ══════════════ */
   /* Sections are always visible — animation is enhancement only */
@@ -1494,7 +1727,7 @@ Action items:
   .reveal.revealed .stat-block,
   .reveal.revealed .tl-item,
   .reveal.revealed .team-card {
-    animation: stagger-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: stagger-up var(--duration-slow) var(--ease-out) both;
   }
   .reveal.revealed .stat-block:nth-child(1) { animation-delay: 0ms; }
   .reveal.revealed .stat-block:nth-child(2) { animation-delay: 60ms; }
@@ -1515,5 +1748,9 @@ Action items:
     .reveal { opacity: 1; transform: none; transition: none; }
     .reveal.revealed .stat-block,
     .reveal.revealed .tl-item { animation: none; }
+    .mode-thumb { transition: none; }
+    .mode-desc, .tradeoff-val { animation: none; }
+    .live-dot, .scan-beam, .halo, .flow-line,
+    :global(.pm-hero) { animation: none !important; }
   }
 </style>

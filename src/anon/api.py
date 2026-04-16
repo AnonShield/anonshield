@@ -46,6 +46,8 @@ def anonymize_file(
     secret_key: str = "",
     use_db: bool = False,
     anonymization_config: dict | None = None,
+    ner_score_threshold: float | None = None,
+    ner_aggregation_strategy: str | None = None,
 ) -> dict[str, Any]:
     """Anonymize a single file and write output to output_dir.
 
@@ -146,6 +148,8 @@ def anonymize_file(
         hash_generator=hash_generator,
         entity_detector=entity_detector,
         transformer_model=transformer_model,
+        ner_score_threshold=ner_score_threshold,
+        ner_aggregation_strategy=ner_aggregation_strategy,
     )
 
     processor = ProcessorRegistry.get_processor(

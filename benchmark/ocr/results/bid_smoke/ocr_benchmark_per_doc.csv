@@ -1,0 +1,6 @@
+doc_id,engine,quality_tier,doc_type,cer,wer,cer_no_diac,latency_s,field_f1,anls_score,_ref,_hyp
+bid_CNH_ABERTA_00000000_in,tesseract,degraded,form,0.7518355359765051,0.8850574712643678,0.750367107195301,0.8138002589985263,"{""doc_class"": 0.0, ""macro_f1"": 0.0}",0.0,,
+bid_CNH_ABERTA_00000001_in,tesseract,degraded,form,0.7269230769230769,0.8857142857142857,0.725,1.7625165680001373,"{""doc_class"": 0.0, ""macro_f1"": 0.0}",0.0,,
+bid_CNH_ABERTA_00000002_in,tesseract,degraded,form,0.6942307692307692,0.9142857142857143,0.6923076923076923,0.21974277999834158,"{""doc_class"": 0.0, ""macro_f1"": 0.0}",0.0,,
+bid_CNH_ABERTA_00000003_in,tesseract,degraded,form,0.6386861313868614,0.9305555555555556,0.6313868613138686,0.31206220199965173,"{""doc_class"": 0.0, ""macro_f1"": 0.0}",0.0,,
+bid_CNH_ABERTA_00000004_in,tesseract,degraded,form,0.8970814132104454,1.0,0.8940092165898618,0.24066908700478962,"{""doc_class"": 0.0, ""macro_f1"": 0.0}",0.0,,

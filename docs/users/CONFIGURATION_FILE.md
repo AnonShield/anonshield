@@ -34,7 +34,7 @@ transformer_model: Davlan/xlm-roberta-base-ner-hrl   # HuggingFace model ID
 slug_length: 8               # integer 0–64  (0 = label only, no hash)
 
 # ─── OCR engine ─────────────────────────────────────────────────────────────
-ocr_engine: tesseract        # string  — tesseract | easyocr | paddleocr | doctr | kerasocr
+ocr_engine: tesseract        # 13 options — see docs/users/OCR_ENGINES.md (tesseract, easyocr, paddleocr, doctr, onnxtr, surya, rapidocr, kerasocr, paddle_vl, deepseek_ocr, monkey_ocr, glm_ocr, lighton_ocr)
 
 # ─── Entity selection ────────────────────────────────────────────────────────
 # Positive selection: ONLY these types are anonymized.
