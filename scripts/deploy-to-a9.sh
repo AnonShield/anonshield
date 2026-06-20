@@ -5,21 +5,30 @@
 #   ./scripts/deploy-to-a9.sh            # deploys to host alias "a9"
 #   ./scripts/deploy-to-a9.sh myhost     # deploys to a different ssh host
 #
-# It never touches the host's local secrets: web/.env and web/certs are preserved.
+# It only deletes inside the code directories it manages; the host's local files
+# (web/.env, web/certs, datasets, logs) are never touched.
 set -euo pipefail
 HOST="${1:-a9}"
 DEST="anonshield_deploy"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PY=(--exclude='__pycache__' --exclude='*.pyc')
 
-echo "[deploy] syncing code to $HOST:$DEST (preserving .env and certs)..."
-rsync -az --delete \
-  --exclude='.env' --exclude='certs/' --exclude='node_modules' --exclude='.svelte-kit' \
-  --exclude='build/' --exclude='__pycache__' --exclude='*.pyc' --exclude='*.log' --exclude='*.bak*' \
-  "$ROOT/web/" "$HOST:$DEST/web/"
-rsync -az --delete --exclude='__pycache__' --exclude='*.pyc' "$ROOT/src/" "$HOST:$DEST/src/"
+echo "[deploy] syncing code to $HOST:$DEST ..."
+# Code dirs: mirror exactly (safe to --delete inside these).
+rsync -az --delete "${PY[@]}" --exclude='node_modules' --exclude='.svelte-kit' --exclude='build' \
+  "$ROOT/web/frontend/src/"   "$HOST:$DEST/web/frontend/src/"
+rsync -az --delete "$ROOT/web/frontend/static/" "$HOST:$DEST/web/frontend/static/"
+rsync -az --delete "${PY[@]}" "$ROOT/web/backend/" "$HOST:$DEST/web/backend/"
+rsync -az --delete "${PY[@]}" "$ROOT/src/"         "$HOST:$DEST/src/"
+# Single files: update in place, never delete siblings.
+rsync -az \
+  "$ROOT/web/Makefile" "$ROOT/web/warm_cache.sh" "$ROOT/web/RUNBOOK.md" \
+  "$ROOT/web/docker-compose.prod.yml" "$ROOT/web/docker-compose.a9.yml" \
+  "$HOST:$DEST/web/"
+rsync -az "$ROOT/web/frontend/Dockerfile" "$HOST:$DEST/web/frontend/Dockerfile"
 rsync -az "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$ROOT/anon.py" "$HOST:$DEST/"
 
-echo "[deploy] building, starting, and warming on $HOST..."
+echo "[deploy] building, starting, and warming on $HOST ..."
 ssh "$HOST" "cd $DEST/web && make deploy"
 
 echo "[deploy] done. https://anonshield.org"
