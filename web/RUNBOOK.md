@@ -50,6 +50,30 @@ The containers use `restart: unless-stopped`, so they come back after a reboot.
    cache) and warms the model cache.
 3. Verify: `curl -fsS https://anonshield.org/api/health` and open the site.
 
+## Continuous deployment (CI/CD)
+
+Pushing to `main` deploys automatically. The pipeline (`.github/workflows/ci-cd.yml`)
+runs the Python tests and the frontend build on GitHub-hosted runners, then, only if
+both pass, runs the deploy on a self-hosted runner on this host: it syncs the code
+into `~/anonshield_deploy` and runs `make deploy`. Pull requests run the tests and
+build only, never the deploy.
+
+The self-hosted runner runs as a user systemd service on the host (no inbound SSH,
+no host name in the repo; it connects out to GitHub and is picked by the generic
+label `anonshield-prod`):
+
+```bash
+systemctl --user status gh-runner      # is the runner up
+systemctl --user restart gh-runner     # restart it
+journalctl --user -u gh-runner -f      # follow its logs
+```
+
+To remove it: `systemctl --user disable --now gh-runner`, then
+`cd ~/actions-runner && ./config.sh remove --token "$(gh api -X POST repos/AnonShield/anonshield/actions/runners/remove-token --jq .token)"`.
+
+The manual `./scripts/deploy.sh <host>` path still works and is unchanged; CI/CD
+just automates the same steps.
+
 ## Configuration
 
 - `web/.env` (on the host, not in git): `ANON_SECRET_KEY` (required, keep it
