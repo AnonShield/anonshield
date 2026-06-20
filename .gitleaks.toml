@@ -1,0 +1,22 @@
+title = "AnonShield gitleaks configuration"
+
+# Use the upstream default rule set, then allowlist this repository's test
+# fixtures, example data, and docs. These contain only fake keys and synthetic
+# PII (this is a pseudonymization tool), never real secrets.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures, example data, and documentation (no real secrets)"
+paths = [
+  '''(^|/)tests/''',
+  '''(^|/)benchmark/''',
+  '''(^|/)docs/''',
+  '''(^|/)test_output[^/]*/''',
+  '''(^|/)\.github/workflows/''',
+]
+regexes = [
+  '''test-key-[0-9]+''',
+  '''test-secret[-a-z0-9]*''',
+  '''warmup''',
+]

@@ -276,23 +276,8 @@ def _parse_arguments():
 
     # OCR options
     parser.add_argument("--ocr-engine", type=str, default="tesseract",
-                        choices=["tesseract", "easyocr", "paddleocr", "doctr", "kerasocr"],
-                        help="OCR engine for image/PDF text extraction. Default: tesseract. "
-                             "Others require optional dependencies — see docs/users/OCR_ENGINES.md.")
-    parser.add_argument("--ocr-preprocess-preset", type=str, default="none",
-                        choices=["none", "scan", "photo", "fax"],
-                        help="Image preprocessing preset applied before OCR. "
-                             "'scan' — scanned documents (CLAHE, deskew, adaptive threshold). "
-                             "'photo' — camera-captured pages (noise removal, morph cleanup). "
-                             "'fax' — fax / dot-matrix prints (aggressive binarization). "
-                             "'none' — no preprocessing (default). "
-                             "Overridden by --ocr-preprocess when both are specified.")
-    parser.add_argument("--ocr-preprocess", type=str, default="",
-                        metavar="STEPS",
-                        help="Comma-separated list of preprocessing steps to apply before OCR. "
-                             "Valid steps (run in given order): "
-                             "grayscale, upscale, clahe, denoise, deskew, binarize, morph_open, border. "
-                             "Example: --ocr-preprocess grayscale,upscale,binarize,border")
+                        choices=["tesseract"],
+                        help="OCR engine for image and PDF text extraction. Default and only option: tesseract.")
 
     # Performance & Filtering options
     parser.add_argument("--preserve-row-context", action="store_true", help="For CSV/XLSX, process all values to preserve context instead of only unique values.")
@@ -845,24 +830,14 @@ def main():
                 logging.error(f"Invalid --batch-size value: '{batch_size_value}'. Use 'auto' or an integer. Defaulting to {DefaultSizes.BATCH_SIZE}.")
                 batch_size_value = DefaultSizes.BATCH_SIZE
         
-        # --- OCR Engine ---
+        # --- OCR Engine (tesseract only) ---
         from src.anon.ocr.factory import get_ocr_engine
-        from src.anon.ocr.preprocessor import PRESETS as _OCR_PRESETS, VALID_STEPS as _OCR_VALID_STEPS
         try:
             ocr_engine = get_ocr_engine(args.ocr_engine)
             logging.info(f"OCR engine: {args.ocr_engine}")
         except RuntimeError as e:
             logging.error(str(e))
             sys.exit(1)
-
-        # --- OCR Preprocessing ---
-        ocr_preprocess_steps: list[str] = []
-        if args.ocr_preprocess:
-            ocr_preprocess_steps = [s.strip() for s in args.ocr_preprocess.split(",") if s.strip() in _OCR_VALID_STEPS]
-        elif args.ocr_preprocess_preset and args.ocr_preprocess_preset != "none":
-            ocr_preprocess_steps = list(_OCR_PRESETS[args.ocr_preprocess_preset])
-        if ocr_preprocess_steps:
-            logging.info(f"OCR preprocessing steps: {ocr_preprocess_steps}")
 
         processor_factory_args = {
             "ner_data_generation": args.generate_ner_data,
@@ -883,7 +858,6 @@ def main():
             "force_large_xml": args.force_large_xml,
             "use_datasets": args.use_datasets,
             "ocr_engine": ocr_engine,
-            "preprocess_steps": ocr_preprocess_steps,
         }
         logging.debug(f"Processor factory arguments: {processor_factory_args}")
 
