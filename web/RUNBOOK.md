@@ -53,10 +53,13 @@ The containers use `restart: unless-stopped`, so they come back after a reboot.
 ## Continuous deployment (CI/CD)
 
 Pushing to `main` deploys automatically. The pipeline (`.github/workflows/ci-cd.yml`)
-runs the Python tests and the frontend build on GitHub-hosted runners, then, only if
-both pass, runs the deploy on a self-hosted runner on this host: it syncs the code
-into `~/anonshield_deploy` and runs `make deploy`. Pull requests run the tests and
-build only, never the deploy.
+runs, on GitHub-hosted runners: the Python tests, the frontend build, a dependency
+and container vulnerability scan (pip-audit, npm audit, Trivy), and a secret scan
+plus SAST (gitleaks, bandit). Then, only if the tests, the build, and the secret
+scan pass, it runs the deploy on a self-hosted runner on this host: it syncs the
+code into `~/anonshield_deploy` and runs `make deploy`. Pull requests run all the
+checks but never the deploy. Dependabot (`.github/dependabot.yml`) opens weekly
+update PRs and raises alerts for the Python, npm, Docker, and Actions ecosystems.
 
 The self-hosted runner runs as a user systemd service on the host (no inbound SSH,
 no host name in the repo; it connects out to GitHub and is picked by the generic

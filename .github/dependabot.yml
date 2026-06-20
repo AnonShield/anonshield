@@ -1,0 +1,37 @@
+version: 2
+
+# Automated dependency vulnerability alerts and update pull requests.
+# Covers the Python (uv), frontend (npm), Docker, and GitHub Actions ecosystems.
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: "npm"
+    directory: "/web/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      frontend:
+        patterns: ["*"]
+
+  - package-ecosystem: "docker"
+    directories:
+      - "/web/backend"
+      - "/web/frontend"
+      - "/docker"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

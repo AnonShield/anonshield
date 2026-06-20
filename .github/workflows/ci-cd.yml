@@ -41,6 +41,10 @@ jobs:
     name: Frontend build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # SvelteKit needs this public var present at build time; the value only
+      # matters at runtime (the deployed image injects the real one).
+      PUBLIC_API_URL: http://localhost:8000
     defaults:
       run:
         working-directory: web/frontend
@@ -54,9 +58,58 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  vuln-scan:
+    name: Dependency & container scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Python dependency audit (pip-audit)
+        run: |
+          uv export --frozen --no-dev --format requirements-txt -o /tmp/requirements.txt
+          uvx pip-audit -r /tmp/requirements.txt --progress-spinner off
+        continue-on-error: true
+      - name: Frontend dependency audit (npm audit)
+        working-directory: web/frontend
+        run: npm audit --audit-level=high
+        continue-on-error: true
+      - name: Filesystem vulnerability & misconfig scan (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+
+  secret-scan:
+    name: Secret scan & SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Secret scan (gitleaks)
+        run: |
+          VER=8.21.2
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" | tar -xz gitleaks
+          ./gitleaks detect --source . --no-banner --redact --exit-code 1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Python SAST (bandit)
+        run: uvx bandit -r src web/backend -ll -q
+        continue-on-error: true
+
   deploy:
     name: Deploy to production
-    needs: [test, frontend]
+    needs: [test, frontend, secret-scan]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'AnonShield/anonshield'
     runs-on: [self-hosted, anonshield-prod]
     timeout-minutes: 30
