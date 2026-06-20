@@ -78,13 +78,11 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true
       - name: Filesystem vulnerability & misconfig scan (Trivy)
-        uses: aquasecurity/trivy-action@0.36.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "0"
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b "$RUNNER_TEMP/bin"
+          "$RUNNER_TEMP/bin/trivy" fs --scanners vuln,secret,misconfig \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 --no-progress .
+        continue-on-error: true
 
   secret-scan:
     name: Secret scan & SAST
