@@ -1,6 +1,5 @@
 <script lang="ts">
   import '../app.css';
-  import favicon from '$lib/assets/favicon.svg';
   import { t, toggleLocale } from '$lib/i18n';
   import { page } from '$app/state';
 
@@ -16,7 +15,6 @@
 </script>
 
 <svelte:head>
-  <link rel="icon" href={favicon} />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" />
 </svelte:head>
