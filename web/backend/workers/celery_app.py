@@ -47,7 +47,7 @@ app.conf.update(
 def warm_up_default_model(sender, **kwargs):  # noqa: ARG001
     """Pre-load the default NER model inside each worker process after fork.
 
-    worker_process_init fires INSIDE each forked worker — unlike worker_ready
+    worker_process_init fires INSIDE each forked worker, unlike worker_ready
     which fires in the MainProcess (before workers exist). This ensures the
     loaded engine lives in the same process that will serve jobs, so
     _ENGINE_CACHE hits on every subsequent call.
@@ -62,10 +62,10 @@ def warm_up_default_model(sender, **kwargs):  # noqa: ARG001
     if model.lower() == "none":
         return
 
-    logger.info("Worker process init — warming up '%s' (lang=%s) …", model, lang)
+    logger.info("Worker process init: warming up '%s' (lang=%s) …", model, lang)
     try:
         from src.anon.engine import warm_up_model
         warm_up_model(transformer_model=model, lang=lang)
         logger.info("Warm-up complete for '%s'.", model)
     except Exception as exc:
-        logger.warning("Warm-up failed — first job will be slow: %s", exc)
+        logger.warning("Warm-up failed; first job will be slow: %s", exc)

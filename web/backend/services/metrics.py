@@ -1,4 +1,4 @@
-"""Lightweight SQLite metrics collector — never crashes the app."""
+"""Lightweight SQLite metrics collector that never crashes the app."""
 import json
 import os
 import sqlite3
@@ -173,6 +173,74 @@ def _rows(c: sqlite3.Connection, sql: str, *args) -> list[dict]:
     return [dict(r) for r in c.execute(sql, args).fetchall()]
 
 
+def _percentile(values: list[float], pct: float) -> float | None:
+    """Linear-interpolated percentile (pct in 0..100); None on empty input."""
+    if not values:
+        return None
+    s = sorted(values)
+    if len(s) == 1:
+        return round(s[0], 2)
+    rank = (pct / 100.0) * (len(s) - 1)
+    lo = int(rank)
+    hi = min(lo + 1, len(s) - 1)
+    frac = rank - lo
+    return round(s[lo] + (s[hi] - s[lo]) * frac, 2)
+
+
+def _percentiles(c: sqlite3.Connection, col: str) -> dict:
+    """p50/p90/p99 plus min/max for a numeric job column, ignoring NULLs."""
+    vals = [
+        r[col]
+        for r in c.execute(f"SELECT {col} FROM job WHERE {col} IS NOT NULL")
+        if r[col] is not None
+    ]
+    return {
+        "n": len(vals),
+        "p50": _percentile(vals, 50),
+        "p90": _percentile(vals, 90),
+        "p99": _percentile(vals, 99),
+        "min": round(min(vals), 2) if vals else None,
+        "max": round(max(vals), 2) if vals else None,
+    }
+
+
+def _timeseries(c: sqlite3.Connection, buckets: int = 24) -> list[dict]:
+    """Job volume and average throughput/latency over an adaptive time span.
+
+    Buckets the full job history into a fixed number of equal-width intervals
+    between the first and last job. Returns one row per non-empty bucket with
+    the bucket start timestamp, job count, average throughput and average ms.
+    Empty table yields an empty list.
+    """
+    span = _row(c, "SELECT MIN(ts) lo, MAX(ts) hi FROM job WHERE ts IS NOT NULL")
+    lo, hi = span.get("lo"), span.get("hi")
+    if lo is None or hi is None:
+        return []
+    width = (hi - lo) / buckets if hi > lo else 1.0
+    # Clamp the last edge (ts == hi) into the final bucket so it does not spill
+    # into an extra index; the MIN keeps bucket in [0, buckets-1].
+    rows = _rows(c, """
+        SELECT MIN(CAST((ts - ?) / ? AS INTEGER), ?) bucket,
+               COUNT(*) n,
+               ROUND(AVG(throughput_bps)) avg_throughput_bps,
+               ROUND(AVG(ms), 2) avg_ms,
+               SUM(entity_cnt) total_entities
+        FROM job WHERE ts IS NOT NULL
+        GROUP BY bucket ORDER BY bucket
+    """, lo, width, buckets - 1)
+    out = []
+    for r in rows:
+        b = r["bucket"] if r["bucket"] is not None else 0
+        out.append({
+            "ts": round(lo + b * width, 2),
+            "n": r["n"],
+            "avg_throughput_bps": r["avg_throughput_bps"],
+            "avg_ms": r["avg_ms"],
+            "total_entities": r["total_entities"] or 0,
+        })
+    return out
+
+
 def get_summary() -> dict:
     try:
         with sqlite3.connect(str(_DB_PATH)) as c:
@@ -248,6 +316,11 @@ def get_summary() -> dict:
                 [{"entity": k, "n": v} for k, v in entity_totals.items()],
                 key=lambda x: x["n"], reverse=True
             )
+            percentiles = {
+                "ms": _percentiles(c, "ms"),
+                "throughput_bps": _percentiles(c, "throughput_bps"),
+            }
+            timeseries = _timeseries(c)
             return {
                 "requests": {"aggregate": req_agg, "by_endpoint": by_endpoint},
                 "jobs": {
@@ -257,6 +330,8 @@ def get_summary() -> dict:
                     "by_model": by_model,
                     "by_ocr_engine": by_ocr_engine,
                     "by_entity_type": by_entity_type,
+                    "percentiles": percentiles,
+                    "timeseries": timeseries,
                     "recent": recent_jobs,
                 },
             }

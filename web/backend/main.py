@@ -1,4 +1,4 @@
-"""AnonShield Web — FastAPI application."""
+"""AnonShield Web: FastAPI application."""
 from fastapi import FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -67,7 +67,7 @@ def validate_profile(body: dict) -> dict:
 async def analyze_fields(file: UploadFile) -> dict:
     """Detect columns/fields from a structured file (CSV, XLSX, JSON, JSONL).
     Returns {fields: [{name, sample_values}]} for field selector UI.
-    Accepts first 256 KB only — lightweight, no disk write.
+    Accepts first 256 KB only; lightweight, no disk write.
     """
     import io
     from src.anon.utils import detect_fields_from_stream

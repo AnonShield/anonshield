@@ -1,8 +1,8 @@
-"""File lifecycle management — zero persistence guarantee.
+"""File lifecycle management: zero persistence guarantee.
 
 ANON_JOBS_DIR env var sets the root directory for job files.
 Default: /tmp/anon/jobs (fine for dev/demo on shared servers).
-No dedicated partition required — the sweep task keeps disk usage bounded.
+No dedicated partition required; the sweep task keeps disk usage bounded.
 """
 import os
 import shutil

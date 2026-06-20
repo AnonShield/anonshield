@@ -2,7 +2,7 @@
 
 Used by the legacy_vlm sidecar (transformers 4.51 → paddle_vl, monkey_ocr)
 and the kerasocr sidecar (TensorFlow → kerasocr). The same code serves both
-images — each one only has its own engines installed, so requests for an
+images; each one only has its own engines installed, so requests for an
 unsupported engine return 503.
 """
 from fastapi import FastAPI, HTTPException, UploadFile

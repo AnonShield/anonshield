@@ -1,5 +1,5 @@
 <!--
-  FieldSelector — Refactored into a Modal-based Schema Configurator.
+  FieldSelector: refactored into a Modal-based Schema Configurator.
   Includes compact summary bar and high-fidelity modal overlay.
 -->
 <script lang="ts">

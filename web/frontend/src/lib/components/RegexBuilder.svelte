@@ -57,7 +57,7 @@
       <span class="hint">Python <code>re</code> syntax. Quantifiers: <code>\d+</code> <code>\w*</code> <code>[A-Z]</code>. Case-insensitive: <code>(?i)</code>.</span>
     </label>
 
-    <label>Confidence score — {score.toFixed(2)}
+    <label>Confidence score: {score.toFixed(2)}
       <input type="range" min="0" max="1" step="0.05" bind:value={score} />
     </label>
 

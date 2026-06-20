@@ -1,5 +1,5 @@
 """
-Python API for AnonShield — callable from web workers and the web backend.
+Python API for AnonShield, callable from web workers and the web backend.
 
 Provides:
   - anonymize_file(): run anonymization programmatically
@@ -222,12 +222,12 @@ def get_supported_entities(
             presidio_entities = ae.get_supported_entities(language=lang)
             result = sorted(set(list(presidio_entities) + custom + list(model_ner_entities)))
         except Exception as exc:
-            logger.warning("Could not load Presidio for entity list (%s) — using custom + model entities", exc)
+            logger.warning("Could not load Presidio for entity list (%s); using custom + model entities", exc)
             result = sorted(set(custom) | model_ner_entities)
     else:
-        # filtered / standalone / hybrid — curated set: custom regex + NER model entities only.
+        # filtered / standalone / hybrid use a curated set: custom regex + NER model entities only.
         # These strategies do NOT use Presidio's broad built-in recognizers (CREDIT_CARD,
-        # IBAN, US_DRIVER_LICENSE, etc.) — those generate many false positives in practice.
+        # IBAN, US_DRIVER_LICENSE, etc.); those generate many false positives in practice.
         result = sorted(set(custom) | model_ner_entities)
 
     _ENTITY_CACHE[cache_key] = result

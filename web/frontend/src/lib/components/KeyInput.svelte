@@ -22,7 +22,7 @@
   </div>
   <p class="hint">
     {#if $config.key}
-      <span class="hint-good">{$t('key.hint_deterministic').split(' — ')[0]}</span> — {$t('key.hint_deterministic').split(' — ')[1]}
+      <span class="hint-good">{$t('key.hint_deterministic').split(/: (.*)/s)[0]}</span>: {$t('key.hint_deterministic').split(/: (.*)/s)[1]}
     {:else}
       {$t('key.hint_random')}
     {/if}

@@ -14,7 +14,7 @@ from typing import List, Dict, TYPE_CHECKING, Optional, Set, Tuple
 import logging
 import pandas as pd
 
-# Module-level pipeline cache — keyed by (model_id, device).
+# Module-level pipeline cache, keyed by (model_id, device).
 # Avoids reloading the transformer model on every job.
 _PIPELINE_CACHE: dict[str, object] = {}
 
@@ -98,7 +98,7 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
 
         cache_key = f"{self.transformer_model}:{device}"
         if cache_key in _PIPELINE_CACHE:
-            self.logger.info("Pipeline cache hit for '%s' — skipping model load.", self.transformer_model)
+            self.logger.info("Pipeline cache hit for '%s'; skipping model load.", self.transformer_model)
             self.ner_pipeline = _PIPELINE_CACHE[cache_key]
         else:
             try:
@@ -414,7 +414,7 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
 
 class RegexOnlyStrategy(StandaloneAnonymizationStrategy):
     """
-    Pure regex anonymization — zero NLP/ML overhead.
+    Pure regex anonymization with zero NLP/ML overhead.
 
     Detection: compiled regex patterns only (no spaCy, no Transformers)
     Replacement: same slug-based logic as StandaloneStrategy

@@ -1,4 +1,4 @@
-"""Job endpoints — create, status, download."""
+"""Job endpoints: create, status, download."""
 import json
 import mimetypes
 import os
@@ -19,8 +19,8 @@ from services.limiter import limiter
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 # Limits are configurable via env vars (values in MB)
-# ANON_MAX_SIZE_MB      — without key (default: 1 MB)
-# ANON_MAX_SIZE_KEY_MB  — with key     (default: 1 MB)
+# ANON_MAX_SIZE_MB      : without key (default: 1 MB)
+# ANON_MAX_SIZE_KEY_MB  : with key     (default: 1 MB)
 LIMIT_NO_KEY  = int(os.getenv("ANON_MAX_SIZE_MB",     "1"))  * 1024 * 1024
 LIMIT_WITH_KEY = int(os.getenv("ANON_MAX_SIZE_KEY_MB", "1")) * 1024 * 1024
 

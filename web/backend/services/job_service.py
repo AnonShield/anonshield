@@ -6,8 +6,8 @@ from typing import Any
 import redis
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-KEY_TTL = 3600       # 1h — user secret key
-META_TTL = 7200      # 2h — job metadata
+KEY_TTL = 3600       # 1h; user secret key
+META_TTL = 7200      # 2h; job metadata
 STATUS_TTL = 7200
 
 _pool: redis.ConnectionPool | None = None

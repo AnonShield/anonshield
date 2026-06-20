@@ -1,4 +1,4 @@
-"""GET /api/entities — dynamic entity list sourced from the real Presidio engine."""
+"""GET /api/entities: dynamic entity list sourced from the real Presidio engine."""
 import json
 import logging
 import sys
@@ -165,7 +165,7 @@ def _build_response(entity_ids: list[str], strategy: str) -> dict:
     return {"groups": groups, "strategy": strategy}
 
 
-_ENTITIES_TTL = 86400  # 24h — entity list changes only on deploy
+_ENTITIES_TTL = 86400  # 24h; entity list changes only on deploy
 _ENTITIES_VERSION = "v2"  # bump this to invalidate all cached entity lists on deploy
 
 
@@ -189,7 +189,7 @@ def _set_in_redis(key: str, entity_ids: list[str]) -> None:
         from services.job_service import _client
         _client().setex(key, _ENTITIES_TTL, json.dumps(entity_ids))
     except Exception:
-        pass  # Redis unavailable — in-memory cache in api.py still works
+        pass  # Redis unavailable; in-memory cache in api.py still works
 
 
 @router.get("")

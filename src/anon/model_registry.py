@@ -1,7 +1,7 @@
 """
 Transformer NER model registry.
 
-Adding a new model requires only a single entry here — no scattered
+Adding a new model requires only a single entry here, with no scattered
 conditionals in engine.py or strategies.py.
 
 Usage:
@@ -65,7 +65,7 @@ class ModelEntry:
 
 
 # ---------------------------------------------------------------------------
-# Registry — add new models here only
+# Registry: add new models here only
 # ---------------------------------------------------------------------------
 
 # Default transformer model IDs per language.
@@ -89,13 +89,13 @@ MODEL_REGISTRY: dict[str, ModelEntry] = {
     # ── Multilingual general-purpose ─────────────────────────────────────────
     "Davlan/xlm-roberta-base-ner-hrl": ModelEntry(
         entity_mapping=_DEFAULT_ENTITY_MAPPING,
-        description="Multilingual NER (default) — covers en, pt, es, fr, de, ar, zh",
+        description="Multilingual NER (default), covers en, pt, es, fr, de, ar, zh",
         languages=["en", "pt", "es", "fr", "de", "ar", "zh"],
     ),
     # ── Cybersecurity ────────────────────────────────────────────────────────
     "attack-vector/SecureModernBERT-NER": ModelEntry(
         entity_mapping=_SECURE_MODERNBERT_ENTITY_MAPPING,
-        description="Cybersecurity-focused NER — extracts CVE, malware, threat actors, hashes, IPs",
+        description="Cybersecurity-focused NER: extracts CVE, malware, threat actors, hashes, IPs",
         languages=["en"],
     ),
 }
@@ -114,7 +114,7 @@ def get_entity_mapping(model_id: str) -> dict[str, str]:
     if model_id in MODEL_REGISTRY:
         return MODEL_REGISTRY[model_id].entity_mapping
     logger.warning(
-        "Model '%s' is not in the registry — using default entity mapping. "
+        "Model '%s' is not in the registry; using default entity mapping. "
         "Register it with model_registry.register_model() for precise mapping.",
         model_id,
     )

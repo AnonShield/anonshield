@@ -39,7 +39,7 @@ class EntityDetector:
         return detected_entities
 
     def extract_regex_entities(self, text: str) -> List[Dict]:
-        """Detect entities using only compiled regex patterns — no spaCy doc required."""
+        """Detect entities using only compiled regex patterns; no spaCy doc required."""
         detected_entities = []
         for pat in self.compiled_patterns:
             for match in pat["regex"].finditer(text):

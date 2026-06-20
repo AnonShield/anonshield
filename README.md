@@ -10,9 +10,9 @@ AnonShield is a pseudonymization framework designed for secure and compliant dat
 - **Referential Integrity**: Uses HMAC-SHA256 to ensure the same entity always receives the same pseudonym across different files and runs.
 - **Schema-Aware Configuration**: Fine-grained control over which fields to anonymize in structured files.
 - **On-Premise**: Process sensitive data entirely locally without external API dependencies.
-- **Multiple Anonymization Strategies**: `filtered`, `presidio`, `hybrid`, `standalone`, and `regex` (zero NLP overhead — pure regex, fastest of all).
+- **Multiple Anonymization Strategies**: `filtered`, `presidio`, `hybrid`, `standalone`, and `regex` (zero NLP overhead, pure regex, fastest of all).
 - **Multi-Engine OCR**: Choose from Tesseract, EasyOCR, PaddleOCR, DocTR, or Keras-OCR via `--ocr-engine`.
-- **Image Preprocessing**: Apply a configurable pipeline before OCR — grayscale, 300-DPI upscale, CLAHE contrast, Gaussian denoise, auto-deskew, adaptive binarization, morphological cleanup, and border padding. Pre-built presets for scanned documents, camera photos, and fax/low-quality images.
+- **Image Preprocessing**: Apply a configurable pipeline before OCR: grayscale, 300-DPI upscale, CLAHE contrast, Gaussian denoise, auto-deskew, adaptive binarization, morphological cleanup, and border padding. Pre-built presets for scanned documents, camera photos, and fax/low-quality images.
 - **YAML Config Profiles**: Persist all run settings in a YAML file (`--config`); pre-built profiles for banking documents.
 - **Custom Regex Patterns**: Add domain-specific detectors (CPF, CNPJ, IBAN, employee IDs…) without modifying source code (`--custom-patterns`).
 - **Entity Selection**: Anonymize only the exact types you specify (`--entities`), complementing the existing exclusion list (`--preserve-entities`).
@@ -58,7 +58,7 @@ Anonymize a file using the default settings:
 uv run anon.py path/to/your/file.txt
 ```
 
-Regex-only mode (no model loading — fastest):
+Regex-only mode (no model loading, fastest):
 
 ```bash
 uv run anon.py ./banking_docs/ \
@@ -102,11 +102,11 @@ A single script provisions the environment, downloads the datasets (XFUND-pt, BI
 
 Outputs:
 
-- `benchmark/ocr/results/<config>/ocr_benchmark_summary.csv` — per-config metrics
-- `benchmark/ocr/results/ablation_consolidated.csv` — engine × preprocess pivot
-- `benchmark/ocr/REPORT.md` — narrative summary with headline ranking
-- `benchmark/ocr/METHODOLOGY.md` — metrics, statistical tests, normalization
-- `benchmark/ocr/RESULTS_AUDIT.md` — fairness audit and sample I/O pairs
+- `benchmark/ocr/results/<config>/ocr_benchmark_summary.csv`: per-config metrics
+- `benchmark/ocr/results/ablation_consolidated.csv`: engine × preprocess pivot
+- `benchmark/ocr/REPORT.md`: narrative summary with headline ranking
+- `benchmark/ocr/METHODOLOGY.md`: metrics, statistical tests, normalization
+- `benchmark/ocr/RESULTS_AUDIT.md`: fairness audit and sample I/O pairs
 
 Partial results are usable mid-run: each configuration is independently resumable (per-doc keys in `run_state.json`), so stopping/restarting the script picks up where it left off.
 
@@ -118,7 +118,7 @@ AnonShield includes a full-featured web application (SvelteKit + FastAPI) for br
 ```bash
 cd web
 echo "ANON_SECRET_KEY=$(openssl rand -hex 32)" > .env
-# Edit web/Caddyfile — set your domain
+# Edit web/Caddyfile: set your domain
 docker compose -f docker-compose.prod.yml up -d
 ```
 
@@ -128,12 +128,12 @@ See [docs/web/SETUP.md](docs/web/SETUP.md) for the complete guide (production + 
 
 Detailed guides are available in the `docs/` directory:
 
-- [Web Setup](docs/web/SETUP.md) — production deploy (Docker + Caddy) and local dev mode
-- [CLI Reference](docs/users/CLI_REFERENCE.md) — every flag, with examples
-- [Configuration File](docs/users/CONFIGURATION_FILE.md) — YAML config file schema and profiles
-- [OCR Engines](docs/users/OCR_ENGINES.md) — comparison of all 13 OCR engines (classical, deep-learning, VLM)
+- [Web Setup](docs/web/SETUP.md): production deploy (Docker + Caddy) and local dev mode
+- [CLI Reference](docs/users/CLI_REFERENCE.md): every flag, with examples
+- [Configuration File](docs/users/CONFIGURATION_FILE.md): YAML config file schema and profiles
+- [OCR Engines](docs/users/OCR_ENGINES.md): comparison of all 13 OCR engines (classical, deep-learning, VLM)
 - [Architecture Overview](docs/developers/ARCHITECTURE.md)
-- [Extensibility Guide](docs/developers/EXTENSIBILITY.md) — how to add strategies, OCR engines, models, patterns
+- [Extensibility Guide](docs/developers/EXTENSIBILITY.md): how to add strategies, OCR engines, models, patterns
 - [Anonymization Strategies](docs/developers/ANONYMIZATION_STRATEGIES.md)
 - [SLM Integration Guide](docs/developers/SLM_INTEGRATION_GUIDE.md)
 

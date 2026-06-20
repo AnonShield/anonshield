@@ -51,7 +51,7 @@ SUPPORTED_LANGUAGES = {
 
 
 # ---------------------------------------------------------------------------
-# Module-level engine cache — keyed by (transformer_model, lang).
+# Module-level engine cache, keyed by (transformer_model, lang).
 # TransformersNlpEngine takes 30-60 s to load; caching it means the second
 # job with the same model is near-instant. Safe to share because
 # BatchAnalyzerEngine and AnonymizerEngine are stateless inference objects.
@@ -143,7 +143,7 @@ def warm_up_model(
     logger = _log.getLogger(__name__)
     cache_key = f"{transformer_model}:{lang}"
     if cache_key in _ENGINE_CACHE:
-        logger.info("warm_up_model: '%s' already cached — skipping.", transformer_model)
+        logger.info("warm_up_model: '%s' already cached; skipping.", transformer_model)
         return
     logger.info("warm_up_model: loading '%s' (lang=%s) …", transformer_model, lang)
     try:
@@ -670,13 +670,13 @@ class AnonymizationOrchestrator:
             anonymizer.add_anonymizer(CustomSlugAnonymizer)
             return batch_analyzer, anonymizer
 
-        # --- Transformer path — check module-level cache first ---
+        # --- Transformer path: check module-level cache first ---
         cache_key = f"{self.transformer_model}:{effective_lang}:{self.ner_aggregation_strategy}"
         if cache_key in _ENGINE_CACHE:
-            logging.info("Engine cache hit for '%s' (lang=%s) — skipping model load.", self.transformer_model, effective_lang)
+            logging.info("Engine cache hit for '%s' (lang=%s); skipping model load.", self.transformer_model, effective_lang)
             return _ENGINE_CACHE[cache_key]
 
-        logging.info("Engine cache miss — loading TransformersNlpEngine for '%s' (lang=%s).", self.transformer_model, effective_lang)
+        logging.info("Engine cache miss; loading TransformersNlpEngine for '%s' (lang=%s).", self.transformer_model, effective_lang)
         trf_model_config = [
             {"lang_code": effective_lang,
              "model_name": {"spacy": spacy_model_name, "transformers": self.transformer_model}}

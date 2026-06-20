@@ -113,6 +113,6 @@ Because the rest of the application depends on the protocol, no other code chang
 
 ### See Also
 
-- [Extensibility Guide](EXTENSIBILITY.md) — full reference for implementing a custom `SLMClient`, adding prompt versions, and injecting the SLM layer into the orchestrator
-- [Architecture Reference](ARCHITECTURE.md) — system design and module responsibilities
-- [Anonymization Strategies](ANONYMIZATION_STRATEGIES.md) — comparison of all built-in strategies
+- [Extensibility Guide](EXTENSIBILITY.md): full reference for implementing a custom `SLMClient`, adding prompt versions, and injecting the SLM layer into the orchestrator
+- [Architecture Reference](ARCHITECTURE.md): system design and module responsibilities
+- [Anonymization Strategies](ANONYMIZATION_STRATEGIES.md): comparison of all built-in strategies

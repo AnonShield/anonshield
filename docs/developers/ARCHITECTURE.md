@@ -92,7 +92,7 @@ SQLite database at `db/entities.db`:
 
 ### 1. CLI Layer (`anon.py`)
 
-The composition root — parses arguments, instantiates and wires all core components (`CacheManager`, `HashGenerator`, `EntityDetector`, `DatabaseContext`), injects dependencies into `AnonymizationOrchestrator`, dispatches files to processors, and generates performance reports.
+The composition root: parses arguments, instantiates and wires all core components (`CacheManager`, `HashGenerator`, `EntityDetector`, `DatabaseContext`), injects dependencies into `AnonymizationOrchestrator`, dispatches files to processors, and generates performance reports.
 
 ### 2. Anonymization Orchestrator (`engine.py`)
 
@@ -138,7 +138,7 @@ GPU placement is engine-specific: `easyocr` auto-detects, `doctr` calls `.cuda()
 
 ### 4. Model Registry (`src/anon/model_registry.py`)
 
-A single `MODEL_REGISTRY` dict maps model IDs to their NER entity label mappings. Adding a new model requires only one `register_model()` call — no conditionals in `engine.py` or `strategies.py`.
+A single `MODEL_REGISTRY` dict maps model IDs to their NER entity label mappings. Adding a new model requires only one `register_model()` call; no conditionals in `engine.py` or `strategies.py`.
 
 ```python
 # Before (hardcoded):
@@ -160,14 +160,14 @@ Template Method Pattern with a base `FileProcessor` and specialized subclasses:
 
 | Processor | Handles |
 |:----------|:--------|
-| `TextFileProcessor` | `.txt`, `.log` — line-by-line |
-| `ImageFileProcessor` | Images — OCR extraction |
-| `DocxFileProcessor` | `.docx` — paragraphs + embedded images |
-| `PdfFileProcessor` | `.pdf` — text blocks + images |
-| `CsvFileProcessor` | `.csv` — column-wise with translation maps |
-| `XlsxFileProcessor` | `.xlsx` — in-memory workbook processing |
-| `XmlFileProcessor` | `.xml` — structure-preserving with XPath tracking |
-| `JsonFileProcessor` | `.json`, `.jsonl` — hybrid streaming/in-memory |
+| `TextFileProcessor` | `.txt`, `.log`: line-by-line |
+| `ImageFileProcessor` | Images: OCR extraction |
+| `DocxFileProcessor` | `.docx`: paragraphs + embedded images |
+| `PdfFileProcessor` | `.pdf`: text blocks + images |
+| `CsvFileProcessor` | `.csv`: column-wise with translation maps |
+| `XlsxFileProcessor` | `.xlsx`: in-memory workbook processing |
+| `XmlFileProcessor` | `.xml`: structure-preserving with XPath tracking |
+| `JsonFileProcessor` | `.json`, `.jsonl`: hybrid streaming/in-memory |
 
 **JSON Processing Modes:**
 1. JSONL: line-by-line streaming
@@ -322,8 +322,8 @@ After batch processing, the orchestrator verifies input count == output count. O
 
 ### See Also
 
-- [Extensibility Guide](EXTENSIBILITY.md) — all extension points with worked examples (strategies, processors, cache, storage, SLM client, model providers, etc.)
-- [Anonymization Strategies](ANONYMIZATION_STRATEGIES.md) — detailed description of each built-in strategy
-- [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md) — deep dive into the SLM module architecture
-- [Contributing](../../CONTRIBUTING.md) — development setup, conventions, and pull-request process
-- [Changelog](../../CHANGELOG.md) — release history
+- [Extensibility Guide](EXTENSIBILITY.md): all extension points with worked examples (strategies, processors, cache, storage, SLM client, model providers, etc.)
+- [Anonymization Strategies](ANONYMIZATION_STRATEGIES.md): detailed description of each built-in strategy
+- [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md): deep dive into the SLM module architecture
+- [Contributing](../../CONTRIBUTING.md): development setup, conventions, and pull-request process
+- [Changelog](../../CHANGELOG.md): release history

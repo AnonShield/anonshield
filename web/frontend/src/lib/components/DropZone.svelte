@@ -1,5 +1,5 @@
 <!--
-  DropZone — file upload target.
+  DropZone: file upload target.
   When `file` prop is set, renders a compact "file selected" chip instead of the full drop area.
 -->
 <script lang="ts">
@@ -72,7 +72,7 @@
     class:dragging={isDragging}
     role="button"
     tabindex="0"
-    aria-label="Change file — {file.name}"
+    aria-label="Change file: {file.name}"
     onclick={() => input?.click()}
     onkeydown={handleKeydown}
     ondragover={(e) => { e.preventDefault(); isDragging = true; }}

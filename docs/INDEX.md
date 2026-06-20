@@ -4,12 +4,12 @@
 
 ## Web Application
 
-Browser-based UI for anonymization — upload files, select models and entities, download results.
+Browser-based UI for anonymization: upload files, select models and entities, download results.
 
 | Document | What it covers |
 |----------|---------------|
 | [web/SETUP.md](web/SETUP.md) | **Production deploy (Docker + Caddy) and local development setup.** Start here for the web app. |
-| [developers/WEB_SYSTEM_DESIGN.md](developers/WEB_SYSTEM_DESIGN.md) | Architecture internals — job lifecycle, data flow, Redis design, scaling path. |
+| [developers/WEB_SYSTEM_DESIGN.md](developers/WEB_SYSTEM_DESIGN.md) | Architecture internals: job lifecycle, data flow, Redis design, scaling path. |
 
 ---
 
@@ -46,5 +46,5 @@ Formal benchmark suite for the OCR engines (targets ICDAR/SIBGRAPI/IJDAR venues)
 | Document | What it covers |
 |----------|---------------|
 | [../benchmark/ocr/METHODOLOGY.md](../benchmark/ocr/METHODOLOGY.md) | Metrics (CER, WER, Field-F1, ANLS), statistical tests, and normalization pipeline. |
-| [../benchmark/ocr/REPORT.md](../benchmark/ocr/REPORT.md) | Consolidated results — headline ranking, preprocess ablation, engine inventory. |
-| [../benchmark/ocr/RESULTS_AUDIT.md](../benchmark/ocr/RESULTS_AUDIT.md) | Fairness audit — sample I/O pairs, known biases per engine, out-of-scope items. |
+| [../benchmark/ocr/REPORT.md](../benchmark/ocr/REPORT.md) | Consolidated results: headline ranking, preprocess ablation, engine inventory. |
+| [../benchmark/ocr/RESULTS_AUDIT.md](../benchmark/ocr/RESULTS_AUDIT.md) | Fairness audit: sample I/O pairs, known biases per engine, out-of-scope items. |

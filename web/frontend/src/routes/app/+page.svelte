@@ -75,7 +75,7 @@
   let limitBytes = $derived(limitMb * 1024 * 1024);
   let fileTooLarge = $derived(selectedFile !== null && (selectedFile as File).size > limitBytes);
 
-  // ── Entity fetch — re-run when strategy, model, or lang changes ──
+  // Entity fetch: re-run when strategy, model, or lang changes
   let entityFetchKey = $derived(`${$config.strategy}||${$config.model}||${$config.lang}`);
 
   $effect(() => {
@@ -83,7 +83,7 @@
     const key = entityFetchKey; // subscribe only to this derived
     const [strategy, model, lang] = key.split('||');
     groups = []; // clear while loading
-    // Reset entity selection when model/strategy/lang changes — old IDs may not exist in new model
+    // Reset entity selection when model/strategy/lang changes; old IDs may not exist in new model
     config.update(c => ({ ...c, selected_entities: null }));
     fetchEntities(strategy, model, lang)
       .then(r => { groups = r.groups; })
@@ -92,7 +92,7 @@
 
   function onFile(file: File) {
     selectedFile = file;
-    // stay on configure screen — file chip appears in-place
+    // stay on configure screen; file chip appears in-place
   }
 
   function clearFile() {
@@ -184,7 +184,7 @@
       const result = await validateProfile(text);
       if (!result.valid) { showToast('err', result.error ?? 'Invalid profile'); return; }
       fromYaml(text);
-      showToast('ok', `Profile loaded — ${result.entities_count ?? 0} entities, ${result.patterns_count ?? 0} patterns`);
+      showToast('ok', `Profile loaded: ${result.entities_count ?? 0} entities, ${result.patterns_count ?? 0} patterns`);
     } catch {
       showToast('err', 'Could not read profile file');
     }
@@ -348,10 +348,10 @@
 </script>
 
 <svelte:head>
-  <title>AnonShield — App</title>
+  <title>AnonShield: App</title>
 </svelte:head>
 
-<!-- Tutorial fires on first visit — spotlights dropzone, key, strategy, entities in-place -->
+<!-- Tutorial fires on first visit; spotlights dropzone, key, strategy, entities in-place -->
 <Tutorial />
 
 {#if screen === 'configure'}
@@ -393,7 +393,7 @@
           />
           {#if fileTooLarge}
             <p class="file-too-large">
-              File is {(selectedFile!.size / 1024 / 1024).toFixed(1)} MB — demo limit is {limitMb} MB.
+              File is {(selectedFile!.size / 1024 / 1024).toFixed(1)} MB; demo limit is {limitMb} MB.
             </p>
           {/if}
 
@@ -538,7 +538,7 @@
     <h2>{$activeJob?.filename ?? selectedFile?.name}</h2>
     <p class="status-label">
       {$t('status.processing')}
-      {#if etaLabel}<span class="eta-label">— {etaLabel}</span>{/if}
+      {#if etaLabel}<span class="eta-label">({etaLabel})</span>{/if}
     </p>
     <ProgressBar {progress} label={progress > 0 ? `${progress}%` : ''} />
     <p class="cache-hint">
@@ -568,7 +568,7 @@
         download
         onclick={() => setTimeout(() => { screen = 'configure'; clearJob(); selectedFile = null; }, 3000)}
       >
-        {$t('status.download')} — anon_{$activeJob?.filename}
+        {$t('status.download')}: anon_{$activeJob?.filename}
         {#if outputSize > 0}<span class="file-size">({(outputSize / 1024 / 1024).toFixed(1)} MB)</span>{/if}
       </a>
       <p class="delete-warning">{$t('status.delete_warning')}</p>
@@ -678,7 +678,7 @@
         <div class="adv-grid">
           <div class="adv-field">
             <label class="adv-label" for="adv-ner-threshold">
-              {$t('app.ner_score_threshold')} — {($config.ner_score_threshold ?? nerDefaults.score_threshold).toFixed(2)}
+              {$t('app.ner_score_threshold')}: {($config.ner_score_threshold ?? nerDefaults.score_threshold).toFixed(2)}
             </label>
             <input id="adv-ner-threshold" type="range" min="0.1" max="0.95" step="0.05"
                    value={$config.ner_score_threshold ?? nerDefaults.score_threshold}
@@ -706,9 +706,9 @@
         <input type="range" min="0" max="64" step="1" bind:value={$config.slug_length} class="slug-slider" />
         <p class="slug-mode">
           {#if $config.slug_length === 0}
-            <span class="slug-anon">{$t('app.slug.anon')}</span> — {$t('app.slug.anon_desc')}
+            <span class="slug-anon">{$t('app.slug.anon')}</span>: {$t('app.slug.anon_desc')}
           {:else}
-            <span class="slug-pseudo">{$t('app.slug.pseudo')}</span> — {$t('app.slug.pseudo_desc', { bits: $config.slug_length * 4 })}
+            <span class="slug-pseudo">{$t('app.slug.pseudo')}</span>: {$t('app.slug.pseudo_desc', { bits: $config.slug_length * 4 })}
           {/if}
         </p>
       </div>
@@ -811,7 +811,7 @@
 
   .settings-col { display: flex; flex-direction: column; gap: var(--space-4); }
 
-  /* File too large warning — pop spring matches other feedback moments; mono for exactness */
+  /* File too large warning: pop spring matches other feedback moments; mono for exactness */
   .file-too-large {
     margin-top: var(--space-2);
     font-size: var(--text-xs);
@@ -825,7 +825,7 @@
     opacity: 0.45; cursor: not-allowed;
   }
 
-  /* Section eyebrow — uppercase + tracked to read as a label, not body copy */
+  /* Section eyebrow: uppercase + tracked to read as a label, not body copy */
   .panel-title {
     margin: 0 0 var(--space-3);
     font-size: var(--text-xs); font-weight: 600;
@@ -833,7 +833,7 @@
     color: var(--color-text-secondary);
   }
 
-  /* Advanced toggle — Fitts: full-width tap target, visible border for affordance,
+  /* Advanced toggle: Fitts: full-width tap target, visible border for affordance,
      accent border on hover telegraphs that it opens further controls. */
   .advanced-toggle {
     display: flex; align-items: center; justify-content: space-between;
@@ -903,7 +903,7 @@
     position: relative;
   }
 
-  /* Header — sticky so the modal context is never lost on scroll
+  /* Header: sticky so the modal context is never lost on scroll
      (Nielsen #1: visibility of system status) */
   .adv-header {
     display: flex; align-items: center; justify-content: space-between;
@@ -919,7 +919,7 @@
     letter-spacing: 0.06em; text-transform: uppercase;
     color: var(--color-text-primary);
   }
-  /* Close — 32×32 target (WCAG 2.5.5 AA, Fitts-friendly) */
+  /* Close: 32×32 target (WCAG 2.5.5 AA, Fitts-friendly) */
   .adv-close {
     width: 32px; height: 32px;
     display: inline-flex; align-items: center; justify-content: center;
@@ -976,7 +976,7 @@
     line-height: 1.5;
   }
 
-  /* Tour highlight — clearly visible without border chrome.
+  /* Tour highlight: clearly visible without border chrome.
      Uses outline (no layout shift) + subtle tint. */
   .adv-active {
     position: relative;
@@ -989,7 +989,7 @@
                 background    var(--duration-normal) var(--ease-out);
   }
 
-  /* Coach-mark tour overlay — inside dialog, respects top-layer */
+  /* Coach-mark tour overlay: inside dialog, respects top-layer */
   .adv-tour-overlay {
     position: absolute; inset: 0;
     background: rgba(0,0,0,0.72);
@@ -1072,7 +1072,7 @@
   .adv-tour-next:active:not(:disabled) { transform: translateY(1px); }
   .adv-tour-next:disabled { opacity: 0.5; cursor: default; }
 
-  /* Strategy cards — Hick-Hyman: three options in a short vertical list, one clear
+  /* Strategy cards: Hick-Hyman: three options in a short vertical list, one clear
      CTA per row. Gestalt: name + desc are visually paired via tight 2px gap so each
      row reads as one decision unit, not two. */
   .strategy-list { display: flex; flex-direction: column; gap: var(--space-1); }
@@ -1101,12 +1101,12 @@
 
   select { width: 100%; }
 
-  /* Entity panel: stretch naturally — no fixed max-height causing unnecessary inner scroll */
+  /* Entity panel: stretch naturally, no fixed max-height causing unnecessary inner scroll */
   .entity-panel { min-height: 200px; overflow-y: visible; }
   .loading-hint { color: var(--color-text-secondary); font-size: var(--text-sm); margin: 0; }
 
   /* Patterns */
-  /* .patterns-card removed — now inside adv-dialog as adv-field */
+  /* .patterns-card removed; now inside adv-dialog as adv-field */
   .patterns-header { display: flex; justify-content: space-between; align-items: center; }
   .patterns-table {
     width: 100%; border-collapse: collapse;
@@ -1181,7 +1181,7 @@
   .slug-slider:active::-webkit-slider-thumb { cursor: grabbing; }
   .slug-slider:active::-moz-range-thumb { cursor: grabbing; }
 
-  /* Slug mode hint — inline legend; semantic colors match the destructive/safe
+  /* Slug mode hint: inline legend; semantic colors match the destructive/safe
      distinction so users read the action, not the hue. */
   .slug-mode {
     margin-top: var(--space-2);
@@ -1202,8 +1202,8 @@
 
   /* ── OCR engine hint → now .adv-hint inside modal ── */
 
-  /* ── Batch queue ──
-     Goals: (a) state (done / error / processing) must be readable at a glance —
+  /* Batch queue.
+     Goals: (a) state (done / error / processing) must be readable at a glance;
      semantic color tokens instead of raw greens/reds so it matches the rest of
      the system; (b) every row-level control meets WCAG 2.5.5 (≥24px target);
      (c) meta text at ≥12px (--text-xs) for legibility. */
@@ -1295,7 +1295,7 @@
     gap: var(--space-6);
   }
 
-  /* Entity chart — compact horizontal bars; the fixed-width label column keeps
+  /* Entity chart: compact horizontal bars; the fixed-width label column keeps
      bar origins aligned (Gestalt: common region), so eyes compare lengths, not
      starting positions. Grow animation is easing-out to telegraph completion. */
   .entity-chart {
@@ -1370,7 +1370,7 @@
   }
   .cache-note { display: block; opacity: 0.6; margin-top: var(--space-1); }
 
-  /* Success — pop spring on entry. Disney: anticipation then settle. */
+  /* Success: pop spring on entry. Disney: anticipation then settle. */
   .success-icon {
     width: 56px; height: 56px;
     background: color-mix(in srgb, var(--color-success) 15%, transparent);
@@ -1386,7 +1386,7 @@
   .file-size { opacity: 0.7; }
   .delete-warning { margin: 0; font-size: var(--text-sm); color: var(--color-warning); }
 
-  /* Error — same pop as success (consistency heuristic #4) */
+  /* Error: same pop as success (consistency heuristic #4) */
   .error-icon {
     width: 56px; height: 56px;
     background: color-mix(in srgb, var(--color-error) 15%, transparent);

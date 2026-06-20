@@ -300,7 +300,7 @@ class FilteredPresidioStrategy:
 
 #### Filtered Entity Scope
 
-**Included (24 types, default model — derived dynamically from `ENTITY_MAPPING` + custom recognizers):**
+**Included (24 types, default model, derived dynamically from `ENTITY_MAPPING` + custom recognizers):**
 
 ```python
 # Derived at runtime by FilteredPresidioStrategy._get_core_entities()
@@ -1616,9 +1616,9 @@ AnonShield (Current):
 
 ### See Also
 
-- [Extensibility Guide](EXTENSIBILITY.md) — how to implement and register a custom anonymization strategy
-- [Architecture Reference](ARCHITECTURE.md) — system design and module responsibilities
-- [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md) — SLM-based strategy details
+- [Extensibility Guide](EXTENSIBILITY.md): how to implement and register a custom anonymization strategy
+- [Architecture Reference](ARCHITECTURE.md): system design and module responsibilities
+- [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md): SLM-based strategy details
 
 ---
 

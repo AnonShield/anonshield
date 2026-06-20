@@ -1,4 +1,4 @@
-"""GET /api/metrics — anonymization benchmark data."""
+"""GET /api/metrics: anonymization benchmark data."""
 from fastapi import APIRouter, Query
 from services.metrics import get_summary
 

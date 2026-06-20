@@ -1,6 +1,6 @@
-# OCR Engines — Comparison and Installation
+# OCR Engines: Comparison and Installation
 
-AnonShield supports **13 OCR engines** across three families — classical (Tesseract), deep-learning detectors+recognizers (EasyOCR, DocTR, OnnxTR, Surya, PaddleOCR, RapidOCR, Keras-OCR), and vision-language models (PaddleOCR-VL, DeepSeek-OCR-2, MonkeyOCR, GLM-OCR, LightOn-OCR). All engines run **100% locally** — no cloud calls, no data leaves your machine.
+AnonShield supports **13 OCR engines** across three families: classical (Tesseract), deep-learning detectors+recognizers (EasyOCR, DocTR, OnnxTR, Surya, PaddleOCR, RapidOCR, Keras-OCR), and vision-language models (PaddleOCR-VL, DeepSeek-OCR-2, MonkeyOCR, GLM-OCR, LightOn-OCR). All engines run **100% locally**: no cloud calls, no data leaves your machine.
 
 Select one with `--ocr-engine <name>` or set `ocr_engine:` in a config file.
 
@@ -23,8 +23,8 @@ Accuracy is reported as OmniDocBench overall score when available; otherwise CER
 | `paddle_vl` | VLM 0.9B | ✅ required | OmniDocBench 94.50 | Slow (gen) | ~2 GB | Apache-2.0 | SOTA all-rounder |
 | `deepseek_ocr` | VLM 3B MoE | ✅ + flash-attn | OmniDocBench 91.09 | Slow (gen) | ~6 GB | MIT | Complex layouts, markdown |
 | `monkey_ocr` | VLM 1.2B | ✅ required | OmniDocBench 86.96 | Slow (gen) | ~2.4 GB | Apache-2.0 | Compact VLM alternative |
-| `glm_ocr` | VLM | ✅ required | — | Slow (gen) | — | — | Experimental |
-| `lighton_ocr` | VLM | ✅ required | — | Slow (gen) | — | — | Experimental |
+| `glm_ocr` | VLM | ✅ required | N/A | Slow (gen) | N/A | N/A | Experimental |
+| `lighton_ocr` | VLM | ✅ required | N/A | Slow (gen) | N/A | N/A | Experimental |
 
 **Why three families?** Classical engines handle the fast path on clean inputs; deep-learning detectors+recognizers give a solid accuracy/speed tradeoff across ~80 languages; VLMs give SOTA accuracy on documents with complex layouts (receipts, invoices, multi-column forms) at the cost of GPU memory and generation latency.
 
@@ -34,13 +34,13 @@ Accuracy is reported as OmniDocBench overall score when available; otherwise CER
 
 | Engine | How GPU is enabled |
 |---|---|
-| `easyocr` | Auto — `torch.cuda.is_available()` detected in `easyocr_engine.py` |
-| `doctr` | `.cuda()` moves model explicitly — `ocr_predictor()` alone does **not** auto-place |
+| `easyocr` | Auto: `torch.cuda.is_available()` detected in `easyocr_engine.py` |
+| `doctr` | `.cuda()` moves model explicitly; `ocr_predictor()` alone does **not** auto-place |
 | `onnxtr` | Passes `providers=["CUDAExecutionProvider", ...]` when `onnxruntime-gpu` installed |
-| `surya` | Reads `TORCH_DEVICE` env var — benchmark script sets `TORCH_DEVICE=cuda` |
+| `surya` | Reads `TORCH_DEVICE` env var; benchmark script sets `TORCH_DEVICE=cuda` |
 | `paddleocr` | `device="gpu"` passed explicitly in v5 API |
-| `paddle_vl` / `deepseek_ocr` / `monkey_ocr` | `.to("cuda")` on load — GPU is mandatory |
-| `tesseract` / `rapidocr` | **CPU-only by design** — no GPU code path |
+| `paddle_vl` / `deepseek_ocr` / `monkey_ocr` | `.to("cuda")` on load; GPU is mandatory |
+| `tesseract` / `rapidocr` | **CPU-only by design**; no GPU code path |
 
 Verify your setup:
 
@@ -77,7 +77,7 @@ pip install easyocr
 
 ### paddleocr
 
-PaddleOCR v5 (PP-OCRv5) — SOTA accuracy for forms, checks, IDs, multilingual.
+PaddleOCR v5 (PP-OCRv5): SOTA accuracy for forms, checks, IDs, multilingual.
 
 ```bash
 pip install "paddleocr>=2.9.0" "paddlepaddle>=3.0.0"
@@ -97,7 +97,7 @@ pip install "python-doctr>=1.0"
 # or: uv sync --extra doctr
 ```
 
-GPU is **not** enabled automatically — `DocTREngine._get_model()` calls `.cuda()` when CUDA is available (see `src/anon/ocr/doctr_engine.py`).
+GPU is **not** enabled automatically; `DocTREngine._get_model()` calls `.cuda()` when CUDA is available (see `src/anon/ocr/doctr_engine.py`).
 
 ### onnxtr
 
@@ -109,7 +109,7 @@ pip install "onnxtr[cpu]"      # CPU only
 # or: uv sync --extra onnxtr
 ```
 
-Drop-in replacement — same architectures (`fast_base` det, `crnn_vgg16_bn` reco).
+Drop-in replacement: same architectures (`fast_base` det, `crnn_vgg16_bn` reco).
 
 ### kerasocr
 
@@ -128,11 +128,11 @@ pip install "surya-ocr>=0.14"
 # or: uv sync --extra surya
 ```
 
-Set `TORCH_DEVICE=cuda` in the environment to force GPU — Surya's Predictor reads this env var at init.
+Set `TORCH_DEVICE=cuda` in the environment to force GPU; Surya's Predictor reads this env var at init.
 
 ### rapidocr
 
-PaddleOCR models in ONNX (no Paddle framework). **CPU-only** by design — ideal for lightweight deployments.
+PaddleOCR models in ONNX (no Paddle framework). **CPU-only** by design, ideal for lightweight deployments.
 
 ```bash
 pip install rapidocr-onnxruntime
@@ -152,7 +152,7 @@ Model auto-downloads from HuggingFace on first use (~2 GB).
 
 ### deepseek_ocr (DeepSeek-OCR-2)
 
-3B MoE VLM with markdown grounding. Pins `transformers==4.46.3` — install in a separate env if you have other VLM engines.
+3B MoE VLM with markdown grounding. Pins `transformers==4.46.3`; install in a separate env if you have other VLM engines.
 
 ```bash
 pip install transformers==4.46.3 tokenizers==0.20.3 einops addict easydict
@@ -164,7 +164,7 @@ Requires **~10 GB free disk** for model + flash-attn build artifacts.
 
 ### monkey_ocr (MonkeyOCR-pro-1.2B)
 
-Compact VLM. No PyPI package — requires git clone:
+Compact VLM. No PyPI package; requires git clone:
 
 ```bash
 git clone https://github.com/Yuliang-Liu/MonkeyOCR /opt/MonkeyOCR
@@ -172,9 +172,9 @@ pip install -r /opt/MonkeyOCR/requirements.txt
 export MONKEY_OCR_ROOT=/opt/MonkeyOCR
 ```
 
-### glm_ocr (GLM-OCR — SOTA on OmniDocBench)
+### glm_ocr (GLM-OCR, SOTA on OmniDocBench)
 
-Native `transformers` VLM — OmniDocBench 94.62 (highest open-source score as of Apr/2026).
+Native `transformers` VLM: OmniDocBench 94.62 (highest open-source score as of Apr/2026).
 
 ```bash
 pip install "transformers>=5.3.0" torch pillow
@@ -194,7 +194,7 @@ pip install "transformers>=5.0.0" pypdfium2 torch pillow
 
 Model: `lightonai/LightOnOCR-2-1B`.
 
-### Planned (roadmap — not yet integrated)
+### Planned (roadmap, not yet integrated)
 
 | Engine | Model ID | Size | Rationale |
 |---|---|---|---|
@@ -210,7 +210,7 @@ These are tracked as pending tasks (#44, #45, #46). See `docs/developers/OCR_ROA
 
 | Use case | Recommended |
 |---|---|
-| Anonymization pipeline default — any document | `tesseract` (safe baseline) |
+| Anonymization pipeline default, any document | `tesseract` (safe baseline) |
 | Noisy / rotated scans, receipts | `easyocr` |
 | Brazilian forms, checks, RG/CPF | `paddleocr` (v5 latin) or `paddle_vl` |
 | Complex multi-column forms (academic papers, contracts) | `doctr` or `onnxtr` |

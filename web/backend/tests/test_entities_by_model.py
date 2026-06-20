@@ -1,5 +1,5 @@
 """
-Integration tests for GET /api/entities?model=... — model-aware entity lists.
+Integration tests for GET /api/entities?model=... (model-aware entity lists).
 
 Verifies that the endpoint returns different entity sets per model and that
 model-specific entities (cybersecurity) appear only when the matching model
@@ -68,7 +68,7 @@ def test_default_model_has_regex_entities(client):
 
 
 # ---------------------------------------------------------------------------
-# 2. SecureModernBERT — cybersecurity entities
+# 2. SecureModernBERT: cybersecurity entities
 # ---------------------------------------------------------------------------
 
 def test_securemodern_has_cybersec_entities(client):
@@ -90,11 +90,11 @@ def test_securemodern_has_no_person(client):
     # PERSON may appear from Presidio built-ins but NOT from model registry
     # (we verify cybersec entities dominate, not that PERSON is absent from Presidio)
     ids = _entity_ids(r.json())
-    assert "MALWARE" in ids  # key assertion — model-specific entity is present
+    assert "MALWARE" in ids  # key assertion: model-specific entity is present
 
 
 # ---------------------------------------------------------------------------
-# 3. Regex strategy — no NER model entities regardless of model param
+# 3. Regex strategy: no NER model entities regardless of model param
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("model", [

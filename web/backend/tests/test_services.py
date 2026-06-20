@@ -1,4 +1,4 @@
-"""Unit tests for backend services — no Redis, no disk I/O required."""
+"""Unit tests for backend services; no Redis, no disk I/O required."""
 import re
 import sys
 import tempfile

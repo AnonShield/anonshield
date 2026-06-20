@@ -1,6 +1,6 @@
-# Configuration File — YAML Run Config
+# Configuration File: YAML Run Config
 
-The `--config` flag lets you store all run settings in a YAML (or JSON) file and reuse them across runs. CLI arguments always override the config file — the file only fills in values you have not set on the command line.
+The `--config` flag lets you store all run settings in a YAML (or JSON) file and reuse them across runs. CLI arguments always override the config file; the file only fills in values you have not set on the command line.
 
 ---
 
@@ -130,10 +130,10 @@ The config file is applied **before** CLI argument processing. The rule is:
 
 AnonShield ships with two example profiles in `examples/profiles/`:
 
-### `banking_pt.yaml` — Brazilian Banking Documents
+### `banking_pt.yaml`: Brazilian Banking Documents
 
 Optimized for anonymizing Brazilian banking records:
-- Strategy: `regex` (no model loading — maximum speed)
+- Strategy: `regex` (no model loading, maximum speed)
 - Language: `pt`
 - Entities: EMAIL, PHONE, IP, CREDIT_CARD, UUID, CPF, CNPJ, PIX keys, CEP, RG, bank account/agency
 - Custom patterns: `examples/patterns/banking_pt.yaml`
@@ -168,7 +168,7 @@ The `entity_type` string becomes the label in the anonymized output: `[CPF_a1b2c
 
 ## See Also
 
-- [`docs/users/CLI_REFERENCE.md`](CLI_REFERENCE.md) — full argument reference
-- [`docs/users/OCR_ENGINES.md`](OCR_ENGINES.md) — OCR engine comparison and installation
-- [`examples/anon_config.example.yaml`](../../examples/anon_config.example.yaml) — fully commented template
-- [`examples/patterns/banking_pt.yaml`](../../examples/patterns/banking_pt.yaml) — Brazilian banking patterns
+- [`docs/users/CLI_REFERENCE.md`](CLI_REFERENCE.md): full argument reference
+- [`docs/users/OCR_ENGINES.md`](OCR_ENGINES.md): OCR engine comparison and installation
+- [`examples/anon_config.example.yaml`](../../examples/anon_config.example.yaml): fully commented template
+- [`examples/patterns/banking_pt.yaml`](../../examples/patterns/banking_pt.yaml): Brazilian banking patterns

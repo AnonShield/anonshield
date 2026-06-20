@@ -80,7 +80,7 @@ See [docs/developers/ARCHITECTURE.md](docs/developers/ARCHITECTURE.md) for the f
 
 ### Patterns
 
-Respect the established patterns — do not work around them:
+Respect the established patterns; do not work around them:
 
 | Pattern | Where |
 |---|---|
@@ -135,7 +135,7 @@ The most common extension points are:
 | New file format processor | [Section 3 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#3-file-processors) |
 | New entity type / regex | [Section 4 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#4-entity-types-and-regex-patterns) |
 | New transformer model | [Section 5 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#5-transformer-models) |
-| Custom cache / hash / storage | [Sections 6–8 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#6-cache-backend) |
+| Custom cache / hash / storage | [Sections 6-8 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#6-cache-backend) |
 | New SLM backend | [Section 11 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#11-slm-client) |
 
 For larger changes (new strategies, new processors), open an issue first to discuss the approach before writing code.
@@ -180,7 +180,7 @@ Keep the subject line under 72 characters. Use the commit body for motivation an
 
 1. **Branch** off `main` with a descriptive name: `feat/xml-streaming`, `fix/csv-empty-header`, `docs/slm-guide-update`.
 2. **Write tests** that cover the change. All existing tests must continue to pass.
-3. **Update documentation** — if you change a public interface or add an extension point, update the relevant file in `docs/developers/`.
+3. **Update documentation**: if you change a public interface or add an extension point, update the relevant file in `docs/developers/`.
 4. **Open the PR** against `main`. Fill in the PR description:
    - What problem does this solve?
    - How was it tested?

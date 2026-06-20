@@ -77,7 +77,7 @@
     config.update(c => {
       const sel = c.selected_entities;
       if (allCyberOn) {
-        // Deselect cyber entities only — keep everything else intact
+        // Deselect cyber entities only; keep everything else intact
         if (sel === null) {
           // Currently all selected → make explicit set without cyber entities
           const allIds = groups.flatMap(g => g.entities.map(e => e.id));
@@ -89,7 +89,7 @@
         cyberIds.forEach(id => s.delete(id));
         return { ...c, selected_entities: s };
       } else {
-        // Select cyber entities — keep everything else intact
+        // Select cyber entities; keep everything else intact
         if (sel === null) return c; // already all selected
         const s = new Set(sel);
         cyberIds.forEach(id => s.add(id));

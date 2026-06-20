@@ -1,4 +1,4 @@
-# AnonShield Web — Setup Guide
+# AnonShield Web: Setup Guide
 
 This guide covers running the AnonShield web application in both **production** and **development** modes.
 
@@ -13,8 +13,8 @@ Browser → Caddy (TLS) → FastAPI (backend) ← Redis ← Celery workers
 
 - **Frontend**: SvelteKit SSR app (Node.js, port 3000)
 - **Backend**: FastAPI + uvicorn (port 8000)
-- **Queue**: Celery with two queues — `fast` (CPU/regex) and `gpu` (NER models)
-- **Broker**: Redis (no persistence — purely ephemeral)
+- **Queue**: Celery with two queues: `fast` (CPU/regex) and `gpu` (NER models)
+- **Broker**: Redis (no persistence, purely ephemeral)
 - **TLS**: Caddy with automatic HTTPS (production) or plain HTTP (dev)
 
 ---
@@ -24,7 +24,7 @@ Browser → Caddy (TLS) → FastAPI (backend) ← Redis ← Celery workers
 ### Prerequisites
 
 - Docker + Docker Compose v2
-- NVIDIA Container Toolkit (if using GPU workers — optional)
+- NVIDIA Container Toolkit (if using GPU workers, optional)
 - A domain name pointed at your server (for automatic HTTPS via Caddy)
 
 ### 1. Environment Variables
@@ -48,7 +48,7 @@ openssl rand -hex 32
 
 ### 2. Configure Caddy
 
-Edit `web/Caddyfile` — replace the domain:
+Edit `web/Caddyfile`, replace the domain:
 
 ```
 anonshield.example.com {
@@ -82,12 +82,12 @@ Services started:
 | `caddy` | TLS termination, reverse proxy |
 | `frontend` | SvelteKit SSR (Node.js) |
 | `backend` | FastAPI API server |
-| `worker-fast` | Celery — CPU queue (regex, fast NER) |
+| `worker-fast` | Celery: CPU queue (regex, fast NER) |
 | `redis` | Broker + entity-list cache |
 
 > **GPU workers**: If you have a NVIDIA GPU, add a `worker-gpu` service (see `docker-compose.yml` for the template). Requires the NVIDIA Container Toolkit installed on the host.
 
-### 4. First Run — Model Downloads
+### 4. First Run: Model Downloads
 
 On first startup the Celery workers will download transformer models from HuggingFace. Depending on your chosen model:
 
@@ -112,7 +112,7 @@ curl https://anonshield.example.com/api/health
 
 ## Development Setup
 
-Dev mode runs each service natively (no Docker required) with hot-reload. You do **not** need to download all OCR models — Tesseract (installed via your system package manager) is enough.
+Dev mode runs each service natively (no Docker required) with hot-reload. You do **not** need to download all OCR models; Tesseract (installed via your system package manager) is enough.
 
 ### Prerequisites
 
@@ -159,24 +159,24 @@ Add these to your shell profile or create a `.envrc` file (direnv).
 
 Open **four terminals**:
 
-**Terminal 1 — Redis**
+**Terminal 1: Redis**
 ```bash
 redis-server --save "" --appendonly no
 ```
 
-**Terminal 2 — Backend API**
+**Terminal 2: Backend API**
 ```bash
 cd web/backend
 PYTHONPATH=. uvicorn main:app --reload --port 8000
 ```
 
-**Terminal 3 — Celery Worker**
+**Terminal 3: Celery Worker**
 ```bash
 cd web/backend
 PYTHONPATH=. celery -A workers.celery_app worker -Q fast,gpu --concurrency 2 --loglevel=info
 ```
 
-**Terminal 4 — Frontend**
+**Terminal 4: Frontend**
 ```bash
 cd web/frontend
 PUBLIC_API_URL=http://localhost:8000/api npm run dev
@@ -210,7 +210,7 @@ AnonShield can apply an image preprocessing pipeline before OCR is run on images
 
 | Preset | Steps applied | Best for |
 |--------|--------------|---------|
-| `none` | — | Clean digital PDFs, text files |
+| `none` | None | Clean digital PDFs, text files |
 | `scan` | grayscale → upscale → clahe → denoise → deskew → binarize → border | Flatbed-scanned documents with possible skew |
 | `photo` | grayscale → upscale → clahe → denoise → deskew → binarize → morph_open → border | Pages photographed by hand or mobile |
 | `fax` | grayscale → upscale → clahe → denoise → binarize → morph_open → border | Fax output, dot-matrix prints, heavy photocopies |
@@ -221,12 +221,12 @@ AnonShield can apply an image preprocessing pipeline before OCR is run on images
 |------|-------------|
 | `grayscale` | Convert to single-channel. Required before threshold-based steps. |
 | `upscale` | Double resolution when image is below 1000 px. Targets the 300 DPI sweet spot for Tesseract. |
-| `clahe` | Adaptive histogram equalization — recovers faded, low-contrast prints. |
-| `denoise` | Gaussian blur — removes scanner speckles and JPEG artifacts. |
+| `clahe` | Adaptive histogram equalization. Recovers faded, low-contrast prints. |
+| `denoise` | Gaussian blur. Removes scanner speckles and JPEG artifacts. |
 | `deskew` | Auto-correct rotation up to ±15° (requires OpenCV). |
-| `binarize` | Adaptive thresholding → pure black & white — handles uneven lighting well. |
+| `binarize` | Adaptive thresholding → pure black & white. Handles uneven lighting well. |
 | `morph_open` | Removes isolated noise pixels after binarization (requires OpenCV). |
-| `border` | Adds 20 px white padding — prevents Tesseract from missing edge text. |
+| `border` | Adds 20 px white padding. Prevents Tesseract from missing edge text. |
 
 ### Web UI
 
@@ -249,7 +249,7 @@ uv run anon.py ./photo.jpg \
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ANON_SECRET_KEY` | — (required) | HMAC key for pseudonymization |
+| `ANON_SECRET_KEY` | None (required) | HMAC key for pseudonymization |
 | `REDIS_URL` | `redis://redis:6379/0` | Redis connection string |
 | `ANON_JOBS_DIR` | `/anon-jobs` | Scratch dir for in-flight job files |
 | `ANON_MAX_SIZE_MB` | `10` | Per-file upload size limit (MB) |
@@ -262,8 +262,8 @@ uv run anon.py ./photo.jpg \
 
 - Input files are deleted **immediately** after the worker reads them.
 - Output files are deleted **immediately** after streaming to the browser.
-- The anonymization key is stored only in Redis (1h TTL) — never written to disk.
-- `--db-mode in-memory` is set on every job — no entity database is created.
+- The anonymization key is stored only in Redis (1h TTL); never written to disk.
+- `--db-mode in-memory` is set on every job; no entity database is created.
 - Celery Beat runs cleanup every 15 minutes for any orphaned job files.
 
 ---

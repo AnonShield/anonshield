@@ -1,4 +1,4 @@
-# AnonShield Web — System Design
+# AnonShield Web: System Design
 
 **Stack:** SvelteKit · FastAPI · Celery · Redis · Nginx  
 **Servidor:** On-premise, GPU disponível  
@@ -21,7 +21,7 @@
 
 ---
 
-## 2. Arquitetura — Visão Geral
+## 2. Arquitetura: Visão Geral
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -93,7 +93,7 @@
   - Validar tipo de arquivo e tamanho por tier
   - Criar job + enfileirar no Celery
   - Servir status e output em streaming
-  - Endpoint `/api/entities` — lista dinâmica de entidades por estratégia + modelo
+  - Endpoint `/api/entities`: lista dinâmica de entidades por estratégia + modelo
 
 ### 3.3 Celery Workers
 
@@ -105,9 +105,9 @@
 ### 3.4 Redis
 
 - Broker Celery
-- `job:{id}:key` — chave do usuário, TTL 1h, deletada pelo worker após uso
-- `job:{id}:status` — `queued` / `running:{pct}` / `done` / `error:{msg}`
-- `job:{id}:meta` — nome do arquivo, tamanho, estratégia, TTL 2h
+- `job:{id}:key`: chave do usuário, TTL 1h, deletada pelo worker após uso
+- `job:{id}:status`: `queued` / `running:{pct}` / `done` / `error:{msg}`
+- `job:{id}:meta`: nome do arquivo, tamanho, estratégia, TTL 2h
 
 ---
 
@@ -184,7 +184,7 @@ Controle de disco — sem partição dedicada:
   5. Limite de 1 job simultâneo na fila gpu (concurrency=1) — sem sobreposição de picos
 ```
 
-**Por que não tmpfs?** 10 GB em RAM não é viável — e tmpfs usaria RAM compartilhada do servidor. O diretório configurável via `ANON_JOBS_DIR` é a solução adequada para servidor compartilhado.
+**Por que não tmpfs?** 10 GB em RAM não é viável, e tmpfs usaria RAM compartilhada do servidor. O diretório configurável via `ANON_JOBS_DIR` é a solução adequada para servidor compartilhado.
 
 ---
 
@@ -208,8 +208,8 @@ def process_job(job_id: str):
 
 **Garantias:**
 - Chave nunca vai para disco (Redis com `appendonly no`)
-- Redis bind em `127.0.0.1` — não exposto na rede
-- HTTPS obrigatório — chave nunca trafega em claro
+- Redis bind em `127.0.0.1`, não exposto na rede
+- HTTPS obrigatório, chave nunca trafega em claro
 - Chave nunca aparece em logs (FastAPI: `exclude_unset=True`, sem request logging do body)
 
 ---
@@ -317,7 +317,7 @@ Valida um YAML de perfil antes de importar (sem executar nada).
 **Princípios aplicados:**
 - **Lei de Hick:** não apresentar escolhas antes de serem relevantes. Estratégia aparece *depois* do upload.
 - **Lei de Fitts:** área de drop grande o suficiente para não exigir precisão.
-- **Lei de Miller:** no máximo 7±2 entidades visíveis por grupo — usar grupos colapsáveis.
+- **Lei de Miller:** no máximo 7±2 entidades visíveis por grupo; usar grupos colapsáveis.
 - **Gestalt (proximidade + similaridade):** entidades agrupadas por categoria, mesmo espaçamento interno.
 - **Nielsen #1 (visibilidade do status):** progresso sempre visível, nunca tela em branco.
 - **WCAG 2.1 AA:** contraste ≥ 4.5:1, foco visível, sem informação só por cor.
@@ -417,13 +417,13 @@ Valida um YAML de perfil antes de importar (sem executar nada).
 
 ---
 
-### 8.3 Configuration Builder — Padrão de Interação
+### 8.3 Configuration Builder: Padrão de Interação
 
 **Seleção de Entidades (por que chips/checkboxes em grupos, não text input):**
 
-O usuário *nunca digita* um nome de entidade. O sistema chama `GET /api/entities?strategy=...&model=...` assim que estratégia ou modelo mudam e renderiza os grupos. Justificativa: elimina erro de digitação, torna o scope visível, reduz carga cognitiva (reconhecer > recordar — Nielsen #6).
+O usuário *nunca digita* um nome de entidade. O sistema chama `GET /api/entities?strategy=...&model=...` assim que estratégia ou modelo mudam e renderiza os grupos. Justificativa: elimina erro de digitação, torna o scope visível, reduz carga cognitiva (reconhecer > recordar, Nielsen #6).
 
-**Regex Builder — modal:**
+**Regex Builder, modal:**
 ```
 [+ Adicionar Padrão]
 ┌─────────────────────────────────────────────────────┐
@@ -487,7 +487,7 @@ custom_patterns:
 
 ---
 
-### 8.5 Suporte a ZIP — UX
+### 8.5 Suporte a ZIP: UX
 
 Ao detectar `.zip` no upload, a UI mostra:
 
@@ -505,7 +505,7 @@ Resultado: anon_relatorio.zip com os arquivos processados.
 Os arquivos não suportados não serão incluídos.
 ```
 
-A análise do conteúdo do ZIP acontece client-side (Web API `zip.js`) — sem upload apenas para inspecionar. Reduz round-trip, dá feedback instantâneo.
+A análise do conteúdo do ZIP acontece client-side (Web API `zip.js`); sem upload apenas para inspecionar. Reduz round-trip, dá feedback instantâneo.
 
 ---
 
@@ -549,7 +549,7 @@ A análise do conteúdo do ZIP acontece client-side (Web API `zip.js`) — sem u
 
 ---
 
-### 8.7 Motion — Regras
+### 8.7 Motion: Regras
 
 | Elemento | Animação | Duração | Por quê |
 |---------|----------|---------|--------|
@@ -558,7 +558,7 @@ A análise do conteúdo do ZIP acontece client-side (Web API `zip.js`) — sem u
 | Modal entrada | `opacity 0→1` + `translateY(8px→0)` | 250ms ease-out | Orienta atenção, evita pop-in abrupto |
 | Checkbox entidade | `scale(0.8→1)` no check | 100ms | Confirma seleção sem ruído |
 | Toast de erro | slide-in top | 200ms ease-out | Urgência sem susto |
-| Status "concluído" | ✓ com `scale(0→1)` | 300ms spring | Recompensa — único momento de "alegria" |
+| Status "concluído" | ✓ com `scale(0→1)` | 300ms spring | Recompensa: único momento de "alegria" |
 
 **O que NÃO tem animação:** hover em links de texto, abertura de grupos de entidades, resize de painéis. Decoração = ruído.
 
@@ -765,7 +765,7 @@ http {
 - 1 instância FastAPI
 - 1 instância SvelteKit
 
-### Produção (quando necessário — sem reescrever nada)
+### Produção (quando necessário, sem reescrever nada)
 
 | Mudança | O que habilita |
 |---------|---------------|
@@ -781,11 +781,11 @@ http {
 
 ## 13. Checklist de Segurança
 
-- [ ] HTTPS obrigatório — redirecionar HTTP → HTTPS no Nginx
+- [ ] HTTPS obrigatório: redirecionar HTTP → HTTPS no Nginx
 - [ ] Redis bind em `127.0.0.1` + senha (`requirepass`)
-- [ ] `appendonly no` no Redis — chave nunca persiste em disco
+- [ ] `appendonly no` no Redis: chave nunca persiste em disco
 - [ ] Validação de Content-Type no backend (não confiar no cliente)
-- [ ] Path traversal: jobs isolados em `UUID/` — nunca aceitar `../`
+- [ ] Path traversal: jobs isolados em `UUID/`; nunca aceitar `../`
 - [ ] Chave nunca aparece em logs (configurar `log_config` do uvicorn)
 - [ ] Headers de segurança no Nginx: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
 - [ ] Tamanho máximo verificado via streaming (não carregar arquivo inteiro para checar)

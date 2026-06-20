@@ -3,7 +3,7 @@
   import { t } from '$lib/i18n';
 
   // ── Client-side regex demo ────────────────────────────────────────────────
-  const SAMPLE = `Meeting notes — Q4 Security Review
+  const SAMPLE = `Meeting notes: Q4 Security Review
 Attendees: Sarah Chen (sarah.chen@acme.com), Marcus Rodriguez
 Phone: +1 (555) 234-5678  ·  Alt: (415) 900-2211
 
@@ -104,13 +104,13 @@ Action items:
 
   // ── Scroll-reveal for sections ────────────────────────────────────────────
   onMount(() => {
-    // Stats counter observer — fire as soon as 10% is visible
+    // Stats counter observer: fire as soon as 10% is visible
     const statsObs = new IntersectionObserver(([e]) => {
       if (e.isIntersecting) { statsVisible = true; statsObs.disconnect(); }
     }, { threshold: 0.1 });
     if (statsRef) statsObs.observe(statsRef);
 
-    // General reveal observer — trigger on first pixel entering viewport
+    // General reveal observer: trigger on first pixel entering viewport
     const revealObs = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
@@ -128,8 +128,8 @@ Action items:
 </script>
 
 <svelte:head>
-  <title>AnonShield — On-premise PII anonymization</title>
-  <meta name="description" content="Research-grade sensitive entities redaction. Zero cloud, zero persistence. Built at UNIPAMPA — published at SBSeg 2025, ERRC 2025, SBRC 2026." />
+  <title>AnonShield: On-premise PII anonymization</title>
+  <meta name="description" content="Research-grade sensitive entities redaction. Zero cloud, zero persistence. Built at UNIPAMPA; published at SBSeg 2025, ERRC 2025, SBRC 2026." />
 </svelte:head>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -485,7 +485,7 @@ Action items:
             <div class="nd-zero">
               <div class="nd-zero-row">
                 <span class="nd-zero-label">{$t('landing.n5.zero.original')}</span>
-                <span class="nd-zero-val nd-deleted">— {$t('landing.n5.zero.deleted')}</span>
+                <span class="nd-zero-val nd-deleted">✕ {$t('landing.n5.zero.deleted')}</span>
               </div>
               <div class="nd-zero-row">
                 <span class="nd-zero-label">{$t('landing.n5.zero.anon')}</span>
@@ -493,7 +493,7 @@ Action items:
               </div>
               <div class="nd-zero-row">
                 <span class="nd-zero-label">{$t('landing.n5.zero.after')}</span>
-                <span class="nd-zero-val nd-deleted">— {$t('landing.n5.zero.deleted')}</span>
+                <span class="nd-zero-val nd-deleted">✕ {$t('landing.n5.zero.deleted')}</span>
               </div>
             </div>
             <p class="nd-desc">{$t('landing.n5.desc')}</p>
@@ -520,7 +520,7 @@ Action items:
       <span class="stat-desc">{$t('landing.stat.f1')}</span>
     </div>
     <div class="stat-block">
-      <span class="stat-val" class:animated={statsVisible}>96.7<span class="stat-unit">%</span></span>
+      <span class="stat-val" class:animated={statsVisible}>96.4<span class="stat-unit">%</span></span>
       <span class="stat-desc">{$t('landing.stat.recall')}</span>
     </div>
     <div class="stat-block">
@@ -572,17 +572,19 @@ Action items:
             <span class="paper-gen">AnonLFI v1.0</span>
           </div>
           <h3 class="paper-title">Anonimização de Incidentes de Segurança com Reidentificação Controlada</h3>
-          <p class="paper-authors">C. T. Bandel, J. P. R. Esteves, K. P. Guerra, L. M. Bertholdo, D. Kreutz, R. S. Miani</p>
+          <p class="paper-authors">Carolina Tompsen Bandel (SENAC EAD), João Pedro Ramires Esteves (UFU), Kalian Pereira Guerra (UFRGS), Leandro M. Bertholdo (UFRGS), Diego Kreutz (UNIPAMPA), Rodrigo S. Miani (UFU)</p>
           <p class="paper-context">{$t('landing.research.gen1.ctx')}</p>
           <div class="paper-metrics">
             <span class="pm pm-good">100% Precision</span>
-            <span class="pm pm-good">97.38% Recall</span>
+            <span class="pm pm-good">97.38% efficacy</span>
             <span class="pm pm-info">763 {$t('landing.research.gen1.incidents')}</span>
+            <span class="pm pm-info">Controlled re-identification</span>
+            <span class="pm pm-info">NER + regex</span>
             <span class="pm pm-info">On-premise</span>
           </div>
           <div class="paper-links">
             <a href="https://sol.sbc.org.br/index.php/sbseg/article/view/36614" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.paper')} ↗</a>
-            <a href="https://github.com/AnonShield/tool/tree/main/anonlfi_1.0" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.code')} ↗</a>
+            <a href="https://anonymous.4open.science/r/anon-F0EB" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.code')} ↗</a>
           </div>
         </div>
       </div>
@@ -599,15 +601,19 @@ Action items:
             <span class="paper-gen">AnonLFI v2.0</span>
           </div>
           <h3 class="paper-title">AnonLFI 2.0: Extensible Architecture for PII Pseudonymization in CSIRTs with OCR and Technical Recognizers</h3>
-          <p class="paper-authors">C. Kapelinski, D. Lautert, B. Machado, D. Kreutz</p>
+          <p class="paper-authors">Cristhian Kapelinski (UNIPAMPA), Douglas Lautert (UNIPAMPA), Beatriz Machado (UNIPAMPA), Diego Kreutz (UNIPAMPA)</p>
           <p class="paper-context">{$t('landing.research.gen2.ctx')}</p>
           <div class="paper-metrics">
-            <span class="pm pm-good">92.1% F1 (XML)</span>
+            <span class="pm pm-good">100% Precision</span>
+            <span class="pm pm-good">92.13% F1 (OpenVAS XML)</span>
+            <span class="pm pm-good">76.5% F1 (OCR / PDF)</span>
+            <span class="pm pm-info">Reversible (HMAC-SHA256)</span>
+            <span class="pm pm-info">XML / JSON structure preserved</span>
             <span class="pm pm-info">On-premise</span>
           </div>
           <div class="paper-links">
             <a href="https://sol.sbc.org.br/index.php/errc/article/view/39186" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.paper')} ↗</a>
-            <a href="https://github.com/AnonShield/tool/tree/main/anonlfi_2.0" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.code')} ↗</a>
+            <a href="https://github.com/AnonShield/AnonLFI2.0" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.code')} ↗</a>
           </div>
         </div>
       </div>
@@ -623,14 +629,15 @@ Action items:
             <span class="paper-gen accent-gen">AnonShield ← {$t('landing.research.gen3.here')}</span>
           </div>
           <h3 class="paper-title">AnonShield: Scalable On-Premise Pseudonymization for CSIRT Vulnerability Data</h3>
-          <p class="paper-authors">C. Kapelinski, D. Lautert, B. Machado, I. G. Ferrão, D. Kreutz · UNIPAMPA / UBO</p>
+          <p class="paper-authors">Cristhian Kapelinski (UNIPAMPA), Douglas Lautert (UNIPAMPA), Beatriz Machado (UNIPAMPA), Isadora Garcia Ferrão (UBO), Diego Kreutz (UNIPAMPA)</p>
           <p class="paper-context">{$t('landing.research.gen3.ctx')}</p>
           <div class="paper-metrics">
             <span class="pm pm-good">94.2% F1</span>
-            <span class="pm pm-good">96.7% Recall</span>
+            <span class="pm pm-good">96.4% Recall</span>
             <span class="pm pm-hero">738× {$t('landing.research.gen3.faster')}</span>
-            <span class="pm pm-hero">&lt;10 min / 550 MB</span>
-            <span class="pm pm-info">70,951 {$t('landing.research.gen3.records')}</span>
+            <span class="pm pm-hero">92h to &lt;10 min</span>
+            <span class="pm pm-info">550 MB / 70,951 {$t('landing.research.gen3.records')}</span>
+            <span class="pm pm-info">GPU-accelerated NER</span>
             <span class="pm pm-info">On-premise</span>
           </div>
           <div class="paper-links">
@@ -671,6 +678,26 @@ Action items:
       <div class="member">
         <span class="member-name">Isadora G. Ferrão</span>
         <span class="member-role">UBO</span>
+      </div>
+      <div class="member">
+        <span class="member-name">Carolina Tompsen Bandel</span>
+        <span class="member-role">SENAC EAD</span>
+      </div>
+      <div class="member">
+        <span class="member-name">João Pedro Ramires Esteves</span>
+        <span class="member-role">UFU</span>
+      </div>
+      <div class="member">
+        <span class="member-name">Kalian Pereira Guerra</span>
+        <span class="member-role">UFRGS</span>
+      </div>
+      <div class="member">
+        <span class="member-name">Leandro M. Bertholdo</span>
+        <span class="member-role">UFRGS</span>
+      </div>
+      <div class="member">
+        <span class="member-name">Rodrigo S. Miani</span>
+        <span class="member-role">UFU</span>
       </div>
     </div>
 
@@ -797,7 +824,7 @@ Action items:
   }
   textarea.panel-body:focus { color: var(--color-text-primary); }
   .output-body {
-    /* deliberately muted "ghost" tone — below --color-text-secondary to indicate non-primary output */
+    /* deliberately muted "ghost" tone: below --color-text-secondary to indicate non-primary output */
     color: color-mix(in srgb, var(--color-text-secondary) 55%, var(--color-surface));
   }
 
@@ -857,7 +884,7 @@ Action items:
     .hero { padding: 32px 16px 32px; }
   }
 
-  /* Mode toggle — segmented control with sliding thumb (Fitts: large targets; Miller: 2 options)
+  /* Mode toggle: segmented control with sliding thumb (Fitts: large targets; Miller: 2 options)
      Thumb animates between positions to imply state change is causal, not magical. */
   .mode-toggle {
     display: grid;
@@ -930,13 +957,13 @@ Action items:
     to { opacity: 1; transform: translateY(0); }
   }
 
-  /* Token span inside .ent — dims the hashed slug slightly so the type label reads as primary */
+  /* Token span inside .ent: dims the hashed slug slightly so the type label reads as primary */
   :global(.ent-token) {
     opacity: 0.72;
     font-weight: 500;
   }
 
-  /* Tradeoffs — three-axis grid that re-renders on mode change.
+  /* Tradeoffs: three-axis grid that re-renders on mode change.
      Axis labels stay constant (Gestalt: common region); values animate to cue the change. */
   .tradeoffs {
     display: flex; flex-direction: column; gap: var(--space-3);
@@ -990,7 +1017,7 @@ Action items:
   .tradeoff-row:has(.val-pos) { border-left-color: var(--color-success); }
   .tradeoff-row:has(.val-neg) { border-left-color: var(--color-warning); }
 
-  /* Legend — inline chip strip, monospaced for alignment */
+  /* Legend: inline chip strip, monospaced for alignment */
   .legend {
     display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4);
     padding: 2px 0;
@@ -1012,7 +1039,7 @@ Action items:
     border-radius: 999px;
   }
 
-  /* Hero actions — primary CTA uses accent token; glow shadow derived from accent via color-mix
+  /* Hero actions: primary CTA uses accent token; glow shadow derived from accent via color-mix
      so it stays in sync with the palette (no hex literal of 99,102,241). */
   .hero-actions { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
   .cta-primary {
@@ -1134,7 +1161,7 @@ Action items:
     50%       { opacity: 1;   transform: translate(-50%, -60%) scale(1.25); }
   }
 
-  /* Circular icon ring — now a button */
+  /* Circular icon ring: now a button */
   .node-ring {
     width: 72px; height: 72px;
     display: flex; align-items: center; justify-content: center;
@@ -1210,7 +1237,7 @@ Action items:
     color: var(--color-text-primary); letter-spacing: 0.01em;
   }
 
-  /* Stat pills — neutral chips on tinted glass surface */
+  /* Stat pills: neutral chips on tinted glass surface */
   .nd-stats {
     display: flex; flex-wrap: wrap; gap: var(--space-1);
     padding: var(--space-3) var(--space-4) var(--space-2);
@@ -1226,7 +1253,7 @@ Action items:
     white-space: nowrap;
   }
 
-  /* Format tags (node 1) — syntax-coloured blue for "file format" domain */
+  /* Format tags (node 1): syntax-coloured blue for "file format" domain */
   .nd-formats {
     display: flex; flex-wrap: wrap; gap: var(--space-1);
     padding: 2px var(--space-4) var(--space-3);
@@ -1259,7 +1286,7 @@ Action items:
     font-weight: 600; font-size: var(--text-xs);
   }
 
-  /* Code block (node 3) — darker recessed surface to feel like a terminal/code snippet */
+  /* Code block (node 3): darker recessed surface to feel like a terminal/code snippet */
   .nd-code {
     margin: var(--space-1) var(--space-4) var(--space-2);
     background: color-mix(in srgb, #000 40%, transparent);
@@ -1273,7 +1300,7 @@ Action items:
     font-size: var(--text-xs);
     color: color-mix(in srgb, var(--color-text-primary) 85%, var(--color-text-secondary));
   }
-  /* Syntax highlight — keyword amber matches --color-warning; muted italics for comments */
+  /* Syntax highlight: keyword amber matches --color-warning; muted italics for comments */
   .nd-kw { color: var(--color-warning); font-weight: 600; }
   .nd-val { color: var(--color-warning); }
   .nd-muted {
@@ -1347,7 +1374,7 @@ Action items:
     from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
     to   { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
-  /* Affordance hint — shows on hover to signal interactivity without clutter */
+  /* Affordance hint: shows on hover to signal interactivity without clutter */
   .pipe-node::after {
     content: '↕';
     position: absolute; bottom: -4px; right: -4px;
@@ -1729,7 +1756,7 @@ Action items:
   }
 
   /* ══════════════ SCROLL REVEAL ══════════════ */
-  /* Sections are always visible — animation is enhancement only */
+  /* Sections are always visible; animation is enhancement only */
   .reveal {
     opacity: 1;
     transform: none;

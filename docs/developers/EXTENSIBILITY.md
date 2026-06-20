@@ -27,9 +27,9 @@ This guide documents every extension point in AnonShield. Each section covers on
 
 AnonShield is designed around three complementary patterns:
 
-- **Strategy pattern** — anonymization algorithms are interchangeable (`AnonymizationStrategy`).
-- **Template Method pattern** — file-format handling uses a shared pipeline with format-specific hooks (`FileProcessor`).
-- **Protocol-based dependency inversion** — core services (cache, hash, storage, secrets) are interfaces defined in [`src/anon/core/protocols.py`](../../src/anon/core/protocols.py), injected into the orchestrator at construction time.
+- **Strategy pattern:** anonymization algorithms are interchangeable (`AnonymizationStrategy`).
+- **Template Method pattern:** file-format handling uses a shared pipeline with format-specific hooks (`FileProcessor`).
+- **Protocol-based dependency inversion:** core services (cache, hash, storage, secrets) are interfaces defined in [`src/anon/core/protocols.py`](../../src/anon/core/protocols.py), injected into the orchestrator at construction time.
 
 | Extension Point | Interface / Base | Location | How to register |
 |---|---|---|---|
@@ -304,7 +304,7 @@ def _load(self):
         self._model = self._model.to("cuda")
 ```
 
-Do **not** assume `ocr_predictor()` / `from_pretrained()` auto-places on CUDA — many libraries default to CPU even when PyTorch detects a GPU. For ONNX-based engines, pass `providers=["CUDAExecutionProvider", "CPUExecutionProvider"]` at session creation. For Surya-style engines that read env vars, document the required var (e.g. `TORCH_DEVICE=cuda`) in the engine's module docstring.
+Do **not** assume `ocr_predictor()` / `from_pretrained()` auto-places on CUDA; many libraries default to CPU even when PyTorch detects a GPU. For ONNX-based engines, pass `providers=["CUDAExecutionProvider", "CPUExecutionProvider"]` at session creation. For Surya-style engines that read env vars, document the required var (e.g. `TORCH_DEVICE=cuda`) in the engine's module docstring.
 
 ### Register in the factory
 
@@ -470,7 +470,7 @@ recognizers.append(
 
 **File:** `src/anon/model_registry.py`
 
-Model selection goes through a registry — adding a new model does **not** require modifying `engine.py` or `strategies.py`.
+Model selection goes through a registry; adding a new model does **not** require modifying `engine.py` or `strategies.py`.
 
 ### 5.1 How model selection works
 
@@ -504,7 +504,7 @@ register_model(
 
 ### 5.3 Adding a model via YAML config
 
-Add a `custom_models` block to your run config file — no code changes needed:
+Add a `custom_models` block to your run config file; no code changes needed:
 
 ```yaml
 custom_models:
@@ -717,8 +717,8 @@ class SecretManager(Protocol):
 
 `SecretManagerImpl` checks, in order:
 
-1. `ANON_SECRET_KEY_FILE` environment variable — path to a file whose content is the key.
-2. `ANON_SECRET_KEY` environment variable — raw key string.
+1. `ANON_SECRET_KEY_FILE` environment variable: path to a file whose content is the key.
+2. `ANON_SECRET_KEY` environment variable: raw key string.
 3. Returns `None` (tool will raise at hash time).
 
 ### 9.3 Example: HashiCorp Vault integration
@@ -1087,7 +1087,7 @@ If a component is not provided, the orchestrator creates a safe default (e.g. a 
 
 ### See Also
 
-- [Architecture Reference](ARCHITECTURE.md) — system design and module responsibilities
-- [Anonymization Strategies](ANONYMIZATION_STRATEGIES.md) — detailed description of each built-in strategy
-- [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md) — deep dive into the SLM module architecture
-- [Contributing](../../CONTRIBUTING.md) — development setup, conventions, and pull-request process
+- [Architecture Reference](ARCHITECTURE.md): system design and module responsibilities
+- [Anonymization Strategies](ANONYMIZATION_STRATEGIES.md): detailed description of each built-in strategy
+- [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md): deep dive into the SLM module architecture
+- [Contributing](../../CONTRIBUTING.md): development setup, conventions, and pull-request process

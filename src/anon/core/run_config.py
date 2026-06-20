@@ -96,19 +96,19 @@ def load_run_config(path: str) -> RunConfig:
         if key in field_names:
             setattr(cfg, key, val)
         else:
-            logger.warning("Unknown config key '%s' — ignored", key)
+            logger.warning("Unknown config key '%s'; ignored", key)
     logger.info("Loaded run config from '%s'", path)
     return cfg
 
 
 def merge_with_args(config: RunConfig, args) -> None:
-    """Apply config file values to args namespace — CLI wins (only fills unset/default values).
+    """Apply config file values to args namespace; CLI wins (only fills unset/default values).
 
     For list fields (entities, preserve_entities, allow_list), the config value
     is used only when the CLI argument is empty/default.
     For boolean/None fields, the config value fills in when the arg is None or default.
     """
-    # Fields where CLI default is "" (empty string) — treated as "not set"
+    # Fields where CLI default is "" (empty string), treated as "not set"
     _EMPTY_STR_FIELDS = {"entities", "preserve_entities", "allow_list"}
     # Fields where CLI default is None
     _NONE_FIELDS = {
@@ -173,7 +173,7 @@ def merge_with_args(config: RunConfig, args) -> None:
             elif not current:
                 setattr(args, arg_key, cfg_val)
 
-    # custom_patterns is handled separately — returned as list of dicts
+    # custom_patterns is handled separately, returned as list of dicts
     # anon.py will call _load_custom_patterns_from_config() after merge
 
 

@@ -1,4 +1,4 @@
-"""OCR engine factory — resolves engine name to a concrete OCREngine instance.
+"""OCR engine factory: resolves engine name to a concrete OCREngine instance.
 
 AnonShield ships Tesseract as its only OCR backend.
 """

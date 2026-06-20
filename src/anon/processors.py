@@ -212,7 +212,7 @@ class FileProcessor(ABC):
                  use_datasets: bool = False,
                  ocr_engine=None):
         self.file_path = file_path
-        self._ocr_engine = ocr_engine  # Optional[OCREngine] — injected from CLI
+        self._ocr_engine = ocr_engine  # Optional[OCREngine], injected from CLI
         self.orchestrator = orchestrator
         self.ner_data_generation = ner_data_generation
         self.ner_include_all = ner_include_all

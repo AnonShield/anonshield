@@ -1,5 +1,5 @@
 <!--
-  Tutorial coach marks — appears on first visit.
+  Tutorial coach marks: appears on first visit.
   5 steps: welcome → key → strategy → entities → done.
   Spotlight scrolls target into view; tooltip is always clamped within viewport.
 -->
@@ -47,7 +47,7 @@
       const el = document.querySelector(s.selector);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Wait for smooth scroll to settle — longer on taller pages
+        // Wait for smooth scroll to settle; longer on taller pages
         await new Promise(r => setTimeout(r, 500));
         // Extra rAF to ensure layout is complete before measuring
         await new Promise(r => requestAnimationFrame(r));

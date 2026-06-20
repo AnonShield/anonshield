@@ -7,8 +7,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-pytest.importorskip("fastapi", reason="fastapi not installed — run: pip install fastapi httpx")
-pytest.importorskip("httpx", reason="httpx not installed — run: pip install httpx")
+pytest.importorskip("fastapi", reason="fastapi not installed; run: pip install fastapi httpx")
+pytest.importorskip("httpx", reason="httpx not installed; run: pip install httpx")
 
 from fastapi.testclient import TestClient
 

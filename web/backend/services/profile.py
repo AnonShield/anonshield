@@ -52,7 +52,7 @@ def validate_profile(content: str) -> dict[str, Any]:
         except re.error as exc:
             return {
                 "valid": False,
-                "error": f"Pattern #{i} ({p['entity_type']}): invalid regex — {exc}",
+                "error": f"Pattern #{i} ({p['entity_type']}): invalid regex ({exc})",
             }
 
     return {

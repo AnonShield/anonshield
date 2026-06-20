@@ -1,4 +1,4 @@
-"""Celery tasks — anonymization jobs."""
+"""Celery tasks: anonymization jobs."""
 import os
 import shutil
 import sys

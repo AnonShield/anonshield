@@ -10,7 +10,7 @@
 | Criterion | PyMuPDF (current) | opendataloader-pdf |
 |-----------|------------------|--------------------|
 | Fully local | Yes | Yes |
-| Uses PyMuPDF internally | — | No (independent stack) |
+| Uses PyMuPDF internally | N/A | No (independent stack) |
 | Actively maintained | Yes | Yes (weekly releases; v2.2.1, 2026-04-03) |
 | Overall accuracy | ~73% | ~90% |
 | Complex tables | Weak | Strong (XY-Cut++ algorithm) |
@@ -30,7 +30,7 @@
 
 - Repository: `opendataloader-project/opendataloader-pdf`
 - Python wrapper (3.10+) around a Java-based PDF parser; requires Java 11+ installed on the host.
-- Provides a Python API — no CLI round-trip needed.
+- Provides a Python API; no CLI round-trip needed.
 - Does **not** use PyMuPDF internally; it is an independent implementation.
 - Benchmarks from the project documentation show 90% overall layout/extraction accuracy vs. PyMuPDF's 73%.
 - Handles scanned PDFs with built-in multi-language OCR, making the separate `extract_text_from_image` fallback unnecessary for PDF inputs.
@@ -91,7 +91,7 @@ A preprocessing pipeline has been implemented in `src/anon/ocr/preprocessor.py` 
 
 ### How it interacts with PyMuPDF
 
-The current `PdfFileProcessor` extracts embedded images using `doc.extract_image(xref)`, which returns the image at its native embedded resolution. For scanned PDFs (where the page itself is a raster image), the embedded image DPI matches the scanner DPI — typically 150–300 DPI. Preprocessing steps like `upscale` bring sub-1000 px images up to the 300 DPI range that Tesseract is optimised for.
+The current `PdfFileProcessor` extracts embedded images using `doc.extract_image(xref)`, which returns the image at its native embedded resolution. For scanned PDFs (where the page itself is a raster image), the embedded image DPI matches the scanner DPI, typically 150 to 300 DPI. Preprocessing steps like `upscale` bring sub-1000 px images up to the 300 DPI range that Tesseract is optimised for.
 
 **Critical note for future work:** When rendering full pages via `page.get_pixmap()` (e.g. if a fallback to full-page rasterisation is added), always use:
 
@@ -110,9 +110,9 @@ The PyMuPDF default of 72 DPI will produce degraded OCR results regardless of wh
 | `upscale` | ✓ | ✓ |
 | `clahe` | ✓ | equalize (approximate) |
 | `denoise` | ✓ | GaussianBlur (approximate) |
-| `deskew` | ✓ | — |
-| `binarize` | ✓ | — |
-| `morph_open` | ✓ | — |
+| `deskew` | ✓ | None |
+| `binarize` | ✓ | None |
+| `morph_open` | ✓ | None |
 | `border` | ✓ | ✓ |
 
 ### Impact on opendataloader-pdf evaluation

@@ -1,4 +1,4 @@
-# CLI Reference — Complete Argument Guide
+# CLI Reference: Complete Argument Guide
 
 This document covers every command-line option available in AnonShield. Each argument includes a plain-language description, a concrete example, and notes on when to use it.
 
@@ -6,8 +6,8 @@ This document covers every command-line option available in AnonShield. Each arg
 >
 > | Method | Command prefix |
 > |--------|---------------|
-> | **Docker — from this repository** | `./docker/run.sh [OPTIONS] <file_or_folder>` |
-> | **Docker — downloaded from Docker Hub** | `./run.sh [OPTIONS] <file_or_folder>` (script downloaded per DOCKERHUB_README instructions) |
+> | **Docker, from this repository** | `./docker/run.sh [OPTIONS] <file_or_folder>` |
+> | **Docker, downloaded from Docker Hub** | `./run.sh [OPTIONS] <file_or_folder>` (script downloaded per DOCKERHUB_README instructions) |
 > | **Local install** | `uv run anon.py [OPTIONS] <file_or_folder>` |
 >
 > All examples below use `./docker/run.sh`. If you downloaded the script from Docker Hub, use `./run.sh` instead. If you installed locally, use `uv run anon.py`.
@@ -16,7 +16,7 @@ This document covers every command-line option available in AnonShield. Each arg
 
 ## Table of Contents
 
-1. [Positional Argument — The File or Folder](#1-positional-argument--the-file-or-folder)
+1. [Positional Argument: The File or Folder](#1-positional-argument-the-file-or-folder)
 2. [Informational Commands](#2-informational-commands)
 3. [General Options](#3-general-options)
 4. [Anonymization Options](#4-anonymization-options)
@@ -32,7 +32,7 @@ This document covers every command-line option available in AnonShield. Each arg
 
 ---
 
-## 1. Positional Argument — The File or Folder
+## 1. Positional Argument: The File or Folder
 
 ### `file_path`
 
@@ -66,13 +66,13 @@ When you point to a folder, the tool processes every supported file inside it, i
 
 ## 2. Informational Commands
 
-These flags print information and exit immediately — they do not process any file.
+These flags print information and exit immediately; they do not process any file.
 
 ---
 
 ### `--list-entities`
 
-**What it does:** Prints all entity types detectable for the given strategy and model combination, then exits. The output varies by `--anonymization-strategy` and `--transformer-model` — different combinations produce different entity sets.
+**What it does:** Prints all entity types detectable for the given strategy and model combination, then exits. The output varies by `--anonymization-strategy` and `--transformer-model`; different combinations produce different entity sets.
 
 **When to use:** Before running on a file, to know which entity names to use with `--preserve-entities`.
 
@@ -151,7 +151,7 @@ Supported languages:
 
 **What it does:** Loads all run settings from a YAML (or JSON) file before applying CLI flags. Any argument you pass on the command line overrides the corresponding value in the file.
 
-This is the recommended way to share repeatable configurations across runs — for example, a banking-document profile or a CI/CD pipeline preset.
+This is the recommended way to share repeatable configurations across runs: for example, a banking-document profile or a CI/CD pipeline preset.
 
 **Supported keys:** Every CLI argument has a matching key in the config file. See [`docs/users/CONFIGURATION_FILE.md`](CONFIGURATION_FILE.md) for the full schema.
 
@@ -163,7 +163,7 @@ This is the recommended way to share repeatable configurations across runs — f
 ./docker/run.sh ./invoice.pdf --config examples/profiles/banking_pt.yaml --slug-length 0
 ```
 
-> **Example config file:** `examples/anon_config.example.yaml` — fully commented template with every available option.
+> **Example config file:** `examples/anon_config.example.yaml`: fully commented template with every available option.
 
 ---
 
@@ -183,7 +183,7 @@ This is the recommended way to share repeatable configurations across runs — f
 ./docker/run.sh ./incidente.docx --lang es
 ```
 
-> **Supported codes:** `en`, `pt`, `es`, `de`, `fr`, `it`, `nl`, `pl`, `ru`, `zh`, and more — run `--list-languages` for the full list.
+> **Supported codes:** `en`, `pt`, `es`, `de`, `fr`, `it`, `nl`, `pl`, `ru`, `zh`, and more; run `--list-languages` for the full list.
 
 ---
 
@@ -241,7 +241,7 @@ Output filenames always follow the pattern `anon_<original_filename>.<ext>`.
 
 | Level | What you see |
 |-------|-------------|
-| `DEBUG` | Everything — very verbose, useful for troubleshooting |
+| `DEBUG` | Everything: very verbose, useful for troubleshooting |
 | `INFO` | Progress updates (model loading, file processing) |
 | `WARNING` | Only problems and warnings (default) |
 | `ERROR` | Only errors |
@@ -308,7 +308,7 @@ Use `--entities` when you want to anonymize only a specific, known set of types 
 
 **What it does:** A comma-separated list of specific text values that should **never** be anonymized, regardless of what the NER model detects.
 
-**When to use:** When the tool incorrectly anonymizes a word that is not sensitive in your context — for example, product names, public organization names, or known safe identifiers.
+**When to use:** When the tool incorrectly anonymizes a word that is not sensitive in your context: for example, product names, public organization names, or known safe identifiers.
 
 ```bash
 # Never anonymize these specific values
@@ -326,13 +326,13 @@ Use `--entities` when you want to anonymize only a specific, known set of types 
 
 **What it does:** Controls the length of the random-looking suffix added to each anonymized entity.
 
-When the tool replaces a name like `John Smith`, it generates a tag like `[PERSON_a1b2c3d4...]`. The number after the underscore is a hash derived from the original value and your secret key — the `--slug-length` controls how many characters of that hash appear.
+When the tool replaces a name like `John Smith`, it generates a tag like `[PERSON_a1b2c3d4...]`. The number after the underscore is a hash derived from the original value and your secret key; the `--slug-length` controls how many characters of that hash appear.
 
 | Value | Output example | Notes |
 |-------|---------------|-------|
 | `64` (default) | `[PERSON_a1b2c3...64chars]` | Maximum uniqueness, full reversibility |
 | `8` | `[PERSON_a1b2c3d4]` | Shorter, easier to read, still unique for most datasets |
-| `0` | `[PERSON]` | No hash — entity type label only. **No secret key required.** |
+| `0` | `[PERSON]` | No hash: entity type label only. **No secret key required.** |
 
 ```bash
 # Short slugs for readability
@@ -350,7 +350,7 @@ When the tool replaces a name like `John Smith`, it generates a tag like `[PERSO
 
 **Default:** none
 
-**What it does:** Points to a JSON file that gives the tool precise, field-level instructions for structured files (JSON, CSV, XML). Without this, the tool runs NER inference on every field — correct, but slow on large datasets.
+**What it does:** Points to a JSON file that gives the tool precise, field-level instructions for structured files (JSON, CSV, XML). Without this, the tool runs NER inference on every field: correct, but slow on large datasets.
 
 **The config supports three keys:**
 
@@ -387,7 +387,7 @@ With this config:
 ./docker/run.sh ./nessus_scan.json --anonymization-config ./anon_config.json
 ```
 
-> **Performance impact:** Using `force_anonymize` and `fields_to_exclude` can speed up processing by **25–134x** on large structured files by eliminating NER inference for known fields.
+> **Performance impact:** Using `force_anonymize` and `fields_to_exclude` can speed up processing by **25-134x** on large structured files by eliminating NER inference for known fields.
 
 ---
 
@@ -401,7 +401,7 @@ With this config:
 
 This is ideal for internal terminology: internal system names, internal organization names, project codenames, or employee names that a general NER model might not recognize.
 
-**Format:** A JSON object where each key is the **entity type label** (uppercased automatically) and each value is a list of terms. Any string key is valid — no preset mapping is required. Use the same type labels you would use in `--preserve-entities` or `force_anonymize`.
+**Format:** A JSON object where each key is the **entity type label** (uppercased automatically) and each value is a list of terms. Any string key is valid; no preset mapping is required. Use the same type labels you would use in `--preserve-entities` or `force_anonymize`.
 
 **Example word list file (`my_terms.json`):**
 
@@ -521,7 +521,7 @@ JSON format is also accepted (same fields, wrapped in an array).
 
 ### `--min-word-length <n>`
 
-**Default:** `0` (no minimum — all words are considered)
+**Default:** `0` (no minimum, all words are considered)
 
 **What it does:** Skips any text token shorter than `n` characters. For example, with `--min-word-length 3`, the tokens `"a"`, `"to"`, and `"ok"` are never sent for NER inference. This can significantly reduce processing time on files with many short tokens.
 
@@ -616,7 +616,7 @@ JSON format is also accepted (same fields, wrapped in an array).
 ./docker/run.sh ./huge_file.pdf --disable-gc
 ```
 
-> **When to use:** Processing one very large file on a machine with ample RAM. Do not use when processing many files in a loop — memory will grow unbounded.
+> **When to use:** Processing one very large file on a machine with ample RAM. Do not use when processing many files in a loop; memory will grow unbounded.
 
 ---
 
@@ -632,14 +632,14 @@ JSON format is also accepted (same fields, wrapped in an array).
 
 | Strategy | Description | Best for |
 |----------|-------------|---------|
-| `filtered` | Presidio pipeline with a curated, optimized recognizer set | **Default — best accuracy** |
+| `filtered` | Presidio pipeline with a curated, optimized recognizer set | **Default: best accuracy** |
 | `presidio` | Full Presidio pipeline with all recognizers enabled | Broadest detection, more false positives |
 | `hybrid` | Presidio detection + manual text replacement (no Presidio anonymizer) | When Presidio's anonymizer causes issues |
 | `standalone` | Loads NER models directly, bypasses Presidio entirely | **Maximum GPU throughput (4× faster)** |
-| `regex` | Pure regex only — zero NLP/NER model loading | **Fastest of all; domain-specific pipelines with `--custom-patterns`** |
+| `regex` | Pure regex only, zero NLP/NER model loading | **Fastest of all; domain-specific pipelines with `--custom-patterns`** |
 | `slm` | End-to-end anonymization using a local language model (Ollama) | Experimental / research use |
 
-**Performance comparison — GPU (NVIDIA RTX 5060 Ti, 551 MB JSON, 70,951 records):**
+**Performance comparison, GPU (NVIDIA RTX 5060 Ti, 551 MB JSON, 70,951 records):**
 
 | Strategy | CSV (KB/s) | JSON (KB/s) |
 |----------|-----------|------------|
@@ -681,31 +681,31 @@ JSON format is also accepted (same fields, wrapped in an array).
 
 **Default:** `tesseract`
 
-**What it does:** Selects the OCR engine used to extract text from image-based inputs (PNG, JPG, TIFF, etc.) and scanned PDF pages. AnonShield supports 13 engines across three families — classical, deep-learning detectors, and vision-language models. All run **100% locally** — no cloud calls.
+**What it does:** Selects the OCR engine used to extract text from image-based inputs (PNG, JPG, TIFF, etc.) and scanned PDF pages. AnonShield supports 13 engines across three families: classical, deep-learning detectors, and vision-language models. All run **100% locally**: no cloud calls.
 
 **Classical and deep-learning engines:**
 
 | Engine | Accuracy | Speed | GPU | Notes |
 |--------|----------|-------|-----|-------|
-| `tesseract` | Good | Fast (CPU) | — | Default; requires `tesseract` system package |
+| `tesseract` | Good | Fast (CPU) | None | Default; requires `tesseract` system package |
 | `easyocr` | Very good | Medium | auto | Best for noisy/rotated images; install: `pip install easyocr` |
-| `paddleocr` | Excellent | Fast | explicit | PP-OCRv5 — strong on PT-BR forms, checks, IDs, CJK |
-| `doctr` | Excellent | Medium | `.cuda()` | PyTorch — best layout preservation |
-| `onnxtr` | ≈ DocTR | ~2× faster | CUDAExecutionProvider | ONNX port of DocTR — drop-in faster alternative |
+| `paddleocr` | Excellent | Fast | explicit | PP-OCRv5: strong on PT-BR forms, checks, IDs, CJK |
+| `doctr` | Excellent | Medium | `.cuda()` | PyTorch: best layout preservation |
+| `onnxtr` | ≈ DocTR | ~2× faster | CUDAExecutionProvider | ONNX port of DocTR: drop-in faster alternative |
 | `surya` | Very good | Medium GPU | `TORCH_DEVICE=cuda` | Multilingual transformer foundation |
-| `rapidocr` | Good | Fastest CPU | — (CPU-only) | PaddleOCR models in ONNX — lightweight CPU deploy |
+| `rapidocr` | Good | Fastest CPU | None (CPU-only) | PaddleOCR models in ONNX: lightweight CPU deploy |
 | `kerasocr` | Good | Slow | auto | Legacy English-only Keras pipeline |
 
-**Vision-language model (VLM) engines** — SOTA accuracy, GPU required, slower generation:
+**Vision-language model (VLM) engines**, SOTA accuracy, GPU required, slower generation:
 
 | Engine | Model size | Best for |
 |--------|-----------|----------|
 | `paddle_vl` | ~2 GB | Best open-source all-rounder (OmniDocBench 94.50) |
 | `deepseek_ocr` | ~6 GB | Complex layouts, markdown grounding (requires flash-attn) |
 | `monkey_ocr` | ~2.4 GB | Compact VLM alternative |
-| `glm_ocr`, `lighton_ocr` | — | Experimental |
+| `glm_ocr`, `lighton_ocr` | N/A | Experimental |
 
-All non-default engines are optional dependencies — install only what you need (`uv sync --extra <engine>`).
+All non-default engines are optional dependencies; install only what you need (`uv sync --extra <engine>`).
 
 ```bash
 # Use EasyOCR for a noisy scanned document
@@ -718,7 +718,7 @@ All non-default engines are optional dependencies — install only what you need
 ./docker/run.sh ./invoice.png --ocr-engine paddle_vl
 ```
 
-> **See also:** [`docs/users/OCR_ENGINES.md`](OCR_ENGINES.md) — detailed comparison, installation instructions, GPU configuration, and benchmarks for all 13 engines.
+> **See also:** [`docs/users/OCR_ENGINES.md`](OCR_ENGINES.md): detailed comparison, installation instructions, GPU configuration, and benchmarks for all 13 engines.
 
 ---
 
@@ -893,7 +893,7 @@ These options control how large files are split into pieces for processing. The 
 
 ## 10. NER Data Generation Options
 
-These options switch the tool from *anonymization mode* into *NER training data generation mode*. In this mode, the tool detects entities but instead of replacing them, it writes a JSONL file recording what was found — ready to use as training data for a custom NER model.
+These options switch the tool from *anonymization mode* into *NER training data generation mode*. In this mode, the tool detects entities but instead of replacing them, it writes a JSONL file recording what was found, ready to use as training data for a custom NER model.
 
 > **No secret key required** in NER data generation mode.
 
@@ -947,11 +947,11 @@ These options use a **Small Language Model (SLM)** running locally via [Ollama](
 
 ### `--slm-map-entities`
 
-**What it does:** Uses the SLM to scan a file and produce a detailed report of all potential entities, including confidence scores and the model's reasoning for each detection. **Does not anonymize** — only maps and reports.
+**What it does:** Uses the SLM to scan a file and produce a detailed report of all potential entities, including confidence scores and the model's reasoning for each detection. **Does not anonymize**, only maps and reports.
 
 Output files:
-- `<name>_entity_map.jsonl` — one JSON object per entity
-- `<name>_entity_map.csv` — same data in spreadsheet format
+- `<name>_entity_map.jsonl`: one JSON object per entity
+- `<name>_entity_map.csv`: same data in spreadsheet format
 
 ```bash
 ./docker/run.sh ./report.txt --slm-map-entities --output-dir ./entity_analysis/
@@ -1026,7 +1026,7 @@ Output files:
 
 **Default:** `0.7`
 
-**What it does:** Minimum confidence score (0.0–1.0) for an entity detected by the SLM to be accepted. Entities with lower confidence are discarded.
+**What it does:** Minimum confidence score (0.0 to 1.0) for an entity detected by the SLM to be accepted. Entities with lower confidence are discarded.
 
 ```bash
 # Only accept very high-confidence detections
@@ -1118,22 +1118,22 @@ These options control how the tool manages the Ollama service that runs the loca
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `file_path` | — | File or folder to anonymize **(required)** |
-| `--list-entities` | — | Print all supported entity types and exit |
-| `--list-languages` | — | Print all supported languages and exit |
+| `file_path` | None | File or folder to anonymize **(required)** |
+| `--list-entities` | None | Print all supported entity types and exit |
+| `--list-languages` | None | Print all supported languages and exit |
 | `--lang` | `en` | Document language code |
 | `--output-dir` | `output` | Where to save anonymized files |
 | `--overwrite` | off | Overwrite existing output files |
 | `--no-report` | off | Skip the performance report in `logs/` |
 | `--log-level` | `WARNING` | Verbosity: `DEBUG` `INFO` `WARNING` `ERROR` `CRITICAL` |
-| `--config` | — | Path to YAML/JSON run config file (CLI args override) |
-| `--entities` | — | Comma-separated entity types to anonymize (positive selection) |
-| `--preserve-entities` | — | Comma-separated entity types to skip |
-| `--allow-list` | — | Comma-separated terms to never anonymize |
-| `--slug-length` | `64` | Length of the hash suffix in pseudonyms (0–64) |
-| `--anonymization-config` | — | Path to JSON config for field-level control |
-| `--word-list` | — | Path to JSON file of known terms to always anonymize |
-| `--custom-patterns` | — | Path to YAML/JSON file with custom regex patterns |
+| `--config` | None | Path to YAML/JSON run config file (CLI args override) |
+| `--entities` | None | Comma-separated entity types to anonymize (positive selection) |
+| `--preserve-entities` | None | Comma-separated entity types to skip |
+| `--allow-list` | None | Comma-separated terms to never anonymize |
+| `--slug-length` | `64` | Length of the hash suffix in pseudonyms (0 to 64) |
+| `--anonymization-config` | None | Path to JSON config for field-level control |
+| `--word-list` | None | Path to JSON file of known terms to always anonymize |
+| `--custom-patterns` | None | Path to YAML/JSON file with custom regex patterns |
 | `--preserve-row-context` | off | Process every CSV/XLSX cell individually |
 | `--json-stream-threshold-mb` | `100` | Stream JSON files larger than this many MB |
 | `--optimize` | off | Enable all performance optimizations |
@@ -1145,11 +1145,11 @@ These options control how the tool manages the Ollama service that runs the loca
 | `--force-large-xml` | off | Override XML memory safety limits |
 | `--disable-gc` | off | Disable Python garbage collection |
 | `--anonymization-strategy` | `filtered` | Detection engine: `filtered` `presidio` `hybrid` `standalone` `regex` `slm` |
-| `--ocr-engine` | `tesseract` | OCR engine — 13 options (see [OCR_ENGINES.md](OCR_ENGINES.md)) |
+| `--ocr-engine` | `tesseract` | OCR engine: 13 options (see [OCR_ENGINES.md](OCR_ENGINES.md)) |
 | `--transformer-model` | `Davlan/xlm-roberta-base-ner-hrl` | NER model to use |
 | `--db-mode` | `persistent` | Database mode: `persistent` or `in-memory` |
 | `--db-dir` | `db` | Directory for the database file |
-| `--db-synchronous-mode` | — | SQLite sync PRAGMA: `OFF` `NORMAL` `FULL` `EXTRA` |
+| `--db-synchronous-mode` | None | SQLite sync PRAGMA: `OFF` `NORMAL` `FULL` `EXTRA` |
 | `--batch-size` | `1000` | Processing batch size (or `auto`) |
 | `--csv-chunk-size` | `1000` | Rows per CSV read chunk |
 | `--json-chunk-size` | `1000` | Items per JSON streaming chunk |
