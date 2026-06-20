@@ -91,7 +91,7 @@ CMD ["--help"]
 # ----------------------------------------------------------------------------- 
 # Stage 3: GPU Builder
 # ----------------------------------------------------------------------------- 
-FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04 AS builder-gpu
+FROM nvidia/cuda:13.3.0-runtime-ubuntu22.04 AS builder-gpu
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -127,7 +127,7 @@ RUN .venv/bin/python -m spacy download en_core_web_lg
 # -----------------------------------------------------------------------------
 # Stage 4: GPU Runtime (no build tools, no uv)
 # ----------------------------------------------------------------------------- 
-FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04 AS gpu
+FROM nvidia/cuda:13.3.0-runtime-ubuntu22.04 AS gpu
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
