@@ -102,3 +102,5 @@ Vulnerabilidades-CAIS/
 *.json 
 test/test_data_integration/*
 *.zip
+# Claude Code local files
+.claude/
