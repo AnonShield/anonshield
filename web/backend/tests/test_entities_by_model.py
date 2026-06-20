@@ -2,8 +2,8 @@
 Integration tests for GET /api/entities?model=... — model-aware entity lists.
 
 Verifies that the endpoint returns different entity sets per model and that
-model-specific entities (cybersecurity, financial, clinical, biomedical)
-appear only when the matching model is requested.
+model-specific entities (cybersecurity) appear only when the matching model
+is requested.
 
 Redis is mocked (no running broker needed).
 """
@@ -94,60 +94,12 @@ def test_securemodern_has_no_person(client):
 
 
 # ---------------------------------------------------------------------------
-# 3. DeBERTa financial PII
-# ---------------------------------------------------------------------------
-
-def test_deberta_has_financial_entities(client):
-    r = client.get("/api/entities?strategy=filtered&model=lakshyakh93/deberta_finetuned_pii")
-    assert r.status_code == 200
-    ids = _entity_ids(r.json())
-    assert "IBAN_CODE" in ids
-    assert "CREDIT_CARD" in ids
-    assert "CRYPTO" in ids
-
-
-def test_deberta_has_credential_entities(client):
-    r = client.get("/api/entities?strategy=filtered&model=lakshyakh93/deberta_finetuned_pii")
-    assert r.status_code == 200
-    ids = _entity_ids(r.json())
-    assert "USERNAME" in ids
-    assert "PASSWORD" in ids
-    assert "MAC_ADDRESS" in ids
-
-
-# ---------------------------------------------------------------------------
-# 4. Clinical — i2b2
-# ---------------------------------------------------------------------------
-
-def test_i2b2_has_clinical_entities(client):
-    r = client.get("/api/entities?strategy=filtered&model=obi/deid_roberta_i2b2")
-    assert r.status_code == 200
-    ids = _entity_ids(r.json())
-    assert "PERSON" in ids     # PATIENT + STAFF both map to PERSON
-    assert "AGE" in ids
-    assert "DATE_TIME" in ids
-
-
-# ---------------------------------------------------------------------------
-# 5. Biomedical — MACCROBAT
-# ---------------------------------------------------------------------------
-
-def test_biomedical_has_disease_drug(client):
-    r = client.get("/api/entities?strategy=filtered&model=d4data/biomedical-ner-all")
-    assert r.status_code == 200
-    ids = _entity_ids(r.json())
-    assert "DISEASE" in ids
-    assert "DRUG" in ids
-
-
-# ---------------------------------------------------------------------------
-# 6. Regex strategy — no NER model entities regardless of model param
+# 3. Regex strategy — no NER model entities regardless of model param
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("model", [
+    "Davlan/xlm-roberta-base-ner-hrl",
     "attack-vector/SecureModernBERT-NER",
-    "lakshyakh93/deberta_finetuned_pii",
-    "obi/deid_roberta_i2b2",
 ])
 def test_regex_strategy_excludes_ner_entities(client, model):
     r = client.get(f"/api/entities?strategy=regex&model={model}")
@@ -162,30 +114,7 @@ def test_regex_strategy_excludes_ner_entities(client, model):
 
 
 # ---------------------------------------------------------------------------
-# 7. Models that share the same mapping return same entity set
-# ---------------------------------------------------------------------------
-
-def test_conll_models_return_same_entities(client):
-    r1 = client.get("/api/entities?strategy=filtered&model=dslim/bert-base-NER")
-    r2 = client.get("/api/entities?strategy=filtered&model=Jean-Baptiste/roberta-large-ner-english")
-    assert r1.status_code == 200
-    assert r2.status_code == 200
-    # Both CoNLL models produce PERSON, ORG, LOC — sets should be equal
-    ids1 = _entity_ids(r1.json())
-    ids2 = _entity_ids(r2.json())
-    assert ids1 == ids2
-
-
-def test_distilbert_same_as_xlmroberta(client):
-    r1 = client.get("/api/entities?strategy=filtered&model=Davlan/xlm-roberta-base-ner-hrl")
-    r2 = client.get("/api/entities?strategy=filtered&model=Davlan/distilbert-base-multilingual-cased-ner-hrl")
-    assert r1.status_code == 200
-    assert r2.status_code == 200
-    assert _entity_ids(r1.json()) == _entity_ids(r2.json())
-
-
-# ---------------------------------------------------------------------------
-# 8. Different models return different entity sets
+# 4. Different models return different entity sets
 # ---------------------------------------------------------------------------
 
 def test_securemodern_different_from_default(client):
@@ -198,19 +127,8 @@ def test_securemodern_different_from_default(client):
     assert "MALWARE" not in ids_default
 
 
-def test_financial_different_from_clinical(client):
-    r_fin = client.get("/api/entities?strategy=filtered&model=lakshyakh93/deberta_finetuned_pii")
-    r_clin = client.get("/api/entities?strategy=filtered&model=obi/deid_roberta_i2b2")
-    ids_fin = _entity_ids(r_fin.json())
-    ids_clin = _entity_ids(r_clin.json())
-    # Financial has IBAN_CODE which clinical doesn't (i2b2 maps IBAN to ID, not IBAN_CODE)
-    assert "IBAN_CODE" in ids_fin
-    # Biomedical has DISEASE which financial doesn't
-    assert "DISEASE" not in ids_fin
-
-
 # ---------------------------------------------------------------------------
-# 9. Response shape
+# 5. Response shape
 # ---------------------------------------------------------------------------
 
 def test_response_has_correct_shape(client):
@@ -229,7 +147,7 @@ def test_response_has_correct_shape(client):
 
 def test_each_entity_has_example(client):
     """Every entity in the response must have a human-readable label."""
-    r = client.get("/api/entities?model=lakshyakh93/deberta_finetuned_pii")
+    r = client.get("/api/entities?model=Davlan/xlm-roberta-base-ner-hrl")
     assert r.status_code == 200
     for group in r.json()["groups"]:
         for entity in group["entities"]:

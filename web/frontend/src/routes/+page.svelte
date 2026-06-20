@@ -580,6 +580,10 @@ Action items:
             <span class="pm pm-info">763 {$t('landing.research.gen1.incidents')}</span>
             <span class="pm pm-info">On-premise</span>
           </div>
+          <div class="paper-links">
+            <a href="https://sol.sbc.org.br/index.php/sbseg/article/view/36614" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.paper')} ↗</a>
+            <a href="https://github.com/AnonShield/tool/tree/main/anonlfi_1.0" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.code')} ↗</a>
+          </div>
         </div>
       </div>
 
@@ -600,6 +604,10 @@ Action items:
           <div class="paper-metrics">
             <span class="pm pm-good">92.1% F1 (XML)</span>
             <span class="pm pm-info">On-premise</span>
+          </div>
+          <div class="paper-links">
+            <a href="https://sol.sbc.org.br/index.php/errc/article/view/39186" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.paper')} ↗</a>
+            <a href="https://github.com/AnonShield/tool/tree/main/anonlfi_2.0" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.code')} ↗</a>
           </div>
         </div>
       </div>
@@ -625,7 +633,10 @@ Action items:
             <span class="pm pm-info">70,951 {$t('landing.research.gen3.records')}</span>
             <span class="pm pm-info">On-premise</span>
           </div>
-          <a href="https://github.com/AnonShield/tool" target="_blank" class="paper-link">GitHub ↗</a>
+          <div class="paper-links">
+            <a href="https://sol.sbc.org.br/index.php/sbrc_estendido/article/view/42580" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.paper')} ↗</a>
+            <a href="https://github.com/AnonShield/tool" target="_blank" rel="noopener" class="paper-link">{$t('landing.research.code')} ↗</a>
+          </div>
         </div>
       </div>
     </div>
@@ -1612,6 +1623,10 @@ Action items:
     background: color-mix(in srgb, var(--info-sky) 6%, transparent);
   }
 
+  .paper-links {
+    display: flex; flex-wrap: wrap; gap: var(--space-4);
+    margin-top: var(--space-3);
+  }
   .paper-link {
     font-size: var(--text-xs); font-family: var(--font-mono); font-weight: 700;
     color: var(--color-accent); text-decoration: none;

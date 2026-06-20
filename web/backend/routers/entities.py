@@ -81,10 +81,7 @@ _LABELS: dict[str, tuple[str, str]] = {
     "UUID":                ("UUID",                "550e8400-e29b-41d4-a716-446655440000"),
     "PORT":                ("Port / Protocol",     "tcp/8443"),
     "OID":                 ("OID",                 "1.2.840.113549.1.1.11"),
-    # ── Biomedical — d4data/biomedical-ner-all (MACCROBAT) ──────────────────
-    # These are custom Presidio entity types produced by the biomedical model.
-    # i2b2 model labels (PATIENT, STAFF, HOSP, LOC, PATORG, OTHERPHI) all
-    # map to existing types above (PERSON, LOCATION, ORGANIZATION, ID).
+    # ── Healthcare entity types (custom Presidio types) ─────────────────────
     "DISEASE":             ("Disease / Disorder",  "Hypertension, COVID-19"),
     "DRUG":                ("Drug / Medication",   "Aspirin, Metformin"),
     # ── SecureModernBERT-NER specific entities ───────────────────────────────

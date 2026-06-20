@@ -32,7 +32,6 @@ def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
         entities=meta.get("entities") or None,
         custom_patterns=meta.get("custom_patterns") or None,
         ocr_engine=meta.get("ocr_engine", "tesseract"),
-        ocr_preprocess=meta.get("ocr_preprocess") or None,
         secret_key=key,
         anonymization_config=meta.get("anonymization_config"),
         slug_length=meta["slug_length"] if meta.get("slug_length") is not None else 8,

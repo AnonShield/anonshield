@@ -41,7 +41,6 @@ def anonymize_file(
     custom_patterns: list[dict] | None = None,
     slug_length: int = 8,
     ocr_engine: str = "tesseract",
-    ocr_preprocess: list[str] | None = None,
     transformer_model: str = "Davlan/xlm-roberta-base-ner-hrl",
     secret_key: str = "",
     use_db: bool = False,
@@ -157,7 +156,6 @@ def anonymize_file(
         orchestrator,
         output_dir=str(output_dir),
         ocr_engine=ocr_eng,
-        preprocess_steps=ocr_preprocess or [],
         overwrite=True,
         anonymization_config=anonymization_config,
     )

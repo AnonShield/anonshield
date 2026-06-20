@@ -89,32 +89,8 @@ def _list_preprocess_dirs() -> list[str]:
 
 @router.get("/engines")
 def engines_availability() -> dict:
-    """Map of OCR engine name → bool (True if loadable in this image or its sidecars).
-
-    The frontend uses this to filter the dropdown so users only see engines
-    that will actually run. is_available() is import-only for local engines and
-    a 5s GET /engines for sidecar-routed ones.
-    """
-    from src.anon.ocr.factory import _REGISTRY, _SIDECAR_ROUTES
-    from src.anon.ocr.sidecar_engine import SidecarOCREngine
-
-    out: dict[str, bool] = {}
-    for name, cls in _REGISTRY.items():
-        try:
-            if cls().is_available():
-                out[name] = True
-                continue
-        except Exception:
-            pass
-        url = _SIDECAR_ROUTES.get(name)
-        if url:
-            try:
-                out[name] = SidecarOCREngine(name, url).is_available()
-                continue
-            except Exception:
-                pass
-        out[name] = False
-    return {"engines": out}
+    """Map of OCR engine name → bool. AnonShield ships Tesseract only."""
+    return {"engines": {"tesseract": True}}
 
 
 @router.get("/summary")

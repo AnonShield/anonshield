@@ -210,11 +210,9 @@ class FileProcessor(ABC):
                  ner_chunk_size: int = DefaultSizes.NER_CHUNK_SIZE,
                  force_large_xml: bool = False,
                  use_datasets: bool = False,
-                 ocr_engine=None,
-                 preprocess_steps: list[str] | None = None):
+                 ocr_engine=None):
         self.file_path = file_path
         self._ocr_engine = ocr_engine  # Optional[OCREngine] — injected from CLI
-        self._preprocess_steps: list[str] = preprocess_steps or []
         self.orchestrator = orchestrator
         self.ner_data_generation = ner_data_generation
         self.ner_include_all = ner_include_all
@@ -249,9 +247,6 @@ class FileProcessor(ABC):
 
     def _do_ocr(self, image_bytes: bytes) -> str:
         """Extract text from image bytes using the configured OCR engine."""
-        if self._preprocess_steps:
-            from src.anon.ocr.preprocessor import apply as preprocess
-            image_bytes = preprocess(image_bytes, self._preprocess_steps)
         from src.anon.ocr import _timer
         import time as _time
         t0 = _time.monotonic()

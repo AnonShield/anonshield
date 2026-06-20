@@ -21,10 +21,8 @@
   const ADV_TOUR_KEY = 'anonshield_adv_tour_done';
   const ADV_STEPS = [
     { target: 'adv-s0', titleKey: 'adv.s0.title' as const, descKey: 'adv.s0.desc' as const },
-    { target: 'adv-s1', titleKey: 'adv.s1.title' as const, descKey: 'adv.s1.desc' as const },
-    { target: 'adv-s2', titleKey: 'adv.s2.title' as const, descKey: 'adv.s2.desc' as const },
-    { target: 'adv-s3', titleKey: 'adv.s3.title' as const, descKey: 'adv.s3.desc' as const },
-    { target: 'adv-s4', titleKey: 'adv.s4.title' as const, descKey: 'adv.s4.desc' as const },
+    { target: 'adv-s1', titleKey: 'adv.s3.title' as const, descKey: 'adv.s3.desc' as const },
+    { target: 'adv-s2', titleKey: 'adv.s4.title' as const, descKey: 'adv.s4.desc' as const },
   ];
   let advTourStep = $state<number | null>(null);
   let advTourBusy = $state(false);
@@ -64,7 +62,6 @@
   // ── File size limits fetched from /api/config ────────────────────────────
   let limitMb = $state(1); // default 1 MB until config loads
   let nerDefaults = $state<{score_threshold: number; aggregation_strategy: string; aggregation_choices: string[]} | null>(null);
-  let availableEngines = $state<Record<string, boolean>>({});
   onMount(async () => {
     try {
       const r = await fetch('/api/config');
@@ -74,10 +71,6 @@
         if (cfg.ner_defaults) nerDefaults = cfg.ner_defaults;
       }
     } catch { /* use default */ }
-    try {
-      const r = await fetch('/api/benchmark/ocr/engines');
-      if (r.ok) availableEngines = (await r.json()).engines ?? {};
-    } catch { /* dropdown falls back to hardcoded list */ }
   });
   let limitBytes = $derived(limitMb * 1024 * 1024);
   let fileTooLarge = $derived(selectedFile !== null && (selectedFile as File).size > limitBytes);
@@ -121,7 +114,6 @@
         ? toYaml($config, groups)
         : undefined;
 
-      const preprocessSteps = effectivePreprocessSteps();
       const job = await createJob(selectedFile, {
         key:            $config.key || undefined,
         strategy:       $config.strategy,
@@ -129,8 +121,6 @@
         model:          $config.model || undefined,
         entities,
         config:         yamlConfig,
-        ocr_engine:     $config.ocr_engine !== 'tesseract' ? $config.ocr_engine : undefined,
-        ocr_preprocess: preprocessSteps.length > 0 ? preprocessSteps : undefined,
         anonymization_config: $config.anonymization_config,
         ner_score_threshold: $config.ner_score_threshold,
         ner_aggregation_strategy: $config.ner_aggregation_strategy,
@@ -273,18 +263,6 @@
   const MODELS = [
     { v: 'Davlan/xlm-roberta-base-ner-hrl',                  lk: 'model.xlm'       },
     { v: 'attack-vector/SecureModernBERT-NER',               lk: 'model.smbert'    },
-    { v: 'lakshyakh93/deberta_finetuned_pii',                lk: 'model.deberta_pii'},
-    { v: 'dslim/bert-base-NER',                              lk: 'model.bert_fast' },
-    { v: 'Jean-Baptiste/roberta-large-ner-english',          lk: 'model.roberta_en'},
-    { v: 'obi/deid_roberta_i2b2',                            lk: 'model.clinical'  },
-    { v: 'd4data/biomedical-ner-all',                        lk: 'model.bio'       },
-    { v: 'Davlan/distilbert-base-multilingual-cased-ner-hrl',lk: 'model.distil'    },
-    { v: 'pierreguillou/ner-bert-large-cased-pt-lenerbr',    lk: 'model.lener_large'},
-    { v: 'pierreguillou/ner-bert-base-cased-pt-lenerbr',     lk: 'model.lener_base' },
-    { v: 'monilouise/ner_pt_br',                             lk: 'model.harem_pt'   },
-    { v: 'marquesafonso/bertimbau-large-ner-selective',      lk: 'model.bertimbau_sel'},
-    { v: 'lfcc/bert-portuguese-ner',                         lk: 'model.pt_conll'   },
-    { v: 'dominguesm/ner-bertimbau-large-pt-legal-br',       lk: 'model.bertimbau_legal'},
   ] as const;
 
   const LANGS = [
@@ -295,81 +273,7 @@
     { v: 'de', lk: 'lang.de' },
   ] as const;
 
-  const OCR_ENGINES = [
-    { v: 'tesseract',   name: 'Tesseract',         badge_key: 'default',      kind: 'classical' },
-    { v: 'easyocr',     name: 'EasyOCR',           badge_key: 'gpu',          kind: 'classical' },
-    { v: 'paddleocr',   name: 'PaddleOCR',         badge_key: 'tables',       kind: 'classical' },
-    { v: 'doctr',       name: 'DocTR',             badge_key: 'docs',         kind: 'classical' },
-    { v: 'onnxtr',      name: 'OnnxTR',            badge_key: 'onnxtr',       kind: 'classical' },
-    { v: 'kerasocr',    name: 'Keras-OCR',         badge_key: 'kerasocr',     kind: 'classical' },
-    { v: 'surya',       name: 'Surya',             badge_key: 'surya',        kind: 'classical' },
-    { v: 'rapidocr',    name: 'RapidOCR',          badge_key: 'rapidocr',     kind: 'classical' },
-    { v: 'glm_ocr',     name: 'GLM-OCR',           badge_key: 'glm_ocr',      kind: 'vlm'       },
-    { v: 'lighton_ocr', name: 'LightOn OCR-2',     badge_key: 'lighton_ocr',  kind: 'vlm'       },
-    { v: 'paddle_vl',   name: 'PaddleOCR-VL-1.5',  badge_key: 'paddle_vl',    kind: 'vlm'       },
-    { v: 'deepseek_ocr',name: 'DeepSeek-OCR-2',    badge_key: 'deepseek_ocr', kind: 'vlm'       },
-    { v: 'monkey_ocr',  name: 'MonkeyOCR-pro',     badge_key: 'monkey_ocr',   kind: 'vlm'       },
-    { v: 'chandra_ocr', name: 'Chandra OCR',       badge_key: 'chandra_ocr',  kind: 'vlm'       },
-    { v: 'dots_ocr',    name: 'Dots OCR',          badge_key: 'dots_ocr',     kind: 'vlm'       },
-    { v: 'qwen_vl',     name: 'Qwen2.5-VL',        badge_key: 'qwen_vl',      kind: 'vlm'       },
-  ] as const;
-
-  let visibleOcrEngines = $derived(
-    OCR_ENGINES.filter(e => Object.keys(availableEngines).length === 0 || availableEngines[e.v])
-  );
-  let classicalEngines = $derived(visibleOcrEngines.filter(e => e.kind === 'classical'));
-  let vlmEngines       = $derived(visibleOcrEngines.filter(e => e.kind === 'vlm'));
-
-  const OCR_PREPROCESS_PRESETS = [
-    { v: 'none',   lk: 'preprocess.preset.none'   },
-    { v: 'scan',   lk: 'preprocess.preset.scan'   },
-    { v: 'photo',  lk: 'preprocess.preset.photo'  },
-    { v: 'fax',    lk: 'preprocess.preset.fax'    },
-    { v: 'custom', lk: 'preprocess.preset.custom' },
-  ] as const;
-
-  // Short human-readable labels for step pills (language-independent technical terms)
-  const STEP_SHORT: Record<string, string> = {
-    grayscale:  'Grayscale',
-    upscale:    'Upscale',
-    clahe:      'Contrast',
-    denoise:    'Denoise',
-    deskew:     'Deskew',
-    binarize:   'Binarize',
-    morph_open: 'Cleanup',
-    border:     'Border',
-  };
-
-  const PREPROCESS_STEPS = [
-    { v: 'grayscale',  lk: 'preprocess.step.grayscale',  dlk: 'preprocess.step.grayscale.desc'  },
-    { v: 'upscale',    lk: 'preprocess.step.upscale',    dlk: 'preprocess.step.upscale.desc'    },
-    { v: 'clahe',      lk: 'preprocess.step.clahe',      dlk: 'preprocess.step.clahe.desc'      },
-    { v: 'denoise',    lk: 'preprocess.step.denoise',    dlk: 'preprocess.step.denoise.desc'    },
-    { v: 'deskew',     lk: 'preprocess.step.deskew',     dlk: 'preprocess.step.deskew.desc'     },
-    { v: 'binarize',   lk: 'preprocess.step.binarize',   dlk: 'preprocess.step.binarize.desc'   },
-    { v: 'morph_open', lk: 'preprocess.step.morph_open', dlk: 'preprocess.step.morph_open.desc' },
-    { v: 'border',     lk: 'preprocess.step.border',     dlk: 'preprocess.step.border.desc'     },
-  ] as const;
-
-  // Resolve the effective preprocessing step list to send to the API
-  const PRESET_STEPS: Record<string, string[]> = {
-    none:   [],
-    scan:   ['grayscale', 'upscale', 'clahe', 'denoise', 'deskew', 'binarize', 'border'],
-    photo:  ['grayscale', 'upscale', 'clahe', 'denoise', 'deskew', 'binarize', 'morph_open', 'border'],
-    fax:    ['grayscale', 'upscale', 'clahe', 'denoise', 'binarize', 'morph_open', 'border'],
-  };
-
-  function effectivePreprocessSteps(): string[] {
-    const preset = $config.ocr_preprocess_preset;
-    if (preset === 'custom') return $config.ocr_preprocess;
-    return PRESET_STEPS[preset] ?? [];
-  }
-
-  function togglePreprocessStep(step: string) {
-    const current = $config.ocr_preprocess;
-    const next = current.includes(step) ? current.filter(s => s !== step) : [...current, step];
-    config.update(c => ({ ...c, ocr_preprocess: next }));
-  }
+  // Backend is Tesseract-only: no OCR-engine picker, no image preprocessing controls.
 
   // ── Batch queue (task #8) ─────────────────────────────────────────────────
   interface BatchItem {
@@ -402,13 +306,10 @@
         const sel = $config.selected_entities;
         const entities = (sel !== null && sel.size > 0) ? [...sel] : undefined;
         const yamlConfig = $config.custom_patterns.length > 0 ? toYaml($config, groups) : undefined;
-        const batchPreprocessSteps = effectivePreprocessSteps();
         const job = await createJob(item.file, {
           key: $config.key || undefined, strategy: $config.strategy,
           lang: $config.lang, model: $config.model || undefined,
           entities, config: yamlConfig,
-          ocr_engine: $config.ocr_engine !== 'tesseract' ? $config.ocr_engine : undefined,
-          ocr_preprocess: batchPreprocessSteps.length > 0 ? batchPreprocessSteps : undefined,
           anonymization_config: $config.anonymization_config,
         });
         // poll until done
@@ -440,10 +341,8 @@
     batchRunning = false;
   }
 
-  // Detect file type for conditional OCR engine visibility
+  // Detect structured file types for the field selector (csv/tsv/json/jsonl/xlsx)
   let fileExt = $derived((selectedFile as File | null)?.name.split('.').pop()?.toLowerCase() ?? '');
-  let isImageOrPdf = $derived(['pdf','png','jpg','jpeg','tiff','bmp','webp','gif'].includes(fileExt));
-  // csv/tsv/json/jsonl/xlsx — same set FieldSelector supports
   let isStructured = $derived(['csv','tsv','json','jsonl','ndjson','xlsx'].includes(fileExt));
   let useBatch = $state(false);
 </script>
@@ -801,71 +700,8 @@
         </div>
       {/if}
 
-      <!-- OCR Engine -->
-      <div id="adv-s1" class="adv-field" class:adv-active={advTourStep === 1}>
-        <label class="adv-label" for="adv-ocr">{$t('app.ocr_engine')}</label>
-        <select id="adv-ocr" bind:value={$config.ocr_engine}>
-          {#if classicalEngines.length}
-            <optgroup label="Classical OCR">
-              {#each classicalEngines as e}
-                <option value={e.v}>{e.name} — {$t(`ocr.desc.${e.v}` as any)}</option>
-              {/each}
-            </optgroup>
-          {/if}
-          {#if vlmEngines.length}
-            <optgroup label="Vision-Language Models (VLM)">
-              {#each vlmEngines as e}
-                <option value={e.v}>{e.name} — {$t(`ocr.desc.${e.v}` as any)}</option>
-              {/each}
-            </optgroup>
-          {/if}
-        </select>
-        <p class="adv-hint">{$t(`ocr.badge.${OCR_ENGINES.find(e => e.v === $config.ocr_engine)?.badge_key ?? 'default'}` as any)}</p>
-      </div>
-
-      <!-- Image Preprocessing -->
-      {#if !selectedFile || isImageOrPdf}
-        <div id="adv-s2" class="adv-field" class:adv-active={advTourStep === 2}>
-          <span class="adv-label">{$t('preprocess.title')}</span>
-          <p class="adv-hint">{$t('preprocess.hint')}</p>
-          <div class="preprocess-preset-grid">
-            {#each OCR_PREPROCESS_PRESETS as p}
-              <label class="preset-card" class:selected={$config.ocr_preprocess_preset === p.v}>
-                <input type="radio" name="ocr_preprocess_preset" value={p.v}
-                       bind:group={$config.ocr_preprocess_preset} />
-                <span class="preset-card-name">{$t(p.lk)}</span>
-                {#if p.v === 'none'}
-                  <span class="preset-card-hint">pass-through</span>
-                {:else if p.v === 'custom'}
-                  <span class="preset-card-hint">choose below →</span>
-                {:else}
-                  <div class="preset-card-pills">
-                    {#each PRESET_STEPS[p.v] ?? [] as s}
-                      <span class="step-pill">{STEP_SHORT[s] ?? s}</span>
-                    {/each}
-                  </div>
-                {/if}
-              </label>
-            {/each}
-          </div>
-          {#if $config.ocr_preprocess_preset === 'custom'}
-            <div class="preprocess-steps">
-              {#each PREPROCESS_STEPS as step}
-                <label class="step-item" title={$t(step.dlk as any)}>
-                  <input type="checkbox"
-                         checked={$config.ocr_preprocess.includes(step.v)}
-                         onchange={() => togglePreprocessStep(step.v)} />
-                  <span class="step-name">{$t(step.lk as any)}</span>
-                  <span class="step-desc">{$t(step.dlk as any)}</span>
-                </label>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      {/if}
-
       <!-- Slug length -->
-      <div id="adv-s3" class="adv-field" class:adv-active={advTourStep === 3}>
+      <div id="adv-s1" class="adv-field" class:adv-active={advTourStep === 1}>
         <span class="adv-label">{$t('app.slug_length', { n: $config.slug_length })}</span>
         <input type="range" min="0" max="64" step="1" bind:value={$config.slug_length} class="slug-slider" />
         <p class="slug-mode">
@@ -878,7 +714,7 @@
       </div>
 
       <!-- Custom patterns -->
-      <div id="adv-s4" class="adv-field" class:adv-active={advTourStep === 4}>
+      <div id="adv-s2" class="adv-field" class:adv-active={advTourStep === 2}>
         <div class="patterns-header">
           <span class="adv-label" style="margin:0">{$t('app.custom_patterns')}</span>
           <button class="btn btn-ghost" onclick={() => (showRegexBuilder = true)}>
@@ -1568,110 +1404,4 @@
   .error-box p { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
 
   .mt { margin-top: var(--space-2); }
-
-  /* ── Image preprocessing ── */
-  .preprocess-preset-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: var(--space-2);
-  }
-  .preset-card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    padding: var(--space-3);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: border-color var(--duration-fast) var(--ease-out),
-                background   var(--duration-fast) var(--ease-out);
-    min-height: 5rem;
-  }
-  .preset-card input { position: absolute; opacity: 0; pointer-events: none; }
-  .preset-card.selected {
-    border-color: var(--color-accent);
-    background: color-mix(in srgb, var(--color-accent) 8%, transparent);
-  }
-  .preset-card:not(.selected):hover {
-    border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
-  }
-  .preset-card:has(input:focus-visible) {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
-  }
-  .preset-card-name {
-    font-size: var(--text-sm);
-    font-weight: 600;
-    color: var(--color-text-primary);
-    line-height: 1.2;
-  }
-  .preset-card.selected .preset-card-name { color: var(--color-accent); }
-  .preset-card-hint {
-    font-size: var(--text-xs);
-    color: var(--color-text-secondary);
-  }
-  .preset-card-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-    margin-top: var(--space-1);
-  }
-  .step-pill {
-    /* --text-xs (12px) meets WCAG AA minimum — pills previously used 0.6875rem (11px)
-       which fell below legibility threshold for non-body text. */
-    font-size: var(--text-xs);
-    font-weight: 500;
-    padding: 2px var(--space-2);
-    border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-    color: var(--color-accent);
-    border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
-    white-space: nowrap;
-  }
-  .preset-card:not(.selected) .step-pill {
-    background: color-mix(in srgb, var(--color-text-secondary) 8%, transparent);
-    color: var(--color-text-secondary);
-    border-color: color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
-  }
-
-  /* custom step checklist */
-  .preprocess-steps {
-    display: flex; flex-direction: column; gap: var(--space-1);
-    margin-top: var(--space-3);
-    padding-top: var(--space-3);
-    border-top: 1px dashed var(--color-border);
-  }
-  .step-item {
-    display: grid;
-    grid-template-columns: 1rem 1fr;
-    grid-template-rows: auto auto;
-    column-gap: var(--space-3);
-    row-gap: 2px;
-    align-items: start;
-    cursor: pointer;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-sm);
-    border: 1px solid transparent;
-    transition: border-color var(--duration-fast) var(--ease-out),
-                background   var(--duration-fast) var(--ease-out);
-  }
-  .step-item:hover {
-    background: color-mix(in srgb, var(--color-text-primary) 3%, transparent);
-    border-color: var(--color-border);
-  }
-  .step-item input {
-    grid-row: 1; grid-column: 1; margin-top: 2px;
-    accent-color: var(--color-accent);
-  }
-  .step-name {
-    grid-row: 1; grid-column: 2;
-    font-size: var(--text-sm); font-weight: 500;
-    color: var(--color-text-primary);
-  }
-  .step-desc {
-    grid-row: 2; grid-column: 2;
-    font-size: var(--text-xs);
-    color: var(--color-text-secondary); line-height: 1.4;
-  }
 </style>

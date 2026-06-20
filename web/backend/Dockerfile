@@ -20,11 +20,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 # Install Python deps — uv sync always creates /app/.venv
 # --group web: FastAPI, Celery, Redis and web-only deps
-# --all-extras: easyocr, paddleocr, doctr, kerasocr
+# tesseract-only OCR (no OCR extras) with CPU torch
 # --no-install-project: source is copied separately below
 COPY pyproject.toml uv.lock ./
 ENV UV_NO_CACHE=1
-RUN uv sync --frozen --no-install-project --group web --all-extras
+RUN uv sync --frozen --no-install-project --group web
 
 # Expose the virtual environment in PATH so celery/uvicorn/python resolve correctly
 ENV VIRTUAL_ENV=/app/.venv \

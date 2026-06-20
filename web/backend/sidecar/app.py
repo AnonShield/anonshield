@@ -22,11 +22,7 @@ def health() -> dict:
 def engines() -> dict:
     """Probe every known engine name; return whichever ones load in this image."""
     avail = {}
-    for name in [
-        "tesseract", "easyocr", "paddleocr", "doctr", "onnxtr", "kerasocr",
-        "surya", "rapidocr", "glm_ocr", "paddle_vl", "deepseek_ocr",
-        "monkey_ocr", "lighton_ocr", "chandra_ocr", "dots_ocr", "qwen_vl",
-    ]:
+    for name in ["tesseract"]:
         try:
             avail[name] = get_ocr_engine(name).is_available()
         except Exception:

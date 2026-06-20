@@ -59,8 +59,8 @@ SUPPORTED_LANGUAGES = {
 _ENGINE_CACHE: dict[str, tuple["BatchAnalyzerEngine", "AnonymizerEngine"]] = {}
 
 
-# Some PT-BR NER tokenizers (e.g. pierreguillou/ner-bert-large-cased-pt-lenerbr)
-# publish no model_max_length in tokenizer_config.json, so HF defaults to ~1e20.
+# Some NER tokenizers publish no model_max_length in tokenizer_config.json,
+# so HF defaults to ~1e20.
 # transformers 5.x pipeline.preprocess trusts that value and skips truncation;
 # any doc >512 tokens then crashes BERT's positional embedding. spaCy's
 # hf_token_pipe catches the exception and silently returns zero entities, so
