@@ -2,7 +2,7 @@
 from fastapi import FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import jobs, entities, metrics, ocr_benchmark
+from routers import jobs, entities, metrics
 from services.metrics import MetricsMiddleware, init_db
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -33,7 +33,6 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(jobs.router)
 app.include_router(entities.router)
 app.include_router(metrics.router)
-app.include_router(ocr_benchmark.router)
 
 
 @app.get("/api/health")

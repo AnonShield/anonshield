@@ -8,10 +8,9 @@
 
   let isApp       = $derived(page.url.pathname.startsWith('/app'));
   let isMetrics   = $derived(page.url.pathname === '/app/metrics');
-  let isBenchmark = $derived(page.url.pathname === '/app/benchmark');
   let appClass    = $derived(
     isApp
-      ? (isMetrics || isBenchmark ? 'app-main metrics-main' : 'app-main')
+      ? (isMetrics ? 'app-main metrics-main' : 'app-main')
       : '',
   );
 </script>
@@ -36,9 +35,6 @@
         <a href="/" class="nav-link">← Home</a>
         {#if !isMetrics}
           <a href="/app/metrics" class="nav-link metrics-link">Metrics</a>
-        {/if}
-        {#if !isBenchmark}
-          <a href="/app/benchmark" class="nav-link metrics-link">Benchmark</a>
         {/if}
       {/if}
       <button class="lang-btn" onclick={toggleLocale} aria-label="Switch language">
