@@ -9,9 +9,9 @@
 #   make down       stop everything
 #
 # This wraps docker compose with the production file plus the host override
-# (docker-compose.a9.yml: localhost ports for the host Caddy, reduced memory).
+# (docker-compose.host.yml: localhost ports for the host Caddy, reduced memory).
 
-COMPOSE  := docker compose -f docker-compose.prod.yml -f docker-compose.a9.yml
+COMPOSE  := docker compose -f docker-compose.prod.yml -f docker-compose.host.yml
 SERVICES := backend frontend worker-fast redis
 BACKEND  := http://127.0.0.1:18000
 SVC      ?=

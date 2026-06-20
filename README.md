@@ -196,7 +196,7 @@ docker compose -f docker-compose.dev.yml up --build
 Production deployment is one command and is fully scripted. From a developer machine:
 
 ```bash
-./scripts/deploy-to-a9.sh            # sync code, build, start, and warm the model cache on the host
+./scripts/deploy.sh <host>           # sync, build, start, and warm the cache on the given ssh host
 ```
 
 On the host (`web/` directory) everything else is a `make` target:
@@ -211,7 +211,7 @@ make warm       # preload the NER model so the first request is fast
 make down       # stop everything
 ```
 
-See [`web/RUNBOOK.md`](web/RUNBOOK.md) for deploy, maintenance, modify-and-redeploy, configuration, and troubleshooting. The stack runs behind a reverse proxy (Caddy); the host override lives in `web/docker-compose.a9.yml`.
+See [`web/RUNBOOK.md`](web/RUNBOOK.md) for deploy, maintenance, modify-and-redeploy, configuration, and troubleshooting. The stack runs behind a reverse proxy (Caddy); the host override lives in `web/docker-compose.host.yml`.
 
 ## Reproducing the paper
 

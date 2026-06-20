@@ -1,4 +1,4 @@
-# a9 host override: host-level Caddy handles 80/443, so we do NOT run the
+# Host override: an external (host-level) Caddy handles 80/443, so we do NOT run the
 # containerized caddy. Publish backend/frontend to localhost for the host Caddy
 # to reverse-proxy, and reduce memory to fit the shared server.
 services:

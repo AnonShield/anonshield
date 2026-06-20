@@ -3,7 +3,7 @@
 Everything you need to deploy, maintain, and modify the web app. The goal is one
 obvious command per task.
 
-The app runs on the host **a9** under `~/anonshield_deploy/web` as four Docker
+The app runs on your host under `~/anonshield_deploy/web` as four Docker
 containers (backend, frontend, worker-fast, redis) behind the host's Caddy, which
 serves `https://anonshield.org`. All operations go through `make` from that
 `web/` directory.
@@ -13,7 +13,7 @@ serves `https://anonshield.org`. All operations go through `make` from that
 From your dev machine, after editing code:
 
 ```bash
-./scripts/deploy-to-a9.sh        # sync, build, start, warm the cache, on a9
+./scripts/deploy.sh <host>   # sync, build, start, warm the cache, on the host
 ```
 
 That is the whole deploy. It never overwrites the host's `web/.env` or `web/certs`.
@@ -21,7 +21,7 @@ That is the whole deploy. It never overwrites the host's `web/.env` or `web/cert
 To deploy by hand on the host instead:
 
 ```bash
-ssh a9
+ssh <host>
 cd ~/anonshield_deploy/web
 make deploy                      # build, start, warm the cache, show status
 ```
@@ -46,7 +46,7 @@ The containers use `restart: unless-stopped`, so they come back after a reboot.
 ## Modify and redeploy
 
 1. Change code in this repo and commit it.
-2. Run `./scripts/deploy-to-a9.sh`. It rebuilds only what changed (Docker layer
+2. Run `./scripts/deploy.sh <host>`. It rebuilds only what changed (Docker layer
    cache) and warms the model cache.
 3. Verify: `curl -fsS https://anonshield.org/api/health` and open the site.
 
@@ -55,7 +55,7 @@ The containers use `restart: unless-stopped`, so they come back after a reboot.
 - `web/.env` (on the host, not in git): `ANON_SECRET_KEY` (required, keep it
   stable so pseudonyms stay consistent across runs), `ANON_MAX_SIZE_MB`,
   `PUBLIC_API_URL`.
-- `web/docker-compose.a9.yml` (in git): the host override. It publishes the
+- `web/docker-compose.host.yml` (in git): the host override. It publishes the
   backend to `127.0.0.1:18000` and the frontend to `127.0.0.1:13000` for the host
   Caddy, skips the containerized Caddy, and caps memory (backend 3G, worker 6G,
   frontend 1G, redis 512M). Edit the limits here if the host has more or less room.

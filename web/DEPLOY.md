@@ -1,6 +1,6 @@
 # AnonShield Deployment Guide (Production Sandbox)
 
-Este guia descreve como enviar e rodar o AnonShield no servidor compartilhado (`ppges-a9`) usando as configurações de segurança e sandbox preparadas.
+Este guia descreve como enviar e rodar o AnonShield no servidor compartilhado (your server) usando as configurações de segurança e sandbox preparadas.
 
 ## 1. Transferência de Arquivos
 
@@ -8,14 +8,14 @@ No seu computador local (na pasta raiz do projeto `tool`), execute o comando aba
 
 ```bash
 # Sincroniza a pasta web e o código fonte necessário (src e anon.py)
-rsync -avz --progress --exclude 'node_modules' --exclude '.venv' . a9:~/anonshield_deploy/
+rsync -avz --progress --exclude 'node_modules' --exclude '.venv' . <host>:~/anonshield_deploy/
 ```
 
 ## 2. Configuração no Servidor (SSH)
 
 Acesse o servidor:
 ```bash
-ssh a9
+ssh <host>
 cd ~/anonshield_deploy/web
 ```
 
