@@ -22,7 +22,7 @@ jobs:
     env:
       ANON_SECRET_KEY: test-key-12345678901234567890123456789012
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
@@ -49,7 +49,7 @@ jobs:
       run:
         working-directory: web/frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Secret scan (gitleaks)
         run: |
           VER=8.21.2
@@ -115,7 +115,7 @@ jobs:
       group: deploy-prod
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Sync code into the live deploy directory
         # Mirrors scripts/deploy.sh, but locally on the host. Only the code dirs
         # are mirrored with --delete; the host's local files (web/.env, web/certs,
