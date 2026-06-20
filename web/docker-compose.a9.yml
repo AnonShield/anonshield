@@ -1,0 +1,38 @@
+# a9 host override: host-level Caddy handles 80/443, so we do NOT run the
+# containerized caddy. Publish backend/frontend to localhost for the host Caddy
+# to reverse-proxy, and reduce memory to fit the shared server.
+services:
+  frontend:
+    ports:
+      - "127.0.0.1:13000:3000"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+  backend:
+    ports:
+      - "127.0.0.1:18000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health',timeout=5).status==200 else 1)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 3G
+  worker-fast:
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'
+          memory: 6G
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
