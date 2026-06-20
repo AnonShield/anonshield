@@ -15,7 +15,7 @@
 # ----------------------------------------------------------------------------- 
 # Stage 1: CPU Builder (compile everything, thrown away after)
 # ----------------------------------------------------------------------------- 
-FROM python:3.12-slim AS builder-cpu
+FROM python:3.14-slim AS builder-cpu
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -50,7 +50,7 @@ RUN .venv/bin/python -m spacy download en_core_web_lg
 # -----------------------------------------------------------------------------
 # Stage 2: CPU Runtime (minimal, no build tools)
 # ----------------------------------------------------------------------------- 
-FROM python:3.12-slim AS production
+FROM python:3.14-slim AS production
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
