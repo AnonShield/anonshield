@@ -15,7 +15,7 @@
 # ----------------------------------------------------------------------------- 
 # Stage 1: CPU Builder (compile everything, thrown away after)
 # ----------------------------------------------------------------------------- 
-FROM python:3.12-slim AS builder-cpu
+FROM python:3.14-slim AS builder-cpu
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -50,7 +50,7 @@ RUN .venv/bin/python -m spacy download en_core_web_lg
 # -----------------------------------------------------------------------------
 # Stage 2: CPU Runtime (minimal, no build tools)
 # ----------------------------------------------------------------------------- 
-FROM python:3.12-slim AS production
+FROM python:3.14-slim AS production
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -91,7 +91,7 @@ CMD ["--help"]
 # ----------------------------------------------------------------------------- 
 # Stage 3: GPU Builder
 # ----------------------------------------------------------------------------- 
-FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04 AS builder-gpu
+FROM nvidia/cuda:12.9.2-runtime-ubuntu22.04 AS builder-gpu
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -127,7 +127,7 @@ RUN .venv/bin/python -m spacy download en_core_web_lg
 # -----------------------------------------------------------------------------
 # Stage 4: GPU Runtime (no build tools, no uv)
 # ----------------------------------------------------------------------------- 
-FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04 AS gpu
+FROM nvidia/cuda:12.9.2-runtime-ubuntu22.04 AS gpu
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

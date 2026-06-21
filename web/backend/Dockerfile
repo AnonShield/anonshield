@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # Create a non-root user for security
 RUN groupadd -r anonuser && useradd -r -g anonuser -d /app -s /sbin/nologin anonuser
