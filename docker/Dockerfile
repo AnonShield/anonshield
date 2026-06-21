@@ -71,7 +71,6 @@ WORKDIR /app
 # Copy only the pre-built venv and app source
 COPY --from=builder-cpu /app/.venv /app/.venv/
 COPY src/ /app/src/
-COPY prompts/ /app/prompts/
 COPY tests/ /app/tests/
 COPY examples/ /app/examples/
 COPY anon.py /app/
@@ -158,7 +157,6 @@ WORKDIR /app
 # Copy only the pre-built venv and app source
 COPY --from=builder-gpu /app/.venv /app/.venv/
 COPY src/ /app/src/
-COPY prompts/ /app/prompts/
 COPY tests/ /app/tests/
 COPY examples/ /app/examples/
 COPY anon.py /app/
