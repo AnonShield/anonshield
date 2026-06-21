@@ -33,12 +33,16 @@ updates:
     groups:
       docker:
         patterns: ["*"]
-    # Base-image major bumps (e.g. Python 3.12 -> 3.14, Node 22 -> 26) are not
-    # validated by CI and would break the production image builds. Only take
-    # minor/patch (security) updates that stay on the pinned major.
+    # Runtime base images (python, node, cuda) are pinned to a major.minor tag.
+    # CI does not build these images, so any version jump is unvalidated and a
+    # minor bump is breaking too (e.g. python 3.12 -> 3.14 is a semver MINOR but
+    # changes the interpreter and wheel availability; node 22 -> 26 is a major).
+    # Allow only patch/digest updates that stay on the current major.minor.
     ignore:
       - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
 
   - package-ecosystem: "github-actions"
     directory: "/"
