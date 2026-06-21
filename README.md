@@ -183,12 +183,22 @@ A browser front end for non-CLI users and for sharing the tool within a team.
 - **Frontend:** SvelteKit single-page app with drag-and-drop upload, real-time progress, batch processing, per-job entity and strategy selection, and a metrics dashboard (throughput by file format and by strategy, entity-type distribution, jobs over time, file-size versus throughput, and latency percentiles).
 - **Backend:** FastAPI API plus Celery workers and Redis for asynchronous jobs.
 
-Run it locally with the development compose file:
+Run the whole stack locally in containers (CPU, no host reverse proxy):
 
 ```bash
 cd web
-docker compose -f docker-compose.dev.yml up --build
-# frontend on http://localhost:5173 , API on http://localhost:8000
+ANON_SECRET_KEY=$(openssl rand -hex 32) PUBLIC_API_URL=http://localhost:18000 \
+  docker compose -f docker-compose.prod.yml -f docker-compose.host.yml up --build
+# frontend on http://localhost:13000 , API on http://localhost:18000
+```
+
+For frontend development with hot reload, run the dev servers directly instead:
+
+```bash
+docker run -d -p 6379:6379 redis:7-alpine                       # Redis for the job queue
+cd web/backend && uv run uvicorn main:app --reload --port 8000  # API
+cd web/backend && uv run celery -A workers.celery_app worker -Q fast --loglevel=info  # worker
+cd web/frontend && npm install && npm run dev                   # UI on http://localhost:5173
 ```
 
 ## Deployment

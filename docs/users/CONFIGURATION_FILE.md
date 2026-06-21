@@ -22,19 +22,19 @@ Every CLI option has a matching key in the config file. Below is the complete sc
 
 ```yaml
 # ─── Language ───────────────────────────────────────────────────────────────
-lang: en                     # string  — document language (ISO 639-1 code)
+lang: en                     # string: document language (ISO 639-1 code)
 
 # ─── Anonymization strategy ─────────────────────────────────────────────────
-strategy: filtered           # string  — filtered | presidio | hybrid | standalone | regex | slm
+strategy: filtered           # string: filtered | presidio | hybrid | standalone | regex | slm
 
 # ─── NER transformer model ──────────────────────────────────────────────────
 transformer_model: Davlan/xlm-roberta-base-ner-hrl   # HuggingFace model ID
 
 # ─── Slug length ────────────────────────────────────────────────────────────
-slug_length: 8               # integer 0–64  (0 = label only, no hash)
+slug_length: 8               # integer 0 to 64  (0 = label only, no hash)
 
 # ─── OCR engine ─────────────────────────────────────────────────────────────
-ocr_engine: tesseract        # 13 options — see docs/users/OCR_ENGINES.md (tesseract, easyocr, paddleocr, doctr, onnxtr, surya, rapidocr, kerasocr, paddle_vl, deepseek_ocr, monkey_ocr, glm_ocr, lighton_ocr)
+ocr_engine: tesseract        # OCR engine used for images and scanned PDFs
 
 # ─── Entity selection ────────────────────────────────────────────────────────
 # Positive selection: ONLY these types are anonymized.
@@ -74,17 +74,17 @@ custom_patterns: examples/patterns/banking_pt.yaml
 anonymization_config: examples/anonymization_config.json   # path to JSON config
 
 # ─── Database ────────────────────────────────────────────────────────────────
-db_mode: persistent          # string  — persistent | in-memory
+db_mode: persistent          # string: persistent | in-memory
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
-log_level: WARNING           # string  — DEBUG | INFO | WARNING | ERROR | CRITICAL
+log_level: WARNING           # string: DEBUG | INFO | WARNING | ERROR | CRITICAL
 
 # ─── Regex priority ──────────────────────────────────────────────────────────
-regex_priority: false        # boolean — prefer regex over NER for overlapping spans
+regex_priority: false        # boolean: prefer regex over NER for overlapping spans
 
 # ─── Token filtering ─────────────────────────────────────────────────────────
-min_word_length: 0           # integer — skip tokens shorter than this
-skip_numeric: false          # boolean — skip purely numeric strings
+min_word_length: 0           # integer: skip tokens shorter than this
+skip_numeric: false          # boolean: skip purely numeric strings
 
 # ─── Caching ─────────────────────────────────────────────────────────────────
 use_cache: true              # boolean
@@ -94,7 +94,7 @@ max_cache_size: 10000        # integer
 batch_size: auto             # integer or "auto"
 
 # ─── File handling ───────────────────────────────────────────────────────────
-overwrite: false             # boolean — overwrite existing output files
+overwrite: false             # boolean: overwrite existing output files
 
 # ─── Custom NER models ───────────────────────────────────────────────────────
 # Register additional transformer models with their entity label mappings.
@@ -150,7 +150,7 @@ The `custom_patterns` key (or `--custom-patterns` flag) accepts a YAML or JSON f
 
 ```yaml
 # Each entry must have entity_type and pattern.
-# score (float 0.0–1.0) and flags (IGNORECASE, MULTILINE) are optional.
+# score (float 0.0 to 1.0) and flags (IGNORECASE, MULTILINE) are optional.
 
 - entity_type: CPF
   pattern: '\d{3}\.\d{3}\.\d{3}-\d{2}'
@@ -169,6 +169,5 @@ The `entity_type` string becomes the label in the anonymized output: `[CPF_a1b2c
 ## See Also
 
 - [`docs/users/CLI_REFERENCE.md`](CLI_REFERENCE.md): full argument reference
-- [`docs/users/OCR_ENGINES.md`](OCR_ENGINES.md): OCR engine comparison and installation
 - [`examples/anon_config.example.yaml`](../../examples/anon_config.example.yaml): fully commented template
 - [`examples/patterns/banking_pt.yaml`](../../examples/patterns/banking_pt.yaml): Brazilian banking patterns

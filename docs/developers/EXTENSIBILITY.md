@@ -78,8 +78,8 @@ class AnonymizationStrategy(ABC):
 
         Returns:
             Tuple of:
-              - List[str]   — anonymized texts, same length as input.
-              - List[Tuple] — collected entity records:
+              - List[str]:   anonymized texts, same length as input.
+              - List[Tuple]: collected entity records:
                               (entity_type, original_text, display_hash, full_hash)
         """
         ...
@@ -267,7 +267,7 @@ ProcessorRegistry.register([".yaml", ".yml"], YamlFileProcessor)
 
 **Files:** `src/anon/ocr/base.py`, `src/anon/ocr/factory.py`
 
-All OCR engines implement the `OCREngine` ABC and are instantiated via `get_ocr_engine(name)`. The registry currently holds 13 engines; see [users/OCR_ENGINES.md](../users/OCR_ENGINES.md) for a comparison.
+All OCR engines implement the `OCREngine` ABC and are instantiated via `get_ocr_engine(name)`. The registry currently holds a single engine, Tesseract, used for images and scanned PDFs.
 
 ### Interface
 
@@ -304,7 +304,7 @@ def _load(self):
         self._model = self._model.to("cuda")
 ```
 
-Do **not** assume `ocr_predictor()` / `from_pretrained()` auto-places on CUDA; many libraries default to CPU even when PyTorch detects a GPU. For ONNX-based engines, pass `providers=["CUDAExecutionProvider", "CPUExecutionProvider"]` at session creation. For Surya-style engines that read env vars, document the required var (e.g. `TORCH_DEVICE=cuda`) in the engine's module docstring.
+Do **not** assume `from_pretrained()` auto-places on CUDA; many libraries default to CPU even when PyTorch detects a GPU. For ONNX-based engines, pass `providers=["CUDAExecutionProvider", "CPUExecutionProvider"]` at session creation. If an engine reads an environment variable to choose its device, document the required variable (for example `TORCH_DEVICE=cuda`) in the engine's module docstring.
 
 ### Register in the factory
 
@@ -315,8 +315,6 @@ from .my_engine import MyOCREngine
 
 _REGISTRY: dict[str, type[OCREngine]] = {
     "tesseract": TesseractEngine,
-    "easyocr":   EasyOCREngine,
-    # ...
     "myengine":  MyOCREngine,   # ← add here
 }
 ```
@@ -335,16 +333,6 @@ Add an optional extra in `pyproject.toml` if the engine has a separate install:
 [project.optional-dependencies]
 myengine = ["myengine-lib>=1.0"]
 ```
-
-### Benchmarking a new engine
-
-Add the engine name to the engines argument in `benchmark/ocr/run_ablation.sh`:
-
-```bash
-bash benchmark/ocr/run_ablation.sh 100 tesseract,easyocr,myengine
-```
-
-Results are written to `benchmark/ocr/results/<preprocess>/` with CER/WER/latency/field-F1/ANLS metrics per document. The consolidated CSV is produced by `benchmark.ocr.consolidate` and can be visualised with the `benchmark.ocr.report` module.
 
 ---
 
@@ -625,7 +613,7 @@ orchestrator = AnonymizationOrchestrator(
 
 ```python
 class SequentialTokenHasher:
-    """Assigns sequential IDs — deterministic across a single run but NOT across runs."""
+    """Assigns sequential IDs: deterministic across a single run but NOT across runs."""
 
     def __init__(self):
         self._counter: dict[str, int] = {}
@@ -908,7 +896,7 @@ from src.anon.slm.detectors.slm_detector import SLMEntityDetector
 from src.anon.slm.prompts import PromptManager
 
 slm_client = OpenAIClient(api_key="sk-...")
-prompt_mgr  = PromptManager(base_path="prompts/")
+prompt_mgr  = PromptManager(base_path="src/anon/slm/prompt_templates/")
 
 slm_detector = SLMEntityDetector(
     slm_client=slm_client,
@@ -928,7 +916,7 @@ slm_detector = SLMEntityDetector(
 ### 12.1 Directory layout
 
 ```
-prompts/
+src/anon/slm/prompt_templates/
 ├── entity_mapper/
 │   ├── v1_en.json
 │   └── v1_pt.json
@@ -953,7 +941,7 @@ Placeholders (`{text}`, `{entities}`, etc.) are filled by `PromptTemplate.format
 
 ### 12.3 Adding a custom prompt
 
-1. Create `prompts/entity_detector/v2_en.json` with your improved system/user prompts.
+1. Create `src/anon/slm/prompt_templates/entity_detector/v2_en.json` with your improved system/user prompts.
 2. Pass `prompt_version="v2"` when constructing `SLMEntityDetector`:
 
 ```python
@@ -971,7 +959,7 @@ uv run anon.py file.csv --slm-detector --slm-prompt-version v2
 
 ### 12.4 Adding a new task type
 
-1. Create the directory: `prompts/my_task/v1_en.json`.
+1. Create the directory: `src/anon/slm/prompt_templates/my_task/v1_en.json`.
 2. Use `PromptManager.get("my_task", language="en", version="v1")` in your code.
 
 ---
@@ -1049,30 +1037,30 @@ All injectable dependencies are passed to `AnonymizationOrchestrator.__init__()`
 ```python
 AnonymizationOrchestrator(
     # Required
-    lang            = "en",                        # str — language code
+    lang            = "en",                        # str: language code
     db_context      = my_storage,                  # EntityStorage Protocol (or None)
     allow_list      = {"safe_string"},             # List[str]
     entities_to_preserve = {"TOOL", "PLATFORM"},  # List[str]
 
-    # Optional — strategy
+    # Optional: strategy
     strategy        = None,                        # AnonymizationStrategy instance (overrides strategy_name)
-    strategy_name   = "filtered",                  # str — used if strategy=None
+    strategy_name   = "filtered",                  # str: used if strategy=None
 
-    # Optional — pipeline components
+    # Optional: pipeline components
     cache_manager   = my_cache,                    # CacheStrategy Protocol
     hash_generator  = my_hasher,                   # HashingStrategy Protocol
     entity_detector = my_detector,                 # EntityDetector instance
 
-    # Optional — SLM
+    # Optional: SLM
     slm_detector    = my_slm_detector,             # AnonymizationStrategy-compatible
     slm_detector_mode = "hybrid",                  # "hybrid" | "exclusive"
 
-    # Optional — model / engine
+    # Optional: model / engine
     transformer_model = "attack-vector/SecureModernBERT-NER",
     analyzer_engine   = None,                      # Pre-built Presidio BatchAnalyzerEngine
     anonymizer_engine = None,                      # Pre-built Presidio AnonymizerEngine
 
-    # Optional — tuning
+    # Optional: tuning
     slug_length       = 8,
     regex_priority    = False,
     nlp_batch_size    = 32,

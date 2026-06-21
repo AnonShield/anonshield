@@ -120,7 +120,7 @@ def _handle_slm_entity_mapping(args):
             container_name=args.ollama_container_name,
             gpu_enabled=not args.ollama_no_gpu
         )
-        prompt_manager = PromptManager(base_path="prompts")
+        prompt_manager = PromptManager()
         mapper = SLMEntityMapper(
             client, 
             prompt_manager,
@@ -757,7 +757,7 @@ def main():
                     container_name=args.ollama_container_name,
                     gpu_enabled=not args.ollama_no_gpu
                 )
-                prompt_manager = PromptManager(base_path="prompts")
+                prompt_manager = PromptManager()
                 slm_detector_instance = SLMEntityDetector(
                     slm_client=client,
                     prompt_manager=prompt_manager,
@@ -782,7 +782,7 @@ def main():
                     container_name=args.ollama_container_name,
                     gpu_enabled=not args.ollama_no_gpu
                 )
-                prompt_manager = PromptManager(base_path="prompts")
+                prompt_manager = PromptManager()
                 slm_anonymizer = SLMFullAnonymizer(
                     slm_client=client,
                     prompt_manager=prompt_manager,

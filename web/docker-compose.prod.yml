@@ -60,8 +60,6 @@ services:
       - ANON_SECRET_KEY=${ANON_SECRET_KEY:-anonshield-prod-secret-change-me}
       - ANON_MAX_SIZE_MB=${ANON_MAX_SIZE_MB:-10}
       - XDG_CACHE_HOME=/app/.cache
-      - PADDLEOCR_CONFIG_DIR=/app/.cache/paddleocr
-      - EASYOCR_MODULE_PATH=/app/.cache/easyocr
       - HF_HOME=/app/.cache/huggingface
     volumes:
       - anon-jobs:/anon-jobs
@@ -96,8 +94,6 @@ services:
       - ANON_METRICS_DB=/anon-jobs/metrics.db
       - ANON_SECRET_KEY=${ANON_SECRET_KEY:-anonshield-prod-secret-change-me}
       - XDG_CACHE_HOME=/app/.cache
-      - PADDLEOCR_CONFIG_DIR=/app/.cache/paddleocr
-      - EASYOCR_MODULE_PATH=/app/.cache/easyocr
       - HF_HOME=/app/.cache/huggingface
     volumes:
       - anon-jobs:/anon-jobs

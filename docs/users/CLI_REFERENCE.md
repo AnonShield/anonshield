@@ -314,7 +314,7 @@ Use `--entities` when you want to anonymize only a specific, known set of types 
 # Never anonymize these specific values
 ./docker/run.sh ./report.csv --allow-list "Google,Microsoft,CVSS"
 
-# Multiple terms with spaces — quote the whole list
+# Multiple terms with spaces: quote the whole list
 ./docker/run.sh ./report.txt --allow-list "John Doe,127.0.0.1,internal-only"
 ```
 
@@ -437,7 +437,7 @@ You can use any entity type label, including custom ones (`MY_SYSTEM`, `THREAT_A
 ```yaml
 - entity_type: CPF           # label used in anonymized output
   pattern: '\d{3}\.\d{3}\.\d{3}-\d{2}'
-  score: 0.95                # confidence (0.0–1.0)
+  score: 0.95                # confidence (0.0 to 1.0)
 
 - entity_type: IBAN
   pattern: '[A-Z]{2}\d{2}[A-Z0-9]{1,30}'
@@ -658,7 +658,7 @@ JSON format is also accepted (same fields, wrapped in an array).
 | `presidio` | 71.6 % | 96.7 % | 82.3 % |
 
 ```bash
-# Best accuracy (default — no flag needed)
+# Best accuracy (default, no flag needed)
 ./docker/run.sh ./report.csv
 
 # Maximum GPU throughput
@@ -681,44 +681,21 @@ JSON format is also accepted (same fields, wrapped in an array).
 
 **Default:** `tesseract`
 
-**What it does:** Selects the OCR engine used to extract text from image-based inputs (PNG, JPG, TIFF, etc.) and scanned PDF pages. AnonShield supports 13 engines across three families: classical, deep-learning detectors, and vision-language models. All run **100% locally**: no cloud calls.
-
-**Classical and deep-learning engines:**
+**What it does:** Selects the OCR engine used to extract text from image-based inputs (PNG, JPG, TIFF, etc.) and scanned PDF pages. AnonShield uses Tesseract, which runs **100% locally** with no cloud calls.
 
 | Engine | Accuracy | Speed | GPU | Notes |
 |--------|----------|-------|-----|-------|
-| `tesseract` | Good | Fast (CPU) | None | Default; requires `tesseract` system package |
-| `easyocr` | Very good | Medium | auto | Best for noisy/rotated images; install: `pip install easyocr` |
-| `paddleocr` | Excellent | Fast | explicit | PP-OCRv5: strong on PT-BR forms, checks, IDs, CJK |
-| `doctr` | Excellent | Medium | `.cuda()` | PyTorch: best layout preservation |
-| `onnxtr` | ≈ DocTR | ~2× faster | CUDAExecutionProvider | ONNX port of DocTR: drop-in faster alternative |
-| `surya` | Very good | Medium GPU | `TORCH_DEVICE=cuda` | Multilingual transformer foundation |
-| `rapidocr` | Good | Fastest CPU | None (CPU-only) | PaddleOCR models in ONNX: lightweight CPU deploy |
-| `kerasocr` | Good | Slow | auto | Legacy English-only Keras pipeline |
-
-**Vision-language model (VLM) engines**, SOTA accuracy, GPU required, slower generation:
-
-| Engine | Model size | Best for |
-|--------|-----------|----------|
-| `paddle_vl` | ~2 GB | Best open-source all-rounder (OmniDocBench 94.50) |
-| `deepseek_ocr` | ~6 GB | Complex layouts, markdown grounding (requires flash-attn) |
-| `monkey_ocr` | ~2.4 GB | Compact VLM alternative |
-| `glm_ocr`, `lighton_ocr` | N/A | Experimental |
-
-All non-default engines are optional dependencies; install only what you need (`uv sync --extra <engine>`).
+| `tesseract` | Good | Fast (CPU) | None | Default and only engine; requires the `tesseract` system package |
 
 ```bash
-# Use EasyOCR for a noisy scanned document
-./docker/run.sh ./scanned_invoice.pdf --ocr-engine easyocr
+# OCR a scanned document
+./docker/run.sh ./scanned_invoice.pdf --ocr-engine tesseract
 
-# Use PaddleOCR v5 for a Brazilian form (CPF, RG, checks)
-./docker/run.sh ./formulario.pdf --ocr-engine paddleocr --lang pt
-
-# Use PaddleOCR-VL for maximum accuracy on a complex invoice
-./docker/run.sh ./invoice.png --ocr-engine paddle_vl
+# OCR a Brazilian form (CPF, RG, checks)
+./docker/run.sh ./formulario.pdf --ocr-engine tesseract --lang pt
 ```
 
-> **See also:** [`docs/users/OCR_ENGINES.md`](OCR_ENGINES.md): detailed comparison, installation instructions, GPU configuration, and benchmarks for all 13 engines.
+> **Tip:** Install the language data packages you need (for example `tesseract-ocr-por` for Portuguese) so Tesseract can recognise non-English text.
 
 ---
 
@@ -732,14 +709,10 @@ All non-default engines are optional dependencies; install only what you need (`
 |-------|-------|-----------|-------|
 | `Davlan/xlm-roberta-base-ner-hrl` | General-purpose NER | 24 languages | **Default** |
 | `attack-vector/SecureModernBERT-NER` | Cybersecurity-focused NER | English only | Adds `MALWARE`, `THREAT_ACTOR`, `ATTACK_PATTERN`, etc. |
-| `dslim/bert-base-NER` | General-purpose NER, fast | English only | Smaller, faster |
 
 ```bash
 # Cybersecurity-focused model (recommended for security reports)
 ./docker/run.sh ./vuln_report.txt --transformer-model attack-vector/SecureModernBERT-NER
-
-# Fast English model
-./docker/run.sh ./report.txt --transformer-model dslim/bert-base-NER
 ```
 
 > **First run:** The model is downloaded from HuggingFace (~1 GB for the default, ~400 MB for SecureModernBERT) and cached in `./anon/models/` for all subsequent runs.
@@ -764,7 +737,7 @@ The tool uses a SQLite database to store entity mappings (original value → pse
 | `in-memory` | Lives only in RAM during the run. Faster, but mappings are lost when the tool finishes. |
 
 ```bash
-# Save mappings to disk (default — keep for de-anonymization)
+# Save mappings to disk (default, keep for de-anonymization)
 ./docker/run.sh ./report.csv --db-mode persistent
 
 # Temporary run, no de-anonymization needed
@@ -1145,7 +1118,7 @@ These options control how the tool manages the Ollama service that runs the loca
 | `--force-large-xml` | off | Override XML memory safety limits |
 | `--disable-gc` | off | Disable Python garbage collection |
 | `--anonymization-strategy` | `filtered` | Detection engine: `filtered` `presidio` `hybrid` `standalone` `regex` `slm` |
-| `--ocr-engine` | `tesseract` | OCR engine: 13 options (see [OCR_ENGINES.md](OCR_ENGINES.md)) |
+| `--ocr-engine` | `tesseract` | OCR engine (Tesseract) |
 | `--transformer-model` | `Davlan/xlm-roberta-base-ner-hrl` | NER model to use |
 | `--db-mode` | `persistent` | Database mode: `persistent` or `in-memory` |
 | `--db-dir` | `db` | Directory for the database file |

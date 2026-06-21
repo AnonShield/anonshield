@@ -8,7 +8,7 @@ The SLM module is an advanced, experimental feature designed to leverage the con
 
 The integration adheres to the project's core architectural principles:
 - **Modularity & Single Responsibility:** The SLM functionality is broken down into three distinct, single-purpose tasks, each with its own set of modules (`mappers`, `detectors`, `anonymizers`).
-- **Dependency Inversion:** The core logic interacts with an `SLMClient` protocol, not a concrete implementation. This decouples the application from a specific SLM provider (e.g., Ollama), making it easy to swap in a different backend (like `vLLM` or a cloud API) in the future.
+- **Dependency Inversion:** The core logic interacts with an `SLMClient` protocol, not a concrete implementation. This decouples the application from a specific SLM provider (e.g., Ollama), making it easy to swap in a different backend (such as an OpenAI-compatible API) in the future.
 - **Strategy Pattern:** The SLM-based anonymization methods are encapsulated in a `SLMAnonymizationStrategy`, allowing the main `AnonymizationOrchestrator` to switch between traditional and SLM-based anonymization seamlessly.
 - **Configuration over Code:** Prompts, model names, and other parameters are managed via configuration files and CLI arguments, not hard-coded.
 
@@ -77,7 +77,7 @@ The module is designed to perform three distinct tasks, selectable via CLI flags
 
 - **Purpose:** Decouples prompt text from application code.
 - **Key Features:**
-    - **Structured Loading:** Loads prompts from a structured directory (`prompts/{task}/{version}_{lang}.json`). This allows for easy A/B testing of prompt versions and adding new languages.
+    - **Structured Loading:** Loads prompts from a structured directory (`src/anon/slm/prompt_templates/{task}/{version}_{lang}.json`). This allows for easy A/B testing of prompt versions and adding new languages.
     - **Templating:** Wraps prompts in a `PromptTemplate` class that allows for safe insertion of runtime data (e.g., the text to be processed).
     - **Language Fallback:** If a prompt for a specific language is not found, it gracefully falls back to the English (`en`) version.
 
@@ -86,7 +86,7 @@ The module is designed to perform three distinct tasks, selectable via CLI flags
 ### Adding a New Prompt Version
 
 To test a new prompt for the entity mapping task, simply:
-1. Copy `prompts/entity_mapper/v1_en.json` to `prompts/entity_mapper/v2_en.json`.
+1. Copy `src/anon/slm/prompt_templates/entity_mapper/v1_en.json` to `src/anon/slm/prompt_templates/entity_mapper/v2_en.json`.
 2. Modify the `system` and `user` prompts in the new `v2_en.json` file.
 3. Run the mapping task with the new version:
    ```bash

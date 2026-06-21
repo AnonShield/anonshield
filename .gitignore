@@ -23,8 +23,9 @@ benchmarks/results
 *.db-shm
 *.db-wal
 
-# Generated analysis output folders
+# Generated analysis + test output folders
 **/analysis/
+test_output*/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -99,7 +100,8 @@ Vulnerabilidades-CAIS/
 *.jpeg
 *.jpg 
 *.txt 
-*.json 
+*.json
+!src/anon/slm/prompt_templates/**/*.json
 test/test_data_integration/*
 *.zip
 # Claude Code local files

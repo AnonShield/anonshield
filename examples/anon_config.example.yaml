@@ -25,7 +25,7 @@ transformer_model: Davlan/xlm-roberta-base-ner-hrl
 # 0 = [ENTITY_TYPE] only (no hash, no secret key required)
 slug_length: 8
 
-# OCR engine for image/PDF processing: tesseract, easyocr, paddleocr, doctr, kerasocr
+# OCR engine for image and PDF processing (tesseract is the only supported engine)
 ocr_engine: tesseract
 
 # Positive entity selection: ONLY these types will be anonymized

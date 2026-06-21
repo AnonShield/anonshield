@@ -1,8 +1,15 @@
 version: 2
 
-# Automated dependency vulnerability alerts and update pull requests.
-# Covers the Python (uv), frontend (npm), Docker, and GitHub Actions ecosystems.
-# Updates within an ecosystem are grouped into a single PR to reduce noise.
+# Automated dependency vulnerability alerts and update pull requests for the
+# Python (uv), frontend (npm), and GitHub Actions ecosystems. Updates within an
+# ecosystem are grouped into a single PR to reduce noise.
+#
+# Docker base images are intentionally NOT tracked here: they are pinned to
+# floating major.minor tags (python:3.12-slim, node:22-alpine) that receive
+# patches automatically on rebuild, and the Trivy job in ci-cd.yml already scans
+# the images for known vulnerabilities on every run. Dependabot would otherwise
+# keep proposing breaking base-image jumps (python 3.14, node 26, cuda 13) and
+# noisy patch bumps for the unused GPU/CLI image.
 updates:
   - package-ecosystem: "uv"
     directory: "/"
@@ -21,28 +28,6 @@ updates:
     groups:
       frontend:
         patterns: ["*"]
-
-  - package-ecosystem: "docker"
-    directories:
-      - "/web/backend"
-      - "/web/frontend"
-      - "/docker"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    groups:
-      docker:
-        patterns: ["*"]
-    # Runtime base images (python, node, cuda) are pinned to a major.minor tag.
-    # CI does not build these images, so any version jump is unvalidated and a
-    # minor bump is breaking too (e.g. python 3.12 -> 3.14 is a semver MINOR but
-    # changes the interpreter and wheel availability; node 22 -> 26 is a major).
-    # Allow only patch/digest updates that stay on the current major.minor.
-    ignore:
-      - dependency-name: "*"
-        update-types:
-          - "version-update:semver-major"
-          - "version-update:semver-minor"
 
   - package-ecosystem: "github-actions"
     directory: "/"

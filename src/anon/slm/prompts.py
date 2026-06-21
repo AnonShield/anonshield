@@ -10,8 +10,10 @@ class PromptManager:
     This allows for easy versioning, A/B testing, and modification of prompts
     without changing the application code.
 
-    Expected directory structure:
-    /prompts
+    Templates are bundled with the package under src/anon/slm/prompt_templates/
+    and are loaded by default, so the manager works regardless of the current
+    working directory. Expected structure:
+    prompt_templates/
     ├── entity_mapper/
     │   ├── v1_en.json
     │   └── v1_pt.json
@@ -20,8 +22,8 @@ class PromptManager:
     └── full_anonymizer/
         └── v1_en.json
     """
-    def __init__(self, base_path: str | Path = "prompts"):
-        self.base_path = Path(base_path)
+    def __init__(self, base_path: str | Path | None = None):
+        self.base_path = Path(base_path) if base_path is not None else Path(__file__).parent / "prompt_templates"
         if not self.base_path.exists():
             self.base_path.mkdir(parents=True, exist_ok=True)
         self._cache: Dict[str, Dict] = {}
