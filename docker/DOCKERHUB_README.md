@@ -1,92 +1,81 @@
 # AnonShield: PII Pseudonymization for CSIRTs
 
-Pseudonymization tool for Computer Security Incident Response Teams. It replaces PII and cybersecurity indicators with deterministic HMAC-SHA256 pseudonyms, so the same value always maps to the same pseudonym and JSON, XML, and CSV files keep their structure. Multilingual, with Tesseract OCR for scanned documents and custom cybersecurity recognizers (IP, CVE, hash, URL, and more). Runs entirely on-premise, and the mapping is reversible with the database.
+AnonShield lets Computer Security Incident Response Teams share incident data without leaking personal data. It replaces PII and cybersecurity indicators (names, emails, IPs, CVEs, hashes, URLs, and more) with deterministic HMAC-SHA256 pseudonyms, so the same value always maps to the same pseudonym and your JSON, XML, and CSV files keep their structure. It is multilingual, ships with Tesseract OCR for scanned documents, and adds custom cybersecurity recognizers on top of standard NER. Everything runs on-premise, and the substitution is reversible as long as you keep the local mapping database.
 
 [![Best Artifact at SBRC 2026](https://img.shields.io/badge/SBRC%202026-Best%20Artifact-gold)](https://doc-artefatos.github.io/sbrc2026/results.html)
 
-> Selected **Best Artifact** at SBRC 2026 ([official results](https://doc-artefatos.github.io/sbrc2026/results.html)). Source code, documentation, and research artifact: [github.com/AnonShield/tool](https://github.com/AnonShield/tool).
+> Selected **Best Artifact** at SBRC 2026 ([official results](https://doc-artefatos.github.io/sbrc2026/results.html)). Source code, documentation, and research artifact: [github.com/AnonShield/anonshield](https://github.com/AnonShield/anonshield).
 
 ![AnonShield pipeline](https://anonshield.org/pipeline.png)
 
-> **Prefer a browser?** A hosted web app with the same engine runs at **[anonshield.org](https://anonshield.org)**: drag and drop a file, choose entity types and a strategy, and watch a live metrics dashboard. The Docker image below is the command-line tool.
+> **Prefer a browser?** A hosted web app with the same engine runs at **[anonshield.org](https://anonshield.org)**: drag and drop a file, choose entity types and a strategy, and watch a live metrics dashboard. The Docker image documented below is the command-line tool.
 
 ![AnonShield web interface](https://anonshield.org/ui-app.png)
 
 ---
 
-## Available Tags
+## Why AnonShield
 
-Two tags are published: `latest` is the CPU image and `gpu` is the GPU image.
-
-| Tag | Base | Use Case | Approx. download |
-|-----|------|----------|------------------|
-| `latest` | `python:3.12-slim` | CPU image: works on any x86_64 machine | ~900 MB |
-| `gpu` | `nvidia/cuda:12.8.0` | GPU image: requires NVIDIA hardware and CUDA 12.8 | ~3 GB |
-
----
-
-## Requirements
-
-**CPU (`latest`):** Any x86_64 machine with 4 GB+ RAM.
-
-**GPU (`gpu`):**
-- NVIDIA GPU, driver ≥ 525 (CUDA 12.8)
-- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed and configured
+* **Deterministic and reversible.** Identical values always map to the same pseudonym, so cross-references survive anonymization. With the mapping database you can de-anonymize later; without it, the output is irreversible.
+* **Structure-preserving.** JSON, XML, and CSV stay valid and keep their schema. Only the sensitive values change.
+* **Security-aware.** Beyond standard PII, it recognizes IPs, CVEs, hashes, URLs, hostnames, MAC addresses, certificates, and more (full list below).
+* **Multilingual with OCR.** Handles many languages and reads scanned PDFs and images via Tesseract.
+* **Fully on-premise.** No data leaves your machine. The only external network call is the one-time model download on first run.
 
 ---
 
 ## Quick Start
 
-> **The only prerequisite is Docker.** Install it for your OS: [Linux](https://docs.docker.com/engine/install/) · [macOS](https://docs.docker.com/desktop/setup/install/mac-install/) · [Windows](https://docs.docker.com/desktop/setup/install/windows-install/). Everything else is already included in your operating system.
+**The only prerequisite is Docker.** Install it for your OS: [Linux](https://docs.docker.com/engine/install/) | [macOS](https://docs.docker.com/desktop/setup/install/mac-install/) | [Windows](https://docs.docker.com/desktop/setup/install/windows-install/). Everything else is included in your operating system. A small wrapper script handles `docker run`, volume mounts, and path mapping for you, so you never type a raw `docker run` command.
 
 ### Step 1: Download the wrapper script
 
 **Linux / macOS** (open a terminal):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AnonShield/tool/main/docker/run.sh -o run.sh
+curl -fsSL https://raw.githubusercontent.com/AnonShield/anonshield/main/docker/run.sh -o run.sh
 chmod +x run.sh
 ```
 
 **Windows** (open **PowerShell**):
 ```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/tool/main/docker/run.ps1 -OutFile run.ps1
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/anonshield/main/docker/run.ps1 -OutFile run.ps1
 ```
 
 > `curl` is built into Linux and macOS. `Invoke-WebRequest` is built into Windows 10/11. No extra installation needed.
 
 ### Step 2: Generate a secret key
 
-The key is used to generate pseudonyms. To de-anonymize later, you only need the `db/` database folder, not the key itself.
+The key drives pseudonym generation. Keep it stable across runs so the same input always yields the same pseudonym. To de-anonymize later you only need the `db/` database folder, not the key.
 
 **Linux / macOS:**
 ```bash
 export ANON_SECRET_KEY=$(openssl rand -hex 32)
 ```
 
-To keep it across terminal sessions:
+To persist it across terminal sessions, append it to your shell profile:
 
-**Linux:**
 ```bash
+# Linux (bash)
 echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
-```
 
-**macOS:**
-```bash
+# macOS (zsh)
 echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.zshrc
 ```
 
-Windows (PowerShell):
+**Windows (PowerShell):**
 ```powershell
 $bytes = New-Object byte[] 32
 [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
 $env:ANON_SECRET_KEY = [System.BitConverter]::ToString($bytes).Replace("-","").ToLower()
 ```
 
-To keep it across sessions, go to **Settings → System → Environment Variables**, add a new variable named `ANON_SECRET_KEY` with that value.
+To persist it on Windows, go to **Settings > System > Environment Variables** and add a variable named `ANON_SECRET_KEY` with that value.
+
+> **No de-anonymization needed?** Skip the key entirely with `--slug-length 0`. Entities are then replaced with their type only (for example `[IP_ADDRESS]`), and no secret key is required.
 
 ### Step 3: Anonymize
 
-Pass any file or folder, using a relative or absolute path:
+Pass any file or folder, using a relative or absolute path.
 
 **Single file (CPU):**
 ```bash
@@ -94,8 +83,8 @@ Pass any file or folder, using a relative or absolute path:
 ./run.sh ./YOUR_FILE.csv
 ```
 ```powershell
-# Windows
-# Note: Windows blocks script execution by default. Bypass it for the current session only:
+# Windows: Windows blocks script execution by default.
+# Bypass it for the current session only, then run:
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 .\run.ps1 .\YOUR_FILE.csv
 ```
@@ -120,19 +109,38 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 .\run.ps1 .\your\folder\
 ```
 
-Output is written to `./anon/output/anon_YOUR_FILE.csv`. The script automatically creates an `./anon/` folder in your current directory:
+By default the output is written to `./anon/output/`. For example, anonymizing `report.csv` produces `./anon/output/anon_report.csv`. The script creates an `./anon/` folder in your current directory to keep everything together:
 
 ```
 ./anon/
-├── input/    ← optional: put files here if you prefer
-├── output/   ← anonymized files appear here
-├── db/       ← entity mapping database (keep this to de-anonymize later)
-└── models/   ← NER model cached here on first run (~1 GB, automatic)
+├── input/    (optional: put files here if you prefer)
+├── output/   (anonymized files appear here)
+├── db/       (entity mapping database; keep it to de-anonymize later)
+└── models/   (NER model cached here on first run, about 1 GB, automatic)
 ```
 
-> **On first run:** the NER transformer model (~1 GB) is downloaded automatically to `./anon/models/` and reused on all subsequent runs.
+> **First run:** the NER transformer model (about 1 GB) downloads automatically into `./anon/models/` and is reused on every subsequent run. This is the only network call AnonShield makes.
 
-> **Note:** If you don't need to de-anonymize later, use `--slug-length 0`. Entities are replaced with their type only (e.g. `[IP_ADDRESS]`) and no secret key is required.
+---
+
+## Available Tags
+
+Two tags are published. `latest` is the CPU image; `gpu` is the GPU image.
+
+| Tag | Base | Use case | Approx. download |
+|-----|------|----------|------------------|
+| `latest` | `python:3.12-slim` | CPU image: works on any x86_64 machine | ~900 MB |
+| `gpu` | `nvidia/cuda:12.8.0-runtime-ubuntu22.04` | GPU image: needs NVIDIA hardware and CUDA 12.8 | ~3 GB |
+
+Both images include Tesseract OCR (English and Portuguese language data) and the spaCy NLP model. The wrapper script picks the right image automatically: plain `./run.sh` uses `latest`, and `./run.sh --gpu` uses `gpu`.
+
+### Requirements
+
+**CPU (`latest`):** any x86_64 machine with 4 GB or more of RAM.
+
+**GPU (`gpu`):**
+- NVIDIA GPU with driver 525 or newer (CUDA 12.8)
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed and configured (see [GPU Setup](#gpu-setup-nvidia-container-toolkit) below)
 
 ---
 
@@ -141,73 +149,134 @@ Output is written to `./anon/output/anon_YOUR_FILE.csv`. The script automaticall
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--lang <code>` | Document language (`en`, `pt`, `es`, ...) | `en` |
-| `--output-dir <path>` | Local path where anonymized files are saved | `./anon/output/` |
-| `--preserve-entities <types>` | Comma-separated entity types to skip (e.g. `LOCATION,IP_ADDRESS`) | none |
+| `--output-dir <path>` | Local folder for anonymized files | `./anon/output/` |
+| `--anonymization-strategy <s>` | Detection strategy (see [Anonymization Strategies](#anonymization-strategies)) | `filtered` |
+| `--preserve-entities <types>` | Comma-separated entity types to skip (for example `LOCATION,IP_ADDRESS`) | none |
 | `--allow-list <terms>` | Comma-separated terms to never anonymize | none |
-| `--slug-length <n>` | Hash length in the anonymized slug (0 to 64) | `64` |
-| `--word-list <path>` | JSON file of known terms to always anonymize (internal names, acronyms, etc.) | none |
-| `--anonymization-strategy <s>` | Detection strategy (see below) | `filtered` |
-| `--optimize` | Enable all performance optimizations | off |
+| `--word-list <path>` | JSON file of known terms to always anonymize (internal names, acronyms, ...) | none |
+| `--anonymization-config <path>` | JSON file with field-level rules for structured files | none |
+| `--slug-length <n>` | Hash length in the pseudonym (0 to 64). `0` requires no secret key | `64` |
+| `--transformer-model <id>` | NER model: `Davlan/xlm-roberta-base-ner-hrl` (default) or `attack-vector/SecureModernBERT-NER` | `Davlan/xlm-roberta-base-ner-hrl` |
+| `--optimize` | Turn on all optimizations at once: `standalone` strategy, cache, `min-word-length=3`, in-memory DB | off |
 
-For the complete reference with examples for every option, see the **[CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md)**
+Run `./run.sh --help` (Linux/macOS) or `.\run.ps1 --help` (Windows) for the complete flag list. Every option is explained with examples in the **[CLI reference on GitHub](https://github.com/AnonShield/anonshield/blob/main/docs/users/CLI_REFERENCE.md)**.
 
-Run `./run.sh --help` (Linux/macOS) or `.\run.ps1 --help` (Windows) for the full options list.
+---
+
+## Examples
+
+> All examples use `./run.sh` (Linux/macOS). On **Windows** substitute `.\run.ps1` and use backslashes in paths.
+
+**Portuguese document:**
+```bash
+./run.sh ./YOUR_FILE.pdf --lang pt
+```
+
+**Preserve hostnames and IPs (do not anonymize them):**
+```bash
+./run.sh ./YOUR_FILE.txt --preserve-entities "HOSTNAME,IP_ADDRESS"
+```
+
+**Always anonymize known internal terms:**
+```bash
+./run.sh ./YOUR_FILE.txt --word-list ./internal_terms.json
+```
+
+**Structured file with field-level config:**
+```bash
+./run.sh ./YOUR_FILE.json --anonymization-config ./anon_config.json
+```
+
+**GPU run with the cybersecurity-focused NER model:**
+```bash
+./run.sh --gpu ./YOUR_FILE.txt --transformer-model attack-vector/SecureModernBERT-NER
+```
+
+**Entire folder, output to a separate directory:**
+```bash
+./run.sh ./reports/ --output-dir ./results/
+```
+
+**Skip the secret key (irreversible, type-only labels):**
+```bash
+./run.sh ./YOUR_FILE.csv --slug-length 0
+```
+
+**List all supported entity types:**
+```bash
+./run.sh --list-entities
+```
+
+---
+
+## Detected Entity Types
+
+**Standard PII:** `PERSON`, `LOCATION`, `ORGANIZATION`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `USERNAME`, `PASSWORD`
+
+**Cybersecurity (custom recognizers):** `IP_ADDRESS`, `URL`, `HOSTNAME`, `MAC_ADDRESS`, `FILE_PATH`, `HASH`, `AUTH_TOKEN`, `CVE_ID`, `CPE_STRING`, `CERT_SERIAL`, `CERTIFICATE`, `CRYPTOGRAPHIC_KEY`, `UUID`, `PGP_BLOCK`, `PORT`, `OID`
+
+When `--lang pt` is set, additional Brazilian recognizers are enabled (for example `BR_CPF`, `BR_CNPJ`, `BR_RG`, `BR_CEP`). Run `./run.sh --list-entities` (Linux/macOS) or `.\run.ps1 --list-entities` (Windows) for the full, up-to-date list.
 
 ---
 
 ## Anonymization Strategies
 
-Choose with `--anonymization-strategy <name>`.
+Choose with `--anonymization-strategy <name>`. The four production strategies are `filtered` (default), `hybrid`, `standalone`, and `presidio`. A `regex` strategy (pure pattern matching, no ML) and an experimental `slm` strategy are also available; see the [strategies guide](https://github.com/AnonShield/anonshield/blob/main/docs/developers/ANONYMIZATION_STRATEGIES.md).
 
-**Throughput, GPU** (NVIDIA RTX 5060 Ti 16 GB · D2 operational dataset · 420 MB CSV / 551 MB JSON, 70,951 Tenable vulnerability records):
+| Strategy | What it does | Best for |
+|----------|--------------|----------|
+| `filtered` *(default)* | Presidio pipeline scoped to a curated recognizer set; handles overlapping entity merges correctly | Best accuracy; the safe default |
+| `hybrid` | Presidio detection with custom text replacement | Same accuracy as `filtered`, different replacement path |
+| `standalone` | Zero Presidio dependency, fastest on GPU | Maximum throughput |
+| `presidio` | Full upstream Presidio pipeline | Comparison and baseline use |
+
+**Recommendation:** keep `filtered` (the default) for the best accuracy at a small throughput cost. Switch to `standalone` on GPU when you need maximum throughput.
+
+The numbers below come from the AnonShield benchmark suite. See [benchmark/BENCHMARK.md](https://github.com/AnonShield/anonshield/blob/main/benchmark/BENCHMARK.md) for the methodology and raw data.
+
+**Throughput, GPU** (NVIDIA RTX 5060 Ti 16 GB, D2 operational dataset, 420 MB CSV / 551 MB JSON, 70,951 Tenable vulnerability records):
 
 | Strategy | CSV (KB/s) | JSON (KB/s) | vs. slowest |
 |----------|-----------|------------|-------------|
-| `standalone` | **732** | **1,250** | **4.3×** faster |
-| `hybrid` | 248 | 632 | 1.5× faster |
-| `filtered` *(default)* | 240 | 627 | 1.4× faster |
+| `standalone` | **732** | **1,250** | **4.3x** faster |
+| `hybrid` | 248 | 632 | 1.5x faster |
+| `filtered` *(default)* | 240 | 627 | 1.4x faster |
 | `presidio` | 171 | 575 | baseline |
 
-**Throughput, CPU, no GPU** (AMD Ryzen 5 8600G (6c/12t) · D3 synthetic dataset · 247 MB CSV / 444 MB JSON, 70,951 CVE vulnerability records):
-
-Benchmark run without GPU to measure CPU-only performance on a large structured dataset.
+**Throughput, CPU only** (AMD Ryzen 5 8600G, 6c/12t, D3 synthetic dataset, 247 MB CSV / 444 MB JSON, 70,951 CVE vulnerability records):
 
 | Strategy | CSV (KB/s) | JSON (KB/s) | vs. slowest |
 |----------|-----------|------------|-------------|
-| `standalone` | **526** | **518** | CSV: **4×** faster |
+| `standalone` | **526** | **518** | CSV: **4x** faster |
 | `hybrid` | 134 | 461 | similar |
 | `filtered` *(default)* | 132 | 459 | similar |
 | `presidio` | 130 | 439 | baseline |
 
-**Throughput, CPU, heterogeneous formats** (Intel Xeon E5-2650 · D1 OpenVAS dataset · 136 vulnerability reports, median KB/s):
-
-Benchmark on a heterogeneous set of real OpenVAS scan reports in CSV, XML, and PDF format, measuring per-file median throughput on older server hardware.
+**Throughput, CPU, heterogeneous formats** (Intel Xeon E5-2650, D1 OpenVAS dataset, 136 vulnerability reports in CSV, XML, and PDF, median KB/s on older server hardware):
 
 | Strategy | CSV (KB/s) | XML (KB/s) | PDF (KB/s) | vs. slowest |
 |----------|-----------|-----------|-----------|------------|
-| `standalone` | **0.94** | **2.05** | **4.26** | **~15 %** faster |
+| `standalone` | **0.94** | **2.05** | **4.26** | about 15% faster |
 | `hybrid` | 0.85 | 1.83 | 3.57 | similar |
 | `presidio` | 0.85 | 1.85 | 3.56 | similar |
 | `filtered` *(default)* | 0.81 | 1.82 | 3.83 | baseline |
 
-> On GPU, `standalone` is **4× faster** than `presidio` on CSV. On the AMD Ryzen (CPU-only, large dataset), the same ~4× advantage holds for CSV; on heterogeneous OpenVAS reports (Intel Xeon), the gap shrinks to ~15 %.
+> On GPU, `standalone` is about 4x faster than `presidio` on CSV. On the AMD Ryzen (CPU only, large dataset) the same roughly 4x CSV advantage holds; on heterogeneous OpenVAS reports (Intel Xeon) the gap narrows to about 15%.
 
-**Accuracy** (67 annotated vulnerability records · GPU · `attack-vector/SecureModernBERT-NER` model · annotated by 3 security specialists):
+**Accuracy** (67 annotated vulnerability records, GPU, `attack-vector/SecureModernBERT-NER` model, annotated by 3 security specialists):
 
 | Strategy | Precision | Recall | F1 | Notes |
 |----------|-----------|--------|----|-------|
-| `filtered` *(default)* | 91.9 % | 96.7 % | **94.2 %** | Best accuracy. Curated recognizer set; handles overlapping entity merges correctly. |
-| `hybrid` | 91.9 % | 96.7 % | **94.2 %** | Same accuracy as `filtered`. Uses manual text replacement instead of Presidio's anonymizer. |
-| `standalone` | 87.9 % | 94.5 % | 91.1 % | Slightly lower precision. Fastest on GPU. |
-| `presidio` | 71.6 % | 96.7 % | 82.3 % | Many false positives. Rarely the best choice. |
-
-**Recommendation:** `filtered` (default) gives the best accuracy at a small throughput cost. Use `standalone` on GPU for maximum throughput.
+| `filtered` *(default)* | 91.9% | 96.7% | **94.2%** | Best accuracy. Curated recognizer set; handles overlapping merges correctly. |
+| `hybrid` | 91.9% | 96.7% | **94.2%** | Same accuracy as `filtered`. Uses manual replacement instead of Presidio's anonymizer. |
+| `standalone` | 87.9% | 94.5% | 91.1% | Slightly lower precision. Fastest on GPU. |
+| `presidio` | 71.6% | 96.7% | 82.3% | Many false positives. Rarely the best choice. |
 
 ---
 
 ## Word List (`--word-list`)
 
-If your organization uses internal names, system names, acronyms, or codenames that a general NER model might not recognize, you can supply a JSON file listing them. Every term in the list is always anonymized, regardless of context.
+If your organization uses internal names, system names, acronyms, or codenames that a general NER model might miss, supply a JSON file listing them. Every term in the list is always anonymized, regardless of context.
 
 **Format:** a JSON object where each key is the entity type label and the value is a list of terms. The key is used directly as the entity type, so any label is valid, including custom ones.
 
@@ -227,13 +296,13 @@ If your organization uses internal names, system names, acronyms, or codenames t
 
 ---
 
-## Anonymization Config (`--anonymization-config`)
+## Field-Level Config (`--anonymization-config`)
 
-For structured files (JSON, CSV, XML), you can pass a JSON config file to control exactly which fields get anonymized. Without it, the tool runs NER inference on every field, which is accurate but slow on large datasets. The config lets you:
+For structured files (JSON, CSV, XML), a JSON config file controls exactly which fields are anonymized. Without it, the tool runs NER inference on every field, which is accurate but slow on large datasets. The config lets you:
 
-- **`fields_to_exclude`**: fields that are never anonymized (e.g. severity scores, timestamps)
+- **`fields_to_exclude`**: fields that are never anonymized (for example severity scores, timestamps)
 - **`fields_to_anonymize`**: explicit list of fields to run NER on; everything else is skipped
-- **`force_anonymize`**: map a field directly to an entity type, bypassing NER entirely (useful for fields like `Port` or `Hostname` that don't have obvious syntactic patterns)
+- **`force_anonymize`**: map a field directly to an entity type, bypassing NER entirely (useful for fields such as `Port` or `Hostname` that lack obvious syntactic patterns)
 
 **Example, Tenable JSON scan (`config.json`):**
 ```json
@@ -249,7 +318,7 @@ For structured files (JSON, CSV, XML), you can pass a JSON config file to contro
 }
 ```
 
-With this config: `severity`, `port`, etc. are preserved; `asset.ipv4_addresses` is always pseudonymized as `IP_ADDRESS` regardless of its format; only `asset.name` and `output` go through NER inference.
+With this config, `severity`, `port`, and the other excluded fields are preserved; `asset.ipv4_addresses` is always pseudonymized as `IP_ADDRESS` regardless of its format; and only `asset.name` and `output` go through NER inference.
 
 Save the config anywhere and pass its path:
 
@@ -257,64 +326,25 @@ Save the config anywhere and pass its path:
 ./run.sh ./YOUR_FILE.json --anonymization-config ./anon_config.json
 ```
 
-**Performance impact (GPU · NVIDIA RTX 5060 Ti · 70,951 vulnerability records):**
+**Performance impact (GPU, NVIDIA RTX 5060 Ti, 70,951 vulnerability records):**
 
 | Strategy | CSV without | CSV with | CSV gain | JSON without | JSON with | JSON gain |
 |----------|------------|---------|---------|-------------|----------|----------|
-| `standalone` | 732 KB/s | **34,341 KB/s** | **47×** | 1,250 KB/s | **31,272 KB/s** | **25×** |
-| `filtered` | 240 KB/s | 32,115 KB/s | 134× | 627 KB/s | 29,937 KB/s | 48× |
-| `hybrid` | 248 KB/s | 31,902 KB/s | 129× | 632 KB/s | 29,924 KB/s | 47× |
-| `presidio` | 171 KB/s | 32,034 KB/s | 188× | 575 KB/s | 29,855 KB/s | 52× |
+| `standalone` | 732 KB/s | **34,341 KB/s** | **47x** | 1,250 KB/s | **31,272 KB/s** | **25x** |
+| `filtered` | 240 KB/s | 32,115 KB/s | 134x | 627 KB/s | 29,937 KB/s | 48x |
+| `hybrid` | 248 KB/s | 31,902 KB/s | 129x | 632 KB/s | 29,924 KB/s | 47x |
+| `presidio` | 171 KB/s | 32,034 KB/s | 188x | 575 KB/s | 29,855 KB/s | 52x |
 
-The config gain is larger for Presidio-based strategies because they have a higher per-record baseline cost to eliminate. `standalone` remains the fastest even with config (34,341 KB/s vs ~32,000 KB/s for others). When using only `force_anonymize` and `fields_to_exclude` (with no `fields_to_anonymize`), NER inference is completely bypassed and strategy choice no longer affects throughput.
-
----
-
-## Examples
-
-> All examples use `./run.sh` (Linux/macOS). On **Windows** substitute `.\run.ps1` and use backslashes for paths.
-
-**Portuguese document:**
-```bash
-./run.sh ./YOUR_FILE.pdf --lang pt
-```
-
-**Preserve hostnames and IPs (don't anonymize them):**
-```bash
-./run.sh ./YOUR_FILE.txt --preserve-entities "HOSTNAME,IP_ADDRESS"
-```
-
-**Always anonymize known internal terms:**
-```bash
-./run.sh ./YOUR_FILE.txt --word-list ./internal_terms.json
-```
-
-**Structured file with field-level config:**
-```bash
-./run.sh ./YOUR_FILE.json --anonymization-config ./anon_config.json
-```
-
-**GPU with cybersecurity-focused NER model:**
-```bash
-./run.sh --gpu ./YOUR_FILE.txt --transformer-model attack-vector/SecureModernBERT-NER
-```
-
-**Entire folder, output to a separate directory:**
-```bash
-./run.sh ./reports/ --output-dir ./results/
-```
-
-**List all supported entity types:**
-```bash
-./run.sh --list-entities
-```
+The config gain is largest for the Presidio-based strategies because they have a higher per-record baseline cost to eliminate. `standalone` stays the fastest even with config (34,341 KB/s vs. about 32,000 KB/s for the others). When you use only `force_anonymize` and `fields_to_exclude` (with no `fields_to_anonymize`), NER inference is bypassed entirely and the strategy choice no longer affects throughput.
 
 ---
 
 ## GPU Setup (NVIDIA Container Toolkit)
 
+The GPU image needs the NVIDIA Container Toolkit on the host. Install and configure it once:
+
 ```bash
-# Install toolkit
+# Install the toolkit
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
 curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
   sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
@@ -323,50 +353,30 @@ sudo apt update && sudo apt install -y nvidia-container-toolkit
 sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
 sudo systemctl restart docker
 
-# Verify
-docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi
+# Verify the GPU is visible to Docker
+docker run --rm --gpus all nvidia/cuda:12.8.0-runtime-ubuntu22.04 nvidia-smi
 ```
 
-If you get `--gpus all not supported`, try adding `--runtime=nvidia`:
-```bash
-docker run --rm --runtime=nvidia --gpus all anonshield/anon:gpu /data/file.txt ...
-```
+Once `nvidia-smi` works inside that test container, `./run.sh --gpu ...` will use your GPU automatically.
 
 ---
 
-## Detected Entity Types
-
-**Standard PII:** `PERSON`, `LOCATION`, `ORGANIZATION`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `USERNAME`, `PASSWORD`
-
-**Cybersecurity (custom recognizers):** `IP_ADDRESS`, `URL`, `HOSTNAME`, `MAC_ADDRESS`, `FILE_PATH`, `HASH`, `AUTH_TOKEN`, `CVE_ID`, `CPE_STRING`, `CERT_SERIAL`, `CERTIFICATE`, `CRYPTOGRAPHIC_KEY`, `UUID`, `PGP_BLOCK`, `PORT`, `OID`
-
-Run `./run.sh --list-entities` (Linux/macOS) or `.\run.ps1 --list-entities` (Windows) for the full list.
-
----
-
-## Full CLI Reference
-
-Every option explained in plain language with examples: **[CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md)**
-
----
-
-## Source Code & Documentation
+## Source Code and Documentation
 
 | Resource | Link |
 |----------|------|
-| Repository | [github.com/AnonShield/tool](https://github.com/AnonShield/tool) |
-| CLI Reference | [docs/users/CLI_REFERENCE.md](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md) |
-| Architecture | [docs/developers/ARCHITECTURE.md](https://github.com/AnonShield/tool/blob/main/docs/developers/ARCHITECTURE.md) |
-| Anonymization Strategies | [docs/developers/ANONYMIZATION_STRATEGIES.md](https://github.com/AnonShield/tool/blob/main/docs/developers/ANONYMIZATION_STRATEGIES.md) |
-| Benchmark Suite | [benchmark/BENCHMARK.md](https://github.com/AnonShield/tool/blob/main/benchmark/BENCHMARK.md) |
-| Experiments & Datasets | [paper_data/EXPERIMENTS.md](https://github.com/AnonShield/tool/blob/main/paper_data/EXPERIMENTS.md) |
-| Issues | [github.com/AnonShield/tool/issues](https://github.com/AnonShield/tool/issues) |
+| Repository | [github.com/AnonShield/anonshield](https://github.com/AnonShield/anonshield) |
+| CLI reference | [docs/users/CLI_REFERENCE.md](https://github.com/AnonShield/anonshield/blob/main/docs/users/CLI_REFERENCE.md) |
+| Architecture | [docs/developers/ARCHITECTURE.md](https://github.com/AnonShield/anonshield/blob/main/docs/developers/ARCHITECTURE.md) |
+| Anonymization strategies | [docs/developers/ANONYMIZATION_STRATEGIES.md](https://github.com/AnonShield/anonshield/blob/main/docs/developers/ANONYMIZATION_STRATEGIES.md) |
+| Benchmark suite | [benchmark/BENCHMARK.md](https://github.com/AnonShield/anonshield/blob/main/benchmark/BENCHMARK.md) |
+| Issues | [github.com/AnonShield/anonshield/issues](https://github.com/AnonShield/anonshield/issues) |
 
 ---
 
-## Support & Contact
+## Support and Contact
 
 We welcome feedback, questions, and contributions from the community.
 
-* **Bugs & Feature Requests:** Please [open an issue](https://github.com/AnonShield/tool/issues) on our GitHub repository. This helps us track problems and keep the community informed.
-* **Direct Contact & Inquiries:** For institutional questions, partnerships, or to report a security bug directly, reach out to our team at **[anonshield@unipampa.edu.br](mailto:anonshield@unipampa.edu.br)**.
+* **Bugs and feature requests:** please [open an issue](https://github.com/AnonShield/anonshield/issues) on GitHub. This helps us track problems and keep the community informed.
+* **Institutional inquiries and security reports:** for partnerships, institutional questions, or to report a security bug directly, reach our team at **[anonshield@unipampa.edu.br](mailto:anonshield@unipampa.edu.br)**.
