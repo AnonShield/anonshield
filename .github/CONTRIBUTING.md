@@ -65,7 +65,7 @@ examples/                 # Sample configs and documents
 docker/                   # Dockerfile and docker-compose
 ```
 
-See [docs/developers/ARCHITECTURE.md](docs/developers/ARCHITECTURE.md) for the full module map and data-flow diagram.
+See [docs/developers/ARCHITECTURE.md](../docs/developers/ARCHITECTURE.md) for the full module map and data-flow diagram.
 
 ---
 
@@ -90,7 +90,7 @@ Respect the established patterns; do not work around them:
 | Dependency Injection | `AnonymizationOrchestrator.__init__()` parameters |
 | Protocol-based inversion | `src/anon/core/protocols.py` |
 
-New extension points must follow these patterns. See [docs/developers/EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md) for worked examples for every extension point.
+New extension points must follow these patterns. See [docs/developers/EXTENSIBILITY.md](../docs/developers/EXTENSIBILITY.md) for worked examples for every extension point.
 
 ### Security
 
@@ -131,12 +131,12 @@ The most common extension points are:
 
 | What you want to add | Where to look |
 |---|---|
-| New anonymization strategy | [Section 2 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#2-anonymization-strategies) |
-| New file format processor | [Section 3 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#3-file-processors) |
-| New entity type / regex | [Section 4 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#4-entity-types-and-regex-patterns) |
-| New transformer model | [Section 5 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#5-transformer-models) |
-| Custom cache / hash / storage | [Sections 6-8 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#6-cache-backend) |
-| New SLM backend | [Section 11 of EXTENSIBILITY.md](docs/developers/EXTENSIBILITY.md#11-slm-client) |
+| New anonymization strategy | [Section 2 of EXTENSIBILITY.md](../docs/developers/EXTENSIBILITY.md#2-anonymization-strategies) |
+| New file format processor | [Section 3 of EXTENSIBILITY.md](../docs/developers/EXTENSIBILITY.md#3-file-processors) |
+| New entity type / regex | [Section 4 of EXTENSIBILITY.md](../docs/developers/EXTENSIBILITY.md#4-entity-types-and-regex-patterns) |
+| New transformer model | [Section 5 of EXTENSIBILITY.md](../docs/developers/EXTENSIBILITY.md#5-transformer-models) |
+| Custom cache / hash / storage | [Sections 6-8 of EXTENSIBILITY.md](../docs/developers/EXTENSIBILITY.md#6-cache-backend) |
+| New SLM backend | [Section 11 of EXTENSIBILITY.md](../docs/developers/EXTENSIBILITY.md#11-slm-client) |
 
 For larger changes (new strategies, new processors), open an issue first to discuss the approach before writing code.
 
@@ -202,4 +202,4 @@ Please include:
 
 ## 9. License
 
-By contributing you agree that your contributions will be licensed under the [GNU General Public License v3.0](LICENSE) that covers this project.
+By contributing you agree that your contributions will be licensed under the [GNU General Public License v3.0](../LICENSE) that covers this project.

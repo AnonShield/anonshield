@@ -251,7 +251,7 @@ On the AnonShield evaluation (network vulnerability scan reports):
 - The mapping database stores the value-to-pseudonym table; keep it secure, since losing it (or the key) makes de-anonymization impossible.
 - Protect `ANON_SECRET_KEY`: it is required to correlate pseudonyms across runs and to re-identify.
 
-See [SECURITY.md](SECURITY.md) to report a vulnerability.
+See [SECURITY.md](.github/SECURITY.md) to report a vulnerability.
 
 ## Citation
 
@@ -274,7 +274,7 @@ If you use AnonShield in your research, please cite the SBRC 2026 paper:
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md) before opening an issue or pull request.
+Contributions are welcome. Please read [CONTRIBUTING.md](.github/CONTRIBUTING.md) and the [Code of Conduct](.github/CODE_OF_CONDUCT.md) before opening an issue or pull request.
 
 For questions or to report a security issue directly: **anonshield@unipampa.edu.br**.
 
