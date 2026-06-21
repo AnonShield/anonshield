@@ -25,9 +25,40 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Sync Docker Hub description from DOCKERHUB_README.md
-        uses: peter-evans/dockerhub-description@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD || secrets.DOCKERHUB_TOKEN }}
-          repository: anonshield/anon
-          readme-filepath: ./docker/DOCKERHUB_README.md
+        # Direct Docker Hub API call (no third-party action). Logs in to get a
+        # JWT, then PATCHes the repository description with the README contents.
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+
+          user = os.environ["DOCKERHUB_USERNAME"]
+          pw = os.environ["DOCKERHUB_PASSWORD"]
+          repo = "anonshield/anon"
+
+          login = urllib.request.Request(
+              "https://hub.docker.com/v2/users/login/",
+              data=json.dumps({"username": user, "password": pw}).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          token = json.load(urllib.request.urlopen(login))["token"]
+
+          with open("docker/DOCKERHUB_README.md", encoding="utf-8") as f:
+              full_description = f.read()
+
+          patch = urllib.request.Request(
+              f"https://hub.docker.com/v2/repositories/{repo}/",
+              data=json.dumps({"full_description": full_description}).encode(),
+              headers={"Content-Type": "application/json", "Authorization": f"JWT {token}"},
+              method="PATCH",
+          )
+          try:
+              resp = urllib.request.urlopen(patch)
+          except urllib.error.HTTPError as e:
+              print("Docker Hub PATCH failed:", e.code, e.read().decode()[:500])
+              raise
+          print("Docker Hub description updated, HTTP", resp.status)
+          PY
