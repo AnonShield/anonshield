@@ -1,0 +1,33 @@
+name: Docker Hub description
+
+# Syncs docker/DOCKERHUB_README.md to the Docker Hub repository description.
+# This is the ONLY thing that runs on a README-only change: it never builds or
+# pushes an image (that is docker-image.yml).
+#
+# Secrets: DOCKERHUB_USERNAME, and DOCKERHUB_PASSWORD (the description API needs
+# the account password; the access token gets a 403 for this endpoint).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docker/DOCKERHUB_README.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync Docker Hub description
+    if: github.repository == 'AnonShield/anonshield'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Sync Docker Hub description from DOCKERHUB_README.md
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD || secrets.DOCKERHUB_TOKEN }}
+          repository: anonshield/anon
+          readme-filepath: ./docker/DOCKERHUB_README.md
