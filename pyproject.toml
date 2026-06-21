@@ -17,7 +17,6 @@ dependencies = [
     "spacy-huggingface-pipelines>=0.0.4",
     "pytesseract>=0.3.10",
     "Pillow>=10.4.0",
-    "opencv-python-headless>=4.10.0",
     "PyMuPDF>=1.24.9",
     "lxml>=5.2.2",
     "ijson>=3.4.0.post0",
