@@ -26,7 +26,9 @@ help:  ## List the available commands
 	  awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-10s\033[0m %s\n",$$1,$$2}'
 
 deploy: build up warm status  ## Build, start, warm the cache, and show status (full deploy)
-	@echo "Deployed. Public URL: https://anonshield.org"
+	@docker image prune -f >/dev/null 2>&1 || true
+	@docker builder prune -f >/dev/null 2>&1 || true
+	@echo "Deployed (pruned old images and stale build cache). Public URL: https://anonshield.org"
 
 ensure-secret:  ## Generate a random ANON_SECRET_KEY in web/.env if missing (persisted, never regenerated)
 	@touch .env
