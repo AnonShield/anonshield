@@ -1,25 +1,20 @@
 name: CI/CD
 
-# CI (tests + frontend build) runs on GitHub-hosted runners; the deploy job runs
-# on the self-hosted production runner only for pushes to main, after CI passes.
-# The production host is never named here: the runner connects out to GitHub and
-# is selected by the generic label below.
+# CI runs on GitHub-hosted runners; the deploy job runs on the self-hosted
+# production runner only for pushes to main, after CI passes. The production host
+# is never named here: the runner connects out to GitHub and is selected by the
+# generic label below.
 #
-# Docs-only pushes (README, docs/, citation files) skip the whole workflow: they
-# change neither the app nor the tests, so there is nothing to test or deploy.
-# Pull requests have no paths-ignore, so they always run the full suite and the
-# branch-protection required checks are never left pending.
+# The "changes" job detects whether the push/PR actually touches code. When it
+# only touches docs (README, docs/, citation files), the test/build/scan jobs run
+# a single no-op step and report SUCCESS, so the commit stays all-green and the
+# required status checks are satisfied WITHOUT running the suite, and the deploy
+# is skipped. This avoids both wasted test runs and stuck/red checks on a
+# docs-only change (no cancelling needed).
 
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '.gitignore'
-      - '*.cff'
-      - '*.bib'
   pull_request:
     branches: [main]
 
@@ -27,69 +22,125 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+      - id: filter
+        # Mark the run as a "code" change when it touches the app, deps, tests or
+        # the workflows themselves. A docs-only change (README, docs/, citation
+        # files) yields code=false. If the base commit cannot be resolved (first
+        # push, force-push), default to code=true so nothing is skipped unsafely.
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base" 2>/dev/null; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "Base commit unavailable; treating as a code change."
+            exit 0
+          fi
+          changed="$(git diff --name-only "$base" HEAD)"
+          echo "Changed files:"; printf '  %s\n' $changed
+          if printf '%s\n' "$changed" | grep -qE '^(src/|web/|tests/|scripts/|anon\.py|pyproject\.toml|uv\.lock|\.github/workflows/)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
     name: Python tests
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
       ANON_SECRET_KEY: test-key-12345678901234567890123456789012
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Install uv
+      - if: needs.changes.outputs.code != 'true'
+        run: echo "Docs-only change: no Python code touched, nothing to test."
+      - if: needs.changes.outputs.code == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - if: needs.changes.outputs.code == 'true'
+        name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
-      - name: Install dependencies
+      - if: needs.changes.outputs.code == 'true'
+        name: Install dependencies
         run: uv sync --group dev
-      - name: Cache Hugging Face models
+      - if: needs.changes.outputs.code == 'true'
+        name: Cache Hugging Face models
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.cache/huggingface
           key: hf-models-v1
-      - name: Run tests
+      - if: needs.changes.outputs.code == 'true'
+        name: Run tests
         run: uv run pytest -m "not slow and not slm and not ocr" -q --timeout=300
 
   frontend:
     name: Frontend build
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       # SvelteKit needs this public var present at build time; the value only
       # matters at runtime (the deployed image injects the real one).
       PUBLIC_API_URL: http://localhost:8000
-    defaults:
-      run:
-        working-directory: web/frontend
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+      - if: needs.changes.outputs.code != 'true'
+        run: echo "Docs-only change: nothing to build."
+      - if: needs.changes.outputs.code == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - if: needs.changes.outputs.code == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: web/frontend/package-lock.json
-      - run: npm ci
-      - run: npm run build
+      - if: needs.changes.outputs.code == 'true'
+        run: npm ci
+        working-directory: web/frontend
+      - if: needs.changes.outputs.code == 'true'
+        run: npm run build
+        working-directory: web/frontend
 
   vuln-scan:
     name: Dependency & container scan
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Install uv
+      - if: needs.changes.outputs.code != 'true'
+        run: echo "Docs-only change: nothing to scan."
+      - if: needs.changes.outputs.code == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - if: needs.changes.outputs.code == 'true'
+        name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
-      - name: Python dependency audit (pip-audit)
+      - if: needs.changes.outputs.code == 'true'
+        name: Python dependency audit (pip-audit)
         run: |
           uv export --frozen --no-dev --format requirements-txt -o /tmp/requirements.txt
           uvx pip-audit -r /tmp/requirements.txt --progress-spinner off
         continue-on-error: true
-      - name: Frontend dependency audit (npm audit)
+      - if: needs.changes.outputs.code == 'true'
+        name: Frontend dependency audit (npm audit)
         working-directory: web/frontend
         run: npm audit --audit-level=high
         continue-on-error: true
-      - name: Filesystem vulnerability & misconfig scan (Trivy)
+      - if: needs.changes.outputs.code == 'true'
+        name: Filesystem vulnerability & misconfig scan (Trivy)
         run: |
           curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b "$RUNNER_TEMP/bin"
           "$RUNNER_TEMP/bin/trivy" fs --scanners vuln,secret,misconfig \
@@ -98,28 +149,35 @@ jobs:
 
   secret-scan:
     name: Secret scan & SAST
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Secret scan (gitleaks)
+      - if: needs.changes.outputs.code != 'true'
+        run: echo "Docs-only change: no code to scan."
+      - if: needs.changes.outputs.code == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - if: needs.changes.outputs.code == 'true'
+        name: Secret scan (gitleaks)
         run: |
           VER=8.21.2
           curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" | tar -xz gitleaks
           ./gitleaks detect --source . --no-git --config .gitleaks.toml --no-banner --redact --exit-code 1
-      - name: Install uv
+      - if: needs.changes.outputs.code == 'true'
+        name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
-      - name: Python SAST (bandit)
+      - if: needs.changes.outputs.code == 'true'
+        name: Python SAST (bandit)
         # Blocking: a medium or higher finding fails this job (and gates the deploy),
         # so it surfaces as a red run instead of a silently-green check.
         run: uvx bandit -r src web/backend -ll -q
 
   deploy:
     name: Deploy to production
-    needs: [test, frontend, secret-scan]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'AnonShield/anonshield'
+    needs: [changes, test, frontend, secret-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'AnonShield/anonshield' && needs.changes.outputs.code == 'true'
     runs-on: [self-hosted, anonshield-prod]
     timeout-minutes: 30
     concurrency:
