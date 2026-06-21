@@ -1,13 +1,25 @@
 name: CI/CD
 
-# CI (tests + frontend build) runs on GitHub-hosted runners for every push and
-# pull request. The deploy job runs on the self-hosted production runner and only
-# for pushes to main, after CI passes. The production host is never named here:
-# the runner connects out to GitHub and is selected by the generic label below.
+# CI (tests + frontend build) runs on GitHub-hosted runners; the deploy job runs
+# on the self-hosted production runner only for pushes to main, after CI passes.
+# The production host is never named here: the runner connects out to GitHub and
+# is selected by the generic label below.
+#
+# Docs-only pushes (README, docs/, citation files) skip the whole workflow: they
+# change neither the app nor the tests, so there is nothing to test or deploy.
+# Pull requests have no paths-ignore, so they always run the full suite and the
+# branch-protection required checks are never left pending.
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+      - '*.cff'
+      - '*.bib'
   pull_request:
     branches: [main]
 
