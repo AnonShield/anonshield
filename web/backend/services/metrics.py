@@ -189,16 +189,19 @@ def _percentile(values: list[float], pct: float) -> float | None:
     return round(s[lo] + (s[hi] - s[lo]) * frac, 2)
 
 
-_PERCENTILE_COLUMNS = frozenset({"ms", "throughput_bps"})
+# Static query per allowed column: no dynamic SQL, so there is no injection
+# surface and no need for a bandit suppression.
+_PERCENTILE_QUERIES = {
+    "ms": "SELECT ms FROM job WHERE ms IS NOT NULL",
+    "throughput_bps": "SELECT throughput_bps FROM job WHERE throughput_bps IS NOT NULL",
+}
 
 
 def _percentiles(c: sqlite3.Connection, col: str) -> dict:
     """p50/p90/p99 plus min/max for a numeric job column, ignoring NULLs."""
-    if col not in _PERCENTILE_COLUMNS:
+    query = _PERCENTILE_QUERIES.get(col)
+    if query is None:
         raise ValueError(f"unsupported percentile column: {col!r}")
-    # col is restricted to the whitelist above; SQL identifiers cannot be bound as
-    # parameters, so the f-string is safe here.
-    query = f"SELECT {col} FROM job WHERE {col} IS NOT NULL"  # nosec B608
     vals = [r[col] for r in c.execute(query) if r[col] is not None]
     return {
         "n": len(vals),

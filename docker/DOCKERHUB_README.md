@@ -1,12 +1,12 @@
 # AnonShield: PII Pseudonymization for CSIRTs
 
-Modular pseudonymization framework for Cybersecurity Incident Response Teams. It anonymizes PII and cybersecurity indicators using HMAC-SHA256, preserving structure in JSON, XML, CSV, and more. It supports 24 languages, OCR, and custom cybersecurity recognizers (IP, CVE, hash, URL, etc.).
+Pseudonymization tool for Computer Security Incident Response Teams. It replaces PII and cybersecurity indicators with deterministic HMAC-SHA256 pseudonyms, so the same value always maps to the same pseudonym and JSON, XML, and CSV files keep their structure. Multilingual, with Tesseract OCR for scanned documents and custom cybersecurity recognizers (IP, CVE, hash, URL, and more). Runs entirely on-premise, and the mapping is reversible with the database.
 
 [![Best Artifact at SBRC 2026](https://img.shields.io/badge/SBRC%202026-Best%20Artifact-gold)](https://doc-artefatos.github.io/sbrc2026/results.html)
 
-> **Award:** AnonShield received the **Best Artifact award at SBRC 2026**. See the [official results](https://doc-artefatos.github.io/sbrc2026/results.html).
+> Selected **Best Artifact** at SBRC 2026 ([official results](https://doc-artefatos.github.io/sbrc2026/results.html)). Source code, documentation, and research artifact: [github.com/AnonShield/tool](https://github.com/AnonShield/tool).
 
-> **Source code, documentation, and research artifact:** [github.com/AnonShield/tool](https://github.com/AnonShield/tool)
+![AnonShield pipeline](https://anonshield.org/pipeline.png)
 
 ---
 
@@ -14,10 +14,10 @@ Modular pseudonymization framework for Cybersecurity Incident Response Teams. It
 
 Two tags are published: `latest` is the CPU image and `gpu` is the GPU image.
 
-| Tag | Base | Use Case | Approx. Size |
-|-----|------|----------|-------------|
-| `latest` | `python:3.12-slim` | CPU image: works on any x86_64 machine | ~2 GB |
-| `gpu` | `nvidia/cuda:12.8.0` | GPU image: requires NVIDIA hardware and CUDA 12.8 | ~6 GB |
+| Tag | Base | Use Case | Approx. download |
+|-----|------|----------|------------------|
+| `latest` | `python:3.12-slim` | CPU image: works on any x86_64 machine | ~900 MB |
+| `gpu` | `nvidia/cuda:12.8.0` | GPU image: requires NVIDIA hardware and CUDA 12.8 | ~3 GB |
 
 ---
 

@@ -11,6 +11,8 @@ AnonShield replaces personally identifiable information (PII) and network-specif
 
 > This is the **active development** repository. The frozen artifact that backs the SBRC 2026 paper (selected **Best Artifact**) lives at [AnonShield/tool](https://github.com/AnonShield/tool) and is the version to use for reproducing the published experiments.
 
+![AnonShield pipeline](docs/images/pipeline.png)
+
 ---
 
 ## Table of contents
