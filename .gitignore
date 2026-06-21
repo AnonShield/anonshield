@@ -104,3 +104,6 @@ test/test_data_integration/*
 *.zip
 # Claude Code local files
 .claude/
+
+# Runtime data (job files, metrics db) when ANON_JOBS_DIR/ANON_METRICS_DB are unset
+web/backend/data/

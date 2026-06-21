@@ -1,7 +1,7 @@
 """File lifecycle management: zero persistence guarantee.
 
 ANON_JOBS_DIR env var sets the root directory for job files.
-Default: /tmp/anon/jobs (fine for dev/demo on shared servers).
+Default: a data/jobs directory inside the backend package (never /tmp).
 No dedicated partition required; the sweep task keeps disk usage bounded.
 """
 import os
@@ -9,7 +9,10 @@ import shutil
 import time
 from pathlib import Path
 
-JOBS_ROOT = Path(os.getenv("ANON_JOBS_DIR", "/tmp/anon/jobs"))
+# Default to a data/ directory inside the backend package (relative to this
+# file), never a shared /tmp. Production sets ANON_JOBS_DIR to a mounted,
+# writable volume, which overrides this.
+JOBS_ROOT = Path(os.getenv("ANON_JOBS_DIR") or Path(__file__).resolve().parents[1] / "data" / "jobs")
 
 
 def job_dir(job_id: str) -> Path:

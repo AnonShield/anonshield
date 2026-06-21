@@ -49,8 +49,10 @@ async def create_job(
 ) -> dict:
     limit = LIMIT_WITH_KEY if key else LIMIT_NO_KEY
 
-    # Refuse if disk free space < 3× the upload limit (safety margin for output + ZIP)
-    disk = shutil.disk_usage(storage.JOBS_ROOT.parent if storage.JOBS_ROOT.exists() else "/tmp")
+    # Refuse if disk free space < 3× the upload limit (safety margin for output + ZIP).
+    # Probe the nearest existing ancestor of the jobs dir (never a hardcoded /tmp).
+    _probe = next(p for p in (storage.JOBS_ROOT, *storage.JOBS_ROOT.parents) if p.exists())
+    disk = shutil.disk_usage(_probe)
     if disk.free < limit * 3:
         raise HTTPException(
             status_code=507,

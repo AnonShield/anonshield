@@ -100,8 +100,9 @@ jobs:
         with:
           enable-cache: true
       - name: Python SAST (bandit)
+        # Blocking: a medium or higher finding fails this job (and gates the deploy),
+        # so it surfaces as a red run instead of a silently-green check.
         run: uvx bandit -r src web/backend -ll -q
-        continue-on-error: true
 
   deploy:
     name: Deploy to production

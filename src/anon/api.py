@@ -9,8 +9,8 @@ Usage:
     from src.anon.api import anonymize_file
 
     result = anonymize_file(
-        input_path="/tmp/report.pdf",
-        output_dir="/tmp/out/",
+        input_path="report.pdf",
+        output_dir="output/",
         strategy="regex",
         lang="pt",
         entities=["CPF", "EMAIL_ADDRESS"],

@@ -9,7 +9,9 @@ from pathlib import Path
 
 import asyncio
 
-_DB_PATH = Path(os.getenv("ANON_METRICS_DB", "/tmp/anon_metrics.db"))
+# Default inside the backend package (never /tmp). Production sets ANON_METRICS_DB
+# to a path on the mounted volume, which overrides this.
+_DB_PATH = Path(os.getenv("ANON_METRICS_DB") or Path(__file__).resolve().parents[1] / "data" / "metrics.db")
 _lock = threading.Lock()
 _pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="metrics")
 
@@ -187,13 +189,17 @@ def _percentile(values: list[float], pct: float) -> float | None:
     return round(s[lo] + (s[hi] - s[lo]) * frac, 2)
 
 
+_PERCENTILE_COLUMNS = frozenset({"ms", "throughput_bps"})
+
+
 def _percentiles(c: sqlite3.Connection, col: str) -> dict:
     """p50/p90/p99 plus min/max for a numeric job column, ignoring NULLs."""
-    vals = [
-        r[col]
-        for r in c.execute(f"SELECT {col} FROM job WHERE {col} IS NOT NULL")
-        if r[col] is not None
-    ]
+    if col not in _PERCENTILE_COLUMNS:
+        raise ValueError(f"unsupported percentile column: {col!r}")
+    # col is restricted to the whitelist above; SQL identifiers cannot be bound as
+    # parameters, so the f-string is safe here.
+    query = f"SELECT {col} FROM job WHERE {col} IS NOT NULL"  # nosec B608
+    vals = [r[col] for r in c.execute(query) if r[col] is not None]
     return {
         "n": len(vals),
         "p50": _percentile(vals, 50),
