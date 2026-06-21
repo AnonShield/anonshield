@@ -32,6 +32,7 @@ COPY pyproject.toml uv.lock ./
 
 # Install deps, then swap torch for CPU-only build (~300MB vs ~4.9GB)
 RUN uv sync --no-cache --no-dev \
+    && .venv/bin/python -m ensurepip --upgrade \
     && .venv/bin/pip install --no-cache-dir --force-reinstall \
        torch --index-url https://download.pytorch.org/whl/cpu \
     && .venv/bin/pip uninstall -y \
@@ -113,6 +114,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 RUN uv sync --no-cache --no-dev \
+    && .venv/bin/python -m ensurepip --upgrade \
     && .venv/bin/pip install --no-cache-dir --force-reinstall \
        torch --index-url https://download.pytorch.org/whl/cu128 \
     && .venv/bin/pip install --no-cache-dir cupy-cuda12x==12.3.0 \
