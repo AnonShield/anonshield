@@ -1,16 +1,23 @@
 name: Publish to Docker Hub
 
-# Builds the standalone CLI image (docker/Dockerfile) and pushes it to Docker Hub,
-# then syncs the Docker Hub repository description from docker/DOCKERHUB_README.md.
-# Runs on a published GitHub release, or manually via the Actions tab.
+# Two automations for the standalone CLI image (anonshield/anon):
+#  - sync-description: pushes docker/DOCKERHUB_README.md to the Docker Hub repo
+#    description automatically whenever that file changes on main (and on release).
+#  - publish: builds the CLI image (CPU + GPU targets) and pushes it to Docker Hub,
+#    on a published GitHub release or a manual run.
 #
-# Requires two repository secrets (Settings -> Secrets and variables -> Actions):
-#   DOCKERHUB_USERNAME  - a Docker Hub account with push access to anonshield/anon
-#   DOCKERHUB_TOKEN     - a Docker Hub access token for that account
+# Secrets (Settings -> Secrets and variables -> Actions):
+#   DOCKERHUB_USERNAME  Docker Hub account with push access to anonshield/anon
+#   DOCKERHUB_TOKEN     Docker Hub access token (for the image push)
+#   DOCKERHUB_PASSWORD  Docker Hub account password (the description API needs it)
 
 on:
   release:
     types: [published]
+  push:
+    branches: [main]
+    paths:
+      - docker/DOCKERHUB_README.md
   workflow_dispatch:
     inputs:
       tag:
@@ -25,10 +32,28 @@ env:
   IMAGE: anonshield/anon
 
 jobs:
-  publish:
-    name: Build and push CLI image
+  sync-description:
+    name: Sync Docker Hub description
     runs-on: ubuntu-latest
     if: github.repository == 'AnonShield/anonshield'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Sync Docker Hub description from DOCKERHUB_README.md
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD || secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ env.IMAGE }}
+          readme-filepath: ./docker/DOCKERHUB_README.md
+
+  publish:
+    name: Build and push CLI image
+    # Build and push images only on a release or a manual run, never on a
+    # README-only change (that just re-syncs the description above).
+    if: >-
+      github.repository == 'AnonShield/anonshield' &&
+      (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -60,7 +85,7 @@ jobs:
             if [ "$VER" != "latest" ] && [ -n "$VER" ]; then echo "$IMAGE:$VER-gpu"; fi
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
-      - name: Build and push CPU image (latest + version)
+      - name: Build and push CPU image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -80,14 +105,3 @@ jobs:
           tags: ${{ steps.tags.outputs.gpu }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Sync Docker Hub description from DOCKERHUB_README.md
-        # Docker Hub's description API rejects access-token auth (returns Forbidden);
-        # it needs the account password. Add a DOCKERHUB_PASSWORD secret to enable
-        # this. Non-blocking so the image publish never fails on the README sync.
-        continue-on-error: true
-        uses: peter-evans/dockerhub-description@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD || secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ env.IMAGE }}
-          readme-filepath: ./docker/DOCKERHUB_README.md
