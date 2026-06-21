@@ -18,7 +18,7 @@ SVC      ?=
 
 .DEFAULT_GOAL := help
 
-.PHONY: help deploy build up down restart status ps health logs stats warm shell clean
+.PHONY: help deploy ensure-secret build up down restart status ps health logs stats warm shell clean
 
 help:  ## List the available commands
 	@echo "AnonShield ops. Usage: make <target>"
@@ -28,10 +28,17 @@ help:  ## List the available commands
 deploy: build up warm status  ## Build, start, warm the cache, and show status (full deploy)
 	@echo "Deployed. Public URL: https://anonshield.org"
 
-build:  ## Build the container images
+ensure-secret:  ## Generate a random ANON_SECRET_KEY in web/.env if missing (persisted, never regenerated)
+	@touch .env
+	@grep -q '^ANON_SECRET_KEY=' .env || { \
+	  echo "ANON_SECRET_KEY=$$(openssl rand -hex 32)" >> .env; \
+	  echo "[setup] generated a random ANON_SECRET_KEY and saved it to web/.env"; \
+	}
+
+build: ensure-secret  ## Build the container images
 	$(COMPOSE) build $(SERVICES)
 
-up:  ## Start the stack (no rebuild)
+up: ensure-secret  ## Start the stack (no rebuild)
 	$(COMPOSE) up -d $(SERVICES)
 
 down:  ## Stop and remove the containers
