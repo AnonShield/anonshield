@@ -5,11 +5,10 @@ name: Docker image
 # never triggers a build.
 #
 #  - push to main touching image inputs (Dockerfile, entrypoint, src, scripts,
-#    anon.py, deps): rebuild and push the CPU image (:latest). This is fast and
-#    keeps :latest current with the code.
-#  - published release or manual run: build and push BOTH the CPU image (:latest)
-#    and the GPU image (:gpu), plus version-suffixed tags. The GPU image is large
-#    (~3 GB), so it is built only on these intentional events, never on a push.
+#    anon.py, deps): rebuild and push BOTH the CPU image (:latest) and the GPU
+#    image (:gpu), keeping them current with the code.
+#  - published release or manual run: same build, plus version-suffixed tags
+#    (:X.Y.Z and :X.Y.Z-gpu).
 #
 # README-only changes are handled by dockerhub-readme.yml (description sync, no build).
 #
@@ -89,9 +88,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Build and push GPU image
-        # GPU image is ~3 GB: built only on a release or a manual run, never on
-        # an ordinary push to main.
-        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+        # ~3 GB image, built on every image-input change too (not just releases),
+        # so :gpu stays current with the code. This makes the job take longer.
         uses: docker/build-push-action@v6
         with:
           context: .
