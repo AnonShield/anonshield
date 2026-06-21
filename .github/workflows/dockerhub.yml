@@ -71,9 +71,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Sync Docker Hub description from DOCKERHUB_README.md
+        # Docker Hub's description API rejects access-token auth (returns Forbidden);
+        # it needs the account password. Add a DOCKERHUB_PASSWORD secret to enable
+        # this. Non-blocking so the image publish never fails on the README sync.
+        continue-on-error: true
         uses: peter-evans/dockerhub-description@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD || secrets.DOCKERHUB_TOKEN }}
           repository: ${{ env.IMAGE }}
           readme-filepath: ./docker/DOCKERHUB_README.md
