@@ -65,7 +65,7 @@ jobs:
       ANON_SECRET_KEY: test-key-12345678901234567890123456789012
     steps:
       - if: needs.changes.outputs.code != 'true'
-        run: echo "Docs-only change: no Python code touched, nothing to test."
+        run: echo "Docs-only change,no Python code touched, nothing to test."
       - if: needs.changes.outputs.code == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - if: needs.changes.outputs.code == 'true'
@@ -97,7 +97,7 @@ jobs:
       PUBLIC_API_URL: http://localhost:8000
     steps:
       - if: needs.changes.outputs.code != 'true'
-        run: echo "Docs-only change: nothing to build."
+        run: echo "Docs-only change,nothing to build."
       - if: needs.changes.outputs.code == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - if: needs.changes.outputs.code == 'true'
@@ -120,7 +120,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - if: needs.changes.outputs.code != 'true'
-        run: echo "Docs-only change: nothing to scan."
+        run: echo "Docs-only change,nothing to scan."
       - if: needs.changes.outputs.code == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - if: needs.changes.outputs.code == 'true'
@@ -154,7 +154,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - if: needs.changes.outputs.code != 'true'
-        run: echo "Docs-only change: no code to scan."
+        run: echo "Docs-only change,no code to scan."
       - if: needs.changes.outputs.code == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - if: needs.changes.outputs.code == 'true'
