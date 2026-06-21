@@ -8,6 +8,10 @@ Pseudonymization tool for Computer Security Incident Response Teams. It replaces
 
 ![AnonShield pipeline](https://anonshield.org/pipeline.png)
 
+> **Prefer a browser?** A hosted web app with the same engine runs at **[anonshield.org](https://anonshield.org)**: drag and drop a file, choose entity types and a strategy, and watch a live metrics dashboard. The Docker image below is the command-line tool.
+
+![AnonShield web interface](https://anonshield.org/ui-app.png)
+
 ---
 
 ## Available Tags

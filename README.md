@@ -185,6 +185,17 @@ A browser front end for non-CLI users and for sharing the tool within a team.
 - **Frontend:** SvelteKit single-page app with drag-and-drop upload, real-time progress, batch processing, per-job entity and strategy selection, and a metrics dashboard (throughput by file format and by strategy, entity-type distribution, jobs over time, file-size versus throughput, and latency percentiles).
 - **Backend:** FastAPI API plus Celery workers and Redis for asynchronous jobs.
 
+The live app runs at **[anonshield.org](https://anonshield.org)**.
+
+![Anonymization interface](docs/images/app.png)
+*Upload a file, choose which entity types to anonymize, and pick a strategy.*
+
+![Advanced settings](docs/images/advanced.png)
+*Advanced settings: language, NER model, confidence threshold, aggregation, slug length, and custom regex patterns.*
+
+![Metrics dashboard](docs/images/metrics.png)
+*Built-in metrics dashboard: throughput by file format and strategy, jobs over time, file size versus throughput, and the entity mix.*
+
 Run the whole stack locally in containers (CPU, no host reverse proxy):
 
 ```bash
