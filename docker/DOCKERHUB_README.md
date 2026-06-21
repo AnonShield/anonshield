@@ -1,17 +1,23 @@
-# AnonShield — PII Pseudonymization for CSIRTs
+# AnonShield: PII Pseudonymization for CSIRTs
 
-Modular pseudonymization framework for Cybersecurity Incident Response Teams. Anonymizes PII and cybersecurity indicators using HMAC-SHA256, preserving structure in JSON, XML, CSV, and more. Supports 24 languages, OCR, and custom cybersecurity recognizers (IP, CVE, hash, URL, etc.).
+Modular pseudonymization framework for Cybersecurity Incident Response Teams. It anonymizes PII and cybersecurity indicators using HMAC-SHA256, preserving structure in JSON, XML, CSV, and more. It supports 24 languages, OCR, and custom cybersecurity recognizers (IP, CVE, hash, URL, etc.).
 
-> **Source code, documentation & research artifact:** [github.com/AnonShield/tool](https://github.com/AnonShield/tool)
+[![Best Artifact at SBRC 2026](https://img.shields.io/badge/SBRC%202026-Best%20Artifact-gold)](https://doc-artefatos.github.io/sbrc2026/results.html)
+
+> **Award:** AnonShield received the **Best Artifact award at SBRC 2026**. See the [official results](https://doc-artefatos.github.io/sbrc2026/results.html).
+
+> **Source code, documentation, and research artifact:** [github.com/AnonShield/tool](https://github.com/AnonShield/tool)
 
 ---
 
 ## Available Tags
 
+Two tags are published: `latest` is the CPU image and `gpu` is the GPU image.
+
 | Tag | Base | Use Case | Approx. Size |
 |-----|------|----------|-------------|
-| `latest` | `python:3.12-slim` | CPU — works on any x86_64 machine | ~2 GB |
-| `gpu` | `nvidia/cuda:12.8.0` | GPU — requires NVIDIA hardware + CUDA 12.8 | ~6 GB |
+| `latest` | `python:3.12-slim` | CPU image: works on any x86_64 machine | ~2 GB |
+| `gpu` | `nvidia/cuda:12.8.0` | GPU image: requires NVIDIA hardware and CUDA 12.8 | ~6 GB |
 
 ---
 
@@ -29,24 +35,24 @@ Modular pseudonymization framework for Cybersecurity Incident Response Teams. An
 
 > **The only prerequisite is Docker.** Install it for your OS: [Linux](https://docs.docker.com/engine/install/) · [macOS](https://docs.docker.com/desktop/setup/install/mac-install/) · [Windows](https://docs.docker.com/desktop/setup/install/windows-install/). Everything else is already included in your operating system.
 
-### Step 1 — Download the wrapper script
+### Step 1: Download the wrapper script
 
-**Linux / macOS** — open a terminal:
+**Linux / macOS** (open a terminal):
 ```bash
 curl -fsSL https://raw.githubusercontent.com/AnonShield/tool/main/docker/run.sh -o run.sh
 chmod +x run.sh
 ```
 
-**Windows** — open **PowerShell**:
+**Windows** (open **PowerShell**):
 ```powershell
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/tool/main/docker/run.ps1 -OutFile run.ps1
 ```
 
 > `curl` is built into Linux and macOS. `Invoke-WebRequest` is built into Windows 10/11. No extra installation needed.
 
-### Step 2 — Generate a secret key
+### Step 2: Generate a secret key
 
-The key is used to generate pseudonyms. To de-anonymize later, you only need the `db/` database folder — not the key itself.
+The key is used to generate pseudonyms. To de-anonymize later, you only need the `db/` database folder, not the key itself.
 
 **Linux / macOS:**
 ```bash
@@ -74,9 +80,9 @@ $env:ANON_SECRET_KEY = [System.BitConverter]::ToString($bytes).Replace("-","").T
 
 To keep it across sessions, go to **Settings → System → Environment Variables**, add a new variable named `ANON_SECRET_KEY` with that value.
 
-### Step 3 — Anonymize
+### Step 3: Anonymize
 
-Pass any file or folder — relative or absolute path:
+Pass any file or folder, using a relative or absolute path:
 
 **Single file (CPU):**
 ```bash
@@ -122,7 +128,7 @@ Output is written to `./anon/output/anon_YOUR_FILE.csv`. The script automaticall
 
 > **On first run:** the NER transformer model (~1 GB) is downloaded automatically to `./anon/models/` and reused on all subsequent runs.
 
-> **Note:** If you don't need to de-anonymize later, use `--slug-length 0` — entities are replaced with their type only (e.g. `[IP_ADDRESS]`) and no secret key is required.
+> **Note:** If you don't need to de-anonymize later, use `--slug-length 0`. Entities are replaced with their type only (e.g. `[IP_ADDRESS]`) and no secret key is required.
 
 ---
 
@@ -132,11 +138,11 @@ Output is written to `./anon/output/anon_YOUR_FILE.csv`. The script automaticall
 |------|-------------|---------|
 | `--lang <code>` | Document language (`en`, `pt`, `es`, ...) | `en` |
 | `--output-dir <path>` | Local path where anonymized files are saved | `./anon/output/` |
-| `--preserve-entities <types>` | Comma-separated entity types to skip (e.g. `LOCATION,IP_ADDRESS`) | — |
-| `--allow-list <terms>` | Comma-separated terms to never anonymize | — |
-| `--slug-length <n>` | Hash length in the anonymized slug (0–64) | `64` |
-| `--word-list <path>` | JSON file of known terms to always anonymize (internal names, acronyms, etc.) | — |
-| `--anonymization-strategy <s>` | Detection strategy — see below | `filtered` |
+| `--preserve-entities <types>` | Comma-separated entity types to skip (e.g. `LOCATION,IP_ADDRESS`) | none |
+| `--allow-list <terms>` | Comma-separated terms to never anonymize | none |
+| `--slug-length <n>` | Hash length in the anonymized slug (0 to 64) | `64` |
+| `--word-list <path>` | JSON file of known terms to always anonymize (internal names, acronyms, etc.) | none |
+| `--anonymization-strategy <s>` | Detection strategy (see below) | `filtered` |
 | `--optimize` | Enable all performance optimizations | off |
 
 For the complete reference with examples for every option, see the **[CLI_REFERENCE.md on GitHub](https://github.com/AnonShield/tool/blob/main/docs/users/CLI_REFERENCE.md)**
@@ -149,7 +155,7 @@ Run `./run.sh --help` (Linux/macOS) or `.\run.ps1 --help` (Windows) for the full
 
 Choose with `--anonymization-strategy <name>`.
 
-**Throughput — GPU** (NVIDIA RTX 5060 Ti 16 GB · D2 operational dataset · 420 MB CSV / 551 MB JSON, 70,951 Tenable vulnerability records):
+**Throughput, GPU** (NVIDIA RTX 5060 Ti 16 GB · D2 operational dataset · 420 MB CSV / 551 MB JSON, 70,951 Tenable vulnerability records):
 
 | Strategy | CSV (KB/s) | JSON (KB/s) | vs. slowest |
 |----------|-----------|------------|-------------|
@@ -158,7 +164,7 @@ Choose with `--anonymization-strategy <name>`.
 | `filtered` *(default)* | 240 | 627 | 1.4× faster |
 | `presidio` | 171 | 575 | baseline |
 
-**Throughput — CPU, no GPU** (AMD Ryzen 5 8600G (6c/12t) · D3 synthetic dataset · 247 MB CSV / 444 MB JSON, 70,951 CVE vulnerability records):
+**Throughput, CPU, no GPU** (AMD Ryzen 5 8600G (6c/12t) · D3 synthetic dataset · 247 MB CSV / 444 MB JSON, 70,951 CVE vulnerability records):
 
 Benchmark run without GPU to measure CPU-only performance on a large structured dataset.
 
@@ -169,7 +175,7 @@ Benchmark run without GPU to measure CPU-only performance on a large structured 
 | `filtered` *(default)* | 132 | 459 | similar |
 | `presidio` | 130 | 439 | baseline |
 
-**Throughput — CPU, heterogeneous formats** (Intel Xeon E5-2650 · D1 OpenVAS dataset · 136 vulnerability reports, median KB/s):
+**Throughput, CPU, heterogeneous formats** (Intel Xeon E5-2650 · D1 OpenVAS dataset · 136 vulnerability reports, median KB/s):
 
 Benchmark on a heterogeneous set of real OpenVAS scan reports in CSV, XML, and PDF format, measuring per-file median throughput on older server hardware.
 
@@ -199,7 +205,7 @@ Benchmark on a heterogeneous set of real OpenVAS scan reports in CSV, XML, and P
 
 If your organization uses internal names, system names, acronyms, or codenames that a general NER model might not recognize, you can supply a JSON file listing them. Every term in the list is always anonymized, regardless of context.
 
-**Format:** a JSON object where each key is the entity type label and the value is a list of terms. The key is used directly as the entity type — any label is valid, including custom ones.
+**Format:** a JSON object where each key is the entity type label and the value is a list of terms. The key is used directly as the entity type, so any label is valid, including custom ones.
 
 ```json
 {
@@ -219,13 +225,13 @@ If your organization uses internal names, system names, acronyms, or codenames t
 
 ## Anonymization Config (`--anonymization-config`)
 
-For structured files (JSON, CSV, XML), you can pass a JSON config file to control exactly which fields get anonymized. Without it, the tool runs NER inference on every field — accurate but slow on large datasets. The config lets you:
+For structured files (JSON, CSV, XML), you can pass a JSON config file to control exactly which fields get anonymized. Without it, the tool runs NER inference on every field, which is accurate but slow on large datasets. The config lets you:
 
-- **`fields_to_exclude`** — fields that are never anonymized (e.g. severity scores, timestamps)
-- **`fields_to_anonymize`** — explicit list of fields to run NER on; everything else is skipped
-- **`force_anonymize`** — map a field directly to an entity type, bypassing NER entirely (useful for fields like `Port` or `Hostname` that don't have obvious syntactic patterns)
+- **`fields_to_exclude`**: fields that are never anonymized (e.g. severity scores, timestamps)
+- **`fields_to_anonymize`**: explicit list of fields to run NER on; everything else is skipped
+- **`force_anonymize`**: map a field directly to an entity type, bypassing NER entirely (useful for fields like `Port` or `Hostname` that don't have obvious syntactic patterns)
 
-**Example — Tenable JSON scan (`config.json`):**
+**Example, Tenable JSON scan (`config.json`):**
 ```json
 {
   "fields_to_exclude": ["severity", "port", "protocol", "age_in_days"],
@@ -256,7 +262,7 @@ Save the config anywhere and pass its path:
 | `hybrid` | 248 KB/s | 31,902 KB/s | 129× | 632 KB/s | 29,924 KB/s | 47× |
 | `presidio` | 171 KB/s | 32,034 KB/s | 188× | 575 KB/s | 29,855 KB/s | 52× |
 
-The config gain is larger for Presidio-based strategies because they have a higher per-record baseline cost to eliminate. `standalone` remains the fastest even with config (34,341 KB/s vs ~32,000 KB/s for others). When using only `force_anonymize` and `fields_to_exclude` — with no `fields_to_anonymize` — NER inference is completely bypassed and strategy choice no longer affects throughput.
+The config gain is larger for Presidio-based strategies because they have a higher per-record baseline cost to eliminate. `standalone` remains the fastest even with config (34,341 KB/s vs ~32,000 KB/s for others). When using only `force_anonymize` and `fields_to_exclude` (with no `fields_to_anonymize`), NER inference is completely bypassed and strategy choice no longer affects throughput.
 
 ---
 
