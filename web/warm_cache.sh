@@ -11,11 +11,12 @@ for _ in $(seq 1 30); do
   sleep 2
 done
 
-tmp="$(mktemp)"
+tmpdir="$(mktemp -d)"
+tmp="$tmpdir/warmup.txt"   # the backend selects a processor by extension, so keep .txt
 printf 'Contact John Doe at john@example.com or 192.168.1.10 (host web01.corp.local).\n' > "$tmp"
 echo "[warm] submitting a warm-up job (downloads the model on first run, can take a few minutes)..."
 resp="$(curl -fsS -F "file=@$tmp" -F "key=warmup" -F "strategy=filtered" "$URL/api/jobs" || true)"
-rm -f "$tmp"
+rm -rf "$tmpdir"
 jid="$(printf '%s' "$resp" | grep -oE '[a-f0-9-]{36}' | head -1 || true)"
 if [ -z "$jid" ]; then
   echo "[warm] could not submit the warm-up job. Response: $resp"
