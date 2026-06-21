@@ -15,8 +15,6 @@ cve_dataset*.csv
 cve_dataset*.json
 vulnnet_scans_openvas*
 !vulnnet_scans_openvas_compilado.csv
-benchmarks/output
-benchmarks/results
 
 # Database files
 *.db

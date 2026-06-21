@@ -18,8 +18,7 @@ This guide documents every extension point in AnonShield. Each section covers on
 10. [Entity Detector](#10-entity-detector)
 11. [SLM Client](#11-slm-client)
 12. [SLM Prompts](#12-slm-prompts)
-13. [Model Provider](#13-model-provider)
-14. [Dependency Injection Reference](#14-dependency-injection-reference)
+13. [Dependency Injection Reference](#13-dependency-injection-reference)
 
 ---
 
@@ -42,7 +41,6 @@ AnonShield is designed around three complementary patterns:
 | Entity detector | `EntityDetector` (class) | `src/anon/entity_detector.py` | Pass to `AnonymizationOrchestrator.__init__()` |
 | SLM client | `SLMClient` (Protocol) | `src/anon/slm/client.py` | Pass to `SLMEntityDetector` / `SLMFullAnonymizer` |
 | SLM prompts | `PromptManager` (class) | `src/anon/slm/prompts.py` | Pass to SLM detectors/anonymizers |
-| Model provider | `ModelProvider` (Protocol) | `src/anon/model_manager.py` | `ModelManager.register_provider()` |
 | Regex patterns | `RegexPatterns` (class) | `src/anon/engine.py` | Add attribute + entry in `load_custom_recognizers()` |
 | Entity type mapping | `ENTITY_MAPPING` dict | `src/anon/config.py` | Add key-value pair |
 | Transformer model | string identifier | `--transformer-model` CLI flag | Add mapping in `_setup_engines()` |
@@ -964,73 +962,7 @@ uv run anon.py file.csv --slm-detector --slm-prompt-version v2
 
 ---
 
-## 13. Model Provider
-
-**File:** `src/anon/model_manager.py`
-
-### 13.1 Interface
-
-```python
-class ModelProvider(Protocol):
-    def is_available(self, model_name: str) -> bool:
-        """Return True if the model is already present locally."""
-        ...
-
-    def download(self, model_name: str) -> bool:
-        """Download the model. Return True on success."""
-        ...
-
-    def get_info(self, model_name: str) -> ModelInfo:
-        """Return metadata about the model."""
-        ...
-```
-
-### 13.2 Built-in providers
-
-| Provider | Key | Models |
-|---|---|---|
-| `SpacyModelProvider` | `"spacy"` | spaCy language models |
-| `TransformerModelProvider` | `"transformer"` | HuggingFace transformer models |
-| `TesseractProvider` | `"tesseract"` | Tesseract OCR engine |
-
-### 13.3 Registering a custom provider
-
-```python
-from src.anon.model_manager import ModelManager
-
-manager = ModelManager()
-manager.register_provider("my_provider", MyModelProvider())
-
-# The provider will be invoked when ensure_available("my_provider", model_name) is called.
-manager.ensure_available("my_provider", "my-model-v1")
-```
-
-### 13.4 Example: local-file model provider
-
-```python
-from pathlib import Path
-from src.anon.model_manager import ModelInfo
-
-class LocalFileModelProvider:
-    def __init__(self, model_dir: Path):
-        self._dir = model_dir
-
-    def is_available(self, model_name: str) -> bool:
-        return (self._dir / model_name).exists()
-
-    def download(self, model_name: str) -> bool:
-        # No-op: models must be placed manually
-        return self.is_available(model_name)
-
-    def get_info(self, model_name: str) -> ModelInfo:
-        path = self._dir / model_name
-        return ModelInfo(name=model_name, size_mb=path.stat().st_size / 1e6,
-                         provider="local", location=str(path))
-```
-
----
-
-## 14. Dependency Injection Reference
+## 13. Dependency Injection Reference
 
 All injectable dependencies are passed to `AnonymizationOrchestrator.__init__()`. Below is the complete constructor signature with the Protocol or ABC each parameter must satisfy.
 

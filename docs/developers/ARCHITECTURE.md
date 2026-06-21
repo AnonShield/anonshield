@@ -249,7 +249,6 @@ After batch processing, the orchestrator verifies input count == output count. O
 │   ├── hash_generator.py            # HMAC-SHA256 hash generation
 │   ├── cache_manager.py             # LRU cache
 │   ├── security.py                  # Key validation
-│   ├── model_manager.py             # Model loading and management
 │   ├── tqdm_handler.py              # Progress bar handler
 │   ├── core/
 │   │   ├── config_loader.py         # Configuration loading
