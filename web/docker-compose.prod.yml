@@ -57,7 +57,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - ANON_JOBS_DIR=/anon-jobs
       - ANON_METRICS_DB=/anon-jobs/metrics.db
-      - ANON_SECRET_KEY=${ANON_SECRET_KEY:-anonshield-prod-secret-change-me}
+      - ANON_SECRET_KEY=${ANON_SECRET_KEY:?ANON_SECRET_KEY must be set in web/.env (no insecure default)}
       - ANON_MAX_SIZE_MB=${ANON_MAX_SIZE_MB:-10}
       - XDG_CACHE_HOME=/app/.cache
       - HF_HOME=/app/.cache/huggingface
@@ -92,7 +92,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - ANON_JOBS_DIR=/anon-jobs
       - ANON_METRICS_DB=/anon-jobs/metrics.db
-      - ANON_SECRET_KEY=${ANON_SECRET_KEY:-anonshield-prod-secret-change-me}
+      - ANON_SECRET_KEY=${ANON_SECRET_KEY:?ANON_SECRET_KEY must be set in web/.env (no insecure default)}
       - XDG_CACHE_HOME=/app/.cache
       - HF_HOME=/app/.cache/huggingface
     volumes:
