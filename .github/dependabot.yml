@@ -2,6 +2,7 @@ version: 2
 
 # Automated dependency vulnerability alerts and update pull requests.
 # Covers the Python (uv), frontend (npm), Docker, and GitHub Actions ecosystems.
+# Updates within an ecosystem are grouped into a single PR to reduce noise.
 updates:
   - package-ecosystem: "uv"
     directory: "/"
@@ -29,9 +30,21 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      docker:
+        patterns: ["*"]
+    # Base-image major bumps (e.g. Python 3.12 -> 3.14, Node 22 -> 26) are not
+    # validated by CI and would break the production image builds. Only take
+    # minor/patch (security) updates that stay on the pinned major.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
