@@ -60,11 +60,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/.venv/bin:$PATH" \
     VIRTUAL_ENV="/app/.venv"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     bash curl \
     tesseract-ocr tesseract-ocr-por \
     libmagic1 \
     && rm -rf /var/lib/apt/lists/*
+
+# Drop perl from the runtime image. It ships in the Debian base as an Essential
+# package but the CLI (bash entrypoint + Python venv + tesseract) never invokes
+# it, and it carries the only two CRITICAL CVEs in the image plus three HIGH.
+# curl stays (the entrypoint uses it for the optional Ollama integration), libgif
+# stays (tesseract/leptonica image decoding), ncurses stays (bash).
+RUN dpkg --purge --force-remove-essential --force-depends perl-base 2>/dev/null || true; \
+    rm -rf /usr/share/doc/* /usr/share/man/* /var/lib/apt/lists/*
 
 RUN mkdir -p /app
 WORKDIR /app
