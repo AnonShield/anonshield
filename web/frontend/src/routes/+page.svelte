@@ -592,8 +592,6 @@ Action items:
           </figure>
         </div>
 
-        <p class="award-distinguished">{$t('landing.award.distinguished')}</p>
-
         <div class="award-links">
           <a
             href="https://doc-artefatos.github.io/sbrc2026/results.html"
@@ -1682,12 +1680,6 @@ Action items:
     font-size: var(--text-xs); font-weight: 700;
     letter-spacing: 0.06em; text-transform: uppercase;
     font-family: var(--font-mono);
-    color: var(--color-text-secondary);
-  }
-
-  .award-distinguished {
-    margin: var(--space-2) 0 0;
-    font-size: var(--text-sm); font-family: var(--font-mono);
     color: var(--color-text-secondary);
   }
 
