@@ -13,6 +13,10 @@ app = FastAPI(
     title="AnonShield Web API",
     version="1.0.0",
     docs_url="/api/docs",
+    # The app is served under /api (the host proxy routes /api/* here), so the
+    # OpenAPI spec must live under /api too; otherwise the Swagger UI at
+    # /api/docs fetches /openapi.json at the root and gets a 404.
+    openapi_url="/api/openapi.json",
     redoc_url=None,
 )
 
