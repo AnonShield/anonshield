@@ -551,6 +551,69 @@ Action items:
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- AWARD                                                                  -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section class="award reveal">
+  <div class="award-inner">
+    <div class="award-card">
+      <div class="award-glow" aria-hidden="true"></div>
+      <div class="award-body">
+        <span class="award-trophy" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
+            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
+            <path d="M4 22h16"/>
+            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
+            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
+            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+          </svg>
+        </span>
+        <p class="section-label award-label">{$t('landing.award.label')}</p>
+        <h2 class="award-title">{$t('landing.award.title')}</h2>
+        <p class="award-sub">{$t('landing.award.sub')}</p>
+
+        <p class="award-seals-label">{$t('landing.award.seals_label')}</p>
+        <div class="award-seals">
+          <figure class="award-seal">
+            <img src="/seals/SBRC25_SF_SeloD.png" width="72" height="72" loading="lazy" alt={$t('landing.award.seal.alt', { name: $t('landing.award.seal.available') })} />
+            <figcaption>{$t('landing.award.seal.available')}</figcaption>
+          </figure>
+          <figure class="award-seal">
+            <img src="/seals/SBRC25_SF_SeloF.png" width="72" height="72" loading="lazy" alt={$t('landing.award.seal.alt', { name: $t('landing.award.seal.functional') })} />
+            <figcaption>{$t('landing.award.seal.functional')}</figcaption>
+          </figure>
+          <figure class="award-seal">
+            <img src="/seals/SBRC25_SF_SeloR.png" width="72" height="72" loading="lazy" alt={$t('landing.award.seal.alt', { name: $t('landing.award.seal.reproducible') })} />
+            <figcaption>{$t('landing.award.seal.reproducible')}</figcaption>
+          </figure>
+          <figure class="award-seal">
+            <img src="/seals/SBRC25_SF_SeloS.png" width="72" height="72" loading="lazy" alt={$t('landing.award.seal.alt', { name: $t('landing.award.seal.sustainable') })} />
+            <figcaption>{$t('landing.award.seal.sustainable')}</figcaption>
+          </figure>
+        </div>
+
+        <p class="award-distinguished">{$t('landing.award.distinguished')}</p>
+
+        <div class="award-links">
+          <a
+            href="https://doc-artefatos.github.io/sbrc2026/results.html"
+            target="_blank"
+            rel="noopener"
+            class="award-link award-link-primary"
+          >{$t('landing.award.results')} ↗</a>
+          <a
+            href="https://sol.sbc.org.br/index.php/sbrc_estendido/article/view/42580"
+            target="_blank"
+            rel="noopener"
+            class="award-link award-link-secondary"
+          >{$t('landing.award.paper')} ↗</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- RESEARCH                                                               -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <section class="research reveal">
@@ -1522,6 +1585,153 @@ Action items:
                 color var(--duration-fast) var(--ease-out);
   }
   .fmt-tag:hover { border-color: var(--color-accent); color: var(--color-text-primary); }
+
+  /* ══════════════ AWARD ══════════════ */
+  .award {
+    padding: var(--space-16) var(--space-6);
+    border-bottom: 1px solid var(--color-border);
+    background: radial-gradient(ellipse 70% 70% at 50% 0%,
+      color-mix(in srgb, var(--color-accent) 8%, transparent) 0%,
+      transparent 70%);
+  }
+  .award-inner { max-width: 900px; margin: 0 auto; }
+
+  /* The whole card is the primary link to the official results. */
+  .award-card {
+    position: relative;
+    display: block;
+    text-decoration: none;
+    border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--color-accent) 5%, var(--color-surface-raised));
+    overflow: hidden;
+    transition: border-color var(--duration-normal) var(--ease-out),
+                box-shadow var(--duration-normal) var(--ease-out),
+                transform var(--duration-normal) var(--ease-out);
+  }
+  .award-card:hover {
+    border-color: color-mix(in srgb, var(--color-accent) 65%, transparent);
+    box-shadow: 0 8px 40px color-mix(in srgb, var(--color-accent) 22%, transparent);
+    transform: translateY(-2px);
+  }
+
+  /* Soft accent glow behind the card content */
+  .award-glow {
+    position: absolute; top: -40%; left: 50%;
+    width: 360px; height: 360px;
+    transform: translateX(-50%);
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--color-accent) 18%, transparent) 0%,
+      transparent 70%);
+    filter: blur(20px);
+    pointer-events: none;
+  }
+
+  .award-body {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center;
+    gap: var(--space-3);
+    padding: var(--space-12) var(--space-8);
+  }
+
+  .award-trophy {
+    display: flex; align-items: center; justify-content: center;
+    width: 56px; height: 56px; border-radius: 50%;
+    color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+    box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 25%, transparent);
+    margin-bottom: var(--space-1);
+  }
+
+  .award-label { margin: 0; }
+  .award-title {
+    margin: 0; font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 800; letter-spacing: -0.035em;
+    color: var(--color-text-primary);
+  }
+  .award-sub {
+    margin: 0; max-width: 560px;
+    font-size: var(--text-base); line-height: 1.7;
+    color: var(--color-text-secondary);
+  }
+
+  .award-seals-label {
+    margin: var(--space-4) 0 0;
+    font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--color-text-secondary);
+  }
+  .award-seals {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: var(--space-6) var(--space-8);
+    margin-top: var(--space-1);
+  }
+  .award-seal {
+    margin: 0;
+    display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  }
+  .award-seal img {
+    width: 72px; height: 72px;
+    display: block;
+    filter: drop-shadow(0 4px 12px color-mix(in srgb, #000 45%, transparent));
+    transition: transform var(--duration-normal) var(--ease-out);
+  }
+  .award-card:hover .award-seal img { transform: translateY(-3px); }
+  .award-seal figcaption {
+    font-size: var(--text-xs); font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+  }
+
+  .award-distinguished {
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-sm); font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+  }
+
+  .award-links {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: var(--space-3) var(--space-6);
+    margin-top: var(--space-4);
+  }
+  .award-link {
+    font-size: var(--text-sm); font-weight: 700;
+    font-family: var(--font-mono);
+    text-decoration: none;
+    transition: color var(--duration-fast) var(--ease-out),
+                transform var(--duration-fast) var(--ease-out);
+  }
+  .award-link-primary {
+    display: inline-flex; align-items: center;
+    padding: var(--space-3) var(--space-6);
+    background: var(--color-accent); color: #fff;
+    border-radius: var(--radius-md);
+    box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+  .award-card:hover .award-link-primary,
+  .award-link-primary:hover { background: var(--color-accent-hover); }
+  .award-link-primary:focus-visible,
+  .award-link-secondary:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+  }
+  .award-link-secondary { color: var(--color-accent); align-self: center; }
+  .award-link-secondary:hover { color: var(--color-accent-hover); transform: translateX(3px); }
+
+  @media (max-width: 680px) {
+    .award { padding: var(--space-12) var(--space-4); }
+    .award-body { padding: var(--space-8) var(--space-5); }
+    .award-seals { gap: var(--space-5) var(--space-6); }
+    .award-seal img { width: 64px; height: 64px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .award-card:hover { transform: none; }
+    .award-card:hover .award-seal img { transform: none; }
+  }
 
   /* ══════════════ RESEARCH ══════════════ */
   .research {

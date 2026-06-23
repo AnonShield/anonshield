@@ -414,6 +414,19 @@ const messages = {
     'landing.cta.title': 'Ready to anonymize your data?',
     'landing.cta.sub': 'Run it on-premise in seconds. No account, no upload, no data ever leaves your network.',
     'landing.cta.btn': 'Launch the app',
+    /* ── landing: award ── */
+    'landing.award.label': 'Recognition',
+    'landing.award.title': 'Best Artifact Award at SBRC 2026',
+    'landing.award.sub': 'AnonShield was selected as the best artifact of the entire conference, and earned all four SBC reproducibility seals.',
+    'landing.award.distinguished': 'The work also received a Distinguished Artifact Reviewer recognition.',
+    'landing.award.seals_label': 'SBC reproducibility seals',
+    'landing.award.seal.available': 'Available',
+    'landing.award.seal.functional': 'Functional',
+    'landing.award.seal.reproducible': 'Reproducible',
+    'landing.award.seal.sustainable': 'Sustainable',
+    'landing.award.seal.alt': '{name} seal (SBC)',
+    'landing.award.results': 'View official results',
+    'landing.award.paper': 'Read the paper',
   },
   pt: {
     /* nav */
@@ -823,6 +836,19 @@ const messages = {
     'landing.cta.title': 'Pronto para anonimizar seus dados?',
     'landing.cta.sub': 'Rode on-premise em segundos. Sem conta, sem upload, e nenhum dado sai da sua rede.',
     'landing.cta.btn': 'Abrir o app',
+    /* ── landing: premiação ── */
+    'landing.award.label': 'Reconhecimento',
+    'landing.award.title': 'Prêmio de Melhor Artefato no SBRC 2026',
+    'landing.award.sub': 'O AnonShield foi escolhido o melhor artefato de todo o congresso e conquistou os quatro selos de reprodutibilidade da SBC.',
+    'landing.award.distinguished': 'O trabalho também recebeu a menção de Revisor de Artefatos de Destaque.',
+    'landing.award.seals_label': 'Selos de reprodutibilidade da SBC',
+    'landing.award.seal.available': 'Disponível',
+    'landing.award.seal.functional': 'Funcional',
+    'landing.award.seal.reproducible': 'Reprodutível',
+    'landing.award.seal.sustainable': 'Sustentável',
+    'landing.award.seal.alt': 'Selo {name} (SBC)',
+    'landing.award.results': 'Ver resultados oficiais',
+    'landing.award.paper': 'Ler o artigo',
   },
 } as const;
 

@@ -1,0 +1,84 @@
+# This CITATION.cff lets GitHub show a "Cite this repository" button and
+# provides machine-readable citation metadata (CFF 1.2.0).
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-citation-files
+cff-version: 1.2.0
+title: "AnonShield: Scalable On-Premise Pseudonymization for CSIRT Network Vulnerability Data"
+message: >-
+  If you use AnonShield in your research, please cite the SBRC 2026 paper
+  listed under "preferred-citation" below.
+type: software
+authors:
+  - given-names: "Cristhian"
+    family-names: "Kapelinski"
+    affiliation: "Universidade Federal do Pampa (UNIPAMPA)"
+  - given-names: "Douglas"
+    family-names: "Lautert"
+    affiliation: "Universidade Federal do Pampa (UNIPAMPA)"
+  - given-names: "Beatriz Roland"
+    family-names: "Machado"
+    affiliation: "Universidade Federal do Pampa (UNIPAMPA)"
+  - given-names: "Diego"
+    family-names: "Kreutz"
+    affiliation: "Universidade Federal do Pampa (UNIPAMPA)"
+  - given-names: "Isadora Garcia"
+    family-names: "Ferrão"
+    affiliation: "Université de Bretagne Occidentale (UBO)"
+repository-code: "https://github.com/AnonShield/anonshield"
+license: GPL-3.0-or-later
+keywords:
+  - pseudonymization
+  - anonymization
+  - CSIRT
+  - network vulnerability data
+  - GDPR
+  - LGPD
+  - named entity recognition
+  - data sharing
+abstract: >-
+  AnonShield is a high-throughput, on-premise pseudonymization system for
+  network vulnerability scan reports (e.g. OpenVAS, Tenable) used by Computer
+  Security Incident Response Teams (CSIRTs). It combines GPU-accelerated NER,
+  an LRU entity cache, streaming processors, and a schema-aware configuration
+  mechanism to replace network-specific identifiers with cryptographically
+  secure, deterministic pseudonyms (HMAC-SHA256), preserving referential
+  integrity across documents while enabling GDPR/LGPD-compliant data sharing.
+preferred-citation:
+  type: conference-paper
+  title: "AnonShield: Scalable On-Premise Pseudonymization for CSIRT Network Vulnerability Data"
+  authors:
+    - given-names: "Cristhian"
+      family-names: "Kapelinski"
+      affiliation: "Universidade Federal do Pampa (UNIPAMPA)"
+    - given-names: "Douglas"
+      family-names: "Lautert"
+      affiliation: "Universidade Federal do Pampa (UNIPAMPA)"
+    - given-names: "Beatriz Roland"
+      family-names: "Machado"
+      affiliation: "Universidade Federal do Pampa (UNIPAMPA)"
+    - given-names: "Diego"
+      family-names: "Kreutz"
+      affiliation: "Universidade Federal do Pampa (UNIPAMPA)"
+    - given-names: "Isadora Garcia"
+      family-names: "Ferrão"
+      affiliation: "Université de Bretagne Occidentale (UBO)"
+  collection-title: "Anais Estendidos do XLIV Simpósio Brasileiro de Redes de Computadores e Sistemas Distribuídos (SBRC)"
+  conference:
+    name: "XLIV Simpósio Brasileiro de Redes de Computadores e Sistemas Distribuídos (SBRC 2026) — Salão de Ferramentas"
+    city: "Praia do Forte"
+    region: "Bahia"
+    country: "BR"
+  year: 2026
+  start: 1
+  end: 12
+  publisher:
+    name: "Sociedade Brasileira de Computação (SBC)"
+    city: "Porto Alegre"
+    region: "Rio Grande do Sul"
+    country: "BR"
+  issn: "2177-9384"
+  doi: "10.5753/sbrc_estendido.2026.23154"
+  url: "https://sol.sbc.org.br/index.php/sbrc_estendido/article/view/42580"
+  notes: >-
+    Best Artifact Award (Melhor Artefato) — SBRC 2026 Artifact Evaluation
+    (Salão de Ferramentas). Results:
+    https://doc-artefatos.github.io/sbrc2026/results.html
