@@ -70,7 +70,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - if: needs.changes.outputs.code == 'true'
         name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
       - if: needs.changes.outputs.code == 'true'
@@ -78,7 +78,7 @@ jobs:
         run: uv sync --group dev
       - if: needs.changes.outputs.code == 'true'
         name: Cache Hugging Face models
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.cache/huggingface
           key: hf-models-v1
@@ -125,7 +125,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - if: needs.changes.outputs.code == 'true'
         name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
       - if: needs.changes.outputs.code == 'true'
@@ -165,7 +165,7 @@ jobs:
           ./gitleaks detect --source . --no-git --config .gitleaks.toml --no-banner --redact --exit-code 1
       - if: needs.changes.outputs.code == 'true'
         name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
       - if: needs.changes.outputs.code == 'true'
