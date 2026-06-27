@@ -27,7 +27,7 @@ dependencies = [
     "en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl",
     "torch>=2.6.0",
     "torchvision",
-    "click>=8.1",
+    "click>=8.4.2",
 ]
 
 [tool.uv.sources]
@@ -47,9 +47,9 @@ dev = [
 # Web server + infrastructure (FastAPI, Celery, Redis…)
 # Used by Dockerfile.dev and Dockerfile (prod)
 web = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.32.0",
-    "celery[redis]>=5.4.0",
+    "fastapi>=0.138.1",
+    "uvicorn[standard]>=0.49.0",
+    "celery[redis]>=5.6.3",
     "redis>=5.2.0",
     "python-multipart>=0.0.12",
     "httpx>=0.27.0",
