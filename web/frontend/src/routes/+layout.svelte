@@ -28,6 +28,7 @@
 
     <nav class="nav">
       {#if !isApp}
+        <a href="/slides" class="nav-link">{$t('nav.slides')}</a>
         <a href="/app" class="nav-cta">{$t('nav.app')}</a>
       {:else}
         <a href="/" class="nav-link">← Home</a>
