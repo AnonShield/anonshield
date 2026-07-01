@@ -5,6 +5,18 @@
 
   let mode = $state<'deck' | 'scroll'>('deck');
 
+  // Structured data so the deck can surface as a rich result in search.
+  const jsonLd = `<script type="application/ld+json">${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'CreativeWork',
+    name: 'AnonShield slides',
+    about: 'Secure, scalable pseudonymization of vulnerability and incident data in CSIRTs',
+    author: { '@type': 'Person', name: 'Cristhian Kapelinski' },
+    inLanguage: ['pt-BR', 'en'],
+    url: 'https://anonshield.org/slides',
+    image: 'https://anonshield.org/og-slides.jpg',
+  })}<\/script>`;
+
   const papers = [
     { name: 'AnonShield: Scalable On-Premise Pseudonymization for CSIRT Network Vulnerability Data', venue: 'SBRC 2026', url: 'https://sol.sbc.org.br/index.php/sbrc_estendido/article/view/42580' },
     { name: 'AnonLFI v2.0: extensible pseudonymization for CSIRTs', venue: 'ERRC 2025', url: 'https://sol.sbc.org.br/index.php/errc/article/view/39186' },
@@ -23,9 +35,23 @@
 </script>
 
 <svelte:head>
-  <title>Slides · AnonShield</title>
-  <meta name="description" content="AnonShield presentation slides. Best Artifact at SBRC 2026." />
+  <title>AnonShield slides · pseudonymization for CSIRTs</title>
+  <meta name="description" content="Presentation of AnonShield: secure, scalable pseudonymization of vulnerability and incident data in CSIRTs. Real HTML slides, in Portuguese and English." />
+  <link rel="canonical" href="https://anonshield.org/slides" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="AnonShield" />
+  <meta property="og:url" content="https://anonshield.org/slides" />
+  <meta property="og:title" content="AnonShield slides" />
+  <meta property="og:description" content="Secure, scalable pseudonymization of vulnerability and incident data in CSIRTs. The full presentation as HTML slides." />
+  <meta property="og:image" content="https://anonshield.org/og-slides.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="AnonShield slides" />
+  <meta name="twitter:description" content="Secure, scalable pseudonymization of vulnerability and incident data in CSIRTs." />
+  <meta name="twitter:image" content="https://anonshield.org/og-slides.jpg" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" />
+  {@html jsonLd}
 </svelte:head>
 
 <section class="slides-page">
