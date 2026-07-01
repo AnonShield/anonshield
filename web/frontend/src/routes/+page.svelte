@@ -262,6 +262,10 @@ Action items:
 
     <div class="hero-actions">
       <a href="/app" class="cta-primary">{$t('landing.hero.cta')}</a>
+      <a href="/slides" class="cta-secondary">
+        <span class="cta-ico" aria-hidden="true">▤</span>
+        {$t('landing.hero.slides')}
+      </a>
       <span class="hero-meta">{$t('landing.hero.meta')}</span>
     </div>
   </div>
@@ -1124,6 +1128,27 @@ Action items:
     outline: 2px solid var(--color-accent);
     outline-offset: 3px;
   }
+  .cta-secondary {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+    color: var(--color-text-primary);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+    border-radius: var(--radius-md);
+    font-size: var(--text-base); font-weight: 600;
+    text-decoration: none; letter-spacing: -0.01em;
+    transition: border-color var(--duration-fast) var(--ease-out),
+                background var(--duration-fast) var(--ease-out),
+                transform var(--duration-fast) var(--ease-out);
+  }
+  .cta-secondary:hover {
+    border-color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+    transform: translateY(-2px);
+  }
+  .cta-secondary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+  .cta-ico { color: var(--color-accent); font-size: var(--text-lg); line-height: 1; }
+
   .hero-meta {
     font-size: var(--text-xs); font-family: var(--font-mono);
     color: var(--color-text-secondary);
