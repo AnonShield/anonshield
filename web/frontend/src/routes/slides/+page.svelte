@@ -97,7 +97,6 @@
     font-size: var(--text-2xl); font-weight: 800; letter-spacing: -0.02em;
     margin: 0 0 var(--space-2); color: var(--color-text-primary);
   }
-  .s-sub { margin: 0 auto; max-width: 60ch; color: var(--color-text-secondary); }
 
   .s-hint {
     text-align: center; font-size: var(--text-xs); color: var(--color-text-secondary);
