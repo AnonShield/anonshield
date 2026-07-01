@@ -1,6 +1,9 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
-  import SlideDeck from '$lib/components/SlideDeck.svelte';
+  import HtmlDeck from '$lib/components/HtmlDeck.svelte';
+  import DeckScroll from '$lib/components/DeckScroll.svelte';
+
+  let mode = $state<'deck' | 'scroll'>('deck');
 
   const papers = [
     { name: 'AnonShield: Scalable On-Premise Pseudonymization for CSIRT Network Vulnerability Data', venue: 'SBRC 2026', url: 'https://sol.sbc.org.br/index.php/sbrc_estendido/article/view/42580' },
@@ -22,17 +25,35 @@
 <svelte:head>
   <title>Slides · AnonShield</title>
   <meta name="description" content="AnonShield presentation slides. Best Artifact at SBRC 2026." />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" />
 </svelte:head>
 
 <section class="slides-page">
   <header class="s-head">
     <p class="section-label">{$t('slides.label')}</p>
     <h1 class="s-title">{$t('slides.title')}</h1>
-    <p class="s-sub">{$t('slides.sub')}</p>
   </header>
 
-  <SlideDeck count={30} base="/slides" pdf="/slides/AnonShield-slides.pdf" />
-  <p class="s-hint">{$t('slides.hint')}</p>
+  <div class="mode-switch" role="tablist" aria-label={$t('slides.label')}>
+    <button
+      class="mode-btn" class:active={mode === 'deck'}
+      role="tab" aria-selected={mode === 'deck'}
+      onclick={() => (mode = 'deck')}
+    >▤ {$t('slides.mode.deck')}</button>
+    <button
+      class="mode-btn" class:active={mode === 'scroll'}
+      role="tab" aria-selected={mode === 'scroll'}
+      onclick={() => (mode = 'scroll')}
+    >☰ {$t('slides.mode.scroll')}</button>
+  </div>
+
+  {#if mode === 'deck'}
+    <HtmlDeck pdf="/slides/AnonShield-slides.pdf" />
+    <p class="s-hint">{$t('slides.hint')}</p>
+  {:else}
+    <DeckScroll />
+    <p class="s-hint">{$t('slides.scroll_hint')}</p>
+  {/if}
 
   <section class="refs">
     <h2 class="section-title">{$t('slides.refs.title')}</h2>
@@ -82,6 +103,25 @@
     text-align: center; font-size: var(--text-xs); color: var(--color-text-secondary);
     margin: calc(var(--space-2) * -1) 0 0;
   }
+
+  .mode-switch {
+    display: inline-flex; align-self: center; gap: 2px;
+    padding: 3px; border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-surface-raised);
+  }
+  .mode-btn {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    border: none; border-radius: var(--radius-sm); background: transparent;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
+  }
+  .mode-btn:hover { color: var(--color-text-primary); }
+  .mode-btn.active { background: var(--color-accent); color: #fff; }
+  .mode-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .mode-btn { transition: none; } }
 
   .refs { margin-top: var(--space-8); }
   .section-title {
