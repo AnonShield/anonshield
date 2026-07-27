@@ -31,7 +31,7 @@ jobs:
       python: ${{ steps.filter.outputs.python }}
       frontend: ${{ steps.filter.outputs.frontend }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - id: filter
@@ -78,10 +78,10 @@ jobs:
       - if: needs.changes.outputs.python != 'true'
         run: echo "No Python code touched, nothing to test."
       - if: needs.changes.outputs.python == 'true'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - if: needs.changes.outputs.python == 'true'
         name: Install uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
       - if: needs.changes.outputs.python == 'true'
@@ -110,9 +110,9 @@ jobs:
       - if: needs.changes.outputs.frontend != 'true'
         run: echo "No frontend code touched, nothing to build."
       - if: needs.changes.outputs.frontend == 'true'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - if: needs.changes.outputs.frontend == 'true'
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 20
           cache: npm
@@ -133,10 +133,10 @@ jobs:
       - if: needs.changes.outputs.code != 'true'
         run: echo "Docs-only change, nothing to scan."
       - if: needs.changes.outputs.code == 'true'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - if: needs.changes.outputs.python == 'true'
         name: Install uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
       - if: needs.changes.outputs.python == 'true'
@@ -167,7 +167,7 @@ jobs:
       - if: needs.changes.outputs.code != 'true'
         run: echo "Docs-only change, no code to scan."
       - if: needs.changes.outputs.code == 'true'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - if: needs.changes.outputs.code == 'true'
         name: Secret scan (gitleaks)
         run: |
@@ -176,7 +176,7 @@ jobs:
           ./gitleaks detect --source . --no-git --config .gitleaks.toml --no-banner --redact --exit-code 1
       - if: needs.changes.outputs.python == 'true'
         name: Install uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
       - if: needs.changes.outputs.python == 'true'
@@ -195,7 +195,7 @@ jobs:
       group: deploy-prod
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Sync code into the live deploy directory
         # Mirrors scripts/deploy.sh, but locally on the host. Only the code dirs
         # are mirrored with --delete; the host's local files (web/.env, web/certs,
