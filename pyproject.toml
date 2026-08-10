@@ -47,8 +47,8 @@ dev = [
 # Web server + infrastructure (FastAPI, Celery, Redis…)
 # Used by Dockerfile.dev and Dockerfile (prod)
 web = [
-    "fastapi>=0.140.13",
-    "uvicorn[standard]>=0.51.0",
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.52.1",
     "celery[redis]>=5.6.3",
     "redis>=5.2.0",
     "python-multipart>=0.0.12",
