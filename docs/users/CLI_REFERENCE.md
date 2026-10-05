@@ -275,7 +275,9 @@ Output filenames always follow the pattern `anon_<original_filename>.<ext>`.
 ./docker/run.sh ./report.txt --preserve-entities "LOCATION,ORGANIZATION"
 ```
 
-> **Tip:** Use `--list-entities` to see all valid entity type names.
+A preserved value keeps its place: if another recognizer also matches it (an IP address that also looks like a phone number, for example), it is not anonymized under that other label.
+
+> **Tip:** Use `--list-entities` to see all valid entity type names (add `--lang pt` to include the Brazilian types such as `BR_CPF`).
 
 ---
 
@@ -298,7 +300,7 @@ Use `--entities` when you want to anonymize only a specific, known set of types 
   --entities "CPF,CNPJ"
 ```
 
-> **Note:** `--entities` takes priority over `--preserve-entities`. If both are set, `--entities` wins.
+> **Note:** `--entities` takes priority over `--preserve-entities`. If both are set, `--entities` wins. Labels from `--word-list` and `--custom-patterns` (`PROJECT`, `TICKET_ID`, ...) are valid here too.
 
 ---
 
@@ -317,6 +319,8 @@ Use `--entities` when you want to anonymize only a specific, known set of types 
 # Multiple terms with spaces: quote the whole list
 ./docker/run.sh ./report.txt --allow-list "John Doe,127.0.0.1,internal-only"
 ```
+
+Matching is exact and case-sensitive. Everything detected inside an allowed term is kept too: allowing `maria@example.com` keeps the whole address, not just the `EMAIL_ADDRESS` match (the hostname pattern would otherwise still replace `example.com`).
 
 ---
 
@@ -360,7 +364,14 @@ When the tool replaces a name like `John Smith`, it generates a tag like `[PERSO
 | `fields_to_anonymize` | Only these fields run through NER inference |
 | `force_anonymize` | These fields are always anonymized as a specific entity type, skipping NER entirely |
 
-Fields are specified using **dot notation** (e.g., `asset.ipv4_addresses`).
+Fields are specified using **dot notation** (e.g., `asset.ipv4_addresses`):
+
+- **CSV:** the column name (`email`).
+- **XLSX:** sheet name and column letter (`Sheet1.C`).
+- **JSON/JSONL:** the key path, array indices omitted (`tickets.reporter.email`).
+- **XML:** the element path from the root (`tickets.ticket.notes`); attributes as `tickets.ticket.@reporter`, comments as `tickets.ticket.comment()`. XPath-style slashes (`tickets/ticket/notes`) are accepted too.
+
+Numeric values (JSON numbers, numeric XLSX cells) are anonymized only when their field is listed in `force_anonymize` or `fields_to_anonymize`. Field rules apply to structured files only; text, PDF, DOCX and image files in the same run are processed as usual.
 
 **Example config file (`anon_config.json`):**
 
@@ -552,7 +563,7 @@ JSON format is also accepted (same fields, wrapped in an array).
 
 **Default:** off
 
-**What it does:** For CSV and XLSX files, the tool by default groups identical values across rows and processes each unique value only once (much faster). With `--preserve-row-context`, every cell value is processed in full, which is slower but ensures that the surrounding column context is preserved for each row.
+**What it does:** By default the tool groups identical values (CSV/XLSX cells, text lines, PDF/DOCX blocks, JSON/XML strings) and processes each unique value only once (much faster). With `--preserve-row-context`, every occurrence is processed on its own, which is slower but keeps each value in its own context.
 
 ```bash
 ./docker/run.sh ./dataset.csv --preserve-row-context
