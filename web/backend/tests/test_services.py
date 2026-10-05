@@ -129,11 +129,19 @@ custom_patterns:
 
 # ── entity endpoint ─────────────────────────────────────────────────────────────
 
+def _entities(**params):
+    """Call the route function directly: defaults are FastAPI Query objects, so
+    every parameter is passed, and the JSONResponse body is decoded."""
+    import json
+    from routers.entities import list_entities
+    args = {"strategy": "filtered", "model": "Davlan/xlm-roberta-base-ner-hrl", "lang": "en", **params}
+    return json.loads(list_entities(**args).body)
+
+
 class TestEntitiesEndpoint:
     def test_regex_excludes_ner_entities(self):
         """Regex strategy must not include NER-only entities like PERSON."""
-        from routers.entities import list_entities
-        result = list_entities(strategy="regex")
+        result = _entities(strategy="regex")
         all_ids = [e["id"] for g in result["groups"] for e in g["entities"]]
         # NER-only entities must be absent in regex mode
         assert "PERSON" not in all_ids
@@ -142,8 +150,7 @@ class TestEntitiesEndpoint:
 
     def test_filtered_includes_ner_entities(self):
         """Filtered strategy must include both NER entities and custom regex recognizers."""
-        from routers.entities import list_entities
-        result = list_entities(strategy="filtered")
+        result = _entities(strategy="filtered")
         all_ids = [e["id"] for g in result["groups"] for e in g["entities"]]
         # NER entities must appear in non-regex strategies
         assert "PERSON" in all_ids
@@ -151,8 +158,7 @@ class TestEntitiesEndpoint:
         assert any(e in all_ids for e in ("IP_ADDRESS", "URL", "EMAIL_ADDRESS"))
 
     def test_response_structure(self):
-        from routers.entities import list_entities
-        result = list_entities()
+        result = _entities()
         assert "groups" in result
         assert len(result["groups"]) > 0
         for group in result["groups"]:
