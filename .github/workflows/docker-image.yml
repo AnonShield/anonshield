@@ -143,6 +143,9 @@ jobs:
         run: |
           docker image rm anon-cpu:ci || true
           docker buildx prune -af || true
+      # The GPU builds reuse the CPU build cache (same base and venv layers) and
+      # export none: exporting the CUDA layers to the GitHub cache took ~16 min
+      # per image, ran the job past its timeout, and does not fit the 10 GB cache.
       - name: Build GPU image (CUDA 13.0)
         if: env.RUN == 'true'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -153,8 +156,7 @@ jobs:
           build-args: TORCH_CUDA=cu130
           push: ${{ env.PUSH == 'true' }}
           tags: ${{ steps.tags.outputs.gpu }}
-          cache-from: type=gha,scope=gpu
-          cache-to: ${{ env.PUSH == 'true' && 'type=gha,mode=max,scope=gpu' || '' }}
+          cache-from: type=gha,scope=cpu
       - name: Free runner disk between GPU builds
         if: env.RUN == 'true'
         run: docker buildx prune -af || true
@@ -168,5 +170,4 @@ jobs:
           build-args: TORCH_CUDA=cu126
           push: ${{ env.PUSH == 'true' }}
           tags: ${{ steps.tags.outputs.gpu_cu126 }}
-          cache-from: type=gha,scope=gpu-cu126
-          cache-to: ${{ env.PUSH == 'true' && 'type=gha,mode=max,scope=gpu-cu126' || '' }}
+          cache-from: type=gha,scope=cpu
