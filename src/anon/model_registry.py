@@ -138,3 +138,30 @@ def register_model(
         languages=languages or ["en"],
     )
     logger.info("Registered custom model '%s'", model_id)
+
+
+def get_model_labels(model_id: str) -> set[str]:
+    """Entity types a token-classification model can emit, after mapping.
+
+    Read from the model's config in the local Hugging Face cache (no download);
+    returns an empty set when the model is not cached yet. Labels the mapping
+    does not cover come back as-is (DATE for xlm-roberta-base-ner-hrl).
+    """
+    try:
+        import json
+        from huggingface_hub import try_to_load_from_cache
+        path = try_to_load_from_cache(model_id, "config.json")
+        if not isinstance(path, str):
+            return set()
+        with open(path, encoding="utf-8") as f:
+            id2label = json.load(f).get("id2label") or {}
+    except Exception:
+        return set()
+    mapping = get_entity_mapping(model_id)
+    labels = set()
+    for label in id2label.values():
+        if label == "O":
+            continue
+        base = label.split("-", 1)[1] if label[:2] in ("B-", "I-", "E-", "S-", "L-", "U-") else label
+        labels.add(mapping.get(base, base))
+    return labels

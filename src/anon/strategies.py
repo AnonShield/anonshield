@@ -4,7 +4,10 @@ from typing import List, Dict, TYPE_CHECKING, Optional, Set, Tuple
 import logging
 import pandas as pd
 import spacy
+from presidio_analyzer import RecognizerResult
 from presidio_anonymizer import OperatorConfig
+
+from .entity_selection import is_entity_excluded
 
 if TYPE_CHECKING:
     from .core.protocols import CacheStrategy, HashingStrategy
@@ -23,6 +26,30 @@ class AnonymizationStrategy(ABC):
     def anonymize(self, texts: List[str], operator_params: Dict) -> Tuple[List[str], List[Tuple]]:
         """Anonymize a list of texts and return anonymized texts and collected entities."""
         pass
+
+# Recognizers that report transformer/spaCy NER results. --ner-score-threshold
+# is documented as the NER cut-off; applying it to the regex recognizers too made
+# a threshold of 0.9 drop every IP address (regex score 0.85) into the output.
+_NER_RECOGNIZERS = {"SpacyRecognizer", "TransformersRecognizer", "StanzaRecognizer"}
+
+
+def analysis_floor(ner_threshold: float) -> float:
+    """Score floor for Presidio analysis: NER results are cut later, by
+    filter_ner_threshold, while the other recognizers keep the default floor."""
+    from .config import NerDefaults
+    return min(ner_threshold, NerDefaults.SCORE_THRESHOLD)
+
+
+def filter_ner_threshold(analyzer_results, ner_threshold: float) -> list:
+    from .config import NerDefaults
+    kept = []
+    for r in analyzer_results:
+        name = (getattr(r, "recognition_metadata", None) or {}).get("recognizer_name", "")
+        floor = ner_threshold if name in _NER_RECOGNIZERS else NerDefaults.SCORE_THRESHOLD
+        if r.score >= floor:
+            kept.append(r)
+    return kept
+
 
 class FullPresidioStrategy(AnonymizationStrategy):
     """
@@ -44,7 +71,9 @@ class FullPresidioStrategy(AnonymizationStrategy):
                  entities_to_preserve: Set[str],
                  allow_list: Set[str],
                  nlp_batch_size: int = 8,
-                 score_threshold: Optional[float] = None):
+                 score_threshold: Optional[float] = None,
+                 entities_to_anonymize: Optional[Set[str]] = None,
+                 entity_detector: Optional[EntityDetector] = None):
         super().__init__()
         self.analyzer_engine = analyzer_engine
         self.anonymizer_engine = anonymizer_engine
@@ -52,17 +81,39 @@ class FullPresidioStrategy(AnonymizationStrategy):
         self.lang = lang
         self.nlp_batch_size = nlp_batch_size
         self.entities_to_preserve = entities_to_preserve
+        self.entities_to_anonymize = entities_to_anonymize
         self.allow_list = allow_list
+        # Source of the word-list / custom patterns, which are not in the
+        # (shared, cached) Presidio registry.
+        self.entity_detector = entity_detector
         from .config import NerDefaults
         self.score_threshold = score_threshold if score_threshold is not None else NerDefaults.SCORE_THRESHOLD
 
     def _get_entities_to_anonymize(self, entities: Optional[List[str]] = None) -> List[str]:
-        """Determines the list of entities to be analyzed."""
+        """Determines the list of entities to be analyzed.
+
+        Preserved types are analyzed too: they keep their span in _final_results.
+        """
         if entities is not None:
             return entities
         
-        all_entities = self.analyzer_engine.analyzer_engine.get_supported_entities()
-        return [ent for ent in all_entities if ent not in self.entities_to_preserve]
+        return list(self.analyzer_engine.analyzer_engine.get_supported_entities())
+
+    def _final_results(self, text: str, analyzer_results) -> List[RecognizerResult]:
+        """Presidio results plus word-list/custom matches, with exclusions applied
+        and overlaps resolved (see EntityDetector.finalize)."""
+        detected = [{"start": r.start, "end": r.end, "label": r.entity_type, "score": r.score,
+                     "text": text[r.start:r.end]}
+                    for r in filter_ner_threshold(analyzer_results, self.score_threshold)]
+        if self.entity_detector is not None:
+            detected += self.entity_detector.extract_custom_entities(text)
+            detected = self.entity_detector.finalize(text, detected)
+        else:
+            detected = [d for d in detected
+                        if not is_entity_excluded(d["label"], self.entities_to_preserve, self.entities_to_anonymize)
+                        and d["text"] not in self.allow_list]
+        return [RecognizerResult(entity_type=d["label"], start=d["start"], end=d["end"], score=d["score"])
+                for d in detected]
 
     def anonymize(self, texts: List[str], operator_params: Dict) -> Tuple[List[str], List[Tuple]]:
         """Anonymize a batch of texts using the full Presidio pipeline.
@@ -115,8 +166,7 @@ class FullPresidioStrategy(AnonymizationStrategy):
         # PHASE 2: Analyze only uncached texts
         analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
             texts_to_process, language=self.lang,
-            entities=entities_to_use, score_threshold=self.score_threshold,
-            allow_list=self.allow_list,
+            entities=entities_to_use, score_threshold=analysis_floor(self.score_threshold),
             batch_size=self.nlp_batch_size
         )
         
@@ -131,7 +181,7 @@ class FullPresidioStrategy(AnonymizationStrategy):
         for text, analyzer_results, original_idx in zip(texts_to_process, analyzer_results_list, indices_to_process):
             anonymizer_result = self.anonymizer_engine.anonymize(
                 text=text,
-                analyzer_results=analyzer_results,
+                analyzer_results=self._final_results(text, analyzer_results),
                 operators={"DEFAULT": OperatorConfig("custom_slug", operator_params_with_collector)},
             )
             
@@ -165,9 +215,11 @@ class HybridPresidioStrategy(AnonymizationStrategy):
                  entities_to_preserve: Set[str],
                  slm_detector: Optional['SLMEntityDetector'] = None,
                  slm_detector_mode: str = "hybrid",
-                 score_threshold: Optional[float] = None):
+                 score_threshold: Optional[float] = None,
+                 entities_to_anonymize: Optional[Set[str]] = None):
         super().__init__()
         self.nlp_engine = nlp_engine
+        self.entities_to_anonymize = entities_to_anonymize
         self.entity_detector = entity_detector
         self.hash_generator = hash_generator
         self.cache_manager = cache_manager
@@ -193,8 +245,9 @@ class HybridPresidioStrategy(AnonymizationStrategy):
         return list(core_entities)
     
     def _get_entities_to_anonymize(self) -> List[str]:
-        """Returns the list of entities to be analyzed, excluding those to preserve."""
-        return [e for e in self.core_entities if e not in self.entities_to_preserve]
+        """Returns the list of entities to be analyzed. Preserved types are
+        analyzed too, so they keep their span (see EntityDetector.finalize)."""
+        return list(self.core_entities)
     
     def _generate_anonymized_text_and_collect_entities(self, original_doc_text: str, merged_entities: List[Dict], operator_params: Dict) -> Tuple[str, List[Tuple]]:
         """Generates the anonymized text and collects entities based on merged entities."""
@@ -272,7 +325,7 @@ class HybridPresidioStrategy(AnonymizationStrategy):
         # Now with entity filtering to reduce unnecessary processing
         analyzer_results_iterator = self.nlp_engine.analyze_iterator(
             texts_to_process_in_batch, language=self.lang,
-            entities=entities_to_use, score_threshold=self.score_threshold,
+            entities=entities_to_use, score_threshold=analysis_floor(self.score_threshold),
             batch_size=self.nlp_batch_size
         )
         
@@ -288,7 +341,7 @@ class HybridPresidioStrategy(AnonymizationStrategy):
                 self.logger.debug("Running xlm-roberta entity detector.")
                 
                 # Convert Presidio results to entity format
-                for result in analyzer_results:
+                for result in filter_ner_threshold(analyzer_results, self.score_threshold):
                     detected_entities.append({
                         "start": result.start,
                         "end": result.end,
@@ -296,6 +349,9 @@ class HybridPresidioStrategy(AnonymizationStrategy):
                         "text": original_doc_text[result.start:result.end],
                         "score": result.score
                     })
+
+                # Word-list and custom patterns are not in the Presidio registry.
+                detected_entities.extend(self.entity_detector.extract_custom_entities(original_doc_text))
 
             # Run SLM detector if enabled
             if self.slm_detector:
@@ -314,7 +370,7 @@ class HybridPresidioStrategy(AnonymizationStrategy):
                         })
             
             # Merge all collected entities
-            merged_entities = self.entity_detector.merge_overlapping_entities(detected_entities)
+            merged_entities = self.entity_detector.finalize(original_doc_text, detected_entities)
             
             anonymized_text, collected_entities_for_text = self._generate_anonymized_text_and_collect_entities(original_doc_text, merged_entities, operator_params)
             collected_entities_total.extend(collected_entities_for_text)
@@ -361,7 +417,7 @@ class FilteredPresidioStrategy(FullPresidioStrategy):
 
     def _get_entities_to_anonymize(self, entities: Optional[List[str]] = None) -> List[str]:
         """Overrides the parent method to use only the core entities."""
-        return [e for e in self.core_entities if e not in self.entities_to_preserve]
+        return list(self.core_entities)
 
 
 def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
@@ -398,6 +454,8 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             allow_list=kwargs["allow_list"],
             nlp_batch_size=kwargs["nlp_batch_size"],
             score_threshold=kwargs.get("score_threshold"),
+            entities_to_anonymize=kwargs.get("entities_to_anonymize"),
+            entity_detector=kwargs.get("entity_detector"),
         )
 
     elif strategy_name == "filtered":
@@ -412,6 +470,8 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             allow_list=kwargs["allow_list"],
             nlp_batch_size=kwargs["nlp_batch_size"],
             score_threshold=kwargs.get("score_threshold"),
+            entities_to_anonymize=kwargs.get("entities_to_anonymize"),
+            entity_detector=kwargs.get("entity_detector"),
         )
 
     elif strategy_name == "hybrid":
@@ -428,6 +488,7 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             transformer_model=kwargs["transformer_model"],
             entities_to_preserve=kwargs["entities_to_preserve"],
             score_threshold=kwargs.get("score_threshold"),
+            entities_to_anonymize=kwargs.get("entities_to_anonymize"),
         )
     
     elif strategy_name == "standalone":
@@ -441,7 +502,9 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             lang=kwargs["lang"],
             entities_to_preserve=kwargs["entities_to_preserve"],
             slm_detector=kwargs.get("slm_detector"),
-            slm_detector_mode=kwargs.get("slm_detector_mode", "hybrid")
+            slm_detector_mode=kwargs.get("slm_detector_mode", "hybrid"),
+            score_threshold=kwargs.get("score_threshold"),
+            aggregation_strategy=kwargs.get("aggregation_strategy"),
         )
 
     elif strategy_name == "regex":

@@ -66,7 +66,10 @@ class NerDefaults:
     YAML config, web API form fields, and frontend Advanced panel.
     """
     SCORE_THRESHOLD: float = 0.4
-    AGGREGATION_STRATEGY: str = "max"
+    # "simple" groups adjacent tokens with the same label. The word-level modes
+    # (first/average/max) mis-split SentencePiece words in xlm-roberta: with
+    # "max", "New York" comes back as "New" and "York" stays in clear text.
+    AGGREGATION_STRATEGY: str = "simple"
     AGGREGATION_CHOICES: tuple[str, ...] = ("simple", "first", "average", "max")
 
 # Entity mappings between the transformer model's labels and Presidio's entities

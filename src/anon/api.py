@@ -22,7 +22,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
 import re
 from pathlib import Path
 from typing import Any
@@ -53,9 +52,10 @@ def anonymize_file(
     Returns dict with entity_count and entity_counts breakdown.
     CLI (anon.py) remains the primary interface; this is for programmatic use only.
     """
-    from src.anon.config import ENTITY_MAPPING, Global
+    from src.anon.config import ENTITY_MAPPING
     from src.anon.engine import AnonymizationOrchestrator, load_custom_recognizers
     from src.anon.entity_detector import EntityDetector
+    from src.anon.entity_selection import resolve_entity_selection
     from src.anon.hash_generator import HashGenerator
     from src.anon.cache_manager import CacheManager
     from src.anon.database import DatabaseContext
@@ -63,24 +63,9 @@ def anonymize_file(
     from src.anon.model_registry import get_entity_mapping
     from src.anon.ocr.factory import get_ocr_engine
 
-    if secret_key:
-        os.environ["ANON_SECRET_KEY"] = secret_key
-
     input_path = Path(input_path)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    # --- supported entities ---
-    supported_upper = {s.upper() for s in get_supported_entities(strategy, lang=lang)}
-
-    # Entity selection / preservation
-    if entities is not None:
-        # Explicit selection: preserve everything NOT requested (empty list = preserve all = anonymize nothing)
-        valid = {e.upper() for e in entities if e.upper() in supported_upper}
-        entities_to_preserve = list(Global.NON_PII_ENTITIES | (supported_upper - valid))
-    else:
-        requested_preserve = {e.upper() for e in (preserve_entities or []) if e.upper() in supported_upper}
-        entities_to_preserve = list(Global.NON_PII_ENTITIES) + list(requested_preserve)
 
     allow_list = [t.strip() for t in (allow_list or []) if t.strip()]
 
@@ -91,13 +76,12 @@ def anonymize_file(
         db_context.initialize()
 
     # --- Entity detector ---
+    # Preserved types stay in the list: they claim their span (EntityDetector.finalize).
     entity_mapping = get_entity_mapping(transformer_model) if transformer_model else dict(ENTITY_MAPPING)
     custom_recognizers = load_custom_recognizers([lang], regex_priority=False)
     compiled_patterns: list[dict] = []
     for recognizer in custom_recognizers:
         etype = recognizer.supported_entities[0]
-        if etype in entities_to_preserve:
-            continue
         for pattern in recognizer.patterns:
             try:
                 compiled_patterns.append({
@@ -109,31 +93,43 @@ def anonymize_file(
                 pass
 
     # Custom inline patterns
+    extra_patterns: list[dict] = []
     for p in (custom_patterns or []):
-        etype = p.get("entity_type", "CUSTOM")
-        if etype in entities_to_preserve:
-            continue
+        etype = str(p.get("entity_type", "CUSTOM")).upper()
         try:
             flags_val = re.IGNORECASE
             if p.get("flags", "").upper() == "IGNORECASE":
                 flags_val = re.IGNORECASE
-            compiled_patterns.append({
+            extra_patterns.append({
                 "label": etype,
                 "regex": re.compile(p["pattern"], flags=flags_val),
                 "score": float(p.get("score", 0.85)),
             })
         except (re.error, KeyError):
             logger.warning("Skipping invalid custom pattern: %s", p)
+    compiled_patterns.extend(extra_patterns)
+
+    # --- Entity selection ---
+    supported = set(get_supported_entities(strategy, lang=lang, model=transformer_model))
+    supported.update(p["label"] for p in extra_patterns)
+    # entities=[] means "anonymize nothing"; None means no selection.
+    selection = resolve_entity_selection(supported, entities=entities, preserve_entities=preserve_entities)
+    entities_to_preserve = sorted(selection.entities_to_preserve)
 
     entity_detector = EntityDetector(
         compiled_patterns=compiled_patterns,
         entities_to_preserve=set(entities_to_preserve),
         allow_list=set(allow_list),
         entity_mapping=entity_mapping,
+        entities_to_anonymize=selection.entities_to_anonymize,
+        custom_patterns=extra_patterns,
     )
 
     cache_manager = CacheManager(use_cache=False, max_cache_size=0)
-    hash_generator = HashGenerator()
+    # The per-request key goes to the generator directly: SECRET_KEY is read once
+    # at import, so setting os.environ here (as before) left every job hashed
+    # with the worker's startup key instead of the user's.
+    hash_generator = HashGenerator(secret_key=secret_key or None)
     ocr_eng = get_ocr_engine(ocr_engine)
 
     orchestrator = AnonymizationOrchestrator(
@@ -149,6 +145,7 @@ def anonymize_file(
         transformer_model=transformer_model,
         ner_score_threshold=ner_score_threshold,
         ner_aggregation_strategy=ner_aggregation_strategy,
+        entities_to_anonymize=selection.entities_to_anonymize,
     )
 
     processor = ProcessorRegistry.get_processor(
@@ -228,6 +225,10 @@ def get_supported_entities(
         # filtered / standalone / hybrid use a curated set: custom regex + NER model entities only.
         # These strategies do NOT use Presidio's broad built-in recognizers (CREDIT_CARD,
         # IBAN, US_DRIVER_LICENSE, etc.); those generate many false positives in practice.
+        if strategy == "standalone":
+            # standalone also emits labels the mapping does not cover (DATE)
+            from src.anon.model_registry import get_model_labels
+            model_ner_entities |= get_model_labels(model)
         result = sorted(set(custom) | model_ner_entities)
 
     _ENTITY_CACHE[cache_key] = result

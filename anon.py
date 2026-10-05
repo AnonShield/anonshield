@@ -1,8 +1,10 @@
 import argparse
+import importlib
 import warnings
 import re
 import logging
 import os
+import shutil
 import sys
 import subprocess
 import json
@@ -152,33 +154,56 @@ def _handle_slm_entity_mapping(args):
 
 
 
-def models_check(lang: str, transformer_model: str = TRANSFORMER_MODEL):
-    """Downloads and verifies necessary spaCy and Transformer models."""
+def _install_spacy_model(model: str) -> None:
+    """Install a spaCy pipeline package into the running interpreter.
+
+    ``spacy download`` shells out to pip, which a uv-created venv does not have;
+    in that case the same wheel is installed with ``uv pip``.
+    """
+    logging.info(f"Spacy model '{model}' not found. Downloading...")
+    try:
+        subprocess.run([sys.executable, "-m", "spacy", "download", model],
+                       check=True, capture_output=True, text=True)
+        logging.info(f"Successfully downloaded '{model}'.")
+        return
+    except Exception as e:
+        first_error = e
+    uv = shutil.which("uv")
+    if uv:
+        try:
+            from urllib.parse import urljoin
+            from spacy import about
+            from spacy.cli.download import get_compatibility, get_model_filename, get_version
+            version = get_version(model, get_compatibility())
+            url = urljoin(about.__download_url__.rstrip("/") + "/", get_model_filename(model, version))
+            subprocess.run([uv, "pip", "install", "--python", sys.executable, f"{model} @ {url}"],
+                           check=True, capture_output=True, text=True)
+            importlib.invalidate_caches()
+            logging.info(f"Successfully installed '{model}' with uv.")
+            return
+        except Exception as e:
+            first_error = e
+    logging.error(f"Failed to download spaCy model '{model}': {first_error}. "
+                  f"Install it with `uv sync --group pt` (Portuguese) or `python -m spacy download {model}`.")
+    sys.exit(1)
+
+
+def models_check(lang: str, need_spacy: bool = True):
+    """Make sure the spaCy pipeline the engine loads for ``lang`` is installed.
+
+    The engine loads pt_core_news_lg for Portuguese and en_core_web_lg for every
+    other language (see AnonymizationOrchestrator._setup_engines), so only that
+    one is needed. The transformer model is fetched by transformers itself on
+    first load, into the Hugging Face cache it reads from; it used to be
+    pre-downloaded into ./models/<id>, a directory nothing ever loaded from.
+    """
     import spacy.util
-    from huggingface_hub import snapshot_download
 
-    SPACY_MODEL_MAP = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
-    en_model = SPACY_MODEL_MAP["en"]
-    requested = SPACY_MODEL_MAP.get(lang) or f"{lang}_core_news_lg"
-
-    for model in (en_model, requested):
-        if model and not spacy.util.is_package(model):
-            logging.info(f"Spacy model '{model}' not found. Downloading...")
-            try:
-                subprocess.run(
-                    [sys.executable, "-m", "spacy", "download", model],
-                    check=True, capture_output=True, text=True,
-                )
-                logging.info(f"Successfully downloaded '{model}'.")
-            except Exception as e:
-                logging.error(f"Failed to download spaCy model '{model}': {e}")
-                sys.exit(1)
-
-    # Download transformer model dynamically based on user selection
-    trf_model_path = os.path.join(MODELS_DIR, transformer_model)
-    if not os.path.exists(trf_model_path):
-        logging.info(f"Transformer model '{transformer_model}' not found. Downloading...")
-        snapshot_download(repo_id=transformer_model, cache_dir=trf_model_path, max_workers=10)
+    if not need_spacy:
+        return
+    model = "pt_core_news_lg" if lang == "pt" else "en_core_web_lg"
+    if not spacy.util.is_package(model):
+        _install_spacy_model(model)
 
 
 def write_report(file_path, start_time):
@@ -195,6 +220,7 @@ def write_report(file_path, start_time):
 def get_supported_entities(
     strategy_name: str = "filtered",
     transformer_model: str = TRANSFORMER_MODEL,
+    lang: str = "en",
 ) -> list[str]:
     """Return a sorted list of entity types detectable for a given strategy + model combination.
 
@@ -212,9 +238,9 @@ def get_supported_entities(
 
     supported: set[str] = set()
 
-    # 1. Custom regex recognizers — shared by all strategies
+    # 1. Custom regex recognizers — shared by all strategies (PT-BR adds BR_CPF, BR_CNPJ, ...)
     try:
-        for r in load_custom_recognizers(langs=['en']):
+        for r in load_custom_recognizers(langs=[lang]):
             supported.update(r.supported_entities)
     except Exception as exc:
         logging.warning(f"Failed to load custom recognizers: {exc}")
@@ -232,14 +258,19 @@ def get_supported_entities(
     # 3. NER model entity labels — sourced from the model registry (single source of truth)
     if strategy_name != "regex":
         supported.update(get_entity_mapping(transformer_model).values())
+    # The standalone strategy also emits labels the mapping does not cover
+    # (DATE, for xlm-roberta), which must be selectable and preservable.
+    if strategy_name == "standalone":
+        from src.anon.model_registry import get_model_labels
+        supported.update(get_model_labels(transformer_model))
 
     return sorted(supported)
 
 
-def _handle_list_entities(strategy_name: str = "filtered", transformer_model: str = TRANSFORMER_MODEL):
+def _handle_list_entities(strategy_name: str = "filtered", transformer_model: str = TRANSFORMER_MODEL, lang: str = "en"):
     """Prints the list of supported entities for the given strategy + model and exits."""
-    print(f"Supported entity types (strategy={strategy_name}, model={transformer_model}):")
-    for entity in get_supported_entities(strategy_name, transformer_model):
+    print(f"Supported entity types (strategy={strategy_name}, model={transformer_model}, lang={lang}):")
+    for entity in get_supported_entities(strategy_name, transformer_model, lang):
         print(f" - {entity}")
     sys.exit(0)
 
@@ -363,7 +394,7 @@ def _parse_arguments():
             parser.error(f"Failed to load config file '{args.config}': {e}")
 
     if args.list_entities:
-        _handle_list_entities(args.anonymization_strategy, args.transformer_model)
+        _handle_list_entities(args.anonymization_strategy, args.transformer_model, args.lang)
 
     if args.list_languages:
         _handle_list_languages()
@@ -408,7 +439,7 @@ def _handle_list_languages():
     sys.exit(0)
 
 
-def _load_word_list_patterns(word_list_path: str, entities_to_preserve: set) -> list:
+def _load_word_list_patterns(word_list_path: str) -> list:
     """Loads a word list JSON and returns compiled exact-match regex patterns.
 
     The JSON key is used directly as the entity type label (uppercased).
@@ -435,8 +466,6 @@ def _load_word_list_patterns(word_list_path: str, entities_to_preserve: set) -> 
     total_terms = 0
     for category, terms in word_list_data.items():
         entity_type = category.upper()
-        if entity_type in entities_to_preserve:
-            continue
         for term in terms:
             term = term.strip()
             if not term:
@@ -451,7 +480,7 @@ def _load_word_list_patterns(word_list_path: str, entities_to_preserve: set) -> 
     return patterns
 
 
-def _compile_inline_patterns(pattern_list: list, entities_to_preserve: set) -> list:
+def _compile_inline_patterns(pattern_list: list) -> list:
     """Compile a list of pattern dicts (from config file) into compiled_patterns format."""
     import re as _re
     compiled = []
@@ -460,8 +489,6 @@ def _compile_inline_patterns(pattern_list: list, entities_to_preserve: set) -> l
         pattern_str = entry.get("pattern")
         if not pattern_str:
             logging.warning("Custom pattern entry missing 'pattern' field: %s", entry)
-            continue
-        if entity_type in entities_to_preserve:
             continue
         score = float(entry.get("score", 0.8))
         flag_str = str(entry.get("flags", "")).upper()
@@ -475,7 +502,7 @@ def _compile_inline_patterns(pattern_list: list, entities_to_preserve: set) -> l
     return compiled
 
 
-def _load_custom_patterns(path: str, entities_to_preserve: set) -> list:
+def _load_custom_patterns(path: str) -> list:
     """Load custom regex patterns from a YAML or JSON file."""
     import re as _re
     p = Path(path)
@@ -497,7 +524,7 @@ def _load_custom_patterns(path: str, entities_to_preserve: set) -> list:
         logging.error("Failed to parse custom patterns file '%s': %s", path, e)
         sys.exit(1)
 
-    result = _compile_inline_patterns(data, entities_to_preserve)
+    result = _compile_inline_patterns(data)
     logging.info("Custom patterns loaded: %d patterns from '%s'", len(result), path)
     return result
 
@@ -604,7 +631,8 @@ def main():
 
     # --- GPU Activation ---
     logging.info("Verifying hardware...")
-    if torch.cuda.is_available():
+    from src.anon.device import cuda_usable
+    if cuda_usable():
         gpu_name = torch.cuda.get_device_name(0)
         logging.info(f"CUDA GPU detected: {gpu_name}")
         # Test if CuPy actually works on this GPU architecture before enabling spaCy GPU
@@ -631,7 +659,7 @@ def main():
             except Exception as e2:
                 logging.info(f"Could not activate GPU for transformer pipeline: {e2}. Running fully on CPU.")
     else:
-        logging.info("CUDA not detected by PyTorch. Running on CPU.")
+        logging.info("No usable CUDA GPU. Running on CPU.")
 
     # --- SECRET_KEY Validation (Early Exit) ---
     # slug_length=0 means entity type only (no HMAC), so no key needed
@@ -647,31 +675,55 @@ def main():
         db_context.initialize(synchronous=args.db_synchronous_mode)
         logging.info(f"Database initialized in '{args.db_mode}' mode with synchronous PRAGMA set to '{args.db_synchronous_mode or 'NORMAL'}'.")
 
-    if args.anonymization_strategy != "regex":
-        models_check(args.lang, args.transformer_model)
+    # The spaCy pipeline is needed by every NLP strategy and by NER data
+    # generation (which always runs on the Presidio analyzer).
+    models_check(args.lang, need_spacy=args.anonymization_strategy != "regex" or args.generate_ner_data)
 
-    allow_list = [term.strip() for term in args.allow_list.split(',') if term]
+    allow_list = [term.strip() for term in args.allow_list.split(',') if term and term.strip()]
     logging.debug(f"Allow list: {allow_list}")
-    
-    supported_entities_upper = {s.upper() for s in get_supported_entities(args.anonymization_strategy, args.transformer_model)}
 
-    # --entities: positive selection — only anonymize the listed types
-    requested_entities = [e.strip().upper() for e in args.entities.split(',') if e and e.strip()]
-    if requested_entities:
-        unknown = [e for e in requested_entities if e not in supported_entities_upper]
-        if unknown:
-            logging.warning(f"Unknown entity types in --entities (will be ignored): {', '.join(unknown)}")
-        valid_entities = {e for e in requested_entities if e in supported_entities_upper}
-        # Preserve everything NOT explicitly requested (plus built-in non-PII)
-        entities_to_preserve = list(Global.NON_PII_ENTITIES | (supported_entities_upper - valid_entities))
-        logging.info(f"--entities mode: anonymizing only {sorted(valid_entities)}")
-    else:
-        # --preserve-entities: negative selection — preserve the listed types
-        requested_preserve = [e.strip().upper() for e in args.preserve_entities.split(',') if e and e.strip()]
-        unknown_entities = [e for e in requested_preserve if e not in supported_entities_upper]
-        if unknown_entities:
-            logging.warning(f"Unsupported entities in --preserve-entities will be ignored: {', '.join(unknown_entities)}")
-        entities_to_preserve = list(Global.NON_PII_ENTITIES) + [e for e in requested_preserve if e in supported_entities_upper]
+    # --- Word list and custom patterns, loaded first: their labels are valid
+    # values for --entities / --preserve-entities.
+    extra_patterns = []
+    if args.word_list:
+        extra_patterns.extend(_load_word_list_patterns(args.word_list))
+    custom_pattern_sources = []
+    if getattr(args, 'custom_patterns', None):
+        custom_pattern_sources.append(args.custom_patterns)
+    if getattr(args, '_config_custom_patterns', None):
+        custom_pattern_sources.append(getattr(args, '_config_custom_patterns', None))
+    for src in custom_pattern_sources:
+        if isinstance(src, str):
+            extra_patterns.extend(_load_custom_patterns(src))
+        elif isinstance(src, list):
+            extra_patterns.extend(_compile_inline_patterns(src))
+
+    # --- Custom models from config file (before anything reads the entity mapping) ---
+    custom_models_cfg = getattr(args, '_config_custom_models', None)
+    if custom_models_cfg:
+        from src.anon.model_registry import register_model
+        for m in custom_models_cfg:
+            mid = m.get("id") or m.get("model_id")
+            mapping = m.get("entity_mapping", {})
+            if mid and mapping:
+                register_model(mid, mapping, description=m.get("description", ""))
+
+    supported_entities = set(get_supported_entities(args.anonymization_strategy, args.transformer_model, args.lang))
+    supported_entities.update(p["label"] for p in extra_patterns)
+
+    from src.anon.entity_selection import resolve_entity_selection
+    requested_entities = [e for e in args.entities.split(',') if e and e.strip()]
+    selection = resolve_entity_selection(
+        supported_entities,
+        entities=requested_entities or None,
+        preserve_entities=args.preserve_entities.split(','),
+    )
+    if selection.unknown:
+        flag = "--entities" if requested_entities else "--preserve-entities"
+        logging.warning(f"Unknown entity types in {flag} (will be ignored): {', '.join(selection.unknown)}")
+    if selection.entities_to_anonymize is not None:
+        logging.info(f"--entities mode: anonymizing only {sorted(selection.entities_to_anonymize)}")
+    entities_to_preserve = sorted(selection.entities_to_preserve)
 
     logging.info(f"Auto-preserving non-PII entities: {', '.join(sorted(Global.NON_PII_ENTITIES))}")
     logging.debug(f"Effective entities to preserve: {entities_to_preserve}")
@@ -688,17 +740,17 @@ def main():
         hash_generator = HashGenerator()
         
         # --- Determine entity mapping based on transformer model ---
-        from src.anon.config import SECURE_MODERNBERT_ENTITY_MAPPING
-        entity_mapping = SECURE_MODERNBERT_ENTITY_MAPPING if "SecureModernBERT-NER" in args.transformer_model else ENTITY_MAPPING
+        from src.anon.model_registry import get_entity_mapping
+        entity_mapping = get_entity_mapping(args.transformer_model)
         logging.info(f"Using entity mapping for model: {args.transformer_model}")
         
         # --- Entity Detector Setup ---
+        # Preserved types stay in the list: they claim their span so another
+        # recognizer cannot anonymize it (EntityDetector.finalize).
         custom_recognizers = load_custom_recognizers([args.lang], regex_priority=args.regex_priority)
         compiled_patterns = []
         for recognizer in custom_recognizers:
             entity_type = recognizer.supported_entities[0]
-            if entity_type in entities_to_preserve:
-                continue
             for pattern in recognizer.patterns:
                 try:
                     compiled_patterns.append({
@@ -709,39 +761,16 @@ def main():
                 except re.error:
                     logging.warning(f"Invalid regex pattern skipped: {pattern.regex}")
 
-        # --- Word List: inject known terms as high-confidence exact-match patterns ---
-        if args.word_list:
-            compiled_patterns.extend(
-                _load_word_list_patterns(args.word_list, set(entities_to_preserve))
-            )
-
-        # --- Custom patterns from --custom-patterns or config file ---
-        custom_pattern_sources = []
-        if getattr(args, 'custom_patterns', None):
-            custom_pattern_sources.append(args.custom_patterns)
-        if getattr(args, '_config_custom_patterns', None):
-            custom_pattern_sources.append(getattr(args, '_config_custom_patterns', None))
-        for src in custom_pattern_sources:
-            if isinstance(src, str):
-                compiled_patterns.extend(_load_custom_patterns(src, set(entities_to_preserve)))
-            elif isinstance(src, list):
-                compiled_patterns.extend(_compile_inline_patterns(src, set(entities_to_preserve)))
-
-        # --- Custom models from config file ---
-        custom_models_cfg = getattr(args, '_config_custom_models', None)
-        if custom_models_cfg:
-            from src.anon.model_registry import register_model
-            for m in custom_models_cfg:
-                mid = m.get("id") or m.get("model_id")
-                mapping = m.get("entity_mapping", {})
-                if mid and mapping:
-                    register_model(mid, mapping, description=m.get("description", ""))
+        # --- Word list and custom patterns (known terms, user regexes) ---
+        compiled_patterns.extend(extra_patterns)
 
         entity_detector = EntityDetector(
             compiled_patterns=compiled_patterns,
             entities_to_preserve=set(entities_to_preserve),
             allow_list=set(allow_list),
-            entity_mapping=entity_mapping
+            entity_mapping=entity_mapping,
+            entities_to_anonymize=selection.entities_to_anonymize,
+            custom_patterns=extra_patterns,
         )
 
         slm_detector_instance = None
@@ -818,6 +847,7 @@ def main():
             transformer_model=args.transformer_model,
             ner_score_threshold=args.ner_score_threshold,
             ner_aggregation_strategy=args.ner_aggregation_strategy,
+            entities_to_anonymize=selection.entities_to_anonymize,
         )
         
         # --- Processing ---
