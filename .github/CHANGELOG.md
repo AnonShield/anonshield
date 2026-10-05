@@ -40,6 +40,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `--regex-priority` crashed (score above 1.0); `--generate-ner-data` crashed with `standalone`/`regex`; `--lang` other than `en`/`pt` crashed the Presidio strategies; `--lang pt` failed in a uv virtualenv.
 - XML comments crashed the processor; `force_anonymize` ignored numeric JSON values and XLSX cells; invalid JSON produced `{}` instead of an error.
 - Web: the secret key typed for a job was ignored (jobs were hashed with the server key).
+- Deploy: the job pulled base images with an expired Docker Hub login stored on the host; it now logs in with the repository secret.
 - Docker: `anonshield/anon:gpu` shipped CPU-only PyTorch; the NER model was downloaded again on every run; `run.sh`/`run.ps1` dropped the input path after a boolean flag and did not mount `--custom-patterns`/`--config` files.
 
 ### Removed

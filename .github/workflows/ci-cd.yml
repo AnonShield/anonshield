@@ -279,6 +279,16 @@ jobs:
                    "$SRC/web/docker-compose.prod.yml" "$SRC/web/docker-compose.host.yml" "$DEST/web/"
           rsync -a "$SRC/web/frontend/Dockerfile" "$DEST/web/frontend/Dockerfile"
           rsync -a "$SRC/pyproject.toml" "$SRC/uv.lock" "$SRC/anon.py" "$DEST/"
+      - name: Log in to Docker Hub
+        # The build pulls its base images (node, python, the Dockerfile frontend)
+        # from Docker Hub. It used whatever login was stored on the host, and that
+        # token expired ("org access token is expired"), failing every deploy.
+        # Log in with the repository secret instead; the action logs out again
+        # when the job ends.
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build, start, and warm the cache
         run: cd "$HOME/anonshield_deploy/web" && make deploy
       - name: Health check
