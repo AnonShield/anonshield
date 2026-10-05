@@ -125,21 +125,22 @@ By default the output is written to `./anon/output/`. For example, anonymizing `
 
 ## Available Tags
 
-Two tags are published. `latest` is the CPU image; `gpu` is the GPU image.
+Three tags are published. `latest` is the CPU image; `gpu` and `gpu-cu126` are the same GPU image with two PyTorch builds, because no single build runs on every NVIDIA GPU and driver.
 
-| Tag | Base | Use case | Approx. download |
-|-----|------|----------|------------------|
-| `latest` | `python:3.12-slim` | CPU image: works on any x86_64 machine | ~900 MB |
-| `gpu` | `nvidia/cuda:12.8.0-runtime-ubuntu22.04` | GPU image: needs NVIDIA hardware and CUDA 12.8 | ~3 GB |
+| Tag | PyTorch build | Use case | Approx. download |
+|-----|---------------|----------|------------------|
+| `latest` | CPU | Any x86_64 machine | ~1.4 GB |
+| `gpu` | CUDA 13.0 | NVIDIA driver 580+ and an RTX 20xx (Turing) or newer GPU; required for RTX 50xx (Blackwell) | ~4.3 GB |
+| `gpu-cu126` | CUDA 12.6 | Older GPUs (GTX 10xx and earlier) or drivers older than 580; no RTX 50xx | ~5 GB |
 
-Both images include Tesseract OCR (English and Portuguese language data) and the spaCy NLP model. The wrapper script picks the right image automatically: plain `./run.sh` uses `latest`, and `./run.sh --gpu` uses `gpu`.
+All images are based on `python:3.12-slim` and include Tesseract OCR (English and Portuguese language data) and the spaCy pipelines for English and Portuguese. The wrapper script picks the right image automatically: plain `./run.sh` uses `latest`; `./run.sh --gpu` reads the GPU and driver from `nvidia-smi` and uses `gpu` or `gpu-cu126` (set `ANON_GPU_IMAGE` to override). If the image does not match the GPU anyway, AnonShield says so at startup and runs on the CPU instead of failing.
 
 ### Requirements
 
 **CPU (`latest`):** any x86_64 machine with 4 GB or more of RAM.
 
 **GPU (`gpu`):**
-- NVIDIA GPU with driver 525 or newer (CUDA 12.8)
+- NVIDIA GPU and driver: see the table above (the CUDA runtime comes inside the image; only the driver is needed on the host)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed and configured (see [GPU Setup](#gpu-setup-nvidia-container-toolkit) below)
 
 ---
