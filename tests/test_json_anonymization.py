@@ -80,11 +80,14 @@ class TestJsonAnonymization(unittest.TestCase):
         self.assertEqual(data[1]["ip_address"], "10.0.0.5") # Excluded
         self.assertNotIn("Jane Smith", data[1]["comment"]) # Auto-detected in 'comment'
         
-        # Check object 3 (no PII in comment)
+        # Check object 3: "Google" is an ORGANIZATION (the old default "max"
+        # aggregation lost it); the rest of the comment is kept.
         self.assertTrue(data[2]["user"].startswith("[USERNAME_"))
         self.assertTrue(data[2]["email"].startswith("[EMAIL_ADDRESS_"))
         self.assertEqual(data[2]["ip_address"], "8.8.8.8") # Excluded
-        self.assertEqual(data[2]["comment"], "Google's DNS")
+        self.assertNotIn("Google", data[2]["comment"])
+        self.assertTrue(data[2]["comment"].startswith("[ORGANIZATION_"))
+        self.assertTrue(data[2]["comment"].endswith("'s DNS"))
 
     def test_anonymize_jsonl_with_new_config(self):
         """Tests that a JSONL file is correctly anonymized using the new config schema."""

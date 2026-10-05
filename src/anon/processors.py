@@ -49,7 +49,7 @@ class NERTextItem:
         forced_entity_type: Entity type forced by anonymization_config, if any
     """
     text: str
-    path: str = ""
+    path: Optional[str] = None
     forced_entity_type: Optional[Union[str, List[str]]] = None
 
 
@@ -91,7 +91,7 @@ def calculate_adaptive_batch_size(
     
     Args:
         file_path: Path to the file being processed
-        strategy_name: Anonymization strategy (presidio, filtered, hybrid, standalone, slm)
+        strategy_name: Anonymization strategy (presidio, filtered, hybrid, standalone, regex)
         csv_columns: Number of columns (for CSV files)
         sample_text_lengths: Sample of text lengths for estimation
     
@@ -105,7 +105,6 @@ def calculate_adaptive_batch_size(
         "hybrid": 1200,       # Hybrid with custom logic (GPU-optimized)
         "standalone": 1500,   # Zero Presidio, direct model execution
         "regex": 5000,        # Pure regex, zero ML overhead (fastest)
-        "slm": 300            # SLM strategy (LLM calls)
     }
     
     base_size = strategy_base.get(strategy_name, 1000)
@@ -157,7 +156,8 @@ def calculate_adaptive_batch_size(
     # Factor 4: GPU memory (if available)
     if torch is not None:
         try:
-            if torch.cuda.is_available():
+            from .device import cuda_usable
+            if cuda_usable():
                 gpu_mem_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
                 if gpu_mem_gb >= 16:  # High-end GPU
                     base_size = int(base_size * 1.3)
@@ -272,6 +272,10 @@ class FileProcessor(ABC):
             self.ner_file_handle.close()
 
     def _batch_iterator(self, iterator: Iterable, size: int) -> Generator[List, None, None]:
+        if size <= 0:
+            # --batch-size auto leaves -1 until a processor computes a size;
+            # the ones that do not would otherwise get batches of one item.
+            size = DefaultSizes.BATCH_SIZE
         batch = []
         for item in iterator:
             batch.append(item)
@@ -326,20 +330,35 @@ class FileProcessor(ABC):
 
     def _process_anonymization(self, output_path: str):
         with open(output_path, "w", encoding="utf-8") as outfile:
-            text_iterator = self._extract_texts()
-            batch_count = 0
-            for text_batch in self._batch_iterator(text_iterator, self.batch_size):
-                if not text_batch: continue
-                batch_count += 1
-                logging.debug(f"Processing batch {batch_count} for anonymization (size: {len(text_batch)}).")
-                should_anonymize, forced_type = self._should_anonymize(text_batch[0], path="<batch_first_item>") # Heuristic for batch
-                if should_anonymize:
-                    anonymized_batch = self._process_batch_smart(text_batch, forced_entity_type=forced_type)
-                    outfile.write("".join(anonymized_batch))
-                    logging.debug(f"Batch {batch_count} anonymized and written.")
-                else:
-                    outfile.write("".join(text_batch))
-                    logging.debug(f"Batch {batch_count} skipped anonymization and original content written.")
+            for text_batch in self._batch_iterator(self._extract_texts(), self.batch_size):
+                outfile.write("".join(self._anonymize_items(text_batch)))
+
+    def _anonymize_items(self, items: List[str]) -> List[str]:
+        """Anonymize a batch item by item, keeping order.
+
+        Each item gets its own decision. Deciding once per batch, from its first
+        item, wrote the whole batch in clear text whenever that item was a
+        stoplist word, a short line or a number.
+        A trailing line break is kept out of the text sent to the engine.
+        """
+        results = list(items)
+        groups: Dict[Union[str, Tuple[str, ...]], List[int]] = defaultdict(list)
+        bodies: List[str] = []
+        for i, item in enumerate(items):
+            body = item.rstrip("\r\n")
+            bodies.append(body)
+            if not body.strip():
+                continue
+            should, forced_type = self._should_anonymize(body)
+            if should:
+                group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
+                groups[group_key].append(i)
+        for group_key, indices in groups.items():
+            forced_type = None if group_key == "auto" else (list(group_key) if isinstance(group_key, tuple) else group_key)
+            anonymized = self._process_batch_smart([bodies[i] for i in indices], forced_entity_type=forced_type)
+            for i, value in zip(indices, anonymized):
+                results[i] = value + items[i][len(bodies[i]):]
+        return results
 
 
     @abstractmethod
@@ -399,22 +418,21 @@ class FileProcessor(ABC):
         # Implicit mode: anonymize if text passes filters.
         return 'check_text', None
 
-    def _should_anonymize(self, text: str, path: str = "") -> Tuple[bool, Optional[Union[str, List[str]]]]:
-        """
-        Determines if a given text should be anonymized based on configuration and text filters.
+    def _path_decision(self, path: Optional[str]) -> Tuple[str, Optional[Union[str, List[str]]]]:
+        """Config decision for a field path; see _compute_path_decision.
 
-        Uses a two-level approach for performance:
-        1. Path-level decision (cached): config rules based on generalized path
-        2. Text-level filters (always run): min_word_length, numeric, stoplist
+        ``path=None`` marks unstructured content (txt, docx, pdf, images): it has
+        no fields, so field rules do not apply. Rejecting it, as an explicit
+        ``fields_to_anonymize`` config did, left those files in clear text.
         """
+        if path is None or not self.anonymization_config:
+            return 'check_text', None
         current_path = path.lstrip('.')
 
         # --- Force by exact path (includes array indices, not cacheable) ---
-        if self.anonymization_config:
-            force_config = self.anonymization_config.get('force_anonymize', {})
-            if current_path in force_config:
-                entity_type = force_config[current_path].get("entity_type")
-                return True, entity_type
+        force_config = self.anonymization_config.get('force_anonymize', {})
+        if current_path in force_config:
+            return 'force', force_config[current_path].get("entity_type")
 
         # --- Path-level decision (cached by generalized path) ---
         generalized_path = self._PATH_INDEX_RE.sub('', current_path).lstrip('.')
@@ -422,7 +440,31 @@ class FileProcessor(ABC):
         if generalized_path not in self._path_decision_cache:
             self._path_decision_cache[generalized_path] = self._compute_path_decision(generalized_path)
 
-        decision, forced_type = self._path_decision_cache[generalized_path]
+        return self._path_decision_cache[generalized_path]
+
+    def _number_to_anonymize(self, value, path: Optional[str]) -> Tuple[bool, Optional[Union[str, List[str]]]]:
+        """Numbers in structured data are left alone unless the config names
+        their field (force_anonymize, or fields_to_anonymize in explicit mode)."""
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False, None
+        decision, forced_type = self._path_decision(path)
+        if decision == 'force':
+            return True, forced_type
+        explicit = bool(self.anonymization_config) and (
+            'force_anonymize' in self.anonymization_config or 'fields_to_anonymize' in self.anonymization_config)
+        if decision == 'check_text' and explicit:
+            return self._should_anonymize(str(value), path)
+        return False, None
+
+    def _should_anonymize(self, text: str, path: Optional[str] = None) -> Tuple[bool, Optional[Union[str, List[str]]]]:
+        """
+        Determines if a given text should be anonymized based on configuration and text filters.
+
+        Uses a two-level approach for performance:
+        1. Path-level decision (cached): config rules based on generalized path
+        2. Text-level filters (always run): min_word_length, numeric, stoplist
+        """
+        decision, forced_type = self._path_decision(path)
 
         if decision == 'exclude' or decision == 'reject':
             return False, None
@@ -554,7 +596,7 @@ class TextFileProcessor(FileProcessor):
         return ".txt"
 
     def _extract_texts(self) -> Iterable[str]:
-        with open(self.file_path, "r", encoding="utf-8") as f:
+        with open(self.file_path, "r", encoding="utf-8", newline="") as f:
             for line in f:
                 yield line
 
@@ -615,7 +657,7 @@ class TextFileProcessor(FileProcessor):
             seen_texts: Dict[Union[str, Tuple[str, ...]], set] = defaultdict(set)
             all_lines = []
 
-            with open(self.file_path, "r", encoding="utf-8") as f:
+            with open(self.file_path, "r", encoding="utf-8", newline="") as f:
                 for line in f:
                     stripped_line = line.rstrip("\r\n")
                     all_lines.append(line)
@@ -642,34 +684,20 @@ class TextFileProcessor(FileProcessor):
                     anonymized_texts = self._process_batch_smart(unique_texts, forced_entity_type=current_forced_type)
                     translation_map.update(dict(zip(unique_texts, anonymized_texts)))
             
-            # Pass 2: Write output using translation map
-            with open(output_path, "w", encoding="utf-8") as outfile:
+            # Pass 2: Write output using translation map, keeping each line's own ending
+            with open(output_path, "w", encoding="utf-8", newline="") as outfile:
                 for line in all_lines:
                     stripped_line = line.rstrip("\r\n")
                     if stripped_line in translation_map:
-                        outfile.write(translation_map[stripped_line] + '\n')
+                        outfile.write(translation_map[stripped_line] + line[len(stripped_line):])
                     else:
                         outfile.write(line)
         else:
             logging.debug("TXT processing with line context preservation (slower, context-aware).")
             # Original batch processing for context preservation
-            with open(output_path, "w", encoding="utf-8") as outfile:
-                text_iterator = self._extract_texts()
-
-                for text_batch in self._batch_iterator(text_iterator, self.batch_size):
-                    if not text_batch:
-                        continue
-
-                    lines_to_process = [line.rstrip("\r\n") for line in text_batch]
-                    should_anonymize, forced_type = self._should_anonymize(lines_to_process[0])
-                    
-                    if should_anonymize:
-                        anonymized_lines = self._process_batch_smart(lines_to_process, forced_entity_type=forced_type)
-                        for line in anonymized_lines:
-                            outfile.write(line + '\n')
-                    else:
-                        for line in text_batch:
-                            outfile.write(line)
+            with open(output_path, "w", encoding="utf-8", newline="") as outfile:
+                for text_batch in self._batch_iterator(self._extract_texts(), self.batch_size):
+                    outfile.write("".join(self._anonymize_items(text_batch)))
 
 
 class ImageFileProcessor(FileProcessor):
@@ -788,14 +816,7 @@ class DocxFileProcessor(FileProcessor):
             with open(output_path, "w", encoding="utf-8") as outfile:
                 text_iterator = self._extract_texts()
                 for text_batch in self._batch_iterator(text_iterator, self.batch_size):
-                    if not text_batch:
-                        continue
-                    should_anonymize, forced_type = self._should_anonymize(text_batch[0])
-                    if should_anonymize:
-                        anonymized_batch = self._process_batch_smart(text_batch, forced_entity_type=forced_type)
-                        outfile.write("".join(anonymized_batch))
-                    else:
-                        outfile.write("".join(text_batch))
+                    outfile.write("".join(self._anonymize_items(text_batch)))
 
 
 class PdfFileProcessor(FileProcessor):
@@ -919,14 +940,7 @@ class PdfFileProcessor(FileProcessor):
             with open(output_path, "w", encoding="utf-8") as outfile:
                 text_iterator = self._extract_texts()
                 for text_batch in self._batch_iterator(text_iterator, self.batch_size):
-                    if not text_batch:
-                        continue
-                    should_anonymize, forced_type = self._should_anonymize(text_batch[0])
-                    if should_anonymize:
-                        anonymized_batch = self._process_batch_smart(text_batch, forced_entity_type=forced_type)
-                        outfile.write("".join(anonymized_batch))
-                    else:
-                        outfile.write("".join(text_batch))
+                    outfile.write("".join(self._anonymize_items(text_batch)))
 
 
 class CsvFileProcessor(FileProcessor):
@@ -1032,51 +1046,55 @@ class CsvFileProcessor(FileProcessor):
                 progress_bar = tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024,
                                     desc=f"Processing CSV {os.path.basename(self.file_path)}", leave=False,
                                     bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
-                # Global translation map: persists across chunks in cache mode.
-                global_translation_map: Dict[str, str] = {} if use_deduplication else None
+                # Translation maps persist across chunks, one per forced-type group,
+                # so a value gets the same pseudonym in every column that anonymizes it.
+                group_maps: Dict[Union[str, Tuple[str, ...]], Dict[str, str]] = defaultdict(dict)
 
                 for chunk in reader:
                     anonymized_chunk = chunk.copy()
 
                     if use_deduplication:
-                        texts_to_anonymize_map: Dict[Union[str, Tuple[str, ...]], Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
+                        # Values are selected per column: a value that also appears in an
+                        # excluded column must stay untouched there.
+                        column_selection: Dict[str, Dict[str, Union[str, Tuple[str, ...]]]] = defaultdict(dict)
+                        pending: Dict[Union[str, Tuple[str, ...]], set] = defaultdict(set)
                         for col in chunk.columns:
                             for val in chunk[col].dropna().unique():
                                 val_str = str(val)
-                                if global_translation_map is not None and val_str in global_translation_map:
-                                    continue
                                 should_anon, forced_type = self._should_anonymize(val_str, col)
-                                if should_anon:
-                                    group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
-                                    texts_to_anonymize_map[group_key][col].append(val_str)
+                                if not should_anon:
+                                    continue
+                                group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
+                                column_selection[col][val_str] = group_key
+                                if val_str not in group_maps[group_key]:
+                                    pending[group_key].add(val_str)
 
-                        for group_key, cols_data in texts_to_anonymize_map.items():
+                        for group_key, values in pending.items():
                             current_forced_type = group_key if group_key != "auto" else None
                             if isinstance(current_forced_type, tuple): current_forced_type = list(current_forced_type)
+                            unique_texts_for_group = sorted(values)
+                            anonymized_texts = self._process_batch_smart(unique_texts_for_group, forced_entity_type=current_forced_type)
+                            group_maps[group_key].update(zip(unique_texts_for_group, anonymized_texts))
 
-                            unique_texts_for_group = sorted(set(val for sublist in cols_data.values() for val in sublist))
-                            if unique_texts_for_group:
-                                anonymized_texts = self._process_batch_smart(unique_texts_for_group, forced_entity_type=current_forced_type)
-                                global_translation_map.update(dict(zip(unique_texts_for_group, anonymized_texts)))
-
-                        if global_translation_map:
-                            for col in chunk.columns:
-                                anonymized_chunk[col] = anonymized_chunk[col].map(lambda x: global_translation_map.get(str(x), x))
+                        for col, selection in column_selection.items():
+                            mapping = {v: group_maps[g][v] for v, g in selection.items()}
+                            anonymized_chunk[col] = chunk[col].map(lambda x, m=mapping: m.get(x, x) if isinstance(x, str) else x)
                     else:
                         for col in chunk.columns:
                             series = chunk[col].dropna()
-                            if series.empty:
+                            index, values, forced_type = [], [], None
+                            for row_index, val in series.items():
+                                should_anon, value_forced_type = self._should_anonymize(str(val), col)
+                                if should_anon:
+                                    index.append(row_index)
+                                    values.append(str(val))
+                                    forced_type = value_forced_type
+                            if not values:
                                 continue
-
-                            if not any(self._should_anonymize(str(val), col)[0] for val in series):
-                                continue
-
-                            values_to_process = series.tolist()
-                            _, forced_type = self._should_anonymize(values_to_process[0], col)
-                            anonymized_values = self._process_batch_smart(values_to_process, forced_entity_type=forced_type)
-
-                            anonymized_series = pd.Series(anonymized_values, index=series.index)
-                            anonymized_chunk[col].update(anonymized_series)
+                            anonymized_values = self._process_batch_smart(values, forced_entity_type=forced_type)
+                            # Assign through .loc: under pandas 3 copy-on-write, chunk[col].update()
+                            # changes a copy and the output kept the original values.
+                            anonymized_chunk.loc[index, col] = anonymized_values
 
                     anonymized_chunk.to_csv(temp_output_path, mode='a', index=False, header=not header_written, encoding='utf-8')
                     header_written = True
@@ -1153,6 +1171,23 @@ class XlsxFileProcessor(FileProcessor):
                         if should_anon:
                             yield NERTextItem(text=cell.value, path=path, forced_entity_type=forced_type)
 
+    def _xlsx_cell_selection(self, sheet_title: str, cell) -> Optional[Tuple[Union[str, Tuple[str, ...]], str]]:
+        """(group_key, text) when the cell must be anonymized, else None."""
+        value = cell.value
+        if value is None or not hasattr(cell, "column_letter"):
+            return None
+        path = f"{sheet_title}.{cell.column_letter}"
+        if isinstance(value, str):
+            if not value:
+                return None
+            should_anon, forced_type = self._should_anonymize(value, path)
+        else:
+            should_anon, forced_type = self._number_to_anonymize(value, path)
+        if not should_anon:
+            return None
+        group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type or "auto")
+        return group_key, str(value)
+
     def _process_anonymization(self, output_path: str):
         """
         Process an XLSX file in a memory-efficient way.
@@ -1166,7 +1201,7 @@ class XlsxFileProcessor(FileProcessor):
             shutil.copy(self.file_path, output_path) # Copy original on failure to open
             return
 
-        total_rows = sum(sheet.max_row for sheet in read_only_wb.worksheets)
+        total_rows = sum(sheet.max_row or 0 for sheet in read_only_wb.worksheets)
         file_size = os.path.getsize(self.file_path)
         bytes_per_row = file_size / total_rows if total_rows > 0 else 0
 
@@ -1184,17 +1219,16 @@ class XlsxFileProcessor(FileProcessor):
                     for row in sheet.iter_rows():
                         pbar.update(int(bytes_per_row))
                         for cell in row:
-                            if cell.value and isinstance(cell.value, str):
-                                path = f"{sheet.title}.{cell.column_letter}" # type: ignore
-                                should_anon, forced_type = self._should_anonymize(cell.value, path)
-                                if should_anon:
-                                    group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type or "auto")
-                                    all_texts_map[group_key].append(cell.value)
+                            selected = self._xlsx_cell_selection(sheet.title, cell)
+                            if selected:
+                                group_key, text = selected
+                                all_texts_map[group_key].append(text)
         finally:
             read_only_wb.close() # Ensure read-only workbook is closed
 
-        # Anonymize all collected texts at once.
-        translation_map: Dict[str, deque] = defaultdict(deque)
+        # Anonymize all collected texts at once. The map is keyed by group and
+        # text: pass 2 replaces a cell only when its own column selected it.
+        translation_map: Dict[Union[str, Tuple[str, ...]], Dict[str, deque]] = defaultdict(lambda: defaultdict(deque))
         if all_texts_map:
             for group_key, texts in all_texts_map.items():
                 forced_type = group_key if group_key != "auto" else None
@@ -1207,7 +1241,7 @@ class XlsxFileProcessor(FileProcessor):
                 logging.debug(f"Anonymizing {len(strings_to_process)} texts for group '{group_key}' in XLSX.")
                 anonymized_texts = self._process_batch_smart(strings_to_process, forced_entity_type=forced_type)
                 for original, anonymized in zip(strings_to_process, anonymized_texts):
-                    translation_map[original].append(anonymized)
+                    translation_map[group_key][original].append(anonymized)
 
         if not translation_map:
             logging.info("No PII found for anonymization in XLSX. Copying original file.")
@@ -1240,17 +1274,18 @@ class XlsxFileProcessor(FileProcessor):
                             new_cell = write_sheet.cell(row=row_idx, column=col_idx)
                             
                             original_value = cell.value
-                            if isinstance(original_value, str) and original_value in translation_map:
-                                try:
-                                    if use_deduplication:
-                                        new_cell.value = translation_map[original_value][0]
-                                    else:
-                                        new_cell.value = translation_map[original_value].popleft()
-                                except IndexError:
-                                    logging.error(f"Mismatch in anonymized XLSX cell counts for '{original_value}'. Using original value as fallback.")
-                                    new_cell.value = original_value
-                            else:
-                                new_cell.value = original_value
+                            new_cell.value = original_value
+                            selected = self._xlsx_cell_selection(read_sheet.title, cell)
+                            if not selected:
+                                continue
+                            group_key, text = selected
+                            queue = translation_map[group_key].get(text)
+                            if not queue:
+                                raise RuntimeError(f"Mismatch in anonymized XLSX cell counts for a cell of '{read_sheet.title}'; aborting to avoid writing it in clear text.")
+                            replacement = queue[0] if use_deduplication else queue.popleft()
+                            # A numeric cell in which nothing was detected keeps its type.
+                            if replacement != text:
+                                new_cell.value = replacement
         finally:
             read_only_wb.close()
         
@@ -1272,8 +1307,37 @@ class XmlFileProcessor(FileProcessor):
     def _get_output_extension(self) -> str:
         return ".xml"
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Config rules may use XPath-style slashes ("tickets/ticket/notes"); paths
+        # are matched in the dot notation shared with JSON and CSV.
+        cfg = self.anonymization_config
+        for key in ('fields_to_exclude', 'fields_to_anonymize'):
+            if key in cfg:
+                cfg[key] = [rule.strip('/').replace('/', '.') for rule in cfg[key]]
+        if 'force_anonymize' in cfg:
+            cfg['force_anonymize'] = {k.strip('/').replace('/', '.'): v for k, v in cfg['force_anonymize'].items()}
+
+    @staticmethod
+    def _node_name(elem) -> str:
+        if isinstance(elem.tag, str):
+            return etree.QName(elem.tag).localname
+        return "comment()" if isinstance(elem, etree._Comment) else "pi()"
+
     def _get_xpath(self, elem) -> str:
-        return "/".join(e.tag for e in elem.iterancestors()) + "/" + elem.tag
+        """Root-first dot path of local names, e.g. ``tickets.ticket.notes``.
+
+        It used to list the ancestors nearest-first ("ticket/tickets/notes"), so
+        config rules written root-first never matched, and comment nodes (whose
+        tag is not a string) crashed it.
+        """
+        parts = [self._node_name(e) for e in reversed(list(elem.iterancestors()))]
+        parts.append(self._node_name(elem))
+        return ".".join(parts)
+
+    @staticmethod
+    def _attr_path(path: str, key: str) -> str:
+        return f"{path}.@{etree.QName(key).localname}"
 
     def _extract_texts(self) -> Iterable[str]:
         for _, element in etree.iterparse(self.file_path, events=('end',), recover=True, strip_cdata=False):
@@ -1283,12 +1347,12 @@ class XmlFileProcessor(FileProcessor):
                 if should_anon:
                     yield element.text
             if element.tail and element.tail.strip():
-                should_anon, _ = self._should_anonymize(element.tail, path + "/tail()")
+                should_anon, _ = self._should_anonymize(element.tail, path + ".tail()")
                 if should_anon:
                     yield element.tail
             
             for key, value in element.attrib.items():
-                attr_path = f"{path}[@{key}]"
+                attr_path = self._attr_path(path, key)
                 should_anon, _ = self._should_anonymize(value, attr_path)
                 if should_anon:
                     yield value
@@ -1326,7 +1390,7 @@ class XmlFileProcessor(FileProcessor):
                 f.write(f"<!-- Could not parse XML file {os.path.basename(self.file_path)} due to syntax errors. -->")
             return
 
-        use_deduplication = self.orchestrator.cache_manager.use_cache
+        use_deduplication = self.orchestrator.cache_manager.use_cache and not self.preserve_row_context
         text_groups: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
         logging.debug(f"XML processing with deduplication: {use_deduplication}.")
 
@@ -1343,19 +1407,20 @@ class XmlFileProcessor(FileProcessor):
                     text_groups[group_key].append(element.text)
 
             if element.tail and element.tail.strip():
-                should_anon, forced_type = self._should_anonymize(element.tail, path + "/tail()")
+                should_anon, forced_type = self._should_anonymize(element.tail, path + ".tail()")
                 if should_anon:
                     group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
                     text_groups[group_key].append(element.tail)
 
             for key, value in element.attrib.items():
-                attr_path = f"{path}[@{key}]"
+                attr_path = self._attr_path(path, key)
                 should_anon, forced_type = self._should_anonymize(value, attr_path)
                 if should_anon:
                     group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
                     text_groups[group_key].append(value)
 
-        translation_map: Dict[str, deque] = defaultdict(deque)
+        # Keyed by group and text; pass 2 replaces a node only when its own path selected it.
+        translation_map: Dict[Union[str, Tuple[str, ...]], Dict[str, deque]] = defaultdict(lambda: defaultdict(deque))
         for group_key, texts in text_groups.items():
             forced_type = group_key if group_key != "auto" else None
             if isinstance(forced_type, tuple):
@@ -1365,43 +1430,41 @@ class XmlFileProcessor(FileProcessor):
             if not strings_to_process: continue
             anonymized_texts = self._process_batch_smart(strings_to_process, forced_entity_type=forced_type)
             for original, anonymized in zip(strings_to_process, anonymized_texts):
-                translation_map[original].append(anonymized)
+                translation_map[group_key][original].append(anonymized)
 
         if not translation_map:
             logging.info("No PII found for anonymization in XML. Saving original file.")
             tree.write(output_path, encoding="utf-8", xml_declaration=True)
             return
             
+        def replacement(text: str, path: str) -> Optional[str]:
+            should_anon, forced_type = self._should_anonymize(text, path)
+            if not should_anon:
+                return None
+            group_key = tuple(forced_type) if isinstance(forced_type, list) else (forced_type if forced_type is not None else "auto")
+            queue = translation_map[group_key].get(text)
+            if not queue:
+                raise RuntimeError("Mismatch in anonymized XML text counts; aborting to avoid writing it in clear text.")
+            return queue[0] if use_deduplication else queue.popleft()
+
         desc_anon = f"Pass 2/2: Anonymizing {os.path.basename(self.file_path)}"
         for element in tqdm(tree.iter(), desc=desc_anon, unit="node", leave=False,
                            bar_format='{desc}: {n_fmt} nodes [{elapsed}, {rate_fmt}]'):
-            if element.text in translation_map:
-                try:
-                    if use_deduplication:
-                        element.text = translation_map[element.text][0]
-                    else:
-                        element.text = translation_map[element.text].popleft()
-                except IndexError:
-                    logging.error("Mismatch in anonymized XML text counts. Using original value as fallback.")
+            path = self._get_xpath(element)
+            if element.text and element.text.strip():
+                new_text = replacement(element.text, path)
+                if new_text is not None:
+                    element.text = new_text
 
-            if element.tail in translation_map:
-                try:
-                    if use_deduplication:
-                        element.tail = translation_map[element.tail][0]
-                    else:
-                        element.tail = translation_map[element.tail].popleft()
-                except IndexError:
-                    logging.error("Mismatch in anonymized XML tail counts. Using original value as fallback.")
+            if element.tail and element.tail.strip():
+                new_tail = replacement(element.tail, path + ".tail()")
+                if new_tail is not None:
+                    element.tail = new_tail
 
             for key, value in element.attrib.items():
-                if value in translation_map:
-                    try:
-                        if use_deduplication:
-                            element.set(key, translation_map[value][0])
-                        else:
-                            element.set(key, translation_map[value].popleft())
-                    except IndexError:
-                        logging.error("Mismatch in anonymized XML attribute counts. Using original value as fallback.")
+                new_value = replacement(value, self._attr_path(path, key))
+                if new_value is not None:
+                    element.set(key, new_value)
 
         logging.info(f"Anonymized XML file saved to: {output_path}")
         tree.write(output_path, encoding="utf-8", xml_declaration=True)
@@ -1456,7 +1519,7 @@ class JsonFileProcessor(FileProcessor):
         logging.info(f"Starting JSON array streaming for '{self.file_path}' with chunk size {chunk_size}.")
         temp_output_path = output_path + ".tmp"
         file_size = os.path.getsize(self.file_path)
-        use_cache = self.orchestrator.cache_manager.use_cache
+        use_cache = self._use_deduplication()
 
         try:
             with open(self.file_path, 'rb') as in_f, \
@@ -1537,12 +1600,9 @@ class JsonFileProcessor(FileProcessor):
             with open(self.file_path, "rb") as f:
                 try:
                     data = orjson.loads(f.read())
-                except orjson.JSONDecodeError:
-                    logging.error(f"Invalid JSON in {self.file_path}. Aborting.")
-                    with open(temp_output_path, "wb") as out_f:
-                        out_f.write(b"{}")
-                    shutil.move(temp_output_path, output_path)
-                    return
+                except orjson.JSONDecodeError as e:
+                    # Used to write "{}" and report success.
+                    raise ValueError(f"Invalid JSON in {self.file_path}: {e}") from e
 
             text_groups = self._collect_strings_from_object(data)
             path_aware_map = self._build_path_aware_translation_map(text_groups)
@@ -1578,8 +1638,8 @@ class JsonFileProcessor(FileProcessor):
             elif isinstance(sub_obj, list):
                 for i, item in enumerate(sub_obj):
                     _walk(item, f"{current_path}[{i}]")
-            elif isinstance(sub_obj, str):
-                should_anon, forced_type = self._should_anonymize(sub_obj, current_path)
+            elif isinstance(sub_obj, (str, int, float)):
+                should_anon, forced_type = self._json_value_selection(sub_obj, current_path)
                 if should_anon:
                     group_key = "auto"
                     if isinstance(forced_type, str):
@@ -1587,7 +1647,7 @@ class JsonFileProcessor(FileProcessor):
                     elif isinstance(forced_type, list):
                         group_key = tuple(sorted(forced_type))
                     
-                    text_groups[group_key].append(sub_obj)
+                    text_groups[group_key].append(str(sub_obj))
 
         _walk(obj, path_prefix.lstrip('.'))
         return text_groups
@@ -1598,8 +1658,8 @@ class JsonFileProcessor(FileProcessor):
             return {k: self._reconstruct_object(v, path_aware_map, f"{current_path}.{k}") for k, v in obj.items()}
         elif isinstance(obj, list):
             return [self._reconstruct_object(item, path_aware_map, f"{current_path}[{i}]") for i, item in enumerate(obj)]
-        elif isinstance(obj, str):
-            should_anon, group_key_or_list = self._should_anonymize(obj, current_path)
+        elif isinstance(obj, (str, int, float)):
+            should_anon, group_key_or_list = self._json_value_selection(obj, current_path)
             if not should_anon:
                 return obj
 
@@ -1609,18 +1669,23 @@ class JsonFileProcessor(FileProcessor):
             elif isinstance(group_key_or_list, list):
                 final_group_key = tuple(sorted(group_key_or_list))
 
-            if final_group_key in path_aware_map and obj in path_aware_map[final_group_key]:
-                try:
-                    if self.orchestrator.cache_manager.use_cache:
-                        # In cache mode, replacement is static (peek at the first item).
-                        return path_aware_map[final_group_key][obj][0]
-                    else:
-                        # In full context mode, consume from the queue.
-                        return path_aware_map[final_group_key][obj].popleft()
-                except IndexError:
-                    logging.error(f"Mismatch in anonymized string counts for string '{obj}' in group '{final_group_key}'. Using original value as fallback.")
-                    return obj
+            text = str(obj)
+            queue = path_aware_map[final_group_key].get(text) if final_group_key in path_aware_map else None
+            if not queue:
+                raise RuntimeError(f"Mismatch in anonymized string counts in group '{final_group_key}'; aborting to avoid writing it in clear text.")
+            # Dedup mode: static replacement (peek). Full context mode: consume the queue.
+            replacement = queue[0] if self._use_deduplication() else queue.popleft()
+            # A number in which nothing was detected keeps its JSON type.
+            return obj if replacement == text else replacement
         return obj
+
+    def _use_deduplication(self) -> bool:
+        return self.orchestrator.cache_manager.use_cache and not self.preserve_row_context
+
+    def _json_value_selection(self, value, path: str) -> Tuple[bool, Optional[Union[str, List[str]]]]:
+        if isinstance(value, str):
+            return self._should_anonymize(value, path)
+        return self._number_to_anonymize(value, path)
 
     def _build_path_aware_translation_map(self, text_groups: Dict) -> Dict[Union[str, tuple], Dict[str, 'deque']]:
         path_aware_map: Dict[Union[str, tuple], Dict[str, 'deque']] = defaultdict(lambda: defaultdict(deque))
@@ -1628,7 +1693,7 @@ class JsonFileProcessor(FileProcessor):
             logging.debug("No text groups found for translation map.")
             return path_aware_map
 
-        use_deduplication = self.orchestrator.cache_manager.use_cache
+        use_deduplication = self._use_deduplication()
         total_strings = sum(len(v) if not use_deduplication else len(set(v)) for v in text_groups.values())
         if not total_strings:
             logging.debug("No strings to process for translation map.")

@@ -5,10 +5,11 @@ name: Docker image
 # never triggers a build.
 #
 #  - push to main touching image inputs (Dockerfile, entrypoint, src, scripts,
-#    anon.py, deps): rebuild and push BOTH the CPU image (:latest) and the GPU
-#    image (:gpu), keeping them current with the code.
+#    anon.py, deps): rebuild and push the CPU image (:latest) and the two GPU
+#    images (:gpu for CUDA 13.0, :gpu-cu126 for older GPUs/drivers), keeping
+#    them current with the code.
 #  - published release or manual run: same build, plus version-suffixed tags
-#    (:X.Y.Z and :X.Y.Z-gpu).
+#    (:X.Y.Z, :X.Y.Z-gpu and :X.Y.Z-gpu-cu126).
 #
 # README-only changes are handled by dockerhub-readme.yml (description sync, no build).
 #
@@ -22,6 +23,7 @@ on:
     paths:
       - docker/Dockerfile
       - docker/docker-entrypoint.sh
+      - .github/workflows/docker-image.yml
       - src/**
       - scripts/**
       - anon.py
@@ -75,8 +77,34 @@ jobs:
             echo "$IMAGE:gpu"
             if [ "$VER" != "latest" ] && [ -n "$VER" ]; then echo "$IMAGE:$VER-gpu"; fi
             echo "EOF"
+            echo "gpu_cu126<<EOF"
+            echo "$IMAGE:gpu-cu126"
+            if [ "$VER" != "latest" ] && [ -n "$VER" ]; then echo "$IMAGE:$VER-gpu-cu126"; fi
+            echo "EOF"
           } >> "$GITHUB_OUTPUT"
-      - name: Build and push CPU image
+      # The CPU image is built and loaded first, smoke-tested, then pushed from
+      # the same cache.
+      - name: Build CPU image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: production
+          load: true
+          tags: anon-cpu:ci
+          cache-from: type=gha,scope=cpu
+          cache-to: type=gha,mode=max,scope=cpu
+      - name: Smoke test CPU image
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/in" "$RUNNER_TEMP/out"
+          printf 'Contact maria@example.com from 192.168.10.45\n' > "$RUNNER_TEMP/in/s.txt"
+          docker run --rm -e ANON_SECRET_KEY=ci-smoke-key -v "$RUNNER_TEMP/in:/data:ro" -v "$RUNNER_TEMP/out:/app/output" \
+            anon-cpu:ci /data/s.txt --anonymization-strategy regex --db-mode in-memory
+          cat "$RUNNER_TEMP/out/anon_s.txt"
+          ! grep -E 'maria@example.com|192\.168\.10\.45' "$RUNNER_TEMP/out/anon_s.txt"
+          docker run --rm --entrypoint python anon-cpu:ci -c "import spacy; assert spacy.util.is_package('pt_core_news_lg')"
+      - name: Push CPU image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -84,17 +112,33 @@ jobs:
           target: production
           push: true
           tags: ${{ steps.tags.outputs.cpu }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Build and push GPU image
-        # ~3 GB image, built on every image-input change too (not just releases),
-        # so :gpu stays current with the code. This makes the job take longer.
+          cache-from: type=gha,scope=cpu
+      # Two GPU builds, chosen per host by docker/run.sh --gpu: CUDA 13.0 (:gpu,
+      # driver 580+, RTX 20xx or newer, needed for RTX 50xx) and CUDA 12.6
+      # (:gpu-cu126, older GPUs and drivers). Built on every image-input change
+      # too (not just releases), so they stay current with the code; this makes
+      # the job take longer. The Dockerfile fails the build if torch has no CUDA.
+      - name: Build and push GPU image (CUDA 13.0)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
           target: gpu
+          build-args: TORCH_CUDA=cu130
           push: true
           tags: ${{ steps.tags.outputs.gpu }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=gpu
+          cache-to: type=gha,mode=max,scope=gpu
+      - name: Free runner disk between GPU builds
+        run: docker buildx prune -af || true
+      - name: Build and push GPU image (CUDA 12.6)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: gpu
+          build-args: TORCH_CUDA=cu126
+          push: true
+          tags: ${{ steps.tags.outputs.gpu_cu126 }}
+          cache-from: type=gha,scope=gpu-cu126
+          cache-to: type=gha,mode=max,scope=gpu-cu126

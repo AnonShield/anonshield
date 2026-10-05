@@ -20,7 +20,7 @@ Any alternative approaches you have considered or tried.
 
 ## Extension point (if applicable)
 
-Which extension point would this touch? (e.g., new `FileProcessor`, new `AnonymizationStrategy`, new `SLMClient` backend, new entity type)
+Which extension point would this touch? (e.g., new `FileProcessor`, new `AnonymizationStrategy`, new entity type)
 
 ## Additional context
 

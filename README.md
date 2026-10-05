@@ -89,7 +89,6 @@ Choose with `--anonymization-strategy` (CLI) or the strategy selector (web).
 | **`standalone`** | Direct transformer inference | Highest throughput for large batches |
 | **`presidio`** | The full Presidio pipeline | Maximum entity coverage |
 | **`regex`** | Pure regular expressions, no model is loaded | Fastest path; ideal for structured data and CI pipelines |
-| **`slm`** (experimental) | Small language model via a local Ollama container | Research and experimentation |
 
 ## NER models
 
@@ -159,7 +158,7 @@ Anonymized files are written to `output/` (configurable with `--output-dir`), an
 
 | Flag | Purpose |
 |---|---|
-| `--anonymization-strategy` | `filtered` (default), `hybrid`, `standalone`, `presidio`, `regex`, `slm` |
+| `--anonymization-strategy` | `filtered` (default), `hybrid`, `standalone`, `presidio`, `regex` |
 | `--transformer-model` | NER model to load |
 | `--entities` / `--preserve-entities` | Anonymize only these types / keep these types untouched |
 | `--allow-list` | Terms that must never be anonymized |

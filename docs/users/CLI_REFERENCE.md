@@ -26,9 +26,7 @@ This document covers every command-line option available in AnonShield. Each arg
 8. [Database Options](#8-database-options)
 9. [Chunking and Batching Options](#9-chunking-and-batching-options)
 10. [NER Data Generation Options](#10-ner-data-generation-options)
-11. [SLM / AI Options (Experimental)](#11-slm--ai-options-experimental)
-12. [Ollama Service Options (Experimental)](#12-ollama-service-options-experimental)
-13. [Quick Reference Table](#13-quick-reference-table)
+11. [Quick Reference Table](#11-quick-reference-table)
 
 ---
 
@@ -275,7 +273,9 @@ Output filenames always follow the pattern `anon_<original_filename>.<ext>`.
 ./docker/run.sh ./report.txt --preserve-entities "LOCATION,ORGANIZATION"
 ```
 
-> **Tip:** Use `--list-entities` to see all valid entity type names.
+A preserved value keeps its place: if another recognizer also matches it (an IP address that also looks like a phone number, for example), it is not anonymized under that other label.
+
+> **Tip:** Use `--list-entities` to see all valid entity type names (add `--lang pt` to include the Brazilian types such as `BR_CPF`).
 
 ---
 
@@ -298,7 +298,7 @@ Use `--entities` when you want to anonymize only a specific, known set of types 
   --entities "CPF,CNPJ"
 ```
 
-> **Note:** `--entities` takes priority over `--preserve-entities`. If both are set, `--entities` wins.
+> **Note:** `--entities` takes priority over `--preserve-entities`. If both are set, `--entities` wins. Labels from `--word-list` and `--custom-patterns` (`PROJECT`, `TICKET_ID`, ...) are valid here too.
 
 ---
 
@@ -317,6 +317,8 @@ Use `--entities` when you want to anonymize only a specific, known set of types 
 # Multiple terms with spaces: quote the whole list
 ./docker/run.sh ./report.txt --allow-list "John Doe,127.0.0.1,internal-only"
 ```
+
+Matching is exact and case-sensitive. Everything detected inside an allowed term is kept too: allowing `maria@example.com` keeps the whole address, not just the `EMAIL_ADDRESS` match (the hostname pattern would otherwise still replace `example.com`).
 
 ---
 
@@ -360,7 +362,14 @@ When the tool replaces a name like `John Smith`, it generates a tag like `[PERSO
 | `fields_to_anonymize` | Only these fields run through NER inference |
 | `force_anonymize` | These fields are always anonymized as a specific entity type, skipping NER entirely |
 
-Fields are specified using **dot notation** (e.g., `asset.ipv4_addresses`).
+Fields are specified using **dot notation** (e.g., `asset.ipv4_addresses`):
+
+- **CSV:** the column name (`email`).
+- **XLSX:** sheet name and column letter (`Sheet1.C`).
+- **JSON/JSONL:** the key path, array indices omitted (`tickets.reporter.email`).
+- **XML:** the element path from the root (`tickets.ticket.notes`); attributes as `tickets.ticket.@reporter`, comments as `tickets.ticket.comment()`. XPath-style slashes (`tickets/ticket/notes`) are accepted too.
+
+Numeric values (JSON numbers, numeric XLSX cells) are anonymized only when their field is listed in `force_anonymize` or `fields_to_anonymize`. Field rules apply to structured files only; text, PDF, DOCX and image files in the same run are processed as usual.
 
 **Example config file (`anon_config.json`):**
 
@@ -552,7 +561,7 @@ JSON format is also accepted (same fields, wrapped in an array).
 
 **Default:** off
 
-**What it does:** For CSV and XLSX files, the tool by default groups identical values across rows and processes each unique value only once (much faster). With `--preserve-row-context`, every cell value is processed in full, which is slower but ensures that the surrounding column context is preserved for each row.
+**What it does:** By default the tool groups identical values (CSV/XLSX cells, text lines, PDF/DOCX blocks, JSON/XML strings) and processes each unique value only once (much faster). With `--preserve-row-context`, every occurrence is processed on its own, which is slower but keeps each value in its own context.
 
 ```bash
 ./docker/run.sh ./dataset.csv --preserve-row-context
@@ -637,7 +646,6 @@ JSON format is also accepted (same fields, wrapped in an array).
 | `hybrid` | Presidio detection + manual text replacement (no Presidio anonymizer) | When Presidio's anonymizer causes issues |
 | `standalone` | Loads NER models directly, bypasses Presidio entirely | **Maximum GPU throughput (4× faster)** |
 | `regex` | Pure regex only, zero NLP/NER model loading | **Fastest of all; domain-specific pipelines with `--custom-patterns`** |
-| `slm` | End-to-end anonymization using a local language model (Ollama) | Experimental / research use |
 
 **Performance comparison, GPU (NVIDIA RTX 5060 Ti, 551 MB JSON, 70,951 records):**
 
@@ -669,8 +677,6 @@ JSON format is also accepted (same fields, wrapped in an array).
   --anonymization-strategy regex \
   --custom-patterns examples/patterns/banking_pt.yaml
 
-# Experimental: use a local LLM (requires Ollama)
-./docker/run.sh ./report.txt --anonymization-strategy slm
 ```
 
 > **Recommendation:** Use `filtered` for accuracy. Use `standalone` on GPU for large datasets. Use `regex` when you have domain-specific patterns and do not need NER.
@@ -910,184 +916,7 @@ These options switch the tool from *anonymization mode* into *NER training data 
 
 ---
 
-## 11. SLM / AI Options (Experimental)
-
-These options use a **Small Language Model (SLM)** running locally via [Ollama](https://ollama.com/) to assist with entity detection or anonymization. They are experimental and intended for research use.
-
-> **Prerequisite:** Ollama must be installed and running, or the tool must be allowed to manage an Ollama Docker container (`--no-auto-ollama` disabled).
-
----
-
-### `--slm-map-entities`
-
-**What it does:** Uses the SLM to scan a file and produce a detailed report of all potential entities, including confidence scores and the model's reasoning for each detection. **Does not anonymize**, only maps and reports.
-
-Output files:
-- `<name>_entity_map.jsonl`: one JSON object per entity
-- `<name>_entity_map.csv`: same data in spreadsheet format
-
-```bash
-./docker/run.sh ./report.txt --slm-map-entities --output-dir ./entity_analysis/
-```
-
----
-
-### `--slm-detector`
-
-**What it does:** Adds the SLM as an additional entity detector alongside the standard transformer NER model. The SLM results are merged with the traditional NER results.
-
-```bash
-./docker/run.sh ./report.txt --slm-detector
-```
-
----
-
-### `--slm-detector-mode <mode>`
-
-**Default:** `hybrid`
-
-**What it does:** Controls how SLM detections are combined with traditional NER results.
-
-| Mode | Behavior |
-|------|---------|
-| `hybrid` | Merges SLM and traditional NER results (more detections) |
-| `exclusive` | Uses only SLM results, ignoring the transformer model |
-
-```bash
-./docker/run.sh ./report.txt --slm-detector --slm-detector-mode exclusive
-```
-
----
-
-### `--slm-prompt-version <version>`
-
-**Default:** `v1`
-
-**What it does:** Selects which prompt template version to use for SLM tasks.
-
-```bash
-./docker/run.sh ./report.txt --slm-map-entities --slm-prompt-version v2
-```
-
----
-
-### `--slm-chunk-size <n>`
-
-**Default:** `2000` (characters)
-
-**What it does:** Maximum character length of each text chunk sent to the SLM mapper.
-
-```bash
-./docker/run.sh ./report.txt --slm-map-entities --slm-chunk-size 1500
-```
-
----
-
-### `--slm-anonymizer-chunk-size <n>`
-
-**Default:** `3000` (characters)
-
-**What it does:** Maximum character length of each text chunk sent to the SLM anonymizer (used with `--anonymization-strategy slm`).
-
-```bash
-./docker/run.sh ./report.txt --anonymization-strategy slm --slm-anonymizer-chunk-size 2000
-```
-
----
-
-### `--slm-confidence-threshold <n>`
-
-**Default:** `0.7`
-
-**What it does:** Minimum confidence score (0.0 to 1.0) for an entity detected by the SLM to be accepted. Entities with lower confidence are discarded.
-
-```bash
-# Only accept very high-confidence detections
-./docker/run.sh ./report.txt --slm-map-entities --slm-confidence-threshold 0.9
-```
-
----
-
-### `--slm-context-window <n>`
-
-**Default:** `200` (characters)
-
-**What it does:** The number of characters before and after each detected entity to include as context in the SLM mapper output. Larger windows give more surrounding context.
-
-```bash
-./docker/run.sh ./report.txt --slm-map-entities --slm-context-window 400
-```
-
----
-
-### `--slm-temperature <n>`
-
-**Default:** `0.0`
-
-**What it does:** Controls the randomness of the SLM's output. `0.0` is fully deterministic (best for structured tasks). Higher values produce more varied output.
-
-```bash
-./docker/run.sh ./report.txt --slm-map-entities --slm-temperature 0.1
-```
-
----
-
-## 12. Ollama Service Options (Experimental)
-
-These options control how the tool manages the Ollama service that runs the local SLM.
-
----
-
-### `--no-auto-ollama`
-
-**Default:** off (auto-management is enabled)
-
-**What it does:** Disables automatic Ollama Docker container management. By default, the tool starts an Ollama container if one is not already running. With this flag, you must start Ollama manually before running the tool.
-
-```bash
-# You started Ollama yourself; tell the tool not to touch it
-./docker/run.sh ./report.txt --slm-map-entities --no-auto-ollama
-```
-
----
-
-### `--ollama-docker-image <image>`
-
-**Default:** `ollama/ollama:latest`
-
-**What it does:** Specifies which Docker image to use when the tool starts an Ollama container automatically.
-
-```bash
-./docker/run.sh ./report.txt --slm-map-entities --ollama-docker-image ollama/ollama:0.3.0
-```
-
----
-
-### `--ollama-container-name <name>`
-
-**Default:** `ollama-anon`
-
-**What it does:** Sets the name of the Ollama Docker container managed by the tool.
-
-```bash
-./docker/run.sh ./report.txt --slm-map-entities --ollama-container-name my-ollama
-```
-
----
-
-### `--ollama-no-gpu`
-
-**Default:** off (GPU is used if available)
-
-**What it does:** Disables GPU support when starting the Ollama Docker container. Use this if your GPU is not compatible or you want the SLM to run on CPU.
-
-```bash
-./docker/run.sh ./report.txt --slm-map-entities --ollama-no-gpu
-```
-
----
-
-## 13. Quick Reference Table
+## 11. Quick Reference Table
 
 | Argument | Default | Description |
 |----------|---------|-------------|
@@ -1117,7 +946,7 @@ These options control how the tool manages the Ollama service that runs the loca
 | `--regex-priority` | off | Prioritize regex over model detections |
 | `--force-large-xml` | off | Override XML memory safety limits |
 | `--disable-gc` | off | Disable Python garbage collection |
-| `--anonymization-strategy` | `filtered` | Detection engine: `filtered` `presidio` `hybrid` `standalone` `regex` `slm` |
+| `--anonymization-strategy` | `filtered` | Detection engine: `filtered` `presidio` `hybrid` `standalone` `regex` |
 | `--ocr-engine` | `tesseract` | OCR engine (Tesseract) |
 | `--transformer-model` | `Davlan/xlm-roberta-base-ner-hrl` | NER model to use |
 | `--db-mode` | `persistent` | Database mode: `persistent` or `in-memory` |
@@ -1132,16 +961,3 @@ These options control how the tool manages the Ollama service that runs the loca
 | `--generate-ner-data` | off | Generate NER training data instead of anonymizing |
 | `--ner-include-all` | off | Include texts with no detected entities in NER output |
 | `--ner-aggregate-record` | off | Merge JSON/JSONL record fields into one text line |
-| `--slm-map-entities` | off | Map entities with SLM (no anonymization) |
-| `--slm-detector` | off | Use SLM as an additional entity detector |
-| `--slm-detector-mode` | `hybrid` | `hybrid` or `exclusive` |
-| `--slm-prompt-version` | `v1` | Prompt template version for SLM |
-| `--slm-chunk-size` | `2000` | Max chars per SLM mapper chunk |
-| `--slm-anonymizer-chunk-size` | `3000` | Max chars per SLM anonymizer chunk |
-| `--slm-confidence-threshold` | `0.7` | Minimum SLM confidence to accept an entity |
-| `--slm-context-window` | `200` | Context characters around each entity in SLM output |
-| `--slm-temperature` | `0.0` | SLM output randomness (0 = deterministic) |
-| `--no-auto-ollama` | off | Disable automatic Ollama Docker management |
-| `--ollama-docker-image` | `ollama/ollama:latest` | Ollama Docker image |
-| `--ollama-container-name` | `ollama-anon` | Ollama container name |
-| `--ollama-no-gpu` | off | Disable GPU for Ollama container |

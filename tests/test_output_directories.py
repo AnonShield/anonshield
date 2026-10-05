@@ -4,10 +4,8 @@ import subprocess
 import sys
 import tempfile
 import shutil
-import json
 import sqlite3
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 class TestOutputDirectories(unittest.TestCase):
     def setUp(self):
@@ -16,11 +14,6 @@ class TestOutputDirectories(unittest.TestCase):
         self.output_dir = self.original_cwd / "output"
 
         # Create dummy input files
-        self.entity_map_path = self.test_dir / "entity_map.jsonl"
-        with open(self.entity_map_path, "w") as f:
-            f.write('{"entity_type": "URL", "text": "http://example.com"}\n')
-            f.write('{"entity_type": "PERSON", "text": "John Doe"}\n')
-
         self.text_to_anonymize_path = self.test_dir / "text_to_anonymize.txt"
         with open(self.text_to_anonymize_path, "w") as f:
             f.write("My name is John Doe and my email is john.doe@example.com.")
@@ -91,28 +84,6 @@ class TestOutputDirectories(unittest.TestCase):
 
         self.assertTrue(expected_dir.is_dir())
         self.assertTrue(expected_file.is_file())
-
-    @patch('scripts.slm_regex_generator.get_slm_client')
-    def test_slm_regex_generator_output(self, mock_get_slm_client):
-        mock_client = MagicMock()
-        mock_client.query_json.return_value = {"regex": ".*"}
-        mock_get_slm_client.return_value = mock_client
-
-        from scripts import slm_regex_generator
-        
-        with patch.object(sys, 'argv', ['scripts/slm_regex_generator.py', str(self.entity_map_path)]):
-            slm_regex_generator.main()
-
-        expected_dir = self.output_dir / "slm_regex_generator"
-        expected_file = expected_dir / "slm_regex_report.json"
-
-        self.assertTrue(expected_dir.is_dir())
-        self.assertTrue(expected_file.is_file())
-
-        with open(expected_file, "r") as f:
-            data = json.load(f)
-            self.assertIn("URL", data)
-            self.assertEqual(data["URL"]["slm_response"]["regex"], ".*")
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,7 +13,6 @@ lang: en
 #   hybrid     - Presidio detection + custom replacement (GPU-optimized)
 #   standalone - Zero Presidio, direct model execution (fastest with NER)
 #   regex      - Pure regex only, zero NLP/ML overhead (fastest of all)
-#   slm        - End-to-end Small Language Model (experimental)
 strategy: filtered
 
 # NER transformer model (HuggingFace model ID)

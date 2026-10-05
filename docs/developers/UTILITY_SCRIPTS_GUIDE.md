@@ -6,8 +6,6 @@ This document provides an overview of the utility scripts located in the `script
 - [Database & Core Function Scripts](#database--core-function-scripts)
   - [`deanonymize.py`](#deanonymizepy)
   - [`export_and_clear_db.py`](#export_and_clear_dbpy)
-- [Experimental Scripts](#experimental-scripts)
-  - [`slm_regex_generator.py`](#slm_regex_generatorpy)
 
 ---
 
@@ -39,19 +37,4 @@ These scripts interact directly with the anonymization engine's database.
 
   # Export and clear
   uv run scripts/export_and_clear_db.py --clear
-  ```
-
----
-
-## Experimental Scripts
-
-### `slm_regex_generator.py`
-
-- **Purpose:** [Experimental] Automates regular expression creation. It takes an entity map file (generated via `--slm-map-entities`), groups entities by type, and uses an SLM to suggest regex patterns.
-- **Arguments:**
-  - `file_path`: (Required) Path to the entity map `.json` or `.jsonl` file.
-  - `--output-file`: Path to save the output JSON report. Default: `slm_regex_report.json`.
-- **Usage:**
-  ```bash
-  uv run scripts/slm_regex_generator.py output/my_entity_map.jsonl
   ```

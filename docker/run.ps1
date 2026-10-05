@@ -112,10 +112,30 @@ $null = New-Item -ItemType Directory -Force -Path $DbDir
 # ---------------------------------------------------------------------------
 # Select image
 # ---------------------------------------------------------------------------
+# The GPU image comes in two PyTorch builds: :gpu (CUDA 13.0) needs NVIDIA
+# driver 580+ and an RTX 20xx or newer (CUDA 13 dropped older GPUs; RTX 50xx
+# needs it); :gpu-cu126 (CUDA 12.6) covers older GPUs and drivers.
+# $env:ANON_GPU_IMAGE overrides the choice.
+function Get-GpuImage {
+    $info = $null
+    try { $info = (& nvidia-smi --query-gpu=compute_cap,driver_version --format=csv,noheader 2>$null | Select-Object -First 1) } catch { }
+    if (-not $info -or $info -notmatch '^\s*(\d+)\.(\d+)\s*,\s*(\d+)') {
+        Write-Info "Could not read the GPU from nvidia-smi; using anonshield/anon:gpu"
+        return "anonshield/anon:gpu"
+    }
+    $cc = [int]$Matches[1] * 10 + [int]$Matches[2]
+    $driverMajor = [int]$Matches[3]
+    if ($cc -ge 75 -and $driverMajor -ge 580) { return "anonshield/anon:gpu" }
+    if ($cc -ge 100) {
+        Write-Info "This GPU needs NVIDIA driver 580+ for GPU inference (driver $driverMajor); it will run on CPU"
+    }
+    return "anonshield/anon:gpu-cu126"
+}
+
 if ($UseGpu) {
-    $Image    = "anonshield/anon:gpu"
+    $Image    = if ($env:ANON_GPU_IMAGE) { $env:ANON_GPU_IMAGE } else { Get-GpuImage }
     $GpuFlags = [string[]]@("--gpus", "all")
-    Write-Info "Using GPU image"
+    Write-Info "Using GPU image $Image"
 } else {
     $Image    = "anonshield/anon:latest"
     $GpuFlags = [string[]]@()
@@ -140,13 +160,36 @@ if ($IsInfoCmd) {
 # Each local path gets its own volume mount:
 #   input file/dir  → /anon_input[/filename]
 #   --output-dir    → /anon_output
-#   --anonymization-config → /anon_config/filename
-#   --word-list     → /anon_wordlist/filename
+#   --anonymization-config, --word-list, --custom-patterns, --config
+#                   → /anon_files/<n>/filename
 # ---------------------------------------------------------------------------
 $Volumes    = [System.Collections.Generic.List[string]]::new()
 $Volumes.AddRange([string[]]@("-v", "${ModelsDir}:/app/models", "-v", "${DbDir}:/app/db"))
 
 $NewArgs    = [System.Collections.Generic.List[string]]::new()
+
+# anon.py flags that take no value (store_true / store_false)
+$BoolFlags = @("--help", "--list-entities", "--list-languages", "--overwrite", "--no-report",
+    "--preserve-row-context", "--optimize", "--use-cache", "--no-use-cache", "--skip-numeric",
+    "--regex-priority", "--disable-gc", "--force-large-xml", "--generate-ner-data", "--ner-include-all",
+    "--ner-aggregate-record", "--use-datasets")
+# Flags whose value is a file on the host: its directory is mounted read-only
+$FileFlags = @("--anonymization-config", "--word-list", "--custom-patterns", "--config")
+$script:FileMounts = 0
+function Add-FileArg([string]$flag, [string]$val) {
+    $hostPath = Get-HostPath $val
+    if (-not (Test-Path $hostPath -PathType Leaf)) {
+        Write-Err "File not found for ${flag}: $val"
+        exit 1
+    }
+    $script:FileMounts++
+    $mnt  = "/anon_files/$($script:FileMounts)"
+    $dir  = Split-Path $hostPath -Parent
+    $leaf = Split-Path $hostPath -Leaf
+    $Volumes.AddRange([string[]]@("-v", "${dir}:${mnt}:ro"))
+    $NewArgs.AddRange([string[]]@($flag, "$mnt/$leaf"))
+}
+
 $InputSet   = $false
 $OutputSet  = $false
 $OutputHost = ""
@@ -174,45 +217,24 @@ while ($i -lt $ScriptArgs.Count) {
         $OutputSet  = $true
         $OutputHost = $hostPath
 
-    } elseif ($arg -eq "--anonymization-config") {
+    } elseif ($FileFlags -contains $arg) {
         $i++
-        $val  = $ScriptArgs[$i]
-        $hostPath = Get-HostPath $val
-        $dir  = Split-Path $hostPath -Parent
-        $leaf = Split-Path $hostPath -Leaf
-        $Volumes.AddRange([string[]]@("-v", "${dir}:/anon_config:ro"))
-        $NewArgs.AddRange([string[]]@("--anonymization-config", "/anon_config/$leaf"))
+        if ($i -ge $ScriptArgs.Count) { Write-Err "$arg needs a file path."; exit 1 }
+        Add-FileArg $arg $ScriptArgs[$i]
 
-    } elseif ($arg -like "--anonymization-config=*") {
-        $val  = $arg.Substring("--anonymization-config=".Length)
-        $hostPath = Get-HostPath $val
-        $dir  = Split-Path $hostPath -Parent
-        $leaf = Split-Path $hostPath -Leaf
-        $Volumes.AddRange([string[]]@("-v", "${dir}:/anon_config:ro"))
-        $NewArgs.Add("--anonymization-config=/anon_config/$leaf")
+    } elseif ($arg -like "--*=*" -and ($FileFlags -contains $arg.Split("=", 2)[0])) {
+        $parts = $arg.Split("=", 2)
+        Add-FileArg $parts[0] $parts[1]
 
-    } elseif ($arg -eq "--word-list") {
-        $i++
-        $val  = $ScriptArgs[$i]
-        $hostPath = Get-HostPath $val
-        $dir  = Split-Path $hostPath -Parent
-        $leaf = Split-Path $hostPath -Leaf
-        $Volumes.AddRange([string[]]@("-v", "${dir}:/anon_wordlist:ro"))
-        $NewArgs.AddRange([string[]]@("--word-list", "/anon_wordlist/$leaf"))
-
-    } elseif ($arg -like "--word-list=*") {
-        $val  = $arg.Substring("--word-list=".Length)
-        $hostPath = Get-HostPath $val
-        $dir  = Split-Path $hostPath -Parent
-        $leaf = Split-Path $hostPath -Leaf
-        $Volumes.AddRange([string[]]@("-v", "${dir}:/anon_wordlist:ro"))
-        $NewArgs.Add("--word-list=/anon_wordlist/$leaf")
+    } elseif ($arg -like "--*=*") {
+        $NewArgs.Add($arg)
 
     } elseif ($arg -like "--*") {
-        # Pass through flag unchanged; if the next token is a value (not a flag), carry it too
+        # Flags that take a value carry the next token; boolean flags do not
+        # (treating "--overwrite file.csv" as flag + value swallowed the input path)
         $NewArgs.Add($arg)
         $next = $i + 1
-        if ($next -lt $ScriptArgs.Count -and -not $ScriptArgs[$next].StartsWith("--")) {
+        if (-not ($BoolFlags -contains $arg) -and $next -lt $ScriptArgs.Count) {
             $i++
             $NewArgs.Add($ScriptArgs[$i])
         }

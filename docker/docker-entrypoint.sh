@@ -9,7 +9,6 @@
 # Environment Variables:
 #   ANON_LAZY_LOADING  - Enable lazy loading (default: 1)
 #   ANON_PRELOAD       - Comma-separated list of models to preload
-#   OLLAMA_BASE_URL    - Ollama service URL (default: http://ollama:11434)
 #   ANON_SECRET_KEY    - Secret key for anonymization
 #
 # =============================================================================
@@ -44,12 +43,17 @@ log_error() {
 # =============================================================================
 
 needs_spacy_model() {
-    # spaCy is needed for all NER operations (unless --slm-only mode in future)
+    # spaCy is needed for all NER operations
     # Check if we're doing any anonymization or NER
     local args="$*"
 
     # If just --help, --list-entities, etc., no models needed
     if [[ "$args" == *"--help"* ]] || [[ "$args" == *"--list-entities"* ]] || [[ "$args" == *"--list-languages"* ]]; then
+        return 1
+    fi
+
+    # Regex-only anonymization runs without NLP models
+    if [[ "$args" =~ --anonymization-strategy[=\ ]regex ]] && [[ "$args" != *"--generate-ner-data"* ]]; then
         return 1
     fi
 
@@ -66,8 +70,9 @@ needs_spacy_model() {
 needs_transformer_model() {
     local args="$*"
 
-    # Not needed for SLM-only mode
-    if [[ "$args" == *"--anonymization-strategy slm"* ]] || [[ "$args" == *"--anonymization-strategy=slm"* ]]; then
+    # Not needed for regex-only mode, nor for NER data generation (which runs
+    # on the spaCy pipeline)
+    if [[ "$args" =~ --anonymization-strategy[=\ ]regex ]] || [[ "$args" == *"--generate-ner-data"* ]]; then
         return 1
     fi
 
@@ -86,15 +91,15 @@ needs_transformer_model() {
     return 1
 }
 
-needs_ollama() {
+get_transformer_model() {
     local args="$*"
+    local model="Davlan/xlm-roberta-base-ner-hrl"
 
-    # Check for SLM-related flags
-    if [[ "$args" == *"--slm-"* ]] || [[ "$args" == *"--anonymization-strategy slm"* ]] || [[ "$args" == *"--anonymization-strategy=slm"* ]]; then
-        return 0
+    if [[ "$args" =~ --transformer-model[=\ ]([^ ]+) ]]; then
+        model="${BASH_REMATCH[1]}"
     fi
 
-    return 1
+    echo "$model"
 }
 
 get_language() {
@@ -138,21 +143,39 @@ ensure_spacy_model() {
 
 ensure_transformer_model() {
     local model="$1"
-    local model_dir="/app/models/$model"
 
     log_info "Checking transformer model: $model"
 
-    # Check if model files exist
-    if [[ -d "$model_dir" ]] && find "$model_dir" -name "*.safetensors" -o -name "*.bin" 2>/dev/null | grep -q .; then
+    # The model goes to the Hugging Face cache (HF_HOME=/app/models/huggingface,
+    # on the models volume), which is where transformers loads it from. It used
+    # to go to /app/models/<id>, which nothing read, so every run downloaded it
+    # again into the container's throwaway home.
+    # Cached = config plus weights present (the download skips formats that are
+    # not needed, so the snapshot is not "complete" by huggingface_hub's measure).
+    if ANON_MODEL="$model" /app/.venv/bin/python -c "
+import os, sys
+from huggingface_hub import try_to_load_from_cache
+repo = os.environ['ANON_MODEL']
+cached = lambda f: isinstance(try_to_load_from_cache(repo, f), str)
+weights = ('model.safetensors', 'model.safetensors.index.json', 'pytorch_model.bin', 'pytorch_model.bin.index.json')
+sys.exit(0 if cached('config.json') and any(cached(w) for w in weights) else 1)
+" >/dev/null 2>&1; then
         log_success "Transformer model '$model' is available"
         return 0
     fi
 
     log_warn "Transformer model '$model' not found. Downloading..."
 
-    if /app/.venv/bin/python -c "
-from huggingface_hub import snapshot_download
-snapshot_download(repo_id='$model', cache_dir='$model_dir', max_workers=4)
+    # Only the PyTorch weights are fetched, and only the safetensors copy when
+    # the repo has one (transformers loads that; many repos also carry a .bin).
+    if ANON_MODEL="$model" /app/.venv/bin/python -c "
+import os
+from huggingface_hub import list_repo_files, snapshot_download
+repo = os.environ['ANON_MODEL']
+ignore = ['*.h5', '*.msgpack', '*.onnx', '*.ot', 'onnx/*', 'flax_model*', 'tf_model*', 'rust_model*']
+if any(f.endswith('.safetensors') for f in list_repo_files(repo)):
+    ignore += ['*.bin', '*.pt', '*.pth']
+snapshot_download(repo_id=repo, max_workers=4, ignore_patterns=ignore)
 print('Download complete')
 "; then
         log_success "Transformer model '$model' downloaded successfully"
@@ -161,57 +184,6 @@ print('Download complete')
         log_error "Failed to download transformer model '$model'"
         return 1
     fi
-}
-
-wait_for_ollama() {
-    local url="${OLLAMA_BASE_URL:-http://ollama:11434}"
-    local max_attempts=30
-    local attempt=1
-
-    log_info "Waiting for Ollama service at $url..."
-
-    while [[ $attempt -le $max_attempts ]]; do
-        if curl -s "$url/api/tags" > /dev/null 2>&1; then
-            log_success "Ollama service is ready"
-            return 0
-        fi
-
-        log_info "Waiting for Ollama... (attempt $attempt/$max_attempts)"
-        sleep 2
-        ((attempt++))
-    done
-
-    log_error "Ollama service not available after $max_attempts attempts"
-    return 1
-}
-
-ensure_ollama_model() {
-    local model="${OLLAMA_MODEL:-llama3}"
-    local url="${OLLAMA_BASE_URL:-http://ollama:11434}"
-
-    log_info "Checking Ollama model: $model"
-
-    # Check if model exists
-    local models=$(curl -s "$url/api/tags" 2>/dev/null | grep -o '"name":"[^"]*"' | cut -d'"' -f4)
-
-    if echo "$models" | grep -q "^$model"; then
-        log_success "Ollama model '$model' is available"
-        return 0
-    fi
-
-    log_warn "Ollama model '$model' not found. Pulling..."
-
-    # Pull the model with progress
-    curl -s "$url/api/pull" -d "{\"name\": \"$model\"}" | while read -r line; do
-        local status=$(echo "$line" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-        if [[ -n "$status" ]]; then
-            echo -ne "\r${BLUE}[ollama]${NC} $status                    "
-        fi
-    done
-    echo ""
-
-    log_success "Ollama model '$model' pulled successfully"
-    return 0
 }
 
 # =============================================================================
@@ -234,9 +206,6 @@ handle_preload() {
                 ;;
             transformer:*) 
                 ensure_transformer_model "${model#transformer:}"
-                ;;
-            ollama:*) 
-                wait_for_ollama && ensure_ollama_model "${model#ollama:}"
                 ;;
             en_core_web_lg|pt_core_news_lg|*_core_*)
                 ensure_spacy_model "$model"
@@ -264,28 +233,23 @@ main() {
         exec /app/.venv/bin/python anon.py "$@"
     fi
 
-    # Determine required models based on arguments
+    # Determine required models based on arguments. The engine loads
+    # pt_core_news_lg for Portuguese and en_core_web_lg for every other
+    # language; both ship in the image.
     local lang=$(get_language "$@")
-    local spacy_model="${lang}_core_news_lg"
-    [[ "$lang" == "en" ]] && spacy_model="en_core_web_lg"
+    local spacy_model="en_core_web_lg"
+    [[ "$lang" == "pt" ]] && spacy_model="pt_core_news_lg"
 
     # Provision models as needed
     if needs_spacy_model "$@"; then
         ensure_spacy_model "$spacy_model" || exit 1
-
-        # English is always needed as fallback
-        if [[ "$lang" != "en" ]]; then
-            ensure_spacy_model "en_core_web_lg" || exit 1
-        fi
     fi
 
     if needs_transformer_model "$@"; then
-        ensure_transformer_model "Davlan/xlm-roberta-base-ner-hrl" || exit 1
-    fi
-
-    if needs_ollama "$@"; then
-        wait_for_ollama || exit 1
-        ensure_ollama_model || exit 1
+        ensure_transformer_model "$(get_transformer_model "$@")" || exit 1
+        # The model is in the cache now: load it without asking the Hub for
+        # updates, so a run makes no network call (and none fails offline).
+        export HF_HUB_OFFLINE=1
     fi
 
     # Check if we should run unit tests instead of anon.py

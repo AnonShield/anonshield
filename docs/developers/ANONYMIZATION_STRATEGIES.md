@@ -16,7 +16,6 @@
    - [FilteredPresidio Strategy](#2-filteredpresidio-strategy-filtered)
    - [HybridPresidio Strategy](#3-hybridpresidio-strategy-hybrid)
    - [Standalone Strategy](#4-standalone-strategy-standalone)
-   - [SLM Strategy](#5-slm-strategy-slm)
 5. [Pattern Recognition System](#pattern-recognition-system)
 6. [Performance Benchmarks](#performance-benchmarks)
 7. [Decision Guide](#decision-guide)
@@ -41,7 +40,6 @@ AnonShield implements **five distinct anonymization strategies**. All strategies
 │  FilteredPresidio  → Presidio with filtered scope                │
 │  HybridPresidio    → Presidio detection + manual replacement     │
 │  Standalone        → Zero Presidio dependencies                  │
-│  SLM               → Local LLM via Ollama                        │
 │                                                                   │
 │  All strategies use centralized RegexPatterns (DRY principle)    │
 └─────────────────────────────────────────────────────────────────┘
@@ -120,7 +118,6 @@ orchestrator = AnonymizationOrchestrator(
 | **FilteredPresidio** | Filtered entities | ✅ | Transformers + Filtered recognizers |
 | **HybridPresidio** | Detection only | ✅ | Transformers + Filtered recognizers |
 | **Standalone** | None | ✅ | Transformers only |
-| **SLM** | None | Varies | Ollama LLM |
 
 ### Entity Coverage
 
@@ -130,21 +127,20 @@ orchestrator = AnonymizationOrchestrator(
 | **FilteredPresidio** | 25+ | Filtered Presidio recognizers + custom regex |
 | **HybridPresidio** | 25+ | Same as FilteredPresidio (detection) |
 | **Standalone** | 20+ | Transformers NER + custom regex only |
-| **SLM** | Variable | Depends on LLM and prompt |
 
 ### Feature Differences
 
-| Feature | FullPresidio | FilteredPresidio | HybridPresidio | Standalone | SLM |
-|---------|--------------|------------------|----------------|------------|-----|
-| **Context-Aware Detection** | ✅ | ✅ | ✅ | ❌ | ✅ |
-| **Score Boosting** | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Custom Operators** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Multi-Language** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Allow/Deny Lists** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Batch Processing** | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **Entity Validation** | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Luhn Check (CC)** | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Country-Specific** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Feature | FullPresidio | FilteredPresidio | HybridPresidio | Standalone |
+|---------|--------------|------------------|----------------|------------|
+| **Context-Aware Detection** | ✅ | ✅ | ✅ | ❌ |
+| **Score Boosting** | ✅ | ✅ | ✅ | ❌ |
+| **Custom Operators** | ✅ | ✅ | ✅ | ✅ |
+| **Multi-Language** | ✅ | ✅ | ✅ | ✅ |
+| **Allow/Deny Lists** | ✅ | ✅ | ✅ | ✅ |
+| **Batch Processing** | ✅ | ✅ | ✅ | ✅ |
+| **Entity Validation** | ✅ | ✅ | ❌ | ❌ |
+| **Luhn Check (CC)** | ✅ | ✅ | ❌ | ❌ |
+| **Country-Specific** | ✅ | ✅ | ❌ | ❌ |
 
 ---
 
@@ -739,179 +735,11 @@ INFO - Device set to use cuda:0
 
 ---
 
-### 5. SLM Strategy (`slm`)
-
-**Architecture:** Local Language Model (Ollama) for entity detection - **EXPERIMENTAL**.
-
-#### Technical Details
-
-```python
-# Implementation: src/anon/strategies.py + external Ollama
-class SLMStrategy:
-    """
-    Uses local SLM (via Ollama) for entity detection.
-    
-    Detection Pipeline:
-    1. Ollama REST API call
-       - Model: mistral, llama3, or custom
-       - Prompt engineering for entity extraction
-    
-    2. JSON response parsing
-       - Expected format: {"entities": [...]}
-    
-    3. Fallback regex (optional)
-       - If SLM fails, use regex patterns
-    
-    Anonymization:
-    - Same CustomSlugAnonymizer as other strategies
-    """
-```
-
-#### Ollama Integration
-
-```bash
-# Prerequisites
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull mistral  # Or llama3, phi, etc.
-ollama serve  # Start server on localhost:11434
-
-# Verify
-curl http://localhost:11434/api/tags
-```
-
-#### Prompt Engineering
-
-```python
-ENTITY_EXTRACTION_PROMPT = """
-You are an entity extraction expert. Extract ALL entities from the following text.
-
-Entity Types:
-- PERSON: Names of people
-- EMAIL_ADDRESS: Email addresses
-- IP_ADDRESS: IPv4/IPv6 addresses
-- URL: Web URLs
-- CVE_ID: CVE identifiers (CVE-YYYY-NNNNN)
-- HASH: Cryptographic hashes (MD5, SHA256, etc.)
-- PHONE_NUMBER: Phone numbers
-- LOCATION: Geographic locations
-
-Text: {text}
-
-Return ONLY valid JSON:
-{{
-  "entities": [
-    {{"type": "PERSON", "value": "John Doe", "start": 0, "end": 8}},
-    ...
-  ]
-}}
-"""
-```
-
-#### Execution Flow
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    SLM Execution Flow                         │
-└──────────────────────────────────────────────────────────────┘
-
-Input Text
-    │
-    ├──> Check Ollama Server
-    │       │
-    │       ├──> POST http://localhost:11434/api/generate
-    │       │       ├─ model: mistral
-    │       │       ├─ prompt: ENTITY_EXTRACTION_PROMPT
-    │       │       └─ stream: false
-    │       │
-    │       └──> Timeout: 30s per request
-    │
-    ├──> Parse JSON Response
-    │       │
-    │       ├──> Validate format
-    │       ├──> Extract entities
-    │       └──> Fallback to regex if invalid
-    │
-    ├──> Optional: Regex Augmentation
-    │       │
-    │       └──> Add regex-detected entities not found by SLM
-    │
-    └──> Anonymization (same as other strategies)
-```
-
-#### SLM Modes
-
-```python
-class SLMDetectorMode:
-    EXCLUSIVE = "exclusive"  # Only SLM, no regex
-    HYBRID = "hybrid"        # SLM + regex fallback
-    AUGMENTED = "augmented"  # SLM primary, regex augments
-```
-
-#### Implementation Details
-
-```yaml
-Model Loading: Ollama server startup required
-Processing: Sequential API calls to Ollama
-Memory: Depends on Ollama model size
-GPU: Depends on Ollama configuration
-Mode: Experimental
-```
-
-#### Characteristics
-
-**Features:**
-- Uses LLM for context-aware entity detection
-- No pre-defined regex patterns required
-- Depends on prompt engineering
-- Supports multiple Ollama models
-
-**Limitations:**
-- Requires Ollama server running
-- Sequential processing (no batching)
-- Non-deterministic results
-- Experimental status
-
-#### Status
-
-**Current State:**
-- Experimental implementation
-- Requires external Ollama server
-- Not optimized for production use
-- Suitable for research and testing
-
-#### Example Usage
-
-```bash
-# Start Ollama
-ollama serve
-
-# In another terminal
-python anon.py document.txt \
-  --anonymization-strategy slm \
-  --slm-model mistral \
-  --slm-mode hybrid
-```
-
-#### Future Development
-
-```yaml
-Planned Features:
-  - Batch processing support
-  - Fine-tuned models for entity extraction
-  - Local model caching
-  - Streaming API support
-  - Multi-model ensemble
-
-Status: EXPERIMENTAL - Use at own risk
-```
-
----
-
 ## Pattern Recognition System
 
 ### RegexPatterns Class: Single Source of Truth
 
-All strategies (except SLM) use the centralized `RegexPatterns` class for consistent entity detection.
+All strategies use the centralized `RegexPatterns` class for consistent entity detection.
 
 #### Complete Pattern Inventory
 
@@ -1388,11 +1216,8 @@ If you need:
   ├─ Custom replacement logic per entity
   │  └─ HybridPresidio
   │
-  ├─ Only basic entities without Presidio overhead
-  │  └─ Standalone
-  │
-  └─ LLM-based experimental detection
-     └─ SLM
+  └─ Only basic entities without Presidio overhead
+     └─ Standalone
 ```
 
 ### Entity Type Coverage
@@ -1518,7 +1343,7 @@ Ensure `strategy_name` is correctly set:
 
 ```python
 # engine.py line 286-295
-elif strategy_name in ("slm", "standalone"):
+elif strategy_name in ("standalone", "regex"):
     self.analyzer_engine = None  # Skip Presidio
     self.anonymizer_engine = None
 ```
@@ -1585,7 +1410,7 @@ python anon.py file.txt --anonymization-strategy <strategy>
 --anonymization-strategy presidio      # FullPresidio (maximum coverage)
 --anonymization-strategy hybrid        # HybridPresidio (custom logic)
 --anonymization-strategy standalone    # Standalone (maximum speed)
---anonymization-strategy slm           # SLM (experimental)
+--anonymization-strategy regex         # Regex only (no NLP models)
 
 # Performance options
 --use-datasets                         # Enable dataset mode (faster batching)
@@ -1602,7 +1427,7 @@ python anon.py file.txt --anonymization-strategy <strategy>
 
 ```yaml
 AnonShield (Current):
-  - Strategy names: filtered (default), presidio, hybrid, standalone, slm
+  - Strategy names: filtered (default), presidio, hybrid, standalone, regex
   - Centralized RegexPatterns class (DRY principle)
   - Standalone strategy implementation (no Presidio dependencies)
   - Automatic GPU detection via torch.cuda.is_available()
@@ -1612,13 +1437,11 @@ AnonShield (Current):
 
 - [Presidio Documentation](https://microsoft.github.io/presidio/)
 - [Transformers Documentation](https://huggingface.co/docs/transformers/)
-- [Ollama Documentation](https://ollama.com/docs/)
 
 ### See Also
 
 - [Extensibility Guide](EXTENSIBILITY.md): how to implement and register a custom anonymization strategy
 - [Architecture Reference](ARCHITECTURE.md): system design and module responsibilities
-- [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md): SLM-based strategy details
 
 ---
 

@@ -3,7 +3,7 @@
 import hashlib
 import hmac
 import re
-from typing import Dict, List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Set, Union, Tuple
 import logging
 
 import pandas as pd  # type: ignore
@@ -70,6 +70,43 @@ _ENGINE_CACHE: dict[str, tuple["BatchAnalyzerEngine", "AnonymizerEngine"]] = {}
 _HF_TOKEN_PIPE_PATCHED = False
 
 
+def chunked_ner(hf_pipeline, text: str, chunk_tokens: int = 400, overlap: int = 50) -> list:
+    """Run a HF token-classification pipeline over text of any length.
+
+    Tokenizes once, runs the model on windows of ``chunk_tokens`` tokens that
+    overlap by ``overlap`` tokens, and maps offsets back to ``text``. An entity
+    that starts inside a window's trailing overlap is taken from the next
+    window, which sees it whole, so names cut by a window edge are not split.
+    """
+    tok = hf_pipeline.tokenizer
+    try:
+        enc = tok(text, return_offsets_mapping=True, add_special_tokens=False,
+                  truncation=False, verbose=False)
+    except TypeError:
+        enc = tok(text, return_offsets_mapping=True, add_special_tokens=False, truncation=False)
+    offsets = enc["offset_mapping"]
+    if len(offsets) <= chunk_tokens:
+        return list(hf_pipeline(text))
+    results = []
+    stride = chunk_tokens - overlap
+    i = 0
+    while i < len(offsets):
+        end = min(i + chunk_tokens, len(offsets))
+        char_start = offsets[i][0]
+        char_end = offsets[end - 1][1]
+        last = end >= len(offsets)
+        keep_before = len(text) if last else offsets[i + stride][0]
+        for ent in hf_pipeline(text[char_start:char_end]):
+            gs, ge = ent["start"] + char_start, ent["end"] + char_start
+            if gs >= keep_before:
+                continue
+            results.append({**ent, "start": gs, "end": ge, "word": text[gs:ge]})
+        if last:
+            break
+        i += stride
+    return results
+
+
 def _patch_hf_token_pipe_for_long_docs() -> None:
     global _HF_TOKEN_PIPE_PATCHED
     if _HF_TOKEN_PIPE_PATCHED:
@@ -79,43 +116,17 @@ def _patch_hf_token_pipe_for_long_docs() -> None:
     except ImportError:
         return
 
-    def _chunked_ner(hf_pipeline, text: str, chunk_tokens: int = 400, overlap: int = 50):
-        tok = hf_pipeline.tokenizer
-        enc = tok(text, return_offsets_mapping=True, add_special_tokens=False, truncation=False)
-        offsets = enc["offset_mapping"]
-        if len(offsets) <= chunk_tokens:
-            return hf_pipeline(text)
-        results, seen = [], set()
-        stride = chunk_tokens - overlap
-        i = 0
-        while i < len(offsets):
-            end = min(i + chunk_tokens, len(offsets))
-            char_start = offsets[i][0]
-            char_end = offsets[end - 1][1]
-            chunk = text[char_start:char_end]
-            for ent in hf_pipeline(chunk):
-                gs, ge = ent["start"] + char_start, ent["end"] + char_start
-                key = (gs, ge, ent["entity_group"])
-                if key in seen:
-                    continue
-                seen.add(key)
-                results.append({**ent, "start": gs, "end": ge})
-            if end >= len(offsets):
-                break
-            i += stride
-        return results
-
     def _patched_get_annotations(self, docs):
         import warnings as _w
         if len(docs) > 1:
             try:
-                return [_chunked_ner(self.hf_pipeline, d.text) for d in docs]
+                return [chunked_ner(self.hf_pipeline, d.text) for d in docs]
             except Exception:
                 _w.warn("Unable to process texts as batch, backing off individually")
         out = []
         for d in docs:
             try:
-                out.append(_chunked_ner(self.hf_pipeline, d.text))
+                out.append(chunked_ner(self.hf_pipeline, d.text))
             except Exception as exc:
                 excerpt = d.text if len(d.text) < 100 else d.text[:100] + "..."
                 _w.warn(f"Unable to process, skipping annotation for doc '{excerpt}': {exc}")
@@ -140,15 +151,17 @@ def warm_up_model(
     already in memory before the first job arrives.
     """
     import logging as _log
+    from .config import NerDefaults
     logger = _log.getLogger(__name__)
-    cache_key = f"{transformer_model}:{lang}"
+    lang_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
+    effective_lang = lang if lang in lang_model_map else "en"
+    # Same key as AnonymizationOrchestrator._setup_engines, or the warm-up is never hit.
+    cache_key = f"{transformer_model}:{effective_lang}:{NerDefaults.AGGREGATION_STRATEGY}"
     if cache_key in _ENGINE_CACHE:
         logger.info("warm_up_model: '%s' already cached; skipping.", transformer_model)
         return
     logger.info("warm_up_model: loading '%s' (lang=%s) …", transformer_model, lang)
     try:
-        lang_model_map = {"pt": "pt_core_news_lg", "en": "en_core_web_lg"}
-        effective_lang = lang if lang in lang_model_map else "en"
         spacy_model_name = lang_model_map.get(effective_lang, f"{effective_lang}_core_news_lg")
         trf_model_config = [
             {"lang_code": effective_lang,
@@ -158,7 +171,7 @@ def warm_up_model(
         entity_mapping = get_entity_mapping(transformer_model)
         ner_config = NerModelConfiguration(
             model_to_presidio_entity_mapping=entity_mapping,
-            aggregation_strategy="max",
+            aggregation_strategy=NerDefaults.AGGREGATION_STRATEGY,
             labels_to_ignore=["O"],
         )
         nlp_engine = TransformersNlpEngine(models=trf_model_config, ner_model_configuration=ner_config)
@@ -338,160 +351,164 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
     # Define a score boost for regex patterns if priority is enabled
     SCORE_BOOST = 0.15 if regex_priority else 0.0
 
+    def boosted(score: float) -> float:
+        # Presidio rejects scores above 1.0, so the boost saturates there.
+        return min(1.0, score + SCORE_BOOST)
+
     # --- 1. URL & NETWORK ---
     url_pattern = Pattern(
         name="URL Pattern", 
         regex=RegexPatterns.URL,
-        score=0.7 + SCORE_BOOST
+        score=boosted(0.7)
     )
 
     ip_pattern = Pattern(
         name="IPv4 Address Pattern", 
         regex=RegexPatterns.IPV4, 
-        score=0.85 + SCORE_BOOST
+        score=boosted(0.85)
     )
     
     ipv6_pattern = Pattern(
         name="IPv6 Address Pattern", 
         regex=RegexPatterns.IPV6, 
-        score=0.6 + SCORE_BOOST
+        score=boosted(0.6)
     )
     
     mac_pattern = Pattern(
         name="MAC Address", 
         regex=RegexPatterns.MAC_ADDRESS, 
-        score=0.8 + SCORE_BOOST
+        score=boosted(0.8)
     )
     
     port_pattern = Pattern(
         name="Port/Protocol",
         regex=RegexPatterns.PORT,
-        score=0.85 + SCORE_BOOST
+        score=boosted(0.85)
     )
     
     hostname_patterns = [
-        Pattern(name="FQDN Pattern", regex=RegexPatterns.FQDN, score=0.6 + SCORE_BOOST),
-        Pattern(name="Certificate CN Pattern", regex=RegexPatterns.CERT_CN, score=0.7 + SCORE_BOOST),
-        Pattern(name="Standalone Hex Hostname Pattern", regex=RegexPatterns.HEX_HOSTNAME, score=0.6 + SCORE_BOOST),
+        Pattern(name="FQDN Pattern", regex=RegexPatterns.FQDN, score=boosted(0.6)),
+        Pattern(name="Certificate CN Pattern", regex=RegexPatterns.CERT_CN, score=boosted(0.7)),
+        Pattern(name="Standalone Hex Hostname Pattern", regex=RegexPatterns.HEX_HOSTNAME, score=boosted(0.6)),
     ]
 
     hash_patterns = [
         # Hash patterns ordered by specificity (most specific first)
-        Pattern(name="SHA512 Hash", regex=RegexPatterns.SHA512, score=0.95 + SCORE_BOOST),
-        Pattern(name="SHA256 Hash", regex=RegexPatterns.SHA256, score=0.92 + SCORE_BOOST),
-        Pattern(name="SHA1 Hash", regex=RegexPatterns.SHA1, score=0.88 + SCORE_BOOST),
-        Pattern(name="MD5 Colon-Separated Hash", regex=RegexPatterns.MD5_COLON, score=0.93 + SCORE_BOOST),
-        Pattern(name="MD5 Hash", regex=RegexPatterns.MD5, score=0.88 + SCORE_BOOST),
+        Pattern(name="SHA512 Hash", regex=RegexPatterns.SHA512, score=boosted(0.95)),
+        Pattern(name="SHA256 Hash", regex=RegexPatterns.SHA256, score=boosted(0.92)),
+        Pattern(name="SHA1 Hash", regex=RegexPatterns.SHA1, score=boosted(0.88)),
+        Pattern(name="MD5 Colon-Separated Hash", regex=RegexPatterns.MD5_COLON, score=boosted(0.93)),
+        Pattern(name="MD5 Hash", regex=RegexPatterns.MD5, score=boosted(0.88)),
     ]
 
     cve_pattern = Pattern(
         name="CVE ID Pattern",
         regex=RegexPatterns.CVE, 
-        score=0.95 + SCORE_BOOST
+        score=boosted(0.95)
     )
 
     cpe_pattern = Pattern(
         name="CPE String",
         regex=RegexPatterns.CPE,
-        score=0.9 + SCORE_BOOST
+        score=boosted(0.9)
     )
     
     serial_pattern = Pattern(
         name="Certificate Serial",
         regex=RegexPatterns.CERT_SERIAL,
-        score=0.75 + SCORE_BOOST
+        score=boosted(0.75)
     )
     
     oid_pattern = Pattern(
         name="OID Pattern",
         regex=RegexPatterns.OID, 
-        score=0.95 + SCORE_BOOST
+        score=boosted(0.95)
     )
 
     auth_token_patterns = [
-        Pattern(name="Cookie/Session Assignment", regex=RegexPatterns.COOKIE_SESSION, score=0.9 + SCORE_BOOST),
-        Pattern(name="Generic Auth Token", regex=RegexPatterns.AUTH_TOKEN, score=0.5 + SCORE_BOOST)
+        Pattern(name="Cookie/Session Assignment", regex=RegexPatterns.COOKIE_SESSION, score=boosted(0.9)),
+        Pattern(name="Generic Auth Token", regex=RegexPatterns.AUTH_TOKEN, score=boosted(0.5))
     ]
 
     password_pattern = Pattern(
         name="Contextual Password",
         regex=RegexPatterns.PASSWORD_CONTEXT,
-        score=0.95 + SCORE_BOOST
+        score=boosted(0.95)
     )
 
     username_pattern = Pattern(
         name="Contextual Username",
         regex=RegexPatterns.USERNAME_CONTEXT,
-        score=0.8 + SCORE_BOOST
+        score=boosted(0.8)
     )
 
     email_pattern = Pattern(
         name="Email Pattern", 
         regex=RegexPatterns.EMAIL, 
-        score=1.0 + SCORE_BOOST
+        score=boosted(1.0)
     )
     
     phone_pattern = Pattern(
         name="Phone Number Pattern",
         regex=RegexPatterns.PHONE,
-        score=0.6 + SCORE_BOOST
+        score=boosted(0.6)
     )
 
     cpf_pattern = Pattern(
         name="CPF Pattern", 
         regex=RegexPatterns.CPF, 
-        score=0.85 + SCORE_BOOST
+        score=boosted(0.85)
     )
 
     cc_pattern = Pattern(
         name="Credit Card Pattern", 
         regex=RegexPatterns.CREDIT_CARD, 
-        score=0.7 + SCORE_BOOST
+        score=boosted(0.7)
     )
 
     uuid_pattern = Pattern(
         name="UUID Pattern", 
         regex=RegexPatterns.UUID, 
-        score=0.8 + SCORE_BOOST
+        score=boosted(0.8)
     )
     
     cert_patterns = [
-        Pattern(name="Certificate PEM Block", regex=RegexPatterns.CERT_PEM, score=0.95 + SCORE_BOOST),
-        Pattern(name="Certificate Request PEM Block", regex=RegexPatterns.CERT_REQUEST_PEM, score=0.95 + SCORE_BOOST),
-        Pattern(name="Private Key PEM Block", regex=RegexPatterns.PRIVATE_KEY_PEM, score=0.95 + SCORE_BOOST),
-        Pattern(name="Certificate Body DER", regex=RegexPatterns.CERT_DER, score=0.8 + SCORE_BOOST),
-        Pattern(name="Certificate Thumbprint", regex=RegexPatterns.CERT_THUMBPRINT, score=0.85 + SCORE_BOOST),
+        Pattern(name="Certificate PEM Block", regex=RegexPatterns.CERT_PEM, score=boosted(0.95)),
+        Pattern(name="Certificate Request PEM Block", regex=RegexPatterns.CERT_REQUEST_PEM, score=boosted(0.95)),
+        Pattern(name="Private Key PEM Block", regex=RegexPatterns.PRIVATE_KEY_PEM, score=boosted(0.95)),
+        Pattern(name="Certificate Body DER", regex=RegexPatterns.CERT_DER, score=boosted(0.8)),
+        Pattern(name="Certificate Thumbprint", regex=RegexPatterns.CERT_THUMBPRINT, score=boosted(0.85)),
     ]
 
     crypto_patterns = [
-        Pattern(name="RSA Public Key Modulus", regex=RegexPatterns.RSA_MODULUS, score=0.8 + SCORE_BOOST),
-        Pattern(name="JWT Token", regex=RegexPatterns.JWT, score=0.9 + SCORE_BOOST),
-        Pattern(name="Base64 Encoded Key", regex=RegexPatterns.BASE64_KEY, score=0.7 + SCORE_BOOST),
+        Pattern(name="RSA Public Key Modulus", regex=RegexPatterns.RSA_MODULUS, score=boosted(0.8)),
+        Pattern(name="JWT Token", regex=RegexPatterns.JWT, score=boosted(0.9)),
+        Pattern(name="Base64 Encoded Key", regex=RegexPatterns.BASE64_KEY, score=boosted(0.7)),
     ]
     
     path_pattern = Pattern(
         name="User Home Path", 
         regex=RegexPatterns.USER_PATH, 
-        score=0.6 + SCORE_BOOST
+        score=boosted(0.6)
     )
     
     pgp_pattern = Pattern(
         name="PGP Block",
         regex=RegexPatterns.PGP_BLOCK,
-        score=0.95 + SCORE_BOOST
+        score=boosted(0.95)
     )
 
     # ── Brazilian documents (PT-BR only) ────────────────────────────────────
-    br_cpf_pattern       = Pattern(name="BR CPF",        regex=RegexPatterns.CPF,            score=0.95 + SCORE_BOOST)
-    br_cnpj_pattern      = Pattern(name="BR CNPJ",       regex=RegexPatterns.CNPJ,           score=0.95 + SCORE_BOOST)
-    br_rg_pattern        = Pattern(name="BR RG (SP)",    regex=RegexPatterns.RG_SP,          score=0.80 + SCORE_BOOST)
-    br_cep_pattern       = Pattern(name="BR CEP",        regex=RegexPatterns.CEP,            score=0.85 + SCORE_BOOST)
-    br_pis_pattern       = Pattern(name="BR PIS/PASEP",  regex=RegexPatterns.PIS_PASEP,      score=0.90 + SCORE_BOOST)
-    br_titulo_pattern    = Pattern(name="BR Título Eleitoral", regex=RegexPatterns.TITULO_ELEITOR, score=0.80 + SCORE_BOOST)
-    br_money_pattern     = Pattern(name="BR BRL Amount", regex=RegexPatterns.MONEY_BRL,      score=0.90 + SCORE_BOOST)
-    br_date_pattern      = Pattern(name="BR Date",       regex=RegexPatterns.DATE_BR,        score=0.60 + SCORE_BOOST)
-    br_agency_pattern    = Pattern(name="BR Bank Agency",  regex=RegexPatterns.BANK_AGENCY,  score=0.80 + SCORE_BOOST)
-    br_account_pattern   = Pattern(name="BR Bank Account", regex=RegexPatterns.BANK_ACCOUNT, score=0.80 + SCORE_BOOST)
+    br_cpf_pattern       = Pattern(name="BR CPF",        regex=RegexPatterns.CPF,            score=boosted(0.95))
+    br_cnpj_pattern      = Pattern(name="BR CNPJ",       regex=RegexPatterns.CNPJ,           score=boosted(0.95))
+    br_rg_pattern        = Pattern(name="BR RG (SP)",    regex=RegexPatterns.RG_SP,          score=boosted(0.80))
+    br_cep_pattern       = Pattern(name="BR CEP",        regex=RegexPatterns.CEP,            score=boosted(0.85))
+    br_pis_pattern       = Pattern(name="BR PIS/PASEP",  regex=RegexPatterns.PIS_PASEP,      score=boosted(0.90))
+    br_titulo_pattern    = Pattern(name="BR Título Eleitoral", regex=RegexPatterns.TITULO_ELEITOR, score=boosted(0.80))
+    br_money_pattern     = Pattern(name="BR BRL Amount", regex=RegexPatterns.MONEY_BRL,      score=boosted(0.90))
+    br_date_pattern      = Pattern(name="BR Date",       regex=RegexPatterns.DATE_BR,        score=boosted(0.60))
+    br_agency_pattern    = Pattern(name="BR Bank Agency",  regex=RegexPatterns.BANK_AGENCY,  score=boosted(0.80))
+    br_account_pattern   = Pattern(name="BR Bank Account", regex=RegexPatterns.BANK_ACCOUNT, score=boosted(0.80))
 
     recognizers = []
     for lang in langs:
@@ -555,18 +572,19 @@ class AnonymizationOrchestrator:
                  cache_manager: Optional[CacheStrategy] = None,
                  hash_generator: Optional[HashingStrategy] = None,
                  entity_detector: Optional[EntityDetector] = None,
-                 slm_detector: Optional[AnonymizationStrategy] = None,
-                 slm_detector_mode: str = "hybrid",
                  ner_data_generation: bool = False,
                  transformer_model: str = "Davlan/xlm-roberta-base-ner-hrl",
                  parallel_workers: int = 1,
                  ner_score_threshold: Optional[float] = None,
-                 ner_aggregation_strategy: Optional[str] = None):
+                 ner_aggregation_strategy: Optional[str] = None,
+                 entities_to_anonymize: Optional[Set[str]] = None):
 
         self.lang = lang
         self.db_context = db_context
         self.allow_list = set(allow_list)
         self.entities_to_preserve = set(entities_to_preserve)
+        self.entities_to_anonymize = set(entities_to_anonymize) if entities_to_anonymize is not None else None
+        self.strategy_name = strategy_name
         self.slug_length = slug_length
         self.nlp_batch_size = nlp_batch_size
         self.regex_priority = regex_priority
@@ -584,12 +602,18 @@ class AnonymizationOrchestrator:
         self.cache_manager = cache_manager or CacheManager(use_cache=False, max_cache_size=0)
         self.hash_generator = hash_generator or HashGenerator()
 
+        # The Presidio engines load a spaCy model only for "en" or "pt" (see
+        # _setup_engines), and register the recognizers under that language, so
+        # analysis must run under the same code or every other --lang fails.
+        self.presidio_lang = self.lang if self.lang in ("en", "pt") else "en"
+
         # Initialize Presidio engines for all strategies (xlm-roberta used by fast as well)
         if analyzer_engine and anonymizer_engine:
             self.analyzer_engine = analyzer_engine
             self.anonymizer_engine = anonymizer_engine
-        elif strategy_name in ("slm", "standalone", "regex"):
-            # SLM, Standalone, and Regex-only strategies don't need Presidio engines
+        elif strategy_name in ("standalone", "regex") and not ner_data_generation:
+            # Standalone and Regex-only strategies don't need Presidio engines.
+            # NER data generation always does: detect_entities() runs on the analyzer.
             self.analyzer_engine = None
             self.anonymizer_engine = None
             logging.info(f"Skipping Presidio initialization for '{strategy_name}' strategy (Presidio-free mode).")
@@ -604,9 +628,8 @@ class AnonymizationOrchestrator:
             custom_recognizers = load_custom_recognizers([self.lang], regex_priority=regex_priority)
             compiled_patterns = []
             for recognizer in custom_recognizers:
+                # Preserved types are kept: they claim their span (EntityDetector.finalize).
                 entity_type = recognizer.supported_entities[0]
-                if entity_type in self.entities_to_preserve:
-                    continue
                 for pattern in recognizer.patterns:
                     try:
                         compiled_patterns.append({
@@ -616,10 +639,13 @@ class AnonymizationOrchestrator:
                         })
                     except re.error as e:
                         logging.warning(f"Invalid regex pattern skipped: {pattern.regex} - {e}")
+            from .model_registry import get_entity_mapping
             self.entity_detector = EntityDetector(
                 compiled_patterns=compiled_patterns,
                 entities_to_preserve=self.entities_to_preserve,
-                allow_list=self.allow_list
+                allow_list=self.allow_list,
+                entity_mapping=get_entity_mapping(self.transformer_model),
+                entities_to_anonymize=self.entities_to_anonymize,
             )
 
         # --- Strategy Initialization: Prefer injected strategy, fallback to factory ---
@@ -633,15 +659,15 @@ class AnonymizationOrchestrator:
                 analyzer_engine=self.analyzer_engine,
                 anonymizer_engine=self.anonymizer_engine,
                 entity_detector=self.entity_detector,
-                slm_detector=slm_detector,
-                slm_detector_mode=slm_detector_mode,
                 hash_generator=self.hash_generator,
                 cache_manager=self.cache_manager,
-                lang=self.lang,
+                lang=self.presidio_lang if strategy_name in ("presidio", "filtered", "hybrid") else self.lang,
                 entities_to_preserve=self.entities_to_preserve,
+                entities_to_anonymize=self.entities_to_anonymize,
                 allow_list=self.allow_list,
                 nlp_batch_size=self.nlp_batch_size,
                 score_threshold=self.ner_score_threshold,
+                aggregation_strategy=self.ner_aggregation_strategy,
             )
             logging.info(f"Anonymization strategy '{strategy_name}' initialized via factory.")
 
@@ -836,24 +862,35 @@ class AnonymizationOrchestrator:
 
 
     def _anonymize_texts_pick_one(self, texts: List[str], entity_types: List[str], operator_params: Optional[Dict] = None) -> Tuple[List[str], List[Tuple]]:
+        """Force-anonymize each text as the best-matching type among ``entity_types``.
+
+        The value is always replaced (the field is forced); detection only picks
+        the label. Without a detection the first listed type is used.
+        """
         anonymized_list = []
         collected_entities_from_pick_one: List[Tuple] = []
         if operator_params is None: operator_params = {}
-        
-        analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
-            texts, language=self.lang, entities=entity_types
-        )
 
-        for text, analyzer_results in zip(texts, analyzer_results_iterator):
-            if not analyzer_results:
-                anonymized_list.append(text)
-                continue
-            
-            best_result: RecognizerResult = max(analyzer_results, key=lambda r: r.score)
-            anonymized_text_list, collected_from_forced = self._anonymize_texts_forced_type([text], best_result.entity_type, operator_params)
+        if self.analyzer_engine is not None:
+            best_types = []
+            for analyzer_results in self.analyzer_engine.analyze_iterator(
+                    texts, language=self.presidio_lang, entities=entity_types):
+                best = max(analyzer_results, key=lambda r: r.score) if analyzer_results else None
+                best_types.append(best.entity_type if best else None)
+        else:
+            # Presidio-free strategies (standalone, regex): pick by regex detection.
+            best_types = []
+            for text in texts:
+                found = [e for e in self.entity_detector.extract_regex_entities(str(text))
+                         if e["label"] in entity_types]
+                best_types.append(max(found, key=lambda e: e["score"])["label"] if found else None)
+
+        for text, best_type in zip(texts, best_types):
+            anonymized_text_list, collected_from_forced = self._anonymize_texts_forced_type(
+                [text], best_type or entity_types[0], operator_params)
             anonymized_list.append(anonymized_text_list[0])
             collected_entities_from_pick_one.extend(collected_from_forced)
-            
+
         return anonymized_list, collected_entities_from_pick_one
 
     def _anonymize_texts_forced_type(self, texts: List[str], entity_type: str, operator_params: Optional[Dict] = None) -> Tuple[List[str], List[Tuple]]:
@@ -876,11 +913,12 @@ class AnonymizationOrchestrator:
                 continue
 
             if self.slug_length == 0:
-                collected_entities_from_forced.append((entity_type, clean_text, "", ""))
+                # Counted for statistics but not persisted: there is no hash to look up.
+                collected_entities_from_forced.append((entity_type, clean_text, "", "", False))
                 anonymized_text = f"[{entity_type}]"
             else:
                 display_hash, full_hash = self.hash_generator.generate_slug(clean_text, self.slug_length)
-                collected_entities_from_forced.append((entity_type, clean_text, display_hash, full_hash))
+                collected_entities_from_forced.append((entity_type, clean_text, display_hash, full_hash, True))
                 anonymized_text = f"[{entity_type}_{display_hash}]"
 
             self.cache_manager.add(cache_key, anonymized_text) # Use CacheManager
@@ -906,15 +944,15 @@ class AnonymizationOrchestrator:
         results = []
         
         # Get all supported entities, but filter out those the user wants to preserve.
+        # Preserved types are analyzed too, so they keep their span (see EntityDetector.finalize).
         if self.analyzer_engine and self.analyzer_engine.analyzer_engine:
-            all_entities = self.analyzer_engine.analyzer_engine.get_supported_entities()
-            entities_to_analyze = [e for e in all_entities if e not in self.entities_to_preserve]
+            entities_to_analyze = list(self.analyzer_engine.analyzer_engine.get_supported_entities())
         else:
             entities_to_analyze = []
 
         analyzer_results_iterator = self.analyzer_engine.analyze_iterator(
             texts,
-            language=self.lang,
+            language=self.presidio_lang,
             entities=entities_to_analyze,
             allow_list=self.allow_list,
             score_threshold=0.1
@@ -925,10 +963,15 @@ class AnonymizationOrchestrator:
             # Even if there are no PIIs, we might want to return the text.
             # The current NER implementation expects a "label" key.
             # We will only append if entities are found.
-            if analyzer_results:
-                # Sort by start offset to ensure labels are ordered
-                sorted_results = sorted(analyzer_results, key=lambda r: r.start)
-                labels = [[res.start, res.end, res.entity_type] for res in sorted_results]
+            detected = [{"start": r.start, "end": r.end, "label": r.entity_type, "score": r.score,
+                         "text": text[r.start:r.end]}
+                        for r in analyzer_results]
+            detected += self.entity_detector.extract_custom_entities(text)
+            # Training data cannot hold overlapping spans (several recognizers
+            # often fire on the same text), so keep one span per region.
+            merged = self.entity_detector.finalize(text, detected)
+            if merged:
+                labels = [[ent["start"], ent["end"], ent["label"]] for ent in merged]
                 results.append({"text": text, "label": labels})
         
         return results

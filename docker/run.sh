@@ -92,10 +92,36 @@ mkdir -p "$MODELS_DIR" "$DEFAULT_OUTPUT" "$ANON_DIR/input" "$DB_DIR"
 # ---------------------------------------------------------------------------
 # Select image
 # ---------------------------------------------------------------------------
+# The GPU image comes in two PyTorch builds: :gpu (CUDA 13.0) needs NVIDIA
+# driver 580+ and an RTX 20xx or newer (CUDA 13 dropped older GPUs; RTX 50xx
+# needs it); :gpu-cu126 (CUDA 12.6) covers older GPUs and drivers.
+# ANON_GPU_IMAGE overrides the choice.
+pick_gpu_image() {
+    local info cc drv cc_num drv_major
+    info=$(nvidia-smi --query-gpu=compute_cap,driver_version --format=csv,noheader 2>/dev/null | head -n1 || true)
+    cc=$(echo "$info" | cut -d, -f1 | tr -d ' ')
+    drv=$(echo "$info" | cut -d, -f2 | tr -d ' ')
+    if [[ ! "$cc" =~ ^[0-9]+\.[0-9]+$ || ! "$drv" =~ ^[0-9]+ ]]; then
+        log_info "Could not read the GPU from nvidia-smi; using anonshield/anon:gpu" >&2
+        echo "anonshield/anon:gpu"
+        return
+    fi
+    cc_num=$(( ${cc%%.*} * 10 + ${cc##*.} ))
+    drv_major=${drv%%.*}
+    if (( cc_num >= 75 && drv_major >= 580 )); then
+        echo "anonshield/anon:gpu"
+    else
+        if (( cc_num >= 100 )); then
+            log_info "This GPU (compute capability $cc) needs NVIDIA driver 580+ for GPU inference; driver is $drv, it will run on CPU" >&2
+        fi
+        echo "anonshield/anon:gpu-cu126"
+    fi
+}
+
 if [[ $USE_GPU -eq 1 ]]; then
-    IMAGE="anonshield/anon:gpu"
+    IMAGE="${ANON_GPU_IMAGE:-$(pick_gpu_image)}"
     GPU_FLAGS=(--gpus all)
-    log_info "Using GPU image"
+    log_info "Using GPU image $IMAGE"
 else
     IMAGE="anonshield/anon:latest"
     GPU_FLAGS=()
@@ -106,11 +132,11 @@ fi
 # ---------------------------------------------------------------------------
 if [[ $IS_INFO_CMD -eq 1 ]]; then
     docker run --rm \
-        "${GPU_FLAGS[@]}" \
+        ${GPU_FLAGS[@]+"${GPU_FLAGS[@]}"} \
         -e ANON_SECRET_KEY="${ANON_SECRET_KEY:-}" \
         -v "$MODELS_DIR":/app/models \
         "$IMAGE" \
-        "${ARGS[@]}"
+        ${ARGS[@]+"${ARGS[@]}"}
     exit 0
 fi
 
@@ -120,10 +146,37 @@ fi
 # Each local path gets its own volume mount:
 #   input file/dir  → /anon_input[/filename]
 #   --output-dir    → /anon_output
-#   --anonymization-config → /anon_config/filename
+#   --anonymization-config, --word-list, --custom-patterns, --config
+#                   → /anon_files/<n>/filename
 # ---------------------------------------------------------------------------
 VOLUMES=(-v "$MODELS_DIR":/app/models -v "$DB_DIR":/app/db)
 NEW_ARGS=()
+
+# anon.py flags that take no value (store_true / store_false)
+BOOL_FLAGS=" --help --list-entities --list-languages --overwrite --no-report \
+ --preserve-row-context --optimize --use-cache --no-use-cache --skip-numeric \
+ --regex-priority --disable-gc --force-large-xml --generate-ner-data --ner-include-all \
+ --ner-aggregate-record --use-datasets "
+is_bool_flag() { [[ "$BOOL_FLAGS" == *" $1 "* ]]; }
+
+# Mount the directory of a file argument read-only and point the flag at it.
+FILE_MOUNTS=0
+mount_file_arg() {
+    local flag="$1" val="$2" host mnt
+    if [[ -z "$val" ]]; then
+        log_error "$flag needs a file path."
+        exit 1
+    fi
+    host=$(abs_path "$val")
+    if [[ ! -f "$host" ]]; then
+        log_error "File not found for $flag: $val"
+        exit 1
+    fi
+    FILE_MOUNTS=$((FILE_MOUNTS+1))
+    mnt="/anon_files/$FILE_MOUNTS"
+    VOLUMES+=(-v "$(dirname "$host")":"$mnt":ro)
+    NEW_ARGS+=("$flag" "$mnt/$(basename "$host")")
+}
 INPUT_SET=0
 OUTPUT_SET=0
 OUTPUT_HOST=""
@@ -155,43 +208,30 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
             OUTPUT_HOST="$host"
             ;;
 
-        --anonymization-config)
+        --anonymization-config|--word-list|--custom-patterns|--config)
             i=$((i+1))
-            val="${ARGS[$i]}"
-            host=$(abs_path "$val")
-            VOLUMES+=(-v "$(dirname "$host")":/anon_config:ro)
-            NEW_ARGS+=(--anonymization-config /anon_config/"$(basename "$host")")
+            mount_file_arg "$arg" "${ARGS[$i]:-}"
             ;;
 
-        --anonymization-config=*)
-            val="${arg#--anonymization-config=}"
-            host=$(abs_path "$val")
-            VOLUMES+=(-v "$(dirname "$host")":/anon_config:ro)
-            NEW_ARGS+=(--anonymization-config=/anon_config/"$(basename "$host")")
+        --anonymization-config=*|--word-list=*|--custom-patterns=*|--config=*)
+            mount_file_arg "${arg%%=*}" "${arg#*=}"
             ;;
 
-        --word-list)
-            i=$((i+1))
-            val="${ARGS[$i]}"
-            host=$(abs_path "$val")
-            VOLUMES+=(-v "$(dirname "$host")":/anon_wordlist:ro)
-            NEW_ARGS+=(--word-list /anon_wordlist/"$(basename "$host")")
-            ;;
-
-        --word-list=*)
-            val="${arg#--word-list=}"
-            host=$(abs_path "$val")
-            VOLUMES+=(-v "$(dirname "$host")":/anon_wordlist:ro)
-            NEW_ARGS+=(--word-list=/anon_wordlist/"$(basename "$host")")
+        --*=*)
+            NEW_ARGS+=("$arg")
             ;;
 
         --*)
             NEW_ARGS+=("$arg")
-            # If next arg exists and doesn't start with --, it's the flag's value
-            next_i=$((i+1))
-            if [[ $next_i -lt ${#ARGS[@]} && "${ARGS[$next_i]}" != --* ]]; then
-                i=$next_i
-                NEW_ARGS+=("${ARGS[$i]}")
+            # Flags that take a value consume the next argument; boolean flags
+            # do not (treating "--overwrite file.csv" as a flag and its value
+            # used to swallow the input path).
+            if ! is_bool_flag "$arg"; then
+                next_i=$((i+1))
+                if [[ $next_i -lt ${#ARGS[@]} ]]; then
+                    i=$next_i
+                    NEW_ARGS+=("${ARGS[$i]}")
+                fi
             fi
             ;;
 
@@ -230,11 +270,13 @@ fi
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
+# ${arr[@]+"${arr[@]}"}: an empty array is an "unbound variable" under set -u
+# in bash < 4.4 (the macOS default).
 docker run --rm \
-    "${GPU_FLAGS[@]}" \
+    ${GPU_FLAGS[@]+"${GPU_FLAGS[@]}"} \
     -e ANON_SECRET_KEY="${ANON_SECRET_KEY:-}" \
     "${VOLUMES[@]}" \
     "$IMAGE" \
-    "${NEW_ARGS[@]}"
+    ${NEW_ARGS[@]+"${NEW_ARGS[@]}"}
 
 log_ok "Output is in $OUTPUT_HOST"

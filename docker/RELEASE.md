@@ -70,7 +70,7 @@ import json, urllib.request
 readme = open('docker/DOCKERHUB_README.md').read()
 data = json.dumps({
     'full_description': readme,
-    'description': 'AnonShield - PII pseudonymization framework for CSIRTs with OCR, NER, and SLM support.'
+    'description': 'AnonShield - PII pseudonymization framework for CSIRTs with OCR and NER support.'
 }).encode()
 req = urllib.request.Request('https://hub.docker.com/v2/repositories/anonshield/anon/', data=data, method='PATCH')
 req.add_header('Authorization', 'Bearer $HUB_TOKEN')

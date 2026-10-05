@@ -3,16 +3,12 @@
 # =============================================================================
 #
 # Profiles:
-#   cpu       - CPU anonymization only (default, no Ollama)
-#   slm       - CPU anonymization + Ollama (CPU)
-#   gpu       - GPU anonymization only (no Ollama)
-#   gpu-slm   - GPU anonymization + Ollama (GPU)
+#   cpu       - CPU anonymization (default)
+#   gpu       - GPU anonymization
 #
 # Usage via run.sh (recommended):
 #   ./run.sh input.txt                            # cpu profile
-#   ./run.sh input.txt --slm-detector             # slm profile
 #   ./run.sh --gpu input.txt                      # gpu profile
-#   ./run.sh --gpu input.txt --slm-detector       # gpu-slm profile
 #
 # Manual usage:
 #   docker compose -f docker/docker-compose.yml --profile cpu \
@@ -34,8 +30,6 @@ services:
     environment:
       - ANON_SECRET_KEY=${ANON_SECRET_KEY:-change-me-in-production}
       - ANON_LAZY_LOADING=1
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
     volumes:
       - anon-models:/app/models
       - anon-output:/app/output
@@ -45,7 +39,6 @@ services:
       - anon-network
     profiles:
       - cpu
-      - slm
 
   # ---------------------------------------------------------------------------
   # AnonShield - GPU-Accelerated Version
@@ -60,8 +53,6 @@ services:
     environment:
       - ANON_SECRET_KEY=${ANON_SECRET_KEY:-change-me-in-production}
       - ANON_LAZY_LOADING=1
-      - OLLAMA_BASE_URL=http://ollama-gpu:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
@@ -80,62 +71,6 @@ services:
               capabilities: [gpu]
     profiles:
       - gpu
-      - gpu-slm
-
-  # ---------------------------------------------------------------------------
-  # Ollama - Local LLM Service (CPU)
-  # ---------------------------------------------------------------------------
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama-cpu
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama-models:/root/.ollama
-    networks:
-      - anon-network
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 10s
-    profiles:
-      - slm
-
-  # ---------------------------------------------------------------------------
-  # Ollama GPU - GPU-Accelerated Ollama
-  # ---------------------------------------------------------------------------
-  ollama-gpu:
-    image: ollama/ollama:latest
-    container_name: ollama-gpu
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama-models:/root/.ollama
-    networks:
-      - anon-network
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 10s
-    profiles:
-      - gpu-slm
 
 # =============================================================================
 # Networks
@@ -155,5 +90,3 @@ volumes:
     name: anon-output
   anon-db:
     name: anon-db
-  ollama-models:
-    name: ollama-models

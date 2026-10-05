@@ -2,6 +2,8 @@ import unittest
 import os
 import subprocess
 import shutil
+import sys
+import tempfile
 import json
 import openpyxl
 import fitz
@@ -16,15 +18,16 @@ class TestAnonIntegration(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.test_data_dir = "tests/test_data_integration"
-        cls.output_dir = "test_output_integration"
-        cls.db_dir = "db_pytest_integration"
+        # Everything goes to a temporary directory: these paths used to be
+        # relative to the repo, and the teardown deleted the tracked
+        # tests/test_data_integration/ files.
+        cls.tmp_dir = tempfile.mkdtemp(prefix="anon_integration_")
+        cls.test_data_dir = os.path.join(cls.tmp_dir, "data")
+        cls.output_dir = os.path.join(cls.tmp_dir, "output")
+        cls.db_dir = os.path.join(cls.tmp_dir, "db")
         cls.db_path = os.path.join(cls.db_dir, "entities.db")
 
-        # Clean up and create directories
         for d in [cls.test_data_dir, cls.output_dir, cls.db_dir]:
-            if os.path.exists(d):
-                shutil.rmtree(d)
             os.makedirs(d, exist_ok=True)
 
         cls.text1 = "My name is John Doe."
@@ -85,9 +88,7 @@ class TestAnonIntegration(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        for d in [cls.test_data_dir, cls.output_dir, cls.db_dir]:
-            if os.path.exists(d):
-                shutil.rmtree(d)
+        shutil.rmtree(cls.tmp_dir, ignore_errors=True)
 
     def setUp(self):
         self.secret_key = "test-secret-key"
@@ -98,7 +99,7 @@ class TestAnonIntegration(unittest.TestCase):
 
     def _run_anon_py(self, path, lang="en", preserve_entities="", allow_list="", slug_length=None, anonymization_strategy="presidio", extra_args=None):
         cmd = [
-            "python",
+            sys.executable,
             os.path.join(os.getcwd(), "anon.py"),
             path,
             "--lang", lang,
@@ -271,12 +272,6 @@ class TestAnonIntegration(unittest.TestCase):
 
         self.assertEqual(count, 0, "Database should be empty when slug_length is 0.")
 
-    # Known limitation: an allow-listed email is preserved by the EMAIL recognizer,
-    # but the URL recognizer still anonymizes the bare domain substring (example.com),
-    # so the full "test@example.com" is not kept verbatim. Tracked for a proper fix in
-    # the allow-list / overlapping-span handling. expectedFailure flips to a failure if
-    # the behaviour is fixed, prompting removal of this marker.
-    @unittest.expectedFailure
     def test_preserve_and_allow_list(self):
         test_file = os.path.join(self.test_data_dir, "test.txt")
         # The input is "My name is John Doe and my email is test@example.com."

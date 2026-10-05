@@ -99,7 +99,6 @@ Vulnerabilidades-CAIS/
 *.jpg 
 *.txt 
 *.json
-!src/anon/slm/prompt_templates/**/*.json
 test/test_data_integration/*
 *.zip
 # Claude Code local files

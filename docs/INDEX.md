@@ -34,4 +34,3 @@ Internal architecture, strategy internals, evaluation, and helper scripts.
 | [developers/ANONYMIZATION_STRATEGIES.md](developers/ANONYMIZATION_STRATEGIES.md) | Strategy internals, regex pattern system, and decision guide. |
 | [developers/EXTENSIBILITY.md](developers/EXTENSIBILITY.md) | How to add new strategies, OCR engines, NER models, and custom patterns. |
 | [developers/UTILITY_SCRIPTS_GUIDE.md](developers/UTILITY_SCRIPTS_GUIDE.md) | Helper scripts in `scripts/`: de-anonymization and DB management. |
-| [developers/SLM_INTEGRATION_GUIDE.md](developers/SLM_INTEGRATION_GUIDE.md) | SLM/Ollama integration, prompt design, and experimental features. |

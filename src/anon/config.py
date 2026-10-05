@@ -46,12 +46,8 @@ class DefaultSizes:
     JSON_CHUNK_SIZE = 1000
     NER_CHUNK_SIZE = 1500
     NLP_BATCH_SIZE = 500
-    SLM_MAPPER_CHUNK_SIZE = 1500
-    SLM_ANONYMIZER_CHUNK_SIZE = 1500  # Max chars per chunk for SLM anonymization
     DEFAULT_SLUG_LENGTH = 64
     DEFAULT_MIN_WORD_LENGTH = 0
-    DEFAULT_SLM_CONFIDENCE_THRESHOLD = 0.7
-    DEFAULT_SLM_CONTEXT_WINDOW = 50
 
 # --- Model Configuration ---
 TRANSFORMER_MODEL = "Davlan/xlm-roberta-base-ner-hrl"
@@ -66,7 +62,10 @@ class NerDefaults:
     YAML config, web API form fields, and frontend Advanced panel.
     """
     SCORE_THRESHOLD: float = 0.4
-    AGGREGATION_STRATEGY: str = "max"
+    # "simple" groups adjacent tokens with the same label. The word-level modes
+    # (first/average/max) mis-split SentencePiece words in xlm-roberta: with
+    # "max", "New York" comes back as "New" and "York" stays in clear text.
+    AGGREGATION_STRATEGY: str = "simple"
     AGGREGATION_CHOICES: tuple[str, ...] = ("simple", "first", "average", "max")
 
 # Entity mappings between the transformer model's labels and Presidio's entities
@@ -111,15 +110,4 @@ SECURE_MODERNBERT_ENTITY_MAPPING = {
     "CAMPAIGN": "CAMPAIGN",
     "MITRE_TACTIC": "MITRE_TACTIC",
     "SERVICE": "SERVICE",
-}
-
-# --- LLM Configuration ---
-LLM_CONFIG = {
-    "provider": os.getenv("LLM_PROVIDER", "ollama"), # Prepares for future providers
-    "ollama": {
-        "base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-        "model": os.getenv("OLLAMA_MODEL", "llama3"),
-        "timeout": 120,
-        "temperature": 0.05, # Lower temp for more deterministic output
-    }
 }

@@ -64,21 +64,25 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
                  cache_manager: CacheStrategy,
                  lang: str,
                  entities_to_preserve: Set[str],
-                 slm_detector: Optional['SLMEntityDetector'] = None,
-                 slm_detector_mode: str = "hybrid"):
+                 score_threshold: Optional[float] = None,
+                 aggregation_strategy: Optional[str] = None):
         super().__init__()
+        from .config import NerDefaults
+        from .model_registry import get_entity_mapping
         self.transformer_model = transformer_model
         self.entity_detector = entity_detector
         self.hash_generator = hash_generator
         self.cache_manager = cache_manager
         self.lang = lang
         self.entities_to_preserve = entities_to_preserve
-        self.slm_detector = slm_detector
-        self.slm_detector_mode = slm_detector_mode
+        self.score_threshold = score_threshold if score_threshold is not None else NerDefaults.SCORE_THRESHOLD
+        self.aggregation_strategy = aggregation_strategy or NerDefaults.AGGREGATION_STRATEGY
+        self.entity_mapping = get_entity_mapping(self.transformer_model)
         
-        # Load models directly (no Presidio)
+        # Load models directly (no Presidio). The regexes come from the shared
+        # EntityDetector: the run's built-in recognizers for the language plus
+        # the word list and custom patterns, with the allow list applied.
         self._load_models()
-        self._load_regex_recognizers()
         
     def _load_models(self):
         """Load Transformer and spaCy models directly."""
@@ -86,8 +90,10 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
         import torch
         import spacy
         
-        # Detect GPU availability
-        if torch.cuda.is_available():
+        from .device import cuda_usable
+
+        # Detect GPU availability (and that this torch build can run on it)
+        if cuda_usable():
             device = 0  # Use first GPU
             self.logger.info(f"GPU detected: {torch.cuda.get_device_name(0)}")
         else:
@@ -96,7 +102,7 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
         
         self.logger.info(f"Loading Transformer model directly: {self.transformer_model}")
 
-        cache_key = f"{self.transformer_model}:{device}"
+        cache_key = f"{self.transformer_model}:{device}:{self.aggregation_strategy}"
         if cache_key in _PIPELINE_CACHE:
             self.logger.info("Pipeline cache hit for '%s'; skipping model load.", self.transformer_model)
             self.ner_pipeline = _PIPELINE_CACHE[cache_key]
@@ -107,7 +113,7 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
                     "ner",
                     model=self.transformer_model,
                     tokenizer=self.transformer_model,
-                    aggregation_strategy="simple",
+                    aggregation_strategy=self.aggregation_strategy,
                     device=device
                 )
                 _PIPELINE_CACHE[cache_key] = self.ner_pipeline
@@ -124,106 +130,6 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
             self.logger.warning(f"Could not load spaCy: {e}. Continuing without spaCy support.")
             self.nlp = None
     
-    def _load_regex_recognizers(self):
-        """
-        Load custom regex patterns directly (no Presidio dependencies).
-        
-        Architecture: Uses RegexPatterns from engine.py (DRY principle).
-        Same patterns as Presidio strategies, but without Pattern wrapping or scores.
-        """
-        import re
-        from .config import ENTITY_MAPPING, SECURE_MODERNBERT_ENTITY_MAPPING
-        from .engine import RegexPatterns
-        
-        # Get entity mapping
-        if "SecureModernBERT-NER" in self.transformer_model:
-            self.entity_mapping = SECURE_MODERNBERT_ENTITY_MAPPING
-        else:
-            self.entity_mapping = ENTITY_MAPPING
-        
-        # Define pure Python regex patterns using centralized RegexPatterns (DRY)
-        # These are the SAME patterns used by Presidio strategies, just without scores
-        self.regex_patterns = {
-            # Network & Infrastructure
-            'URL': re.compile(RegexPatterns.URL),
-            'IP_ADDRESS': [
-                re.compile(RegexPatterns.IPV4),
-                re.compile(RegexPatterns.IPV6),
-            ],
-            'MAC_ADDRESS': re.compile(RegexPatterns.MAC_ADDRESS),
-            'PORT': re.compile(RegexPatterns.PORT),
-            
-            # Hostnames
-            'HOSTNAME': [
-                re.compile(RegexPatterns.FQDN),
-                re.compile(RegexPatterns.CERT_CN),
-                re.compile(RegexPatterns.HEX_HOSTNAME),
-            ],
-            
-            # Hashes (ordered by specificity - most specific first)
-            'HASH': [
-                re.compile(RegexPatterns.SHA512),
-                re.compile(RegexPatterns.SHA256),
-                re.compile(RegexPatterns.SHA1),
-                re.compile(RegexPatterns.MD5_COLON),
-                re.compile(RegexPatterns.MD5),
-            ],
-            
-            # Security Identifiers
-            'CVE_ID': re.compile(RegexPatterns.CVE),
-            'CPE_STRING': re.compile(RegexPatterns.CPE),
-            'CERT_SERIAL': re.compile(RegexPatterns.CERT_SERIAL),
-            'OID': re.compile(RegexPatterns.OID),
-            
-            # Authentication & Secrets
-            'AUTH_TOKEN': [
-                re.compile(RegexPatterns.COOKIE_SESSION),
-                re.compile(RegexPatterns.AUTH_TOKEN),
-            ],
-            'PASSWORD': re.compile(RegexPatterns.PASSWORD_CONTEXT),
-            'USERNAME': re.compile(RegexPatterns.USERNAME_CONTEXT),
-            
-            # PII
-            'EMAIL_ADDRESS': re.compile(RegexPatterns.EMAIL),
-            'PHONE_NUMBER': [
-                re.compile(RegexPatterns.PHONE),
-                re.compile(RegexPatterns.CPF),
-            ],
-            'CREDIT_CARD': re.compile(RegexPatterns.CREDIT_CARD),
-            'UUID': re.compile(RegexPatterns.UUID),
-            
-            # Certificates & Cryptographic
-            'CERTIFICATE': [
-                re.compile(RegexPatterns.CERT_PEM),
-                re.compile(RegexPatterns.CERT_REQUEST_PEM),
-                re.compile(RegexPatterns.PRIVATE_KEY_PEM),
-                re.compile(RegexPatterns.CERT_DER),
-                re.compile(RegexPatterns.CERT_THUMBPRINT),
-            ],
-            'CRYPTOGRAPHIC_KEY': [
-                re.compile(RegexPatterns.RSA_MODULUS),
-                re.compile(RegexPatterns.JWT),
-                re.compile(RegexPatterns.BASE64_KEY),
-            ],
-            
-            # File System
-            'FILE_PATH': re.compile(RegexPatterns.USER_PATH),
-            
-            # PGP
-            'PGP_BLOCK': re.compile(RegexPatterns.PGP_BLOCK),
-        }
-        
-        # Count total patterns (including lists)
-        total_patterns = sum(
-            len(p) if isinstance(p, list) else 1 
-            for p in self.regex_patterns.values()
-        )
-        
-        self.logger.info(
-            f"Loaded {len(self.regex_patterns)} entity types "
-            f"({total_patterns} total patterns) from centralized RegexPatterns"
-        )
-    
     def _detect_entities(self, text: str) -> List[Dict]:
         """
         Detect entities using direct model execution (no Presidio).
@@ -233,73 +139,45 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
         - Validates entity boundaries against original text
         - Applies filtering based on entities_to_preserve
         """
+        from .engine import chunked_ner
         entities = []
         
-        # 1. Transformer-based NER
-        if not (self.slm_detector and self.slm_detector_mode == 'exclusive'):
-            try:
-                ner_results = self.ner_pipeline(text)
-                for result in ner_results:
-                    entity_type = self.entity_mapping.get(
-                        result["entity_group"], 
-                        result["entity_group"]
-                    )
-                    
-                    # Filter preserved entities
-                    if entity_type in self.entities_to_preserve:
-                        continue
-                    
-                    entities.append({
-                        "start": result["start"],
-                        "end": result["end"],
-                        "label": entity_type,
-                        "text": result["word"],
-                        "score": result["score"]
-                    })
-            except Exception as e:
-                self.logger.error(f"Transformer NER failed: {e}")
-        
-        # 2. Regex-based recognition (pure Python - no Presidio)
-        # Handle both single patterns and lists of patterns per entity type
-        for entity_type, patterns in self.regex_patterns.items():
-            # Normalize to list for uniform processing
-            pattern_list = patterns if isinstance(patterns, list) else [patterns]
-            
-            for pattern in pattern_list:
-                try:
-                    for match in pattern.finditer(text):
-                        # Filter preserved entities
-                        if entity_type in self.entities_to_preserve:
-                            continue
-                        
-                        entities.append({
-                            "start": match.start(),
-                            "end": match.end(),
-                            "label": entity_type,
-                            "text": match.group(),
-                            "score": 0.85  # Fixed confidence for regex
-                        })
-                except Exception as e:
-                    self.logger.warning(f"Regex pattern {entity_type} failed: {e}")
+        # 1. Transformer-based NER, over the whole text (the model alone stops
+        # at its 512-token window).
+        try:
+            ner_results = chunked_ner(self.ner_pipeline, text)
+            for result in ner_results:
+                if float(result["score"]) < self.score_threshold:
                     continue
-        
-        # 3. SLM detector (if enabled)
-        if self.slm_detector:
-            try:
-                slm_results = self.slm_detector.detect_entities([text], language=self.lang)
-                for result in slm_results:
-                    for start, end, label in result.get("label", []):
-                        if label in self.entities_to_preserve:
-                            continue
-                        entities.append({
-                            "start": start,
-                            "end": end,
-                            "label": label,
-                            "text": text[start:end],
-                            "score": 0.85
-                        })
-            except Exception as e:
-                self.logger.warning(f"SLM detector failed: {e}")
+                entity_type = self.entity_mapping.get(
+                    result["entity_group"], 
+                    result["entity_group"]
+                )
+
+                # Offsets of SentencePiece tokens include the leading space;
+                # replacing it would glue the pseudonym to the previous word.
+                start, end = result["start"], result["end"]
+                while start < end and text[start].isspace():
+                    start += 1
+                while end > start and text[end - 1].isspace():
+                    end -= 1
+                span = text[start:end]
+                if not span:
+                    continue
+
+                entities.append({
+                    "start": start,
+                    "end": end,
+                    "label": entity_type,
+                    "text": span,
+                    "score": float(result["score"])
+                })
+        except Exception as e:
+            self.logger.error(f"Transformer NER failed: {e}")
+            raise
+
+        # 2. Regex-based recognition (pure Python - no Presidio)
+        entities.extend(self.entity_detector.extract_regex_entities(text))
         
         return entities
     
@@ -363,7 +241,8 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
         - Handles empty input gracefully
         - Preserves input order in output
         - Manages cache consistency
-        - Logs errors without crashing entire batch
+        - Fails closed: a text that cannot be processed raises instead of
+          passing through unchanged
         """
         self.logger.debug("Executing StandaloneStrategy (zero Presidio dependencies)")
         
@@ -388,10 +267,8 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
                 # Detect entities
                 detected_entities = self._detect_entities(text)
                 
-                # Merge overlapping entities
-                merged_entities = self.entity_detector.merge_overlapping_entities(
-                    detected_entities
-                )
+                # Drop preserved / allow-listed spans, merge overlaps
+                merged_entities = self.entity_detector.finalize(text, detected_entities)
                 
                 # Generate anonymized text
                 anonymized_text, collected = self._generate_anonymized_text(
@@ -404,10 +281,10 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
                 collected_entities_total.extend(collected)
                 
             except Exception as e:
+                # Fail closed: writing the original text here would put raw PII
+                # in an output that looks anonymized.
                 self.logger.error(f"Failed to anonymize text at index {idx}: {e}")
-                # Fallback: return original text (or empty, depending on policy)
-                anonymized_results[idx] = text
-                continue
+                raise
         
         return anonymized_results, collected_entities_total
 
@@ -456,7 +333,7 @@ class RegexOnlyStrategy(StandaloneAnonymizationStrategy):
                 continue
             try:
                 detected = self.entity_detector.extract_regex_entities(text)
-                merged = self.entity_detector.merge_overlapping_entities(detected)
+                merged = self.entity_detector.finalize(text, detected)
 
                 parts: List[str] = []
                 cur = 0
@@ -475,7 +352,8 @@ class RegexOnlyStrategy(StandaloneAnonymizationStrategy):
                 anonymized_results[idx] = anonymized_text
                 collected_entities_total.extend(collected)
             except Exception as e:
+                # Fail closed (see StandaloneStrategy.anonymize).
                 self.logger.error(f"RegexOnlyStrategy failed at index {idx}: {e}")
-                anonymized_results[idx] = text
+                raise
 
         return anonymized_results, collected_entities_total
