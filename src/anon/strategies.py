@@ -213,8 +213,6 @@ class HybridPresidioStrategy(AnonymizationStrategy):
                  nlp_batch_size: int,
                  transformer_model: str,
                  entities_to_preserve: Set[str],
-                 slm_detector: Optional['SLMEntityDetector'] = None,
-                 slm_detector_mode: str = "hybrid",
                  score_threshold: Optional[float] = None,
                  entities_to_anonymize: Optional[Set[str]] = None):
         super().__init__()
@@ -227,8 +225,6 @@ class HybridPresidioStrategy(AnonymizationStrategy):
         self.nlp_batch_size = nlp_batch_size
         self.transformer_model = transformer_model
         self.entities_to_preserve = entities_to_preserve
-        self.slm_detector = slm_detector
-        self.slm_detector_mode = slm_detector_mode
         from .config import NerDefaults
         self.score_threshold = score_threshold if score_threshold is not None else NerDefaults.SCORE_THRESHOLD
         self.core_entities = self._get_core_entities()
@@ -280,8 +276,7 @@ class HybridPresidioStrategy(AnonymizationStrategy):
         """Anonymize a batch of texts using the filtered/hybrid NER pipeline.
 
         Uses a filtered entity scope and a custom replacement loop instead of
-        Presidio's AnonymizerEngine. Optionally merges SLM-detected entities
-        in hybrid mode or replaces standard detection entirely in exclusive mode.
+        Presidio's AnonymizerEngine.
 
         Args:
             texts: Raw input strings to anonymize.
@@ -291,7 +286,7 @@ class HybridPresidioStrategy(AnonymizationStrategy):
         Returns:
             A tuple of (anonymized_texts, collected_entities).
         """
-        self.logger.debug(f"Executing FastStrategy with SLM mode: {self.slm_detector_mode if self.slm_detector else 'off'}")
+        self.logger.debug("Executing HybridPresidioStrategy")
         if not texts: return [], []
 
         original_texts = [str(text) if pd.notna(text) else "" for text in texts]
@@ -333,42 +328,18 @@ class HybridPresidioStrategy(AnonymizationStrategy):
 
         for idx, (original_doc_text, analyzer_results) in enumerate(zip(texts_to_process_in_batch, analyzer_results_list)):
             
-            # --- Hybrid/Exclusive Detection Logic ---
-            detected_entities = []
-            
-            # Add transformer-detected entities (xlm-roberta)
-            if not (self.slm_detector and self.slm_detector_mode == 'exclusive'):
-                self.logger.debug("Running xlm-roberta entity detector.")
-                
-                # Convert Presidio results to entity format
-                for result in filter_ner_threshold(analyzer_results, self.score_threshold):
-                    detected_entities.append({
-                        "start": result.start,
-                        "end": result.end,
-                        "label": result.entity_type,
-                        "text": original_doc_text[result.start:result.end],
-                        "score": result.score
-                    })
+            # Convert Presidio results (transformer NER + registry recognizers) to entity format
+            detected_entities = [{
+                "start": result.start,
+                "end": result.end,
+                "label": result.entity_type,
+                "text": original_doc_text[result.start:result.end],
+                "score": result.score,
+            } for result in filter_ner_threshold(analyzer_results, self.score_threshold)]
 
-                # Word-list and custom patterns are not in the Presidio registry.
-                detected_entities.extend(self.entity_detector.extract_custom_entities(original_doc_text))
+            # Word-list and custom patterns are not in the Presidio registry.
+            detected_entities.extend(self.entity_detector.extract_custom_entities(original_doc_text))
 
-            # Run SLM detector if enabled
-            if self.slm_detector:
-                self.logger.debug(f"SLM detector enabled in '{self.slm_detector_mode}' mode.")
-                slm_results = self.slm_detector.detect_entities([original_doc_text], language=self.lang)
-                
-                # Convert SLM results to the same format as traditional results
-                for result in slm_results:
-                    for start, end, label in result.get("label", []):
-                        detected_entities.append({
-                            "start": start,
-                            "end": end,
-                            "label": label,
-                            "text": original_doc_text[start:end],
-                            "score": 0.85 # Assign a confident score for SLM entities
-                        })
-            
             # Merge all collected entities
             merged_entities = self.entity_detector.finalize(original_doc_text, detected_entities)
             
@@ -479,8 +450,6 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
         return HybridPresidioStrategy(
             nlp_engine=kwargs["analyzer_engine"],
             entity_detector=kwargs["entity_detector"],
-            slm_detector=kwargs.get("slm_detector"),
-            slm_detector_mode=kwargs.get("slm_detector_mode", "hybrid"),
             hash_generator=kwargs["hash_generator"],
             cache_manager=kwargs["cache_manager"],
             lang=kwargs["lang"],
@@ -501,8 +470,6 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             cache_manager=kwargs["cache_manager"],
             lang=kwargs["lang"],
             entities_to_preserve=kwargs["entities_to_preserve"],
-            slm_detector=kwargs.get("slm_detector"),
-            slm_detector_mode=kwargs.get("slm_detector_mode", "hybrid"),
             score_threshold=kwargs.get("score_threshold"),
             aggregation_strategy=kwargs.get("aggregation_strategy"),
         )

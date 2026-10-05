@@ -25,7 +25,7 @@ Every CLI option has a matching key in the config file. Below is the complete sc
 lang: en                     # string: document language (ISO 639-1 code)
 
 # ─── Anonymization strategy ─────────────────────────────────────────────────
-strategy: filtered           # string: filtered | presidio | hybrid | standalone | regex | slm
+strategy: filtered           # string: filtered | presidio | hybrid | standalone | regex
 
 # ─── NER transformer model ──────────────────────────────────────────────────
 transformer_model: Davlan/xlm-roberta-base-ner-hrl   # HuggingFace model ID

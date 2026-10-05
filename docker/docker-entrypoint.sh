@@ -9,7 +9,6 @@
 # Environment Variables:
 #   ANON_LAZY_LOADING  - Enable lazy loading (default: 1)
 #   ANON_PRELOAD       - Comma-separated list of models to preload
-#   OLLAMA_BASE_URL    - Ollama service URL (default: http://ollama:11434)
 #   ANON_SECRET_KEY    - Secret key for anonymization
 #
 # =============================================================================
@@ -44,7 +43,7 @@ log_error() {
 # =============================================================================
 
 needs_spacy_model() {
-    # spaCy is needed for all NER operations (unless --slm-only mode in future)
+    # spaCy is needed for all NER operations
     # Check if we're doing any anonymization or NER
     local args="$*"
 
@@ -71,9 +70,9 @@ needs_spacy_model() {
 needs_transformer_model() {
     local args="$*"
 
-    # Not needed for SLM-only or regex-only mode, nor for NER data generation
-    # (which runs on the spaCy pipeline)
-    if [[ "$args" =~ --anonymization-strategy[=\ ](slm|regex) ]] || [[ "$args" == *"--generate-ner-data"* ]]; then
+    # Not needed for regex-only mode, nor for NER data generation (which runs
+    # on the spaCy pipeline)
+    if [[ "$args" =~ --anonymization-strategy[=\ ]regex ]] || [[ "$args" == *"--generate-ner-data"* ]]; then
         return 1
     fi
 
@@ -88,17 +87,6 @@ needs_transformer_model() {
             return 0
         fi
     done
-
-    return 1
-}
-
-needs_ollama() {
-    local args="$*"
-
-    # Check for SLM-related flags
-    if [[ "$args" == *"--slm-"* ]] || [[ "$args" == *"--anonymization-strategy slm"* ]] || [[ "$args" == *"--anonymization-strategy=slm"* ]]; then
-        return 0
-    fi
 
     return 1
 }
@@ -198,57 +186,6 @@ print('Download complete')
     fi
 }
 
-wait_for_ollama() {
-    local url="${OLLAMA_BASE_URL:-http://ollama:11434}"
-    local max_attempts=30
-    local attempt=1
-
-    log_info "Waiting for Ollama service at $url..."
-
-    while [[ $attempt -le $max_attempts ]]; do
-        if curl -s "$url/api/tags" > /dev/null 2>&1; then
-            log_success "Ollama service is ready"
-            return 0
-        fi
-
-        log_info "Waiting for Ollama... (attempt $attempt/$max_attempts)"
-        sleep 2
-        ((attempt++))
-    done
-
-    log_error "Ollama service not available after $max_attempts attempts"
-    return 1
-}
-
-ensure_ollama_model() {
-    local model="${OLLAMA_MODEL:-llama3}"
-    local url="${OLLAMA_BASE_URL:-http://ollama:11434}"
-
-    log_info "Checking Ollama model: $model"
-
-    # Check if model exists
-    local models=$(curl -s "$url/api/tags" 2>/dev/null | grep -o '"name":"[^"]*"' | cut -d'"' -f4)
-
-    if echo "$models" | grep -q "^$model"; then
-        log_success "Ollama model '$model' is available"
-        return 0
-    fi
-
-    log_warn "Ollama model '$model' not found. Pulling..."
-
-    # Pull the model with progress
-    curl -s "$url/api/pull" -d "{\"name\": \"$model\"}" | while read -r line; do
-        local status=$(echo "$line" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-        if [[ -n "$status" ]]; then
-            echo -ne "\r${BLUE}[ollama]${NC} $status                    "
-        fi
-    done
-    echo ""
-
-    log_success "Ollama model '$model' pulled successfully"
-    return 0
-}
-
 # =============================================================================
 # Preload Handler (for ANON_PRELOAD environment variable)
 # =============================================================================
@@ -269,9 +206,6 @@ handle_preload() {
                 ;;
             transformer:*) 
                 ensure_transformer_model "${model#transformer:}"
-                ;;
-            ollama:*) 
-                wait_for_ollama && ensure_ollama_model "${model#ollama:}"
                 ;;
             en_core_web_lg|pt_core_news_lg|*_core_*)
                 ensure_spacy_model "$model"
@@ -316,11 +250,6 @@ main() {
         # The model is in the cache now: load it without asking the Hub for
         # updates, so a run makes no network call (and none fails offline).
         export HF_HUB_OFFLINE=1
-    fi
-
-    if needs_ollama "$@"; then
-        wait_for_ollama || exit 1
-        ensure_ollama_model || exit 1
     fi
 
     # Check if we should run unit tests instead of anon.py

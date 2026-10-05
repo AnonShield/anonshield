@@ -86,14 +86,13 @@ FROM python:3.12-slim AS runtime-base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     ANON_LAZY_LOADING=1 \
-    OLLAMA_BASE_URL="http://ollama:11434" \
     HF_HOME=/app/models/huggingface \
     TLDEXTRACT_CACHE=/app/.venv/tldextract-cache \
     PATH="/app/.venv/bin:$PATH" \
     VIRTUAL_ENV="/app/.venv"
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
-    bash curl \
+    bash \
     tesseract-ocr tesseract-ocr-por \
     libmagic1 libgomp1 \
     && rm -rf /var/lib/apt/lists/*
@@ -101,8 +100,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 # Drop perl from the runtime image. It ships in the Debian base as an Essential
 # package but the CLI (bash entrypoint + Python venv + tesseract) never invokes
 # it, and it carries the only two CRITICAL CVEs in the image plus three HIGH.
-# curl stays (the entrypoint uses it for the optional Ollama integration), libgif
-# stays (tesseract/leptonica image decoding), ncurses stays (bash).
+# libgif stays (tesseract/leptonica image decoding), ncurses stays (bash).
 RUN dpkg --purge --force-remove-essential --force-depends perl-base 2>/dev/null || true; \
     rm -rf /usr/share/doc/* /usr/share/man/* /var/lib/apt/lists/*
 

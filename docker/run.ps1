@@ -171,8 +171,7 @@ $NewArgs    = [System.Collections.Generic.List[string]]::new()
 # anon.py flags that take no value (store_true / store_false)
 $BoolFlags = @("--help", "--list-entities", "--list-languages", "--overwrite", "--no-report",
     "--preserve-row-context", "--optimize", "--use-cache", "--no-use-cache", "--skip-numeric",
-    "--regex-priority", "--disable-gc", "--force-large-xml", "--slm-map-entities", "--slm-detector",
-    "--no-auto-ollama", "--ollama-no-gpu", "--generate-ner-data", "--ner-include-all",
+    "--regex-priority", "--disable-gc", "--force-large-xml", "--generate-ner-data", "--ner-include-all",
     "--ner-aggregate-record", "--use-datasets")
 # Flags whose value is a file on the host: its directory is mounted read-only
 $FileFlags = @("--anonymization-config", "--word-list", "--custom-patterns", "--config")

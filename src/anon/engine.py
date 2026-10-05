@@ -572,8 +572,6 @@ class AnonymizationOrchestrator:
                  cache_manager: Optional[CacheStrategy] = None,
                  hash_generator: Optional[HashingStrategy] = None,
                  entity_detector: Optional[EntityDetector] = None,
-                 slm_detector: Optional[AnonymizationStrategy] = None,
-                 slm_detector_mode: str = "hybrid",
                  ner_data_generation: bool = False,
                  transformer_model: str = "Davlan/xlm-roberta-base-ner-hrl",
                  parallel_workers: int = 1,
@@ -613,8 +611,8 @@ class AnonymizationOrchestrator:
         if analyzer_engine and anonymizer_engine:
             self.analyzer_engine = analyzer_engine
             self.anonymizer_engine = anonymizer_engine
-        elif strategy_name in ("slm", "standalone", "regex") and not ner_data_generation:
-            # SLM, Standalone, and Regex-only strategies don't need Presidio engines.
+        elif strategy_name in ("standalone", "regex") and not ner_data_generation:
+            # Standalone and Regex-only strategies don't need Presidio engines.
             # NER data generation always does: detect_entities() runs on the analyzer.
             self.analyzer_engine = None
             self.anonymizer_engine = None
@@ -661,8 +659,6 @@ class AnonymizationOrchestrator:
                 analyzer_engine=self.analyzer_engine,
                 anonymizer_engine=self.anonymizer_engine,
                 entity_detector=self.entity_detector,
-                slm_detector=slm_detector,
-                slm_detector_mode=slm_detector_mode,
                 hash_generator=self.hash_generator,
                 cache_manager=self.cache_manager,
                 lang=self.presidio_lang if strategy_name in ("presidio", "filtered", "hybrid") else self.lang,

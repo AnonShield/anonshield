@@ -57,7 +57,6 @@ class Strategy(Enum):
     FILTERED = "filtered"  # Formerly "balanced" - Presidio with filtered scope (FASTEST)
     HYBRID = "hybrid"      # Formerly "fast" - Presidio detection + custom replacement
     STANDALONE = "standalone"  # NEW - Zero Presidio dependencies
-    SLM = "slm"
     # Legacy aliases for backwards compatibility
     FAST = "hybrid"        # Alias for HYBRID
     BALANCED = "filtered"  # Alias for FILTERED
@@ -130,7 +129,7 @@ VERSION_CONFIGS = {
         ),
         supports_directory=True,
         requires_secret_key=True,
-        strategies=(Strategy.PRESIDIO, Strategy.FILTERED, Strategy.HYBRID, Strategy.STANDALONE, Strategy.SLM)
+        strategies=(Strategy.PRESIDIO, Strategy.FILTERED, Strategy.HYBRID, Strategy.STANDALONE)
     ),
 }
 
@@ -1073,10 +1072,8 @@ class BenchmarkRunner:
             if self.cache_size is not None:
                 cmd.extend(["--max-cache-size", str(self.cache_size)])
 
-            # SLM uses Ollama, not Presidio — skip dataset/batch flags
-            if strategy != Strategy.SLM:
-                cmd.append("--use-datasets")
-                cmd.extend(["--batch-size", "auto"])
+            cmd.append("--use-datasets")
+            cmd.extend(["--batch-size", "auto"])
 
         return cmd
 
@@ -1506,10 +1503,8 @@ class DirectoryBenchmarkRunner:
             if self.cache_size is not None:
                 cmd.extend(["--max-cache-size", str(self.cache_size)])
 
-            # SLM uses Ollama, not Presidio — skip dataset/batch flags
-            if strategy != Strategy.SLM:
-                cmd.append("--use-datasets")
-                cmd.extend(["--batch-size", "auto"])
+            cmd.append("--use-datasets")
+            cmd.extend(["--batch-size", "auto"])
             cmd.extend(["--log-level", "INFO"])
 
         if self.config.version == AnonVersion.V2_0:
@@ -3127,7 +3122,7 @@ Examples:
                                  "invocation to eliminate per-file model loading overhead (~55-77s). "
                                  "v1.0 falls back to single-file mode. Records aggregate metrics.")
     bench_group.add_argument("--strategies", nargs="+",
-                            choices=["presidio", "filtered", "hybrid", "standalone", "slm", "fast", "balanced"],
+                            choices=["presidio", "filtered", "hybrid", "standalone", "fast", "balanced"],
                             help="Strategies to benchmark for AnonShield (default: all strategies). "
                                  "New names: 'filtered' (fastest, recommended), 'hybrid', 'standalone'. "
                                  "Legacy names 'fast' (=hybrid) and 'balanced' (=filtered) still work. "
@@ -3244,7 +3239,6 @@ def main():
             "filtered": Strategy.FILTERED,
             "hybrid": Strategy.HYBRID,
             "standalone": Strategy.STANDALONE,
-            "slm": Strategy.SLM,
             # Legacy aliases
             "fast": Strategy.HYBRID,
             "balanced": Strategy.FILTERED

@@ -18,8 +18,7 @@ graph TD
     subgraph "2. Anonymization Core"
         RawText -- "orchestrator.anonymize()" --> Orch;
         Orch -- "Selects Strategy (--strategy)" --> STR_CHOICE{Strategy};
-        STR_CHOICE -- "'presidio', 'filtered', 'hybrid', 'standalone'" --> PRESIDIO_STR(Traditional Strategy);
-        STR_CHOICE -- "'slm'" --> SLM_STR(SLM Strategy);
+        STR_CHOICE -- "'presidio', 'filtered', 'hybrid', 'standalone', 'regex'" --> PRESIDIO_STR(Traditional Strategy);
     end
 
     subgraph "3. Traditional Engine (Presidio/Regex)"
@@ -29,11 +28,6 @@ graph TD
         Presidio -- "Generates Slug" --> Anonymizer(CustomSlugAnonymizer);
         Anonymizer -- "HMAC + DB" --> DB[(entities.db)];
         Anonymizer -- "Replaces PII" --> AnonymizedText[Anonymized Text];
-    end
-
-    subgraph "3b. SLM Engine (Ollama)"
-        SLM_STR -- "Queries" --> Ollama(OllamaClient);
-        Ollama -- "Local LLM inference" --> AnonymizedText;
     end
 
     subgraph "4. Output Generation"
@@ -259,11 +253,6 @@ After batch processing, the orchestrator verifies input count == output count. O
 │   │   ├── base.py                  # OCREngine ABC
 │   │   ├── factory.py               # get_ocr_engine(name) factory
 │   │   └── tesseract_engine.py      # Tesseract (default)
-│   ├── slm/                         # Small Language Model integration
-│   │   ├── client.py                # OllamaClient (SLMClient protocol)
-│   │   ├── prompts.py               # PromptManager
-│   │   ├── prompts/                 # Prompt templates ({task}/{version}_{lang}.json)
-│   │   ├── ollama_manager.py        # Ollama process management
 │   ├── evaluation/                  # Evaluation support (Internal)
 │   │   ├── ground_truth.py          # Ground truth loading
 │   │   ├── hash_tracker.py          # Hash tracking for evaluation
@@ -272,7 +261,6 @@ After batch processing, the orchestrator verifies input count == output count. O
 ├── scripts/                         # Utility scripts
 │   ├── deanonymize.py               # Controlled de-anonymization
 │   ├── export_and_clear_db.py       # DB export/clear
-│   ├── slm_regex_generator.py       # Entity map analysis
 │   └── utils.py                     # Shared utilities
 │
 ├── tests/                           # Unit and integration tests
@@ -281,7 +269,6 @@ After batch processing, the orchestrator verifies input count == output count. O
         ├── ARCHITECTURE.md
         ├── ANONYMIZATION_STRATEGIES.md
         ├── EXTENSIBILITY.md
-        ├── SLM_INTEGRATION_GUIDE.md
         └── UTILITY_SCRIPTS_GUIDE.md
 ```
 
@@ -289,8 +276,7 @@ After batch processing, the orchestrator verifies input count == output count. O
 
 ### See Also
 
-- [Extensibility Guide](EXTENSIBILITY.md): all extension points with worked examples (strategies, processors, cache, storage, SLM client, model providers, etc.)
+- [Extensibility Guide](EXTENSIBILITY.md): all extension points with worked examples (strategies, processors, cache, storage, model providers, etc.)
 - [Anonymization Strategies](ANONYMIZATION_STRATEGIES.md): detailed description of each built-in strategy
-- [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md): deep dive into the SLM module architecture
 - [Contributing](../../.github/CONTRIBUTING.md): development setup, conventions, and pull-request process
 - [Changelog](../../.github/CHANGELOG.md): release history

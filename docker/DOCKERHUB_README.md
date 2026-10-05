@@ -222,7 +222,7 @@ When `--lang pt` is set, additional Brazilian recognizers are enabled (for examp
 
 ## Anonymization Strategies
 
-Choose with `--anonymization-strategy <name>`. The four production strategies are `filtered` (default), `hybrid`, `standalone`, and `presidio`. A `regex` strategy (pure pattern matching, no ML) and an experimental `slm` strategy are also available; see the [strategies guide](https://github.com/AnonShield/anonshield/blob/main/docs/developers/ANONYMIZATION_STRATEGIES.md).
+Choose with `--anonymization-strategy <name>`. The four production strategies are `filtered` (default), `hybrid`, `standalone`, and `presidio`. A `regex` strategy (pure pattern matching, no ML) is also available; see the [strategies guide](https://github.com/AnonShield/anonshield/blob/main/docs/developers/ANONYMIZATION_STRATEGIES.md).
 
 | Strategy | What it does | Best for |
 |----------|--------------|----------|

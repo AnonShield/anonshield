@@ -46,12 +46,8 @@ class DefaultSizes:
     JSON_CHUNK_SIZE = 1000
     NER_CHUNK_SIZE = 1500
     NLP_BATCH_SIZE = 500
-    SLM_MAPPER_CHUNK_SIZE = 1500
-    SLM_ANONYMIZER_CHUNK_SIZE = 1500  # Max chars per chunk for SLM anonymization
     DEFAULT_SLUG_LENGTH = 64
     DEFAULT_MIN_WORD_LENGTH = 0
-    DEFAULT_SLM_CONFIDENCE_THRESHOLD = 0.7
-    DEFAULT_SLM_CONTEXT_WINDOW = 50
 
 # --- Model Configuration ---
 TRANSFORMER_MODEL = "Davlan/xlm-roberta-base-ner-hrl"
@@ -114,15 +110,4 @@ SECURE_MODERNBERT_ENTITY_MAPPING = {
     "CAMPAIGN": "CAMPAIGN",
     "MITRE_TACTIC": "MITRE_TACTIC",
     "SERVICE": "SERVICE",
-}
-
-# --- LLM Configuration ---
-LLM_CONFIG = {
-    "provider": os.getenv("LLM_PROVIDER", "ollama"), # Prepares for future providers
-    "ollama": {
-        "base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-        "model": os.getenv("OLLAMA_MODEL", "llama3"),
-        "timeout": 120,
-        "temperature": 0.05, # Lower temp for more deterministic output
-    }
 }

@@ -16,9 +16,7 @@ This guide documents every extension point in AnonShield. Each section covers on
 8. [Entity Storage](#8-entity-storage)
 9. [Secret Manager](#9-secret-manager)
 10. [Entity Detector](#10-entity-detector)
-11. [SLM Client](#11-slm-client)
-12. [SLM Prompts](#12-slm-prompts)
-13. [Dependency Injection Reference](#13-dependency-injection-reference)
+11. [Dependency Injection Reference](#11-dependency-injection-reference)
 
 ---
 
@@ -39,8 +37,6 @@ AnonShield is designed around three complementary patterns:
 | Hashing strategy | `HashingStrategy` (Protocol) | `src/anon/core/protocols.py` | Pass to `AnonymizationOrchestrator.__init__()` |
 | Secret manager | `SecretManager` (Protocol) | `src/anon/core/protocols.py` | Swap `SecretManagerImpl` at construction |
 | Entity detector | `EntityDetector` (class) | `src/anon/entity_detector.py` | Pass to `AnonymizationOrchestrator.__init__()` |
-| SLM client | `SLMClient` (Protocol) | `src/anon/slm/client.py` | Pass to `SLMEntityDetector` / `SLMFullAnonymizer` |
-| SLM prompts | `PromptManager` (class) | `src/anon/slm/prompts.py` | Pass to SLM detectors/anonymizers |
 | Regex patterns | `RegexPatterns` (class) | `src/anon/engine.py` | Add attribute + entry in `load_custom_recognizers()` |
 | Entity type mapping | `ENTITY_MAPPING` dict | `src/anon/config.py` | Add key-value pair |
 | Transformer model | string identifier | `--transformer-model` CLI flag | Add mapping in `_setup_engines()` |
@@ -793,176 +789,7 @@ orchestrator = AnonymizationOrchestrator(
 
 ---
 
-## 11. SLM Client
-
-**File:** `src/anon/slm/client.py`
-
-### 11.1 Interface
-
-```python
-class SLMClient(Protocol):
-    def query(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
-        **kwargs,
-    ) -> SLMResponse:
-        """Send a prompt and return a structured response."""
-        ...
-
-    def query_json(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """Send a prompt and parse the JSON response body."""
-        ...
-```
-
-`SLMResponse` is a dataclass with at minimum:
-
-```python
-@dataclass
-class SLMResponse:
-    content: str          # Raw text response
-    model: str            # Model identifier
-    tokens_used: int      # Total tokens consumed
-    success: bool         # Whether the request succeeded
-    error: Optional[str]  # Error message if not success
-```
-
-### 11.2 Default implementation: `OllamaClient`
-
-```python
-OllamaClient(
-    model="llama3",
-    base_url="http://localhost:11434",
-    timeout=120,
-    temperature=None,        # Use model default
-    max_retries=3,
-    auto_manage=True,        # Start/stop Ollama service automatically
-    docker_image=None,       # Pull from Docker Hub if set
-    container_name=None,
-    gpu_enabled=True,
-)
-```
-
-### 11.3 Example: OpenAI-compatible client
-
-```python
-import openai
-from src.anon.slm.client import SLMResponse
-
-class OpenAIClient:
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
-        self._client = openai.OpenAI(api_key=api_key)
-        self._model = model
-
-    def query(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> SLMResponse:
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-
-        try:
-            resp = self._client.chat.completions.create(
-                model=self._model,
-                messages=messages,
-            )
-            return SLMResponse(
-                content=resp.choices[0].message.content,
-                model=self._model,
-                tokens_used=resp.usage.total_tokens,
-                success=True,
-                error=None,
-            )
-        except Exception as exc:
-            return SLMResponse(content="", model=self._model,
-                               tokens_used=0, success=False, error=str(exc))
-
-    def query_json(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> dict:
-        import json
-        response = self.query(prompt, system_prompt, **kwargs)
-        return json.loads(response.content)
-```
-
-Pass the client to the SLM layer:
-
-```python
-from src.anon.slm.detectors.slm_detector import SLMEntityDetector
-from src.anon.slm.prompts import PromptManager
-
-slm_client = OpenAIClient(api_key="sk-...")
-prompt_mgr  = PromptManager(base_path="src/anon/slm/prompt_templates/")
-
-slm_detector = SLMEntityDetector(
-    slm_client=slm_client,
-    prompt_manager=prompt_mgr,
-    entities_to_preserve={"TOOL", "PLATFORM"},
-    allow_list=set(),
-    confidence_threshold=0.7,
-)
-```
-
----
-
-## 12. SLM Prompts
-
-**File:** `src/anon/slm/prompts.py`
-
-### 12.1 Directory layout
-
-```
-src/anon/slm/prompt_templates/
-├── entity_mapper/
-│   ├── v1_en.json
-│   └── v1_pt.json
-├── entity_detector/
-│   └── v1_en.json
-└── full_anonymizer/
-    └── v1_en.json
-```
-
-### 12.2 Prompt JSON format
-
-```json
-{
-  "system": "You are a privacy expert. Identify all PII in the text.",
-  "user": "Text: {text}\n\nIdentify all PII entities and return JSON.",
-  "version": "v1",
-  "language": "en"
-}
-```
-
-Placeholders (`{text}`, `{entities}`, etc.) are filled by `PromptTemplate.format(**kwargs)`.
-
-### 12.3 Adding a custom prompt
-
-1. Create `src/anon/slm/prompt_templates/entity_detector/v2_en.json` with your improved system/user prompts.
-2. Pass `prompt_version="v2"` when constructing `SLMEntityDetector`:
-
-```python
-SLMEntityDetector(
-    ...,
-    prompt_version="v2",
-)
-```
-
-Or via CLI:
-
-```bash
-uv run anon.py file.csv --slm-detector --slm-prompt-version v2
-```
-
-### 12.4 Adding a new task type
-
-1. Create the directory: `src/anon/slm/prompt_templates/my_task/v1_en.json`.
-2. Use `PromptManager.get("my_task", language="en", version="v1")` in your code.
-
----
-
-## 13. Dependency Injection Reference
+## 11. Dependency Injection Reference
 
 All injectable dependencies are passed to `AnonymizationOrchestrator.__init__()`. Below is the complete constructor signature with the Protocol or ABC each parameter must satisfy.
 
@@ -982,10 +809,6 @@ AnonymizationOrchestrator(
     cache_manager   = my_cache,                    # CacheStrategy Protocol
     hash_generator  = my_hasher,                   # HashingStrategy Protocol
     entity_detector = my_detector,                 # EntityDetector instance
-
-    # Optional: SLM
-    slm_detector    = my_slm_detector,             # AnonymizationStrategy-compatible
-    slm_detector_mode = "hybrid",                  # "hybrid" | "exclusive"
 
     # Optional: model / engine
     transformer_model = "attack-vector/SecureModernBERT-NER",
@@ -1009,5 +832,4 @@ If a component is not provided, the orchestrator creates a safe default (e.g. a 
 
 - [Architecture Reference](ARCHITECTURE.md): system design and module responsibilities
 - [Anonymization Strategies](ANONYMIZATION_STRATEGIES.md): detailed description of each built-in strategy
-- [SLM Integration Guide](SLM_INTEGRATION_GUIDE.md): deep dive into the SLM module architecture
 - [Contributing](../../.github/CONTRIBUTING.md): development setup, conventions, and pull-request process

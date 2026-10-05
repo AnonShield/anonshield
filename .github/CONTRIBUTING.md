@@ -56,7 +56,6 @@ src/anon/                 # Core library
   strategies.py           # Built-in anonymization strategies
   processors.py           # File-format processors
   entity_detector.py      # NER (spaCy + Transformers)
-  slm/                    # Small Language Model integration
 scripts/                  # Utility/analysis scripts
 tests/                    # Test suite (unittest)
 benchmark/                # Benchmarking suite
@@ -136,7 +135,6 @@ The most common extension points are:
 | New entity type / regex | [Section 4 of EXTENSIBILITY.md](../docs/developers/EXTENSIBILITY.md#4-entity-types-and-regex-patterns) |
 | New transformer model | [Section 5 of EXTENSIBILITY.md](../docs/developers/EXTENSIBILITY.md#5-transformer-models) |
 | Custom cache / hash / storage | [Sections 6-8 of EXTENSIBILITY.md](../docs/developers/EXTENSIBILITY.md#6-cache-backend) |
-| New SLM backend | [Section 11 of EXTENSIBILITY.md](../docs/developers/EXTENSIBILITY.md#11-slm-client) |
 
 For larger changes (new strategies, new processors), open an issue first to discuss the approach before writing code.
 
@@ -169,7 +167,7 @@ feat: add ODS file processor
 
 fix: handle empty text chunks in fallback path
 
-docs: add worked example for custom SLM client
+docs: add worked example for a custom cache backend
 ```
 
 Keep the subject line under 72 characters. Use the commit body for motivation and context when needed.
@@ -178,7 +176,7 @@ Keep the subject line under 72 characters. Use the commit body for motivation an
 
 ## 7. Pull Request Process
 
-1. **Branch** off `main` with a descriptive name: `feat/xml-streaming`, `fix/csv-empty-header`, `docs/slm-guide-update`.
+1. **Branch** off `main` with a descriptive name: `feat/xml-streaming`, `fix/csv-empty-header`, `docs/cli-reference-update`.
 2. **Write tests** that cover the change. All existing tests must continue to pass.
 3. **Update documentation**: if you change a public interface or add an extension point, update the relevant file in `docs/developers/`.
 4. **Open the PR** against `main`. Fill in the PR description:

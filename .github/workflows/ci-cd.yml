@@ -95,7 +95,7 @@ jobs:
           key: hf-models-v1
       - if: needs.changes.outputs.python == 'true'
         name: Run tests
-        run: uv run pytest -m "not slow and not slm and not ocr" -q --timeout=300
+        run: uv run pytest -m "not slow and not ocr" -q --timeout=300
 
   frontend:
     name: Frontend build

@@ -155,8 +155,7 @@ NEW_ARGS=()
 # anon.py flags that take no value (store_true / store_false)
 BOOL_FLAGS=" --help --list-entities --list-languages --overwrite --no-report \
  --preserve-row-context --optimize --use-cache --no-use-cache --skip-numeric \
- --regex-priority --disable-gc --force-large-xml --slm-map-entities --slm-detector \
- --no-auto-ollama --ollama-no-gpu --generate-ner-data --ner-include-all \
+ --regex-priority --disable-gc --force-large-xml --generate-ner-data --ner-include-all \
  --ner-aggregate-record --use-datasets "
 is_bool_flag() { [[ "$BOOL_FLAGS" == *" $1 "* ]]; }
 

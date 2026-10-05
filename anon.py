@@ -11,24 +11,17 @@ import json
 import torch
 import spacy
 import time
-import csv
 import signal
 from pathlib import Path
-import threading
-import queue
 import pandas as pd
 
 
 from src.anon.config import (
-    ENTITY_MAPPING,
     SECRET_KEY,
     TRANSFORMER_MODEL,
-    TRF_MODEL_PATH,
-    MODELS_DIR,
     ProcessingLimits,
     DefaultSizes,
     Global,
-    LLM_CONFIG,
     NerDefaults
 )
 from src.anon.database import DatabaseContext
@@ -37,121 +30,10 @@ from src.anon.processors import ProcessorRegistry
 from src.anon.cache_manager import CacheManager
 from src.anon.hash_generator import HashGenerator
 from src.anon.entity_detector import EntityDetector
-from src.anon.slm.client import OllamaClient
-from src.anon.slm.prompts import PromptManager
-from src.anon.slm.mappers.entity_mapper import SLMEntityMapper, EntityMapperExporter
-from src.anon.slm.detectors.slm_detector import SLMEntityDetector
-from src.anon.slm.anonymizers.slm_anonymizer import SLMAnonymizationStrategy, SLMFullAnonymizer
 from src.anon.tqdm_handler import TqdmLoggingHandler
 
 warnings.filterwarnings("ignore")
 logging.getLogger("transformers").setLevel(logging.ERROR)
-
-
-
-
-
-
-def _handle_slm_entity_mapping(args):
-    """Orchestrates the SLM entity mapping process with threaded, progressive writing."""
-    logging.info("Starting SLM Entity Mapping process...")
-
-    if not args.file_path or not os.path.exists(args.file_path):
-        logging.error(f"File not found: {args.file_path}")
-        sys.exit(1)
-
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    base_name = Path(args.file_path).stem
-    jsonl_output_path = output_dir / f"{base_name}_entity_map.jsonl"
-    csv_output_path = output_dir / f"{base_name}_entity_map.csv"
-
-    # 1. Setup Producer-Consumer Queue
-    write_queue = queue.Queue()
-
-    # 2. Define the Consumer (Writer) Thread
-    def writer_worker(q, jsonl_path, csv_path):
-        try:
-            with open(jsonl_path, 'w', encoding='utf-8') as jf, \
-                 open(csv_path, 'w', newline='', encoding='utf-8') as cf:
-                
-                csv_writer = csv.writer(cf)
-                csv_writer.writerow(["Text", "Entity Type", "Start", "End", "Confidence", "Reason", "Context"])
-
-                while True:
-                    item = q.get()
-                    if item is None:  # Sentinel value to stop the thread
-                        break
-                    
-                    # Write to both files
-                    jf.write(json.dumps(item.to_dict()) + '\n')
-                    csv_writer.writerow([
-                        item.text, item.entity_type, item.start, 
-                        item.end, item.confidence, item.reason, item.context
-                    ])
-                    q.task_done()
-        except Exception as e:
-            logging.error(f"Error in writer thread: {e}", exc_info=True)
-
-    # 3. Start the writer thread
-    writer_thread = threading.Thread(target=writer_worker, args=(write_queue, jsonl_output_path, csv_output_path))
-    writer_thread.daemon = True # Allows main thread to exit even if writer is blocked
-    writer_thread.start()
-
-    # 4. Graceful shutdown handler
-    def graceful_shutdown(signum, frame):
-        logging.warning(f"Interrupt signal ({signum}) received. Draining queue and exiting.")
-        write_queue.put(None)  # Signal writer to stop
-        writer_thread.join()   # Wait for writer to finish
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, graceful_shutdown)
-    signal.signal(signal.SIGTERM, graceful_shutdown)
-
-    # 5. Main (Producer) Logic
-    try:
-        ollama_config = LLM_CONFIG["ollama"]
-        client = OllamaClient(
-            model=ollama_config["model"],
-            base_url=ollama_config["base_url"],
-            timeout=300,
-            temperature=args.slm_temperature,
-            max_retries=5,
-            auto_manage=not args.no_auto_ollama,
-            docker_image=args.ollama_docker_image,
-            container_name=args.ollama_container_name,
-            gpu_enabled=not args.ollama_no_gpu
-        )
-        prompt_manager = PromptManager()
-        mapper = SLMEntityMapper(
-            client, 
-            prompt_manager,
-            max_chunk_size=args.slm_chunk_size,
-            confidence_threshold=args.slm_confidence_threshold,
-            context_window=args.slm_context_window
-        )
-
-        logging.info(f"Processing file '{args.file_path}'...")
-        with open(args.file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # The stream is now the producer
-        entity_stream = mapper.map_entities_stream(content, language=args.lang, prompt_version=args.slm_prompt_version)
-        
-        for entity in entity_stream:
-            write_queue.put(entity)
-
-        logging.info("Finished processing file. Waiting for writer to complete...")
-
-    except Exception as e:
-        logging.error(f"An error occurred during SLM entity mapping: {e}", exc_info=True)
-    finally:
-        # 6. Signal writer to finish and wait
-        write_queue.put(None)
-        writer_thread.join()
-        logging.info(f"Progressive entity map (JSONL) saved to: {jsonl_output_path}")
-        logging.info(f"Progressive entity map (CSV) saved to: {csv_output_path}")
-
 
 
 def _install_spacy_model(model: str) -> None:
@@ -225,13 +107,12 @@ def get_supported_entities(
     """Return a sorted list of entity types detectable for a given strategy + model combination.
 
     Args:
-        strategy_name: One of presidio / filtered / hybrid / standalone / regex / slm.
+        strategy_name: One of presidio / filtered / hybrid / standalone / regex.
         transformer_model: HuggingFace model ID used for NER.
 
     Entity sources per strategy:
         presidio / filtered / hybrid  → custom regex + Presidio built-ins + NER model labels
         standalone / regex            → custom regex + NER model labels  (no Presidio engine)
-        slm                           → custom regex + NER model labels  (SLM output is open-ended)
     """
     from src.anon.model_registry import get_entity_mapping
     from presidio_analyzer import RecognizerRegistry  # type: ignore
@@ -320,14 +201,13 @@ def _parse_arguments():
     parser.add_argument("--min-word-length", type=int, default=DefaultSizes.DEFAULT_MIN_WORD_LENGTH, help=f"Minimum character length for a word to be processed. Default: {DefaultSizes.DEFAULT_MIN_WORD_LENGTH} (no limit).")
     parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized.")
     parser.add_argument("--anonymization-strategy", type=str, default="filtered",
-                       choices=["presidio", "filtered", "hybrid", "standalone", "regex", "slm"],
+                       choices=["presidio", "filtered", "hybrid", "standalone", "regex"],
                        help="Anonymization strategy. "
                             "'filtered': Presidio pipeline with curated recognizer scope (default, best accuracy). "
                             "'presidio': Full Presidio pipeline. "
                             "'hybrid': Presidio detection + custom replacement. "
                             "'standalone': Zero Presidio dependencies, fastest on GPU. "
-                            "'regex': Pure regex matching only, zero NLP/ML overhead (fastest). "
-                            "'slm': End-to-end SLM anonymization (experimental).")
+                            "'regex': Pure regex matching only, zero NLP/ML overhead (fastest).")
     parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
     parser.add_argument("--transformer-model", type=str, default=TRANSFORMER_MODEL, help=f"Transformer model for NER detection. Options: 'Davlan/xlm-roberta-base-ner-hrl' (default, multilingual), 'attack-vector/SecureModernBERT-NER' (cybersecurity-focused). Default: {TRANSFORMER_MODEL}.")
     parser.add_argument("--ner-score-threshold", type=float, default=NerDefaults.SCORE_THRESHOLD, help=f"Minimum confidence score (0.0-1.0) for a transformer NER detection to be kept. Lower values increase recall (catch more entities like surnames) at the cost of more false positives. Default: {NerDefaults.SCORE_THRESHOLD}.")
@@ -338,25 +218,6 @@ def _parse_arguments():
     parser.add_argument("--db-synchronous-mode", type=str, default=None, choices=["OFF", "NORMAL", "FULL", "EXTRA"], help="SQLite 'synchronous' PRAGMA mode. Overrides config file setting.")
     parser.add_argument("--log-level", type=str, default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level (default: WARNING).")
     parser.add_argument("--force-large-xml", action="store_true", help="Force processing of XML files exceeding memory safety thresholds. Use with caution as it may lead to Out-of-Memory errors.")
-
-    # SLM Options (experimental - under development)
-    slm_group = parser.add_argument_group('SLM Options (experimental - under development)')
-    slm_group.add_argument("--slm-map-entities", action="store_true", help="[experimental] Use SLM to map potential entities for analysis. Does not anonymize.")
-    slm_group.add_argument("--slm-detector", action="store_true", help="[experimental] Use SLM as an entity detector alongside traditional NER methods.")
-    slm_group.add_argument("--slm-detector-mode", type=str, default="hybrid", choices=["hybrid", "exclusive"], help="[experimental] Mode for the SLM detector: 'hybrid' merges with traditional NER, 'exclusive' uses only SLM results.")
-    slm_group.add_argument("--slm-prompt-version", type=str, default="v1", help="[experimental] Prompt version to use for SLM tasks.")
-    slm_group.add_argument("--slm-chunk-size", type=int, default=DefaultSizes.SLM_MAPPER_CHUNK_SIZE, help=f"[experimental] Max character size for chunks sent to the SLM mapper. Default: {DefaultSizes.SLM_MAPPER_CHUNK_SIZE}.")
-    slm_group.add_argument("--slm-anonymizer-chunk-size", type=int, default=DefaultSizes.SLM_ANONYMIZER_CHUNK_SIZE, help=f"[experimental] Max character size for chunks sent to the SLM anonymizer. Default: {DefaultSizes.SLM_ANONYMIZER_CHUNK_SIZE}.")
-    slm_group.add_argument("--slm-confidence-threshold", type=float, default=DefaultSizes.DEFAULT_SLM_CONFIDENCE_THRESHOLD, help=f"[experimental] Minimum confidence score for entities from the SLM mapper. Default: {DefaultSizes.DEFAULT_SLM_CONFIDENCE_THRESHOLD}.")
-    slm_group.add_argument("--slm-context-window", type=int, default=DefaultSizes.DEFAULT_SLM_CONTEXT_WINDOW, help=f"[experimental] Character window size for context extraction in SLM mapper. Default: {DefaultSizes.DEFAULT_SLM_CONTEXT_WINDOW}.")
-    slm_group.add_argument("--slm-temperature", type=float, default=LLM_CONFIG['ollama']['temperature'], help=f"[experimental] Temperature for the SLM model. Default: {LLM_CONFIG['ollama']['temperature']}.")
-
-    # Ollama Service Options (experimental - under development)
-    ollama_group = parser.add_argument_group('Ollama Service Options (experimental - under development)')
-    ollama_group.add_argument("--no-auto-ollama", action="store_true", help="[experimental] Disable automatic Ollama Docker management.")
-    ollama_group.add_argument("--ollama-docker-image", type=str, default="ollama/ollama:latest", help="[experimental] Docker image for Ollama. Default: ollama/ollama:latest")
-    ollama_group.add_argument("--ollama-container-name", type=str, default="ollama-anon", help="[experimental] Docker container name for Ollama. Default: ollama-anon")
-    ollama_group.add_argument("--ollama-no-gpu", action="store_true", help="[experimental] Disable GPU support when starting Ollama Docker container.")
 
     # NER Data Generation Options
     ner_group = parser.add_argument_group('NER Data Generation Options')
@@ -402,7 +263,7 @@ def _parse_arguments():
     if args.slug_length is not None and not (0 <= args.slug_length <= 64):
         parser.error("--slug-length must be between 0 and 64.")
 
-    if not args.file_path and not (args.list_entities or args.list_languages or args.slm_map_entities):
+    if not args.file_path and not (args.list_entities or args.list_languages):
         parser.error("A file path must be provided.")
 
     # Handle the --optimize flag
@@ -561,11 +422,6 @@ def main():
                          "presidio_analyzer.nlp_engine",
                          "transformers", "sentence_transformers"):
         logging.getLogger(noisy_logger).setLevel(logging.WARNING)
-
-    # --- Task 1: SLM Entity Mapping ---
-    if args.slm_map_entities:
-        _handle_slm_entity_mapping(args)
-        sys.exit(0)
 
     logging.info("Starting anonymization process...")
 
@@ -773,60 +629,6 @@ def main():
             custom_patterns=extra_patterns,
         )
 
-        slm_detector_instance = None
-        if args.slm_detector:
-            logging.info("SLM detector enabled for hybrid mode (Task 2).")
-            try:
-                ollama_config = LLM_CONFIG["ollama"]
-                client = OllamaClient(
-                    model=ollama_config["model"],
-                    base_url=ollama_config["base_url"],
-                    auto_manage=not args.no_auto_ollama,
-                    docker_image=args.ollama_docker_image,
-                    container_name=args.ollama_container_name,
-                    gpu_enabled=not args.ollama_no_gpu
-                )
-                prompt_manager = PromptManager()
-                slm_detector_instance = SLMEntityDetector(
-                    slm_client=client,
-                    prompt_manager=prompt_manager,
-                    entities_to_preserve=set(entities_to_preserve),
-                    allow_list=set(allow_list),
-                    prompt_version=args.slm_prompt_version
-                )
-            except Exception as e:
-                logging.error(f"Failed to initialize SLM detector, proceeding without it. Error: {e}")
-
-        # --- Strategy Setup (SLM or Traditional) ---
-        strategy_instance = None
-        if args.anonymization_strategy == "slm":
-            logging.info("Using 'slm' end-to-end anonymization strategy (Task 3).")
-            try:
-                ollama_config = LLM_CONFIG["ollama"]
-                client = OllamaClient(
-                    model=ollama_config["model"],
-                    base_url=ollama_config["base_url"],
-                    auto_manage=not args.no_auto_ollama,
-                    docker_image=args.ollama_docker_image,
-                    container_name=args.ollama_container_name,
-                    gpu_enabled=not args.ollama_no_gpu
-                )
-                prompt_manager = PromptManager()
-                slm_anonymizer = SLMFullAnonymizer(
-                    slm_client=client,
-                    prompt_manager=prompt_manager,
-                    max_chunk_size=args.slm_anonymizer_chunk_size
-                )
-                strategy_instance = SLMAnonymizationStrategy(
-                    slm_anonymizer=slm_anonymizer,
-                    cache_manager=cache_manager,
-                    lang=args.lang
-                )
-                logging.info(f"SLM strategy initialized with cache_manager (use_cache={args.use_cache}, max_size={args.max_cache_size})")
-            except Exception as e:
-                logging.critical(f"Failed to initialize SLM strategy. Error: {e}. Aborting.")
-                sys.exit(1)
-        
         # --- Orchestrator ---
         orchestrator = AnonymizationOrchestrator(
             lang=args.lang,
@@ -834,15 +636,12 @@ def main():
             allow_list=allow_list, 
             entities_to_preserve=entities_to_preserve,
             slug_length=args.slug_length,
-            strategy=strategy_instance,
             strategy_name=args.anonymization_strategy,
             regex_priority=args.regex_priority,
             nlp_batch_size=args.nlp_batch_size,
             cache_manager=cache_manager,
             hash_generator=hash_generator,
             entity_detector=entity_detector,
-            slm_detector=slm_detector_instance,
-            slm_detector_mode=args.slm_detector_mode,
             ner_data_generation=args.generate_ner_data,
             transformer_model=args.transformer_model,
             ner_score_threshold=args.ner_score_threshold,

@@ -91,7 +91,7 @@ def calculate_adaptive_batch_size(
     
     Args:
         file_path: Path to the file being processed
-        strategy_name: Anonymization strategy (presidio, filtered, hybrid, standalone, slm)
+        strategy_name: Anonymization strategy (presidio, filtered, hybrid, standalone, regex)
         csv_columns: Number of columns (for CSV files)
         sample_text_lengths: Sample of text lengths for estimation
     
@@ -105,7 +105,6 @@ def calculate_adaptive_batch_size(
         "hybrid": 1200,       # Hybrid with custom logic (GPU-optimized)
         "standalone": 1500,   # Zero Presidio, direct model execution
         "regex": 5000,        # Pure regex, zero ML overhead (fastest)
-        "slm": 300            # SLM strategy (LLM calls)
     }
     
     base_size = strategy_base.get(strategy_name, 1000)

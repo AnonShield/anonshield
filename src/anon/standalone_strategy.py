@@ -64,8 +64,6 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
                  cache_manager: CacheStrategy,
                  lang: str,
                  entities_to_preserve: Set[str],
-                 slm_detector: Optional['SLMEntityDetector'] = None,
-                 slm_detector_mode: str = "hybrid",
                  score_threshold: Optional[float] = None,
                  aggregation_strategy: Optional[str] = None):
         super().__init__()
@@ -77,8 +75,6 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
         self.cache_manager = cache_manager
         self.lang = lang
         self.entities_to_preserve = entities_to_preserve
-        self.slm_detector = slm_detector
-        self.slm_detector_mode = slm_detector_mode
         self.score_threshold = score_threshold if score_threshold is not None else NerDefaults.SCORE_THRESHOLD
         self.aggregation_strategy = aggregation_strategy or NerDefaults.AGGREGATION_STRATEGY
         self.entity_mapping = get_entity_mapping(self.transformer_model)
@@ -148,57 +144,40 @@ class StandaloneStrategy(StandaloneAnonymizationStrategy):
         
         # 1. Transformer-based NER, over the whole text (the model alone stops
         # at its 512-token window).
-        if not (self.slm_detector and self.slm_detector_mode == 'exclusive'):
-            try:
-                ner_results = chunked_ner(self.ner_pipeline, text)
-                for result in ner_results:
-                    if float(result["score"]) < self.score_threshold:
-                        continue
-                    entity_type = self.entity_mapping.get(
-                        result["entity_group"], 
-                        result["entity_group"]
-                    )
-                    
-                    # Offsets of SentencePiece tokens include the leading space;
-                    # replacing it would glue the pseudonym to the previous word.
-                    start, end = result["start"], result["end"]
-                    while start < end and text[start].isspace():
-                        start += 1
-                    while end > start and text[end - 1].isspace():
-                        end -= 1
-                    span = text[start:end]
-                    if not span:
-                        continue
-                    
-                    entities.append({
-                        "start": start,
-                        "end": end,
-                        "label": entity_type,
-                        "text": span,
-                        "score": float(result["score"])
-                    })
-            except Exception as e:
-                self.logger.error(f"Transformer NER failed: {e}")
-                raise
-        
+        try:
+            ner_results = chunked_ner(self.ner_pipeline, text)
+            for result in ner_results:
+                if float(result["score"]) < self.score_threshold:
+                    continue
+                entity_type = self.entity_mapping.get(
+                    result["entity_group"], 
+                    result["entity_group"]
+                )
+
+                # Offsets of SentencePiece tokens include the leading space;
+                # replacing it would glue the pseudonym to the previous word.
+                start, end = result["start"], result["end"]
+                while start < end and text[start].isspace():
+                    start += 1
+                while end > start and text[end - 1].isspace():
+                    end -= 1
+                span = text[start:end]
+                if not span:
+                    continue
+
+                entities.append({
+                    "start": start,
+                    "end": end,
+                    "label": entity_type,
+                    "text": span,
+                    "score": float(result["score"])
+                })
+        except Exception as e:
+            self.logger.error(f"Transformer NER failed: {e}")
+            raise
+
         # 2. Regex-based recognition (pure Python - no Presidio)
         entities.extend(self.entity_detector.extract_regex_entities(text))
-        
-        # 3. SLM detector (if enabled)
-        if self.slm_detector:
-            try:
-                slm_results = self.slm_detector.detect_entities([text], language=self.lang)
-                for result in slm_results:
-                    for start, end, label in result.get("label", []):
-                        entities.append({
-                            "start": start,
-                            "end": end,
-                            "label": label,
-                            "text": text[start:end],
-                            "score": 0.85
-                        })
-            except Exception as e:
-                self.logger.warning(f"SLM detector failed: {e}")
         
         return entities
     
