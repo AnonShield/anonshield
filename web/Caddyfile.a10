@@ -1,0 +1,24 @@
+# Internal Caddy of the a10 stack (docker-compose.a10.yml), on 127.0.0.1:18080.
+# The host Caddy terminates TLS for anonshield.org and proxies here.
+{
+    auto_https off
+    admin off
+}
+:80 {
+    request_body {
+        max_size 1MB
+    }
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+    handle {
+        reverse_proxy frontend:3000
+    }
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+        -Server
+    }
+}

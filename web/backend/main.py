@@ -1,4 +1,6 @@
 """AnonShield Web: FastAPI application."""
+import os
+
 from fastapi import FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -41,7 +43,9 @@ app.include_router(metrics.router)
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok"}
+    # ANON_VERSION is the deployed commit (set by the deploy); the deploy checks
+    # that the public site reports it, so a stale stack cannot pass as healthy.
+    return {"status": "ok", "version": os.getenv("ANON_VERSION", "dev")}
 
 
 @app.get("/api/config")

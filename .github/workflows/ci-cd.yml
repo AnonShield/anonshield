@@ -249,47 +249,117 @@ jobs:
       push: true
     secrets: inherit
 
+  # Web app images (backend/worker and frontend). Built on every pull request
+  # as a check; on main, pushed to GHCR (tagged with the commit and "latest")
+  # once the tests pass, for the deploy job to pull.
+  web-images:
+    name: Web images
+    needs: [changes, test, web-tests, frontend, secret-scan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    env:
+      PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'AnonShield/anonshield' }}
+      REGISTRY: ghcr.io/anonshield
+    steps:
+      - if: needs.changes.outputs.code != 'true'
+        run: echo "No deployable change, no web images to build."
+      - if: needs.changes.outputs.code == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - if: needs.changes.outputs.code == 'true'
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to GHCR
+        if: needs.changes.outputs.code == 'true' && env.PUSH == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build backend image
+        if: needs.changes.outputs.code == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: web/backend/Dockerfile
+          push: ${{ env.PUSH == 'true' }}
+          tags: |
+            ${{ env.REGISTRY }}/anonshield-web-backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/anonshield-web-backend:latest
+          cache-from: type=gha,scope=web-backend
+          cache-to: ${{ env.PUSH == 'true' && 'type=gha,mode=max,scope=web-backend' || '' }}
+      - name: Build frontend image
+        if: needs.changes.outputs.code == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: web/frontend
+          file: web/frontend/Dockerfile
+          push: ${{ env.PUSH == 'true' }}
+          tags: |
+            ${{ env.REGISTRY }}/anonshield-web-frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/anonshield-web-frontend:latest
+          cache-from: type=gha,scope=web-frontend
+          cache-to: ${{ env.PUSH == 'true' && 'type=gha,mode=max,scope=web-frontend' || '' }}
+
+  # Runs on the self-hosted runner of the host that serves anonshield.org
+  # (label anonshield-prod). It only pulls the images built above and restarts
+  # the stack from web/docker-compose.a10.yml; nothing is built on the host.
   deploy:
     name: Deploy to production
-    needs: [changes, test, web-tests, frontend, secret-scan]
+    needs: [changes, web-images]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'AnonShield/anonshield' && needs.changes.outputs.code == 'true'
     runs-on: [self-hosted, anonshield-prod]
     timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
     concurrency:
       group: deploy-prod
       cancel-in-progress: false
+    env:
+      IMAGE_TAG: ${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Sync code into the live deploy directory
-        # Mirrors scripts/deploy.sh, but locally on the host. Only the code dirs
-        # are mirrored with --delete; the host's local files (web/.env, web/certs,
-        # datasets, db, logs) are never touched.
+      - name: Install the stack files
+        # Only the files the stack reads; the host's .env is never touched.
         run: |
           set -euo pipefail
-          SRC="$GITHUB_WORKSPACE"
-          DEST="$HOME/anonshield_deploy"
-          mkdir -p "$DEST/web"
-          PY=(--exclude=__pycache__ --exclude='*.pyc')
-          rsync -a --delete "${PY[@]}" --exclude=node_modules --exclude=.svelte-kit --exclude=build \
-            "$SRC/web/frontend/src/"      "$DEST/web/frontend/src/"
-          rsync -a --delete "$SRC/web/frontend/static/" "$DEST/web/frontend/static/"
-          rsync -a --delete "${PY[@]}"  "$SRC/web/backend/" "$DEST/web/backend/"
-          rsync -a --delete "${PY[@]}"  "$SRC/src/"         "$DEST/src/"
-          rsync -a "$SRC/web/Makefile" "$SRC/web/warm_cache.sh" "$SRC/web/RUNBOOK.md" \
-                   "$SRC/web/docker-compose.prod.yml" "$SRC/web/docker-compose.host.yml" "$DEST/web/"
-          rsync -a "$SRC/web/frontend/Dockerfile" "$DEST/web/frontend/Dockerfile"
-          rsync -a "$SRC/pyproject.toml" "$SRC/uv.lock" "$SRC/anon.py" "$DEST/"
-      - name: Log in to Docker Hub
-        # The build pulls its base images (node, python, the Dockerfile frontend)
-        # from Docker Hub. It used whatever login was stored on the host, and that
-        # token expired ("org access token is expired"), failing every deploy.
-        # Log in with the repository secret instead; the action logs out again
-        # when the job ends.
+          DEST="$HOME/anonshield_deploy/web"
+          mkdir -p "$DEST"
+          cp web/docker-compose.a10.yml web/Caddyfile.a10 web/warm_cache.sh "$DEST/"
+          test -f "$DEST/.env" || { echo "::error::$DEST/.env is missing (ANON_SECRET_KEY)"; exit 1; }
+      - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build, start, and warm the cache
-        run: cd "$HOME/anonshield_deploy/web" && make deploy
-      - name: Health check
-        run: curl -fsS --retry 6 --retry-delay 10 https://anonshield.org/api/health
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull and restart the stack
+        run: |
+          set -euo pipefail
+          cd "$HOME/anonshield_deploy/web"
+          docker compose -f docker-compose.a10.yml pull
+          docker compose -f docker-compose.a10.yml up -d --remove-orphans
+          docker compose -f docker-compose.a10.yml ps
+      - name: Warm the model cache (runs a real anonymization job)
+        run: bash "$HOME/anonshield_deploy/web/warm_cache.sh" http://127.0.0.1:18000
+      - name: Check that the public site runs this commit
+        # The old check only asked whether the site was up; a stack that was
+        # never updated passed it. The backend reports the deployed commit.
+        run: |
+          for i in $(seq 1 12); do
+            got="$(curl -fsS https://anonshield.org/api/health || true)"
+            echo "$got"
+            case "$got" in *"\"version\":\"$IMAGE_TAG\""*) exit 0 ;; esac
+            sleep 10
+          done
+          echo "::error::anonshield.org does not report $IMAGE_TAG"
+          exit 1
+      - name: Remove this app's previous images
+        # Only AnonShield's own images: the host is shared, so no global prune.
+        if: always()
+        run: |
+          docker images --format '{{.Repository}}:{{.Tag}}' \
+            | grep -E '^ghcr\.io/anonshield/anonshield-web-(backend|frontend):' \
+            | grep -vE ":($IMAGE_TAG|latest)$" | xargs -r docker image rm || true
