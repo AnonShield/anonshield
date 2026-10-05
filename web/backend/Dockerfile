@@ -42,7 +42,10 @@ COPY src ./src
 COPY anon.py ./anon.py
 COPY web/backend/. /app/
 
-RUN mkdir -p /anon-jobs /app/.cache && chown -R anonuser:anonuser /app /anon-jobs
+# Only the directories the app writes to change owner. A recursive chown of /app
+# rewrote the whole venv into a second layer and doubled the image (~5 GB); the
+# code and the venv stay root-owned and read-only for the app user.
+RUN mkdir -p /anon-jobs /app/.cache && chown anonuser:anonuser /app /app/.cache /anon-jobs
 USER anonuser
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

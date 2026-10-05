@@ -1,0 +1,121 @@
+# Production stack on the a10 host, deployed by the "Deploy to production" job
+# in .github/workflows/ci-cd.yml (self-hosted runner on that host, label
+# anonshield-prod). Lives in ~/anonshield_deploy/web next to the host's .env.
+#
+# The images are built and tested by CI and published to GHCR; the host only
+# pulls them (IMAGE_TAG is the commit SHA; "latest" is the last deployed main).
+# Everything listens on 127.0.0.1: the internal Caddy on 18080 routes /api to
+# the backend and the rest to the frontend, and the host Caddy terminates TLS
+# for anonshield.org and proxies to it.
+#
+# .env (on the host, not in git): ANON_SECRET_KEY (keep it stable, or every
+# pseudonym changes) and ANON_MAX_SIZE_MB.
+
+x-backend: &backend
+  image: ghcr.io/anonshield/anonshield-web-backend:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+  environment:
+    - REDIS_URL=redis://redis:6379/0
+    - ANON_JOBS_DIR=/anon-jobs
+    - ANON_METRICS_DB=/anon-jobs/metrics.db
+    - ANON_SECRET_KEY=${ANON_SECRET_KEY:?ANON_SECRET_KEY must be set in .env}
+    - ANON_MAX_SIZE_MB=${ANON_MAX_SIZE_MB:-1}
+    - ANON_VERSION=${IMAGE_TAG:-latest}
+    - XDG_CACHE_HOME=/app/.cache
+    - HF_HOME=/app/.cache/huggingface
+  volumes:
+    - web_anon-jobs:/anon-jobs
+    - web_model_cache:/app/.cache
+  networks: [anon-net]
+  depends_on: [redis]
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  tmpfs:
+    - /tmp
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks: [anon-net]
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    <<: *backend
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+    ports:
+      - "127.0.0.1:18000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health',timeout=5).status==200 else 1)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 3G
+
+  worker-fast:
+    <<: *backend
+    command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "fast", "--pool=solo", "--loglevel=warning"]
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'
+          memory: 6G
+
+  frontend:
+    image: ghcr.io/anonshield/anonshield-web-frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      - PUBLIC_API_URL=/api
+    ports:
+      - "127.0.0.1:13000:3000"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    networks: [anon-net]
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  caddy:
+    image: caddy:2-alpine
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:80"
+    volumes:
+      - ./Caddyfile.a10:/etc/caddy/Caddyfile:ro
+    networks: [anon-net]
+    depends_on: [backend, frontend]
+
+# Created by the first stack on this host; kept so the model cache and the job
+# files (and the metrics DB) survive redeploys.
+volumes:
+  web_anon-jobs:
+    external: true
+  web_model_cache:
+    external: true
+
+networks:
+  anon-net:

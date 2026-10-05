@@ -53,29 +53,36 @@ The containers use `restart: unless-stopped`, so they come back after a reboot.
 ## Continuous deployment (CI/CD)
 
 Pushing to `main` deploys automatically. The pipeline (`.github/workflows/ci-cd.yml`)
-runs, on GitHub-hosted runners: the Python tests, the frontend build, a dependency
-and container vulnerability scan (pip-audit, npm audit, Trivy), and a secret scan
-plus SAST (gitleaks, bandit). Then, only if the tests, the build, and the secret
-scan pass, it runs the deploy on a self-hosted runner on this host: it syncs the
-code into `~/anonshield_deploy` and runs `make deploy`. Pull requests run all the
-checks but never the deploy. Dependabot (`.github/dependabot.yml`) opens weekly
-update PRs and raises alerts for the Python, npm, Docker, and Actions ecosystems.
+runs every check on the pull request first (Python tests including the end-to-end
+CLI runs, the web backend tests, the frontend build, the CLI and web images, the
+scans). On `main`, once they pass, it pushes the web images to GHCR
+(`ghcr.io/anonshield/anonshield-web-backend` and `-frontend`, tagged with the
+commit and `latest`) and runs the deploy on the self-hosted runner of the host
+that serves anonshield.org (label `anonshield-prod`). The deploy:
 
-The self-hosted runner runs as a user systemd service on the host (no inbound SSH,
-no host name in the repo; it connects out to GitHub and is picked by the generic
-label `anonshield-prod`):
+1. copies `web/docker-compose.a10.yml`, `web/Caddyfile.a10` and `warm_cache.sh`
+   into `~/anonshield_deploy/web` (the host's `.env` is never touched);
+2. pulls the images for the commit and restarts the stack
+   (`docker compose -f docker-compose.a10.yml up -d`);
+3. runs a real anonymization job through the API (`warm_cache.sh`);
+4. fails unless `https://anonshield.org/api/health` reports the deployed commit
+   (`"version"`), so a stack that was not updated cannot pass as healthy;
+5. removes this app's previous images (never a global prune: the host is shared).
+
+Nothing is built on the host. To run the stack by hand there:
 
 ```bash
-systemctl --user status gh-runner      # is the runner up
-systemctl --user restart gh-runner     # restart it
-journalctl --user -u gh-runner -f      # follow its logs
+cd ~/anonshield_deploy/web
+docker compose -f docker-compose.a10.yml ps          # status
+docker compose -f docker-compose.a10.yml logs -f backend
+IMAGE_TAG=<commit> docker compose -f docker-compose.a10.yml up -d   # roll back/forward
 ```
 
-To remove it: `systemctl --user disable --now gh-runner`, then
-`cd ~/actions-runner && ./config.sh remove --token "$(gh api -X POST repos/AnonShield/anonshield/actions/runners/remove-token --jq .token)"`.
-
-The manual `./scripts/deploy.sh <host>` path still works and is unchanged; CI/CD
-just automates the same steps.
+The runner lives in `~/actions-runner` on the host and is started at boot by the
+user crontab (`@reboot ~/actions-runner/keepalive.sh`), which restarts it if it
+exits; its log is `~/actions-runner/keepalive.log`. To remove it:
+`cd ~/actions-runner && ./config.sh remove --token "$(gh api -X POST repos/AnonShield/anonshield/actions/runners/remove-token --jq .token)"`
+and drop the crontab line.
 
 ## Configuration
 
