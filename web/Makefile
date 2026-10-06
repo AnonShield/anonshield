@@ -7,6 +7,7 @@
 #   make restart    restart the stack
 #   make warm       preload the NER model so the first request is fast
 #   make down       stop everything
+#   make local      run it on this machine: build, start, http://localhost:8080
 #
 # This wraps docker compose with the production file plus the host override
 # (docker-compose.host.yml: localhost ports for the host Caddy, reduced memory).
@@ -18,7 +19,7 @@ SVC      ?=
 
 .DEFAULT_GOAL := help
 
-.PHONY: help deploy ensure-secret build up down restart status ps health logs stats warm shell clean
+.PHONY: help deploy local ensure-secret build up down restart status ps health logs stats warm shell clean
 
 help:  ## List the available commands
 	@echo "AnonShield ops. Usage: make <target>"
@@ -29,6 +30,12 @@ deploy: build up warm status  ## Build, start, warm the cache, and show status (
 	@docker image prune -f >/dev/null 2>&1 || true
 	@docker builder prune -f >/dev/null 2>&1 || true
 	@echo "Deployed (pruned old images and stale build cache). Public URL: https://anonshield.org"
+
+LOCAL := $(COMPOSE) -f docker-compose.local.yml
+
+local: ensure-secret  ## Run on this machine (no reverse proxy needed): http://localhost:8080
+	$(LOCAL) up -d --build $(SERVICES) proxy
+	@echo "AnonShield is starting on http://localhost:$${ANON_LOCAL_PORT:-8080} (make down to stop)"
 
 ensure-secret:  ## Generate a random ANON_SECRET_KEY in web/.env if missing (persisted, never regenerated)
 	@touch .env
@@ -44,7 +51,7 @@ up: ensure-secret  ## Start the stack (no rebuild)
 	$(COMPOSE) up -d $(SERVICES)
 
 down:  ## Stop and remove the containers
-	$(COMPOSE) down
+	$(LOCAL) down
 
 restart:  ## Restart the stack
 	$(COMPOSE) restart $(SERVICES)

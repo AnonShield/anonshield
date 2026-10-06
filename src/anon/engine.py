@@ -59,6 +59,20 @@ SUPPORTED_LANGUAGES = {
 _ENGINE_CACHE: dict[str, tuple["BatchAnalyzerEngine", "AnonymizerEngine"]] = {}
 
 
+# transformers 5 warns that the tokenizer has "an incorrect regex pattern" and
+# "will lead to incorrect tokenization" for any local model whose config.json
+# has no transformers_version (Davlan/xlm-roberta-base-ner-hrl among them),
+# taking it for an old Mistral checkpoint. It only warns: the tokenizer is not
+# changed unless fix_mistral_regex=True is passed, and no NER model here is a
+# Mistral one.
+class _MistralRegexWarningFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "fix_mistral_regex" not in record.getMessage()
+
+
+logging.getLogger("transformers.tokenization_utils_tokenizers").addFilter(_MistralRegexWarningFilter())
+
+
 # Some NER tokenizers publish no model_max_length in tokenizer_config.json,
 # so HF defaults to ~1e20.
 # transformers 5.x pipeline.preprocess trusts that value and skips truncation;
@@ -243,7 +257,15 @@ class RegexPatterns:
     
     # PII Patterns
     EMAIL = r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b"
-    PHONE = r"\b(?:\+?\d{1,3}[-. ]?)?\(?\d{2,3}\)?[-. ]?\d{4,5}[-. ]?\d{4}\b"
+    # (?<!\w), not \b: a \b before "(" or "+" never matches after a space, so
+    # "(51) 99999-9999" came out as "([PHONE_NUMBER]".
+    PHONE = r"(?<!\w)(?:\+?\d{1,3}[-. ]?)?(?:\(\d{2,3}\)|\d{2,3})[-. ]?\d{4,5}[-. ]?\d{4}\b"
+    # PHONE is shaped on Brazilian numbers (4-5 digit groups); these two catch
+    # the international form with a leading "+" (+1 212 555 0198,
+    # +44 20 7946 0958) and the North American one ((212) 555-0198,
+    # 212-555-0198), which it let through in the regex strategy.
+    PHONE_INTL = r"(?<![\w+])\+\d{1,3}[-. ]?(?:\(\d{1,4}\)|\d{1,4})(?:[-. ]?\d{2,5}){1,3}\b"
+    PHONE_NANP = r"(?:\(\d{3}\)\s?|\b\d{3}[-.])\d{3}[-.]\d{4}\b"
     CPF = r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b"
     CREDIT_CARD = r"\b(?:\d{4}[- ]?){3}\d{4}\b"
     UUID = r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
@@ -277,7 +299,8 @@ class RegexPatterns:
     RG_SP           = r"\b\d{1,2}\.\d{3}\.\d{3}-[0-9Xx]\b"
     CEP             = r"\b\d{5}-\d{3}\b"
     PIS_PASEP       = r"\b\d{3}\.\d{5}\.\d{2}-\d\b"
-    TITULO_ELEITOR  = r"\b\d{4}\s\d{4}\s\d{4}\b"
+    # Not the first or last 12 digits of a 4x4 card number ("4111 1111 1111 1111").
+    TITULO_ELEITOR  = r"(?<!\d\s)\b\d{4}\s\d{4}\s\d{4}\b(?!\s\d)"
     MONEY_BRL       = r"R\$\s?\d{1,3}(?:\.\d{3})*(?:,\d{2})?"
     DATE_BR         = r"\b(?:0?[1-9]|[12]\d|3[01])/(?:0?[1-9]|1[0-2])/\d{4}\b"
     BANK_AGENCY     = r"(?i)(?:ag[êe]ncia|ag\.?)\s*:?\s*\d{4,5}[-\s]?\d?\b"
@@ -453,6 +476,8 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
         regex=RegexPatterns.PHONE,
         score=boosted(0.6)
     )
+    phone_intl_pattern = Pattern(name="Phone Number (international)", regex=RegexPatterns.PHONE_INTL, score=boosted(0.6))
+    phone_nanp_pattern = Pattern(name="Phone Number (North America)", regex=RegexPatterns.PHONE_NANP, score=boosted(0.6))
 
     cpf_pattern = Pattern(
         name="CPF Pattern", 
@@ -528,7 +553,7 @@ def load_custom_recognizers(langs: List[str], regex_priority: bool = False) -> L
             PatternRecognizer(supported_entity="PASSWORD", patterns=[password_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="USERNAME", patterns=[username_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="EMAIL_ADDRESS", patterns=[email_pattern], supported_language=lang),
-            PatternRecognizer(supported_entity="PHONE_NUMBER", patterns=[phone_pattern, cpf_pattern], supported_language=lang),
+            PatternRecognizer(supported_entity="PHONE_NUMBER", patterns=[phone_pattern, phone_intl_pattern, phone_nanp_pattern, cpf_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="CREDIT_CARD", patterns=[cc_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="UUID", patterns=[uuid_pattern], supported_language=lang),
             PatternRecognizer(supported_entity="PGP_BLOCK", patterns=[pgp_pattern], supported_language=lang),

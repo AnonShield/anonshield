@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    AnonLFI — Docker wrapper for Windows (PowerShell).
+    AnonShield — Docker wrapper for Windows (PowerShell).
 
 .DESCRIPTION
     Creates an .\anon\ folder in your current directory to keep everything
@@ -11,13 +11,10 @@
       ├── input\    ← optional: put files here if you prefer
       ├── output\   ← anonymized files appear here
       ├── db\       ← entity mapping database (needed for de-anonymization)
-      └── models\   ← NER model cached here on first run (~1 GB, automatic)
+      ├── models\   ← NER model cached here on first run (~1 GB, automatic)
+      └── secret.key ← HMAC key, created on the first run (unless ANON_SECRET_KEY is set)
 
 .EXAMPLE
-    $env:ANON_SECRET_KEY = [System.BitConverter]::ToString(
-        [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
-    ).Replace("-","").ToLower()
-
     .\run.ps1 .\YOUR_FILE.csv
     .\run.ps1 .\your\folder\
     .\run.ps1 --gpu .\YOUR_FILE.csv
@@ -58,6 +55,7 @@ $AnonDir       = if ($env:ANON_DIR) { $env:ANON_DIR } else { Join-Path (Get-Loca
 $ModelsDir     = Join-Path $AnonDir "models"
 $DefaultOutput = Join-Path $AnonDir "output"
 $DbDir         = Join-Path $AnonDir "db"
+$KeyFile       = Join-Path $AnonDir "secret.key"
 
 # ---------------------------------------------------------------------------
 # Parse --gpu (consumed here, not forwarded)
@@ -85,19 +83,19 @@ foreach ($a in $ScriptArgs) {
 # ---------------------------------------------------------------------------
 # Validate Docker
 # ---------------------------------------------------------------------------
-$dockerCheck = & docker info 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Err "Docker is not running."
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    Write-Err "Docker is not installed: https://docs.docker.com/desktop/setup/install/windows-install/"
     exit 1
 }
-
-# ---------------------------------------------------------------------------
-# Validate secret key
-# ---------------------------------------------------------------------------
-if (-not $env:ANON_SECRET_KEY -and -not $IsInfoCmd -and -not $SlugZero) {
-    Write-Err "ANON_SECRET_KEY is not set."
-    Write-Err "Generate one (run in PowerShell):"
-    Write-Err '  $env:ANON_SECRET_KEY = [System.BitConverter]::ToString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).Replace("-","").ToLower()'
+# Windows PowerShell 5.1 turns a native command's stderr into a terminating
+# error under "Stop" when it is redirected; "docker info" writes there when
+# the engine is down.
+$ErrorActionPreference = "Continue"
+$null = & docker info 2>&1
+$dockerOk = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = "Stop"
+if (-not $dockerOk) {
+    Write-Err "Docker is not running. Start Docker Desktop and try again."
     exit 1
 }
 
@@ -108,6 +106,24 @@ $null = New-Item -ItemType Directory -Force -Path $ModelsDir
 $null = New-Item -ItemType Directory -Force -Path $DefaultOutput
 $null = New-Item -ItemType Directory -Force -Path (Join-Path $AnonDir "input")
 $null = New-Item -ItemType Directory -Force -Path $DbDir
+
+# ---------------------------------------------------------------------------
+# Secret key: $env:ANON_SECRET_KEY if set, otherwise the one kept in
+# anon\secret.key, created on the first run. The same key gives the same
+# pseudonyms across runs. --slug-length 0 (type-only labels) needs none.
+# ---------------------------------------------------------------------------
+$SecretKey = if ($env:ANON_SECRET_KEY) { $env:ANON_SECRET_KEY } else { "" }
+if (-not $SecretKey -and -not $IsInfoCmd -and -not $SlugZero) {
+    if (-not (Test-Path $KeyFile -PathType Leaf) -or -not (Get-Content $KeyFile -Raw)) {
+        $bytes = New-Object byte[] 32
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+        $newKey = [System.BitConverter]::ToString($bytes).Replace("-", "").ToLower()
+        Set-Content -Path $KeyFile -Value $newKey -NoNewline -Encoding ascii
+        Write-Info "Created a secret key in $KeyFile; it keeps pseudonyms the same across runs."
+        Write-Info "Keep it with $DbDir (or set ANON_SECRET_KEY to use your own key)."
+    }
+    $SecretKey = (Get-Content $KeyFile -Raw).Trim()
+}
 
 # ---------------------------------------------------------------------------
 # Select image
@@ -144,14 +160,20 @@ if ($UseGpu) {
 # ---------------------------------------------------------------------------
 # Info commands — no path remapping needed
 # ---------------------------------------------------------------------------
+# The key is handed to docker run by name (-e ANON_SECRET_KEY), so it is not on
+# its command line; the session's own value is put back right after.
+$PrevKey = $env:ANON_SECRET_KEY
+
 if ($IsInfoCmd) {
-    $secretKey = if ($env:ANON_SECRET_KEY) { $env:ANON_SECRET_KEY } else { "" }
+    $env:ANON_SECRET_KEY = $SecretKey
     & docker run --rm @GpuFlags `
-        -e "ANON_SECRET_KEY=$secretKey" `
+        -e ANON_SECRET_KEY `
         -v "${ModelsDir}:/app/models" `
         $Image `
         @ScriptArgs
-    exit $LASTEXITCODE
+    $code = $LASTEXITCODE
+    $env:ANON_SECRET_KEY = $PrevKey
+    exit $code
 }
 
 # ---------------------------------------------------------------------------
@@ -275,14 +297,17 @@ if (-not $OutputSet) {
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
-$secretKey   = if ($env:ANON_SECRET_KEY) { $env:ANON_SECRET_KEY } else { "" }
 $VolumesArr  = $Volumes.ToArray()
 $NewArgsArr  = $NewArgs.ToArray()
 
+$env:ANON_SECRET_KEY = $SecretKey
 & docker run --rm @GpuFlags `
-    -e "ANON_SECRET_KEY=$secretKey" `
+    -e ANON_SECRET_KEY `
     @VolumesArr `
     $Image `
     @NewArgsArr
+$code = $LASTEXITCODE
+$env:ANON_SECRET_KEY = $PrevKey
+if ($code -ne 0) { exit $code }
 
 Write-Ok "Output is in $OutputHost"

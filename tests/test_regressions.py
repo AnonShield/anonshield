@@ -270,3 +270,31 @@ def test_cli_lang_pt_entities_only_email(tmp_path):
     result, content = run_cli(tmp_path, f"CPF 123.456.789-09 {EMAIL}\n", "--lang", "pt", "--entities", "EMAIL_ADDRESS")
     assert result.returncode == 0, result.stdout + result.stderr
     assert "123.456.789-09" in content and EMAIL not in content
+
+
+
+def anonymize_text(tmp_path, text, **kwargs):
+    """Text through the regex strategy with type-only labels (--slug-length 0)."""
+    src = tmp_path / "in.txt"
+    src.write_text(text, encoding="utf-8")
+    orchestrator = regex_orchestrator(slug_length=0, secret_key=None, **kwargs)
+    return process(src, orchestrator, tmp_path / "out").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("phone", ["+1 212 555 0198", "+44 20 7946 0958", "(212) 555-0198", "212-555-0198",
+                                   "+55 51 99999-9999", "(51) 99999-9999"])
+def test_regex_strategy_catches_international_and_us_phones(tmp_path, phone):
+    assert anonymize_text(tmp_path, f"Call {phone} today\n") == "Call [PHONE_NUMBER] today\n"
+
+
+@pytest.mark.parametrize("text", ["version 2.10.3 build 2024-10-06 port 8080", "ticket 12345 at 10:30, 3 hosts"])
+def test_phone_patterns_leave_plain_numbers_alone(tmp_path, text):
+    assert anonymize_text(tmp_path, text + "\n", selected={"PHONE_NUMBER"}) == text + "\n"
+
+
+def test_output_name_keeps_spaces_and_inner_dots(tmp_path):
+    from src.anon.processors import get_output_path
+    assert Path(get_output_path("/data/nota final.v2.txt", ".txt", output_dir=str(tmp_path))).name == "anon_nota final.v2.txt"
+    assert Path(get_output_path("../../etc/passwd", ".txt", output_dir=str(tmp_path))).parent == tmp_path.resolve()
+    with pytest.raises(ValueError):
+        get_output_path("..", ".txt", output_dir=str(tmp_path))

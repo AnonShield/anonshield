@@ -53,8 +53,10 @@ jobs:
     env:
       # Under workflow_call, github.event_name is the caller's event (push or
       # pull_request); a release or a manual run always builds and publishes.
+      # PUSH needs RUN: on main with no image change, the push step used to run
+      # with nothing built and fail the job.
       RUN: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' || inputs.run }}
-      PUSH: ${{ (github.event_name == 'release' || github.event_name == 'workflow_dispatch' || inputs.push) && github.repository == 'AnonShield/anonshield' }}
+      PUSH: ${{ (github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (inputs.run && inputs.push)) && github.repository == 'AnonShield/anonshield' }}
     steps:
       - if: env.RUN != 'true'
         run: echo "Nothing that goes into the image changed; no build."
@@ -128,6 +130,33 @@ jobs:
           run --network none anon-cpu:ci
           check 'maria@example.com|192\.168\.10\.45|Maria Oliveira|John Smith|York'
           docker run --rm --entrypoint python anon-cpu:ci -c "import spacy; assert spacy.util.is_package('pt_core_news_lg')"
+      - name: Smoke test the wrappers as a user runs them
+        if: env.RUN == 'true'
+        # docker/run.sh from this commit, with no key and no setup, as the
+        # runner user (not root), in a folder an older version left root-owned
+        # (the model cache of the step above): the key must be created, the
+        # folder handed back, the output owned by the user, and a second run
+        # must give the same pseudonyms. Then run.ps1 under PowerShell.
+        run: |
+          set -euo pipefail
+          docker tag anon-cpu:ci anonshield/anon:latest
+          W="$RUNNER_TEMP/wrapper"; mkdir -p "$W/anon"; cd "$W"
+          sudo cp -a "$RUNNER_TEMP/smoke/models" anon/models
+          printf 'Contact Maria Oliveira <maria@example.com> from 192.168.10.45, +1 212 555 0198.\n' > "nota final.txt"
+          unset ANON_SECRET_KEY
+          out="anon/output/anon_nota final.txt"
+          "$GITHUB_WORKSPACE/docker/run.sh" "nota final.txt" --db-mode in-memory
+          cat "$out"; ! grep -E 'maria@example.com|192\.168\.10\.45|212 555|Maria Oliveira' "$out"
+          test -s anon/secret.key
+          test -z "$(find anon ! -user "$(id -u)" -print -quit)"
+          first=$(cat "$out")
+          "$GITHUB_WORKSPACE/docker/run.sh" "nota final.txt" --db-mode in-memory --overwrite
+          test "$first" = "$(cat "$out")"
+          mkdir "$W/ps" && cd "$W/ps" && cp "$W/nota final.txt" .
+          pwsh -NoProfile -File "$GITHUB_WORKSPACE/docker/run.ps1" "nota final.txt" --anonymization-strategy regex --db-mode in-memory
+          cat "$out"; ! grep -E 'maria@example.com|192\.168\.10\.45|212 555' "$out"
+          test -s anon/secret.key
+          docker image rm anonshield/anon:latest
       - name: Push CPU image
         if: env.PUSH == 'true'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0

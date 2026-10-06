@@ -42,11 +42,14 @@ COPY pyproject.toml uv.lock ./
 # pip is added for `spacy download` of any other pipeline at runtime.
 # The public suffix list that tldextract (Presidio's URL/e-mail recognizers)
 # would otherwise fetch on every run is cached inside the venv, so the
-# container makes no network call besides the first NER model download.
+# container makes no network call besides the first NER model download. The
+# cache is writable by any user (tldextract takes a lock file even to read it):
+# run.sh runs the container as the calling user, not root.
 RUN uv sync --locked --no-dev --no-install-project --group pt \
     && .venv/bin/python -m ensurepip --upgrade \
     && .venv/bin/python -c "import torch, spacy; assert spacy.util.is_package('pt_core_news_lg')" \
     && TLDEXTRACT_CACHE=/app/.venv/tldextract-cache .venv/bin/python -c "import tldextract; tldextract.extract('example.com')" \
+    && chmod -R a+rwX /app/.venv/tldextract-cache \
     && find .venv -type d -name __pycache__ -prune -exec rm -rf {} + \
     && find .venv -type d -name tests -prune -exec rm -rf {} +
 
@@ -104,7 +107,10 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 RUN dpkg --purge --force-remove-essential --force-depends perl-base 2>/dev/null || true; \
     rm -rf /usr/share/doc/* /usr/share/man/* /var/lib/apt/lists/*
 
-RUN mkdir -p /app/models /app/output /app/logs /app/db
+# Writable by any user, for containers run with --user (run.sh does on Linux);
+# anon.py writes its run report to logs/ under the working directory.
+RUN mkdir -p /app/models /app/output /app/logs /app/db \
+    && chmod 1777 /app/models /app/output /app/logs /app/db
 WORKDIR /app
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

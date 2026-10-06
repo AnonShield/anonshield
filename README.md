@@ -25,7 +25,8 @@ AnonShield replaces personally identifiable information (PII) and network-specif
 - [Anonymization strategies](#anonymization-strategies)
 - [NER models](#ner-models)
 - [Supported formats and entities](#supported-formats-and-entities)
-- [Installation](#installation)
+- [Quick start (Docker)](#quick-start-docker)
+- [Installation from source](#installation-from-source)
 - [Quick start (CLI)](#quick-start-cli)
 - [Configuration](#configuration)
 - [Web application](#web-application)
@@ -112,7 +113,19 @@ uv run anon.py --list-entities
 uv run anon.py --list-languages
 ```
 
-## Installation
+## Quick start (Docker)
+
+The quickest way to run it: Docker is the only requirement (Linux, macOS or Windows). Download the wrapper script and give it a file or a folder:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AnonShield/anonshield/main/docker/run.sh -o run.sh && chmod +x run.sh
+./run.sh report.csv          # writes ./anon/output/anon_report.csv
+./run.sh --gpu report.csv    # on an NVIDIA GPU
+```
+
+On Windows, use [`run.ps1`](docker/run.ps1) in PowerShell the same way. The first run downloads the image and the NER model (about 1 GB, kept in `./anon/models/`) and creates the secret key in `./anon/secret.key`; later runs reuse both. Every CLI flag below works with the script. The [Docker guide](docker/DOCKERHUB_README.md) covers the image tags, GPU setup and examples.
+
+## Installation from source
 
 Requires **Linux**, **Python 3.12**, and [`uv`](https://astral.sh/uv).
 
@@ -197,14 +210,15 @@ The live app runs at **[anonshield.org](https://anonshield.org)**.
 ![Metrics dashboard](docs/images/metrics.png)
 *Built-in metrics dashboard: throughput by file format and strategy, jobs over time, file size versus throughput, and the entity mix.*
 
-Run the whole stack locally in containers (CPU, no host reverse proxy):
+Run the whole stack on your machine in containers (CPU, Docker and `make` only):
 
 ```bash
 cd web
-ANON_SECRET_KEY=$(openssl rand -hex 32) PUBLIC_API_URL=http://localhost:18000 \
-  docker compose -f docker-compose.prod.yml -f docker-compose.host.yml up --build
-# frontend on http://localhost:13000 , API on http://localhost:18000
+make local    # builds the images, starts everything, serves http://localhost:8080
+make down     # stops it
 ```
+
+The first run builds the images (several minutes) and saves a random `ANON_SECRET_KEY` in `web/.env`.
 
 For frontend development with hot reload, run the dev servers directly instead:
 
