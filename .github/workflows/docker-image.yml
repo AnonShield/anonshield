@@ -53,8 +53,10 @@ jobs:
     env:
       # Under workflow_call, github.event_name is the caller's event (push or
       # pull_request); a release or a manual run always builds and publishes.
+      # PUSH needs RUN: on main with no image change, the push step used to run
+      # with nothing built and fail the job.
       RUN: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' || inputs.run }}
-      PUSH: ${{ (github.event_name == 'release' || github.event_name == 'workflow_dispatch' || inputs.push) && github.repository == 'AnonShield/anonshield' }}
+      PUSH: ${{ (github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (inputs.run && inputs.push)) && github.repository == 'AnonShield/anonshield' }}
     steps:
       - if: env.RUN != 'true'
         run: echo "Nothing that goes into the image changed; no build."
