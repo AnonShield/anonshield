@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SLIDES } from '$lib/deck';
+  import { SLIDES } from '#lib/deck.js';
   import DeckStage from './DeckStage.svelte';
 
   const VIDEO: Record<number, string> = {

@@ -3,7 +3,7 @@
  * selected_entities: null = all (no filter); Set = explicit selection; empty Set = none.
  */
 import { writable } from 'svelte/store';
-import type { EntityGroup } from '$lib/api';
+import type { EntityGroup } from '#lib/api.js';
 import * as yaml from 'js-yaml';
 
 export interface CustomPattern {

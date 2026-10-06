@@ -27,7 +27,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - XML field paths are root-first dot paths (`tickets.ticket.notes`, attributes as `tickets.ticket.@reporter`); XPath-style slashes are accepted in rules.
 - `standalone` and `regex` fail instead of writing a text unchanged when its detection raises.
 - The NER model is cached in `HF_HOME=/app/models/huggingface`, on the `/app/models` volume; after the first download, runs make no network call.
-- CI builds the frontend on Node 22, the major of the production image; Dependabot skips the redis and SvelteKit majors until they can be adopted.
+- Frontend on SvelteKit 3 (kit 3.0.1, adapter-node 6): the configuration moved from `svelte.config.js` to `vite.config.ts`, `$lib` imports became `#lib` (package.json `imports`), `PUBLIC_API_URL` is declared in `src/env.ts` and read from `$app/env/public`. Pages, navigation and the upload flow behave as before. The unused `adapter-auto` and the `cookie` override (for Kit 2's cookie 0.6) were removed.
+- CI builds the frontend on Node 22, the major of the production image (SvelteKit 3 needs 22.17 or newer); Dependabot skips the redis major until it can be adopted.
 - Dependencies: transformers 5.18, cryptography 50, urllib3 2.8, torch 2.14.1 and frontend updates (devalue 5.9.4). `pyproject.toml` overrides the `transformers<5` pin of spacy-huggingface-pipelines and the `cryptography<49` pin of presidio-anonymizer.
 
 ### Fixed

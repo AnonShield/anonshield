@@ -605,7 +605,7 @@ tool/                          ← repo existente (CLI)
     │   │   │   └── api.ts                ← cliente tipado da API
     │   │   └── app.css                   ← design tokens CSS
     │   ├── package.json
-    │   └── svelte.config.js
+    │   └── vite.config.ts        ← config do SvelteKit (adapter-node)
     │
     └── backend/               ← FastAPI
         ├── main.py

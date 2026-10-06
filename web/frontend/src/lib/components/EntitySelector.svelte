@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { EntityGroup } from '$lib/api';
-  import { config } from '$lib/stores/config';
-  import { t } from '$lib/i18n';
+  import type { EntityGroup } from '#lib/api.js';
+  import { config } from '#lib/stores/config.js';
+  import { t } from '#lib/i18n.js';
 
   let { groups = [] }: { groups: EntityGroup[] } = $props();
 

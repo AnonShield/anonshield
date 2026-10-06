@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { t } from '$lib/i18n';
-  import { SLIDES } from '$lib/deck';
+  import { t } from '#lib/i18n.js';
+  import { SLIDES } from '#lib/deck.js';
   import DeckStage from './DeckStage.svelte';
 
   let { pdf = '' }: { pdf?: string } = $props();
