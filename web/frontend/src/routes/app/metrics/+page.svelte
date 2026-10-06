@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fetchMetrics } from '$lib/api';
-  import { t } from '$lib/i18n';
+  import { fetchMetrics } from '#lib/api.js';
+  import { t } from '#lib/i18n.js';
 
   interface JobAgg {
     n: number; avg_ms: number; max_ms: number;

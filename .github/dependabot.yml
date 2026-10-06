@@ -34,15 +34,9 @@ updates:
       frontend:
         patterns: ["*"]
     ignore:
-      # @sveltejs/kit and svelte-check accept only typescript ^5 || ^6, and
-      # svelte-check crashes on 7. Lift once they support it.
+      # @sveltejs/kit (^6) and svelte-check (^5 || ^6) do not accept
+      # typescript 7, and svelte-check crashes on it. Lift once they support it.
       - dependency-name: "typescript"
-        update-types: ["version-update:semver-major"]
-      # SvelteKit 3 (and its adapters) is a migration: svelte.config.js must move
-      # to the Kit 3 format (the build stops with config_file_unsupported).
-      - dependency-name: "@sveltejs/kit"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@sveltejs/adapter-*"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"

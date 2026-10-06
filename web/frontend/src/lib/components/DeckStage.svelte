@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { locale } from '$lib/i18n';
-  import { EN } from '$lib/deck-en';
-  import type { Slide, El, Run } from '$lib/deck';
+  import { locale } from '#lib/i18n.js';
+  import { EN } from '#lib/deck-en.js';
+  import type { Slide, El, Run } from '#lib/deck.js';
 
   // `video`: quando presente, a imagem full-bleed vira <video> (slides 2/3/4).
   let { slide, video = '' }: { slide: Slide; video?: string } = $props();

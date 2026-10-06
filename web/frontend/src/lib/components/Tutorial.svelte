@@ -4,7 +4,7 @@
   Spotlight scrolls target into view; tooltip is always clamped within viewport.
 -->
 <script lang="ts">
-  import { t } from '$lib/i18n';
+  import { t } from '#lib/i18n.js';
   import { onMount } from 'svelte';
 
   let { onDone }: { onDone?: () => void } = $props();

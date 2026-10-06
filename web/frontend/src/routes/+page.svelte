@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { t } from '$lib/i18n';
+  import { t } from '#lib/i18n.js';
 
   // ── Client-side regex demo ────────────────────────────────────────────────
   const SAMPLE = `Meeting notes: Q4 Security Review

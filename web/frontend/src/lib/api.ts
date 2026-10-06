@@ -2,7 +2,7 @@
  * Typed API client for AnonShield Web backend.
  * All requests go to PUBLIC_API_URL (set via env at build time).
  */
-import { PUBLIC_API_URL } from '$env/static/public';
+import { PUBLIC_API_URL } from '$app/env/public';
 
 const BASE = PUBLIC_API_URL ?? '/api';
 

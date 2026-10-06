@@ -1,16 +1,16 @@
 <script lang="ts">
-  import DropZone from '$lib/components/DropZone.svelte';
-  import KeyInput from '$lib/components/KeyInput.svelte';
-  import EntitySelector from '$lib/components/EntitySelector.svelte';
-  import RegexBuilder from '$lib/components/RegexBuilder.svelte';
-  import ProgressBar from '$lib/components/ProgressBar.svelte';
-  import Tutorial from '$lib/components/Tutorial.svelte';
-  import FieldSelector from '$lib/components/FieldSelector.svelte';
-  import { config, toYaml, fromYaml } from '$lib/stores/config';
-  import { activeJob, clearJob } from '$lib/stores/job';
-  import { createJob, fetchEntities, validateProfile, downloadUrl, pollStatus, cancelJob } from '$lib/api';
-  import type { EntityGroup } from '$lib/api';
-  import { t } from '$lib/i18n';
+  import DropZone from '#lib/components/DropZone.svelte';
+  import KeyInput from '#lib/components/KeyInput.svelte';
+  import EntitySelector from '#lib/components/EntitySelector.svelte';
+  import RegexBuilder from '#lib/components/RegexBuilder.svelte';
+  import ProgressBar from '#lib/components/ProgressBar.svelte';
+  import Tutorial from '#lib/components/Tutorial.svelte';
+  import FieldSelector from '#lib/components/FieldSelector.svelte';
+  import { config, toYaml, fromYaml } from '#lib/stores/config.js';
+  import { activeJob, clearJob } from '#lib/stores/job.js';
+  import { createJob, fetchEntities, validateProfile, downloadUrl, pollStatus, cancelJob } from '#lib/api.js';
+  import type { EntityGroup } from '#lib/api.js';
+  import { t } from '#lib/i18n.js';
   import { onDestroy, onMount } from 'svelte';
 
   type Screen = 'configure' | 'processing' | 'done' | 'error';

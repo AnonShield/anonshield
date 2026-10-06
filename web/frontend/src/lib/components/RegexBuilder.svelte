@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { config, type CustomPattern } from '$lib/stores/config';
+  import { config, type CustomPattern } from '#lib/stores/config.js';
 
   let { onclose }: { onclose?: () => void } = $props();
 

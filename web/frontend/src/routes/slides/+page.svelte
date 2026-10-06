@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { t } from '$lib/i18n';
-  import HtmlDeck from '$lib/components/HtmlDeck.svelte';
-  import DeckScroll from '$lib/components/DeckScroll.svelte';
+  import { t } from '#lib/i18n.js';
+  import HtmlDeck from '#lib/components/HtmlDeck.svelte';
+  import DeckScroll from '#lib/components/DeckScroll.svelte';
 
   let mode = $state<'deck' | 'scroll'>('deck');
 

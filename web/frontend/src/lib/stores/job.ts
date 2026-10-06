@@ -2,7 +2,7 @@
  * Active job state store.
  */
 import { writable } from 'svelte/store';
-import type { JobStatus } from '$lib/api';
+import type { JobStatus } from '#lib/api.js';
 
 export interface ActiveJob {
   id: string;

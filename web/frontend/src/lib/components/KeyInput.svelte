@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { config } from '$lib/stores/config';
-  import { t } from '$lib/i18n';
+  import { config } from '#lib/stores/config.js';
+  import { t } from '#lib/i18n.js';
   let visible = $state(false);
 </script>
 

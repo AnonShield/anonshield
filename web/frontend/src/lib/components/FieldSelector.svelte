@@ -4,10 +4,10 @@
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { PUBLIC_API_URL } from '$env/static/public';
-  import { t } from '$lib/i18n';
-  import type { EntityGroup } from '$lib/api';
-  import type { AnonymizationConfig } from '$lib/stores/config';
+  import { PUBLIC_API_URL } from '$app/env/public';
+  import { t } from '#lib/i18n.js';
+  import type { EntityGroup } from '#lib/api.js';
+  import type { AnonymizationConfig } from '#lib/stores/config.js';
 
   const API_BASE = PUBLIC_API_URL ?? '/api';
 
