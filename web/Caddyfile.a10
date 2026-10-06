@@ -1,5 +1,7 @@
-# Internal Caddy of the a10 stack (docker-compose.a10.yml), on 127.0.0.1:18080.
-# The host Caddy terminates TLS for anonshield.org and proxies here.
+# Internal Caddy: one port, /api to the backend and the rest to the frontend.
+# On the a10 host (docker-compose.a10.yml) it listens on 127.0.0.1:18080 and the
+# host Caddy terminates TLS for anonshield.org and proxies here; `make local`
+# (docker-compose.local.yml) serves it on http://localhost:8080.
 {
     auto_https off
     admin off

@@ -61,7 +61,9 @@ def get_output_path(original_path: str, new_ext: str, prefix: str = "anon_", out
     original_base_name = Path(original_path).name
     sanitized_base_name = unicodedata.normalize('NFKD', original_base_name).encode('ascii', 'ignore').decode('utf-8')
     name_part, _ = os.path.splitext(sanitized_base_name)
-    name_part = re.sub(r'[^\w\-]', '', name_part)
+    # Path.name already dropped any directory part; keep spaces and inner dots
+    # ("nota final.v2.txt" -> "anon_nota final.v2.txt"), drop everything else.
+    name_part = re.sub(r'[^\w\-. ]', '', name_part).strip(' .')
 
     if not name_part or name_part in (".", ".."):
         raise ValueError(f"Invalid filename derived from original path: '{original_path}'")

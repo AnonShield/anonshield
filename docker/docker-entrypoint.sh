@@ -168,7 +168,10 @@ sys.exit(0 if cached('config.json') and any(cached(w) for w in weights) else 1)
 
     # Only the PyTorch weights are fetched, and only the safetensors copy when
     # the repo has one (transformers loads that; many repos also carry a .bin).
-    if ANON_MODEL="$model" /app/.venv/bin/python -c "
+    # HF_HUB_VERBOSITY=error: without a token the Hub answers with a warning
+    # header ("You are sending unauthenticated requests...") that the hub
+    # client prints; no token is needed for public models.
+    if ANON_MODEL="$model" HF_HUB_VERBOSITY=error /app/.venv/bin/python -c "
 import os
 from huggingface_hub import list_repo_files, snapshot_download
 repo = os.environ['ANON_MODEL']
@@ -223,6 +226,12 @@ handle_preload() {
 
 main() {
     log_info "AnonShield Container Starting..."
+
+    # When run as a non-root user (run.sh passes --user on Linux), HOME is still
+    # /root and not writable; libraries that cache under ~ need one.
+    if [[ ! -w "${HOME:-/}" ]]; then
+        export HOME=/tmp
+    fi
 
     # Handle preload if specified
     handle_preload

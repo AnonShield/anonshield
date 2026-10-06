@@ -43,39 +43,9 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/anonshield/m
 
 > `curl` is built into Linux and macOS. `Invoke-WebRequest` is built into Windows 10/11. No extra installation needed.
 
-### Step 2: Generate a secret key
+### Step 2: Anonymize
 
-The key drives pseudonym generation. Keep it stable across runs so the same input always yields the same pseudonym. To de-anonymize later you only need the `db/` database folder, not the key.
-
-**Linux / macOS:**
-```bash
-export ANON_SECRET_KEY=$(openssl rand -hex 32)
-```
-
-To persist it across terminal sessions, append it to your shell profile:
-
-```bash
-# Linux (bash)
-echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.bashrc
-
-# macOS (zsh)
-echo "export ANON_SECRET_KEY=$ANON_SECRET_KEY" >> ~/.zshrc
-```
-
-**Windows (PowerShell):**
-```powershell
-$bytes = New-Object byte[] 32
-[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
-$env:ANON_SECRET_KEY = [System.BitConverter]::ToString($bytes).Replace("-","").ToLower()
-```
-
-To persist it on Windows, go to **Settings > System > Environment Variables** and add a variable named `ANON_SECRET_KEY` with that value.
-
-> **No de-anonymization needed?** Skip the key entirely with `--slug-length 0`. Entities are then replaced with their type only (for example `[IP_ADDRESS]`), and no secret key is required.
-
-### Step 3: Anonymize
-
-Pass any file or folder, using a relative or absolute path.
+Pass any file or folder, using a relative or absolute path. No other setup is needed.
 
 **Single file (CPU):**
 ```bash
@@ -113,13 +83,29 @@ By default the output is written to `./anon/output/`. For example, anonymizing `
 
 ```
 ./anon/
-├── input/    (optional: put files here if you prefer)
-├── output/   (anonymized files appear here)
-├── db/       (entity mapping database; keep it to de-anonymize later)
-└── models/   (NER model cached here on first run, about 1 GB, automatic)
+├── input/      (optional: put files here if you prefer)
+├── output/     (anonymized files appear here)
+├── db/         (entity mapping database; keep it to de-anonymize later)
+├── models/     (NER model cached here on first run, about 1 GB, automatic)
+└── secret.key  (secret key, created on the first run)
 ```
 
 > **First run:** the NER transformer model (about 1 GB) downloads automatically into `./anon/models/` and is reused on every subsequent run. This is the only network call AnonShield makes.
+
+### The secret key
+
+Pseudonyms are HMAC-SHA256 hashes under a secret key: the same value with the same key always gives the same pseudonym, which is what keeps references consistent across files and runs. On the first run the script creates a random key in `./anon/secret.key` (readable only by you) and reuses it from then on, so there is nothing to set up. Keep it next to `./anon/db/`; to de-anonymize later you only need the `db/` folder.
+
+To use your own key instead (for example the same one on several machines), set `ANON_SECRET_KEY`, which takes precedence over the file:
+
+```bash
+export ANON_SECRET_KEY=$(openssl rand -hex 32)      # Linux / macOS
+```
+```powershell
+$env:ANON_SECRET_KEY = "<64 hex characters>"         # Windows
+```
+
+> **No de-anonymization needed?** Use `--slug-length 0`. Entities are then replaced with their type only (for example `[IP_ADDRESS]`), and no key is created or used.
 
 ---
 

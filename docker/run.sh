@@ -9,11 +9,10 @@
 #   ├── input/    ← optional: put files here if you prefer
 #   ├── output/   ← anonymized files appear here
 #   ├── db/       ← entity mapping database (needed for de-anonymization)
-#   └── models/   ← NER model cached here on first run (~1 GB, automatic)
+#   ├── models/   ← NER model cached here on first run (~1 GB, automatic)
+#   └── secret.key ← HMAC key, created on the first run (unless ANON_SECRET_KEY is set)
 #
 # Usage:
-#   export ANON_SECRET_KEY=$(openssl rand -hex 32)
-#
 #   ./run.sh ./YOUR_FILE.csv
 #   ./run.sh ./your/folder/                     # entire folder
 #   ./run.sh --gpu ./YOUR_FILE.csv              # GPU
@@ -21,7 +20,7 @@
 #   ./run.sh --list-entities
 #
 # Override the base folder:
-#   ANON_DIR=./my-project/ ./run-docker.sh ./my-project/input/file.csv
+#   ANON_DIR=./my-project/ ./run.sh ./my-project/input/file.csv
 # =============================================================================
 
 set -euo pipefail
@@ -52,6 +51,7 @@ ANON_DIR="${ANON_DIR:-$(pwd)/anon}"
 MODELS_DIR="$ANON_DIR/models"
 DEFAULT_OUTPUT="$ANON_DIR/output"
 DB_DIR="$ANON_DIR/db"
+KEY_FILE="$ANON_DIR/secret.key"
 
 # ---------------------------------------------------------------------------
 # Parse --gpu (consumed here, not forwarded)
@@ -66,21 +66,29 @@ done
 # Detect info-only commands (no key needed, no path remapping)
 # ---------------------------------------------------------------------------
 IS_INFO_CMD=0
+SLUG_ZERO=0
+prev=""
 for arg in "${ARGS[@]:-}"; do
     [[ "$arg" == "--help" || "$arg" == --list-* ]] && IS_INFO_CMD=1
+    [[ "$arg" == "--slug-length=0" || ( "$prev" == "--slug-length" && "$arg" == "0" ) ]] && SLUG_ZERO=1
+    prev="$arg"
 done
 
 # ---------------------------------------------------------------------------
 # Validate
 # ---------------------------------------------------------------------------
-if ! docker info &>/dev/null; then
-    log_error "Docker is not running."
+if ! command -v docker &>/dev/null; then
+    log_error "Docker is not installed: https://docs.docker.com/get-docker/"
     exit 1
 fi
-
-if [[ -z "${ANON_SECRET_KEY:-}" && $IS_INFO_CMD -eq 0 ]]; then
-    log_error "ANON_SECRET_KEY is not set."
-    log_error "Generate one:  export ANON_SECRET_KEY=\$(openssl rand -hex 32)"
+if ! docker_err=$(docker info 2>&1 >/dev/null); then
+    if [[ "$docker_err" == *"permission denied"* ]]; then
+        log_error "This user cannot use Docker. Add it to the docker group, then log out and back in:"
+        log_error "  sudo usermod -aG docker \$USER"
+    else
+        log_error "Docker is not running. Start it and try again."
+        log_error "($(echo "$docker_err" | tail -n 1))"
+    fi
     exit 1
 fi
 
@@ -88,6 +96,23 @@ fi
 # Create folder structure
 # ---------------------------------------------------------------------------
 mkdir -p "$MODELS_DIR" "$DEFAULT_OUTPUT" "$ANON_DIR/input" "$DB_DIR"
+
+# ---------------------------------------------------------------------------
+# Secret key: ANON_SECRET_KEY if set, otherwise the one kept in
+# ./anon/secret.key, created on the first run. The same key gives the same
+# pseudonyms across runs. --slug-length 0 (type-only labels) needs none.
+# ---------------------------------------------------------------------------
+if [[ -z "${ANON_SECRET_KEY:-}" && $IS_INFO_CMD -eq 0 && $SLUG_ZERO -eq 0 ]]; then
+    if [[ ! -s "$KEY_FILE" ]]; then
+        (umask 077; od -An -tx1 -N32 /dev/urandom | tr -d ' \n' > "$KEY_FILE")
+        log_info "Created a secret key in $KEY_FILE; it keeps pseudonyms the same across runs."
+        log_info "Keep it with $DB_DIR (or set ANON_SECRET_KEY to use your own key)."
+    fi
+    ANON_SECRET_KEY=$(tr -d ' \n' < "$KEY_FILE")
+fi
+# Handed to docker run by name (-e ANON_SECRET_KEY), so the key is not on its
+# command line, which any local user can read with ps.
+export ANON_SECRET_KEY="${ANON_SECRET_KEY:-}"
 
 # ---------------------------------------------------------------------------
 # Select image
@@ -128,12 +153,29 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Run as the calling user on Linux. As root (the image default), the output,
+# the database and the model cache came out owned by root: not editable or
+# removable without sudo. Docker Desktop (macOS, Windows) maps ownership itself.
+# ---------------------------------------------------------------------------
+USER_FLAGS=()
+if [[ "$(uname -s)" == "Linux" && "$(id -u)" -ne 0 ]]; then
+    USER_FLAGS=(--user "$(id -u):$(id -g)")
+    # An ./anon folder used by an older version of this script holds files
+    # owned by root, which the container can no longer write as this user.
+    if [[ -n "$(find "$ANON_DIR" ! -user "$(id -u)" -print -quit 2>/dev/null)" ]]; then
+        log_info "Giving $ANON_DIR back to $(id -un) (an older version left root-owned files in it)"
+        docker run --rm -v "$ANON_DIR":/anon_dir --entrypoint chown "$IMAGE" -R "$(id -u):$(id -g)" /anon_dir
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Info commands: no path remapping needed
 # ---------------------------------------------------------------------------
 if [[ $IS_INFO_CMD -eq 1 ]]; then
     docker run --rm \
+        ${USER_FLAGS[@]+"${USER_FLAGS[@]}"} \
         ${GPU_FLAGS[@]+"${GPU_FLAGS[@]}"} \
-        -e ANON_SECRET_KEY="${ANON_SECRET_KEY:-}" \
+        -e ANON_SECRET_KEY \
         -v "$MODELS_DIR":/app/models \
         "$IMAGE" \
         ${ARGS[@]+"${ARGS[@]}"}
@@ -273,8 +315,9 @@ fi
 # ${arr[@]+"${arr[@]}"}: an empty array is an "unbound variable" under set -u
 # in bash < 4.4 (the macOS default).
 docker run --rm \
+    ${USER_FLAGS[@]+"${USER_FLAGS[@]}"} \
     ${GPU_FLAGS[@]+"${GPU_FLAGS[@]}"} \
-    -e ANON_SECRET_KEY="${ANON_SECRET_KEY:-}" \
+    -e ANON_SECRET_KEY \
     "${VOLUMES[@]}" \
     "$IMAGE" \
     ${NEW_ARGS[@]+"${NEW_ARGS[@]}"}

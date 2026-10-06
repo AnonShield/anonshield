@@ -417,11 +417,16 @@ def main():
     # Silence noisy third-party loggers (Presidio, transformers, etc.)
     # These emit repetitive INFO lines ("Fetching all recognizers...") per batch,
     # flooding the output for large files without adding useful information.
-    for noisy_logger in ("presidio_analyzer", "presidio_anonymizer",
-                         "presidio_analyzer.analyzer_engine",
-                         "presidio_analyzer.nlp_engine",
-                         "transformers", "sentence_transformers"):
+    for noisy_logger in ("transformers", "sentence_transformers"):
         logging.getLogger(noisy_logger).setLevel(logging.WARNING)
+    # Presidio logs as "presidio-analyzer"/"presidio-anonymizer" (with a hyphen).
+    # At WARNING it prints, on every run, one line per built-in recognizer of
+    # another language ("Recognizer not added to registry because language is
+    # not supported by registry - EsNifRecognizer ..."). The Hub client prints
+    # "You are sending unauthenticated requests" on a model download; public
+    # models need no token.
+    for quiet_logger in ("presidio-analyzer", "presidio-anonymizer", "huggingface_hub"):
+        logging.getLogger(quiet_logger).setLevel(logging.ERROR)
 
     logging.info("Starting anonymization process...")
 
