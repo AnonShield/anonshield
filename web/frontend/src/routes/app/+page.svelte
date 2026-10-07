@@ -364,7 +364,7 @@
           />
           {#if fileTooLarge}
             <p class="file-too-large">
-              File is {(selectedFile!.size / 1024 / 1024).toFixed(1)} MB; demo limit is {limitMb} MB.
+              {$t('app.error.file_size', { size: (selectedFile!.size / 1024 / 1024).toFixed(1), mb: limitMb })}
             </p>
           {/if}
 
