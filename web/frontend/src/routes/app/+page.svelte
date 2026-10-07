@@ -420,6 +420,7 @@
             <FieldSelector
               file={selectedFile}
               entityGroups={groups}
+              initial={$config.anonymization_config}
               onchange={(conf) => config.update(c => ({ ...c, anonymization_config: conf }))}
             />
           {/if}
