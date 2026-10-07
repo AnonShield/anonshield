@@ -141,6 +141,25 @@ if ! docker_err=$(docker info 2>&1 >/dev/null); then
     exit 1
 fi
 
+# docker pull, with the fix spelled out for the failures a user can fix. The
+# download progress still shows; only the error is captured.
+pull_image() {
+    local err
+    if { err=$(docker pull "$1" 2>&1 1>&3 3>&-); } 3>&1; then
+        return 0
+    fi
+    echo "$err" >&2
+    if [[ "$err" == *unauthorized* ]]; then
+        # A Docker Hub login saved on this machine whose token expired or was
+        # revoked: Docker sends it even for public images, which then fail.
+        log_error "Docker Hub refused the login saved on this machine (expired or revoked token)."
+        log_error "The AnonShield images are public: run docker logout, then try again."
+    elif [[ "$err" == *"no such host"* || "$err" == *"i/o timeout"* || "$err" == *"connection refused"* || "$err" == *"network is unreachable"* ]]; then
+        log_error "Could not reach Docker Hub to download $1: check the internet connection (or Docker's proxy settings)."
+    fi
+    return 1
+}
+
 # ---------------------------------------------------------------------------
 # GPU images come in two PyTorch builds: the plain tag (CUDA 13.0) needs NVIDIA
 # driver 580+ and an RTX 20xx or newer (CUDA 13 dropped older GPUs; RTX 50xx
@@ -225,7 +244,7 @@ web_main() {
         return 0
     fi
     if [[ "$action" == update ]]; then
-        docker pull "$image"
+        pull_image "$image" || return 1
         if [[ -n "$state" ]]; then docker rm -f "$WEB_NAME" >/dev/null; fi
         state=""
     fi
@@ -240,7 +259,7 @@ web_main() {
     else
         if ! docker image inspect "$image" >/dev/null 2>&1; then
             log_info "Downloading $image (about $([[ $gpu -eq 1 ]] && echo 4 || echo 1.5) GB, once)..."
-            docker pull "$image"
+            pull_image "$image" || return 1
         fi
         if ! out=$(docker run -d --name "$WEB_NAME" --restart unless-stopped ${gpu_flags[@]+"${gpu_flags[@]}"} \
                 -p "127.0.0.1:$port:8080" -v anonshield:/data "$image" 2>&1); then
@@ -310,6 +329,10 @@ if [[ $USE_GPU -eq 1 ]]; then
 else
     IMAGE="${ANON_IMAGE:-anonshield/anon:latest}"
     GPU_FLAGS=()
+fi
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+    log_info "Downloading $IMAGE (once)..."
+    pull_image "$IMAGE" || exit 1
 fi
 
 # ---------------------------------------------------------------------------
