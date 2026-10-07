@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import re
+import warnings
 from typing import Dict, List, Optional, Set, Union, Tuple
 import logging
 
@@ -38,6 +39,11 @@ from .hash_generator import HashGenerator
 from .strategies import strategy_factory
 from .entity_detector import EntityDetector
 from .core.protocols import EntityStorage, CacheStrategy, HashingStrategy, AnonymizationStrategy
+
+# spacy-huggingface-pipelines warns once per entity it cannot align to spaCy
+# tokens (overlapping sub-words); the entity is skipped either way, and on a
+# large file the warnings flood the log.
+warnings.filterwarnings("ignore", message="Skipping annotation", category=UserWarning)
 
 
 SUPPORTED_LANGUAGES = {

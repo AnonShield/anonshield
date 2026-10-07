@@ -1564,10 +1564,6 @@ class JsonFileProcessor(FileProcessor):
 
                 last_pos = 0
                 for obj_batch in self._batch_iterator(objects_iterator, chunk_size):
-                    current_pos = in_f.tell()
-                    pbar.update(current_pos - last_pos)
-                    last_pos = current_pos
-
                     batch_text_groups = defaultdict(list)
 
                     for obj in obj_batch:
@@ -1603,6 +1599,10 @@ class JsonFileProcessor(FileProcessor):
                         out_f.write(orjson.dumps(reconstructed_obj, option=orjson.OPT_INDENT_2))
 
                     is_first_chunk = False
+                    # Counted once the batch is written, so progress is work done.
+                    current_pos = in_f.tell()
+                    pbar.update(current_pos - last_pos)
+                    last_pos = current_pos
 
                 out_f.write(b'\n]')
 
