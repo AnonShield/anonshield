@@ -87,6 +87,15 @@
     emit();
   }
 
+  // A bare machine name ("srv-files") reads as an ordinary word, so detection
+  // misses it; fields named like these should be forced as HOSTNAME.
+  const HOST_FIELD = /(host_?name|netbios(_name)?|fqdn|computer_?name|dns_?name)$/i;
+  function forceHostname(fieldName: string) {
+    rules[fieldName].type = 'force';
+    rules[fieldName].forcedEntity = 'HOSTNAME';
+    emit();
+  }
+
   function setForcedEntity(fieldName: string, entity: string) {
     rules[fieldName].forcedEntity = entity;
     emit();
@@ -283,6 +292,10 @@
                           </div>
                         {:else if rules[f].type === 'exclude'}
                           <span class="skip-label">{$t('fields.skipped')}</span>
+                        {:else if HOST_FIELD.test(f)}
+                          <button class="btn-link suggest" onclick={() => forceHostname(f)} title={$t('fields.host_hint')}>
+                            {$t('fields.host_suggest')}
+                          </button>
                         {:else}
                           <span class="auto-label">{$t('fields.detected')}</span>
                         {/if}
@@ -461,6 +474,7 @@
   .force-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2); }
   .force-input::placeholder { color: var(--color-text-secondary); opacity: 0.5; font-family: var(--font-sans); font-weight: 400; }
   .skip-label { color: var(--color-text-secondary); font-size: 0.75rem; font-style: italic; }
+  .suggest { color: var(--color-warning); font-weight: 600; text-align: left; }
   .auto-label { color: #4ade80; font-size: 0.75rem; font-weight: 600; }
 
   .modal-footer {
