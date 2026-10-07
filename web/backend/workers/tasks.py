@@ -1,10 +1,12 @@
 """Celery tasks: anonymization jobs."""
 import os
+import re
 import shutil
 import sys
 import tempfile
 import time
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
 
 from celery.utils.log import get_task_logger
@@ -42,6 +44,55 @@ def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
         ner_aggregation_strategy=meta.get("ner_aggregation_strategy"),
         force_large_xml=os.getenv("ANON_FORCE_LARGE_XML", "false").lower() == "true",
     )
+
+
+_PASS_RE = re.compile(r"Pass (\d+)/(\d+)")
+_PROGRESS_EVERY_S = 2.0
+
+
+@contextmanager
+def _progress_to_status(job_id: str):
+    """Publish the engine's file progress bars (tqdm) as the job's progress.
+
+    "Pass k/n" bars map to their share of the run; the inner entity-detection
+    bars are ignored. Progress never goes back, stays below 100 until the job
+    is done, and is written at most every two seconds.
+    """
+    from tqdm import tqdm
+
+    update, iterate = tqdm.update, tqdm.__iter__
+    state = {"sent": 0, "at": 0.0}
+
+    def report(bar, done: int) -> None:
+        desc = str(getattr(bar, "desc", "") or "")
+        if not bar.total or desc.startswith("Detecting Entities"):
+            return
+        fraction = min(1.0, done / bar.total)
+        match = _PASS_RE.search(desc)
+        if match:
+            k, n = int(match.group(1)), int(match.group(2))
+            fraction = (k - 1 + fraction) / n
+        percent = min(99, int(100 * fraction))
+        now = time.monotonic()
+        if percent > state["sent"] and now - state["at"] >= _PROGRESS_EVERY_S:
+            state.update(sent=percent, at=now)
+            job_service.set_status(job_id, "running", progress=percent)
+
+    def counted_update(self, n=1):
+        self._anon_done = getattr(self, "_anon_done", 0) + (n or 0)
+        report(self, self._anon_done)
+        return update(self, n)
+
+    def counted_iter(self):
+        for done, item in enumerate(iterate(self), 1):
+            report(self, done)
+            yield item
+
+    tqdm.update, tqdm.__iter__ = counted_update, counted_iter
+    try:
+        yield
+    finally:
+        tqdm.update, tqdm.__iter__ = update, iterate
 
 
 def _public_error(exc: Exception, path: Path, name: str) -> str:
@@ -151,10 +202,11 @@ def _execute(job_id: str) -> dict:
         _ocr_timer = None  # type: ignore
 
     try:
-        if meta["ext"] == "zip":
-            result = _process_zip(input_file, out_dir, meta, key)
-        else:
-            result = _anonymize(input_file, out_dir, meta, key)
+        with _progress_to_status(job_id):
+            if meta["ext"] == "zip":
+                result = _process_zip(input_file, out_dir, meta, key)
+            else:
+                result = _anonymize(input_file, out_dir, meta, key)
 
         ms = (time.monotonic() - t0) * 1000
         ocr_stats = _ocr_timer.snapshot() if _ocr_timer else {"ms": 0.0, "calls": 0}
@@ -172,7 +224,7 @@ def _execute(job_id: str) -> dict:
                 file_b=meta.get("size"),
                 strategy=meta.get("strategy"),
                 lang=meta.get("lang"),
-                model=meta.get("model"),
+                model=None if meta.get("strategy") == "regex" else meta.get("model"),
                 queue="fast",
                 entity_cnt=result.get("entity_count"),
                 entity_counts=result.get("entity_counts"),

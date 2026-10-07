@@ -71,3 +71,22 @@ def test_local_xml_has_no_artificial_size_limit(tmp_path, monkeypatch):
     monkeypatch.setenv("ANON_FORCE_LARGE_XML", "true")
     _anonymize(source, out, {"strategy": "regex", "slug_length": 0}, "")
     assert b"a@example.com" not in (out / "anon_private.xml").read_bytes()
+
+
+def test_engine_progress_bars_become_job_progress(monkeypatch):
+    import io
+    from tqdm import tqdm
+    from workers import tasks
+    sent = []
+    monkeypatch.setattr(tasks.job_service, "set_status", lambda job, status, **extra: sent.append(extra["progress"]))
+    monkeypatch.setattr(tasks, "_PROGRESS_EVERY_S", 0)
+    with tasks._progress_to_status("job"):
+        for _ in tqdm(range(4), desc="Pass 1/2: Reading x", file=io.StringIO()):
+            pass
+        for _ in tqdm(range(3), desc="Detecting Entities for x", file=io.StringIO()):
+            pass
+        bar = tqdm(total=100, desc="Pass 2/2: Writing x", file=io.StringIO())
+        bar.update(50)
+        bar.update(50)
+    assert sent == [12, 25, 37, 50, 75, 99]
+    assert tqdm.update.__name__ == "update"

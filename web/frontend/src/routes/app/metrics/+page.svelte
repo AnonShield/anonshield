@@ -88,12 +88,6 @@
     });
   }
 
-  function fmtTimeShort(ts: number): string {
-    return new Date(ts * 1000).toLocaleString(undefined, {
-      month: 'short', day: 'numeric', hour: '2-digit',
-    });
-  }
-
   function shortModel(m: string): string { return m.split('/').pop() ?? m; }
   function entityLabel(e: string): string { return e.replace(/_/g, ' '); }
 
@@ -180,10 +174,9 @@
   const tsInner = { w: TS_W - TS_PAD_L - TS_PAD_R, h: TS_H - TS_PAD_T - TS_PAD_B };
   const maxTsN  = $derived(timeseries.reduce((m, p) => Math.max(m, p.n), 1));
   const maxTsTp = $derived(timeseries.reduce((m, p) => Math.max(m, p.avg_throughput_bps ?? 0), 1));
-  function tsX(i: number): number {
-    if (timeseries.length <= 1) return TS_PAD_L + tsInner.w / 2;
-    return TS_PAD_L + (i / (timeseries.length - 1)) * tsInner.w;
-  }
+  // One slot per bucket, so the first and last bars stay inside the plot.
+  const tsSlot = $derived(tsInner.w / Math.max(1, timeseries.length));
+  function tsX(i: number): number { return TS_PAD_L + tsSlot * (i + 0.5); }
   function tsBarH(n: number): number { return (n / maxTsN) * tsInner.h; }
   function tsLineY(tp: number | null): number {
     const v = tp ?? 0;
@@ -197,15 +190,21 @@
   });
 
   // ── Derived: scatter geometry (file_b log-x, throughput y) ───────────────────
-  const SC_W = 640, SC_H = 280, SC_PAD_L = 56, SC_PAD_R = 16, SC_PAD_T = 16, SC_PAD_B = 36;
-  const scInner = { w: SC_W - SC_PAD_L - SC_PAD_R, h: SC_H - SC_PAD_T - SC_PAD_B };
+  // Drawn at the measured width (one unit = one pixel), so its text keeps the
+  // same size on a phone and on a wide screen.
+  let scWidth = $state(640);
+  const SC_H = 260, SC_PAD_L = 84, SC_PAD_R = 16, SC_PAD_T = 16, SC_PAD_B = 44;
+  const SC_W = $derived(Math.max(280, scWidth));
+  const scInner = $derived({ w: SC_W - SC_PAD_L - SC_PAD_R, h: SC_H - SC_PAD_T - SC_PAD_B });
   const scatterPts = $derived(
     recentJobs.filter((j) => (j.file_b ?? 0) > 0 && (j.throughput_bps ?? 0) > 0)
   );
   const scXDomain = $derived.by(() => {
     if (scatterPts.length === 0) return { lo: 0, hi: 1 };
     const xs = scatterPts.map((j) => Math.log10(j.file_b));
-    return { lo: Math.min(...xs), hi: Math.max(...xs) };
+    const lo = Math.min(...xs), hi = Math.max(...xs);
+    const pad = Math.max(0.15, (hi - lo) * 0.08);
+    return { lo: lo - pad, hi: hi + pad };
   });
   const scYMax = $derived(scatterPts.reduce((m, j) => Math.max(m, j.throughput_bps), 1));
   function scX(fileB: number): number {
@@ -226,13 +225,17 @@
       if (Math.log10(v) < lo - 0.01 || Math.log10(v) > hi + 0.01) continue;
       ticks.push({ x: scX(v), label: fmtBytes(v) });
     }
-    return ticks;
+    if (ticks.length >= 2) return ticks;
+    // Sizes within one decade: label the smallest and largest file instead.
+    const sizes = scatterPts.map((j) => j.file_b);
+    const ends = [...new Set([Math.min(...sizes), Math.max(...sizes)])];
+    return ends.map((v) => ({ x: scX(v), label: fmtBytes(v) }));
   });
   const scYTicks = $derived.by(() => {
     const steps = 4;
     return Array.from({ length: steps + 1 }, (_, i) => {
       const v = (scYMax / steps) * i;
-      return { y: scY(v), label: fmtThroughput(v) };
+      return { y: scY(v), label: i === 0 ? '0' : fmtThroughput(v) };
     });
   });
   // strategies present in the scatter, for the legend.
@@ -320,7 +323,7 @@
                   <div class="hbar-fill" style="--w:{w.toFixed(1)}%;--c:{color};--d:{i * 70}ms">
                     <title>{(row.file_ext ?? '?').toUpperCase()}: {fmtThroughput(row.avg_throughput_bps)} ({row.n} {row.n === 1 ? $t('metrics.unit.run') : $t('metrics.unit.runs')})</title>
                   </div>
-                  <span class="hbar-val" style="color:{color}">{fmtThroughput(row.avg_throughput_bps)}</span>
+                  <span class="hbar-val" style="color:{w > 70 ? 'var(--color-text-primary)' : color}">{fmtThroughput(row.avg_throughput_bps)}</span>
                 </div>
                 <span class="hbar-meta">{row.n} {row.n === 1 ? $t('metrics.unit.run') : $t('metrics.unit.runs')}</span>
               </div>
@@ -348,7 +351,7 @@
                   <div class="hbar-fill" style="--w:{w.toFixed(1)}%;--c:{color};--d:{i * 70}ms">
                     <title>{row.strategy}: {fmtThroughput(row.avg_throughput_bps)}, {row.n} {row.n === 1 ? $t('metrics.unit.run') : $t('metrics.unit.runs')}, {$t('metrics.col.avg')} {fmtMs(row.avg_ms)}</title>
                   </div>
-                  <span class="hbar-val" style="color:{color}">{fmtThroughput(row.avg_throughput_bps)}</span>
+                  <span class="hbar-val" style="color:{w > 70 ? 'var(--color-text-primary)' : color}">{fmtThroughput(row.avg_throughput_bps)}</span>
                 </div>
                 <span class="hbar-meta">{row.n} {row.n === 1 ? $t('metrics.unit.run') : $t('metrics.unit.runs')}, {fmtMs(row.avg_ms)}</span>
               </div>
@@ -376,19 +379,19 @@
                role="img" aria-label={$t('metrics.chart.trend')}>
             <!-- volume bars -->
             {#each timeseries as p, i (p.ts)}
-              {@const bw = Math.max(2, (tsInner.w / timeseries.length) * 0.6)}
+              {@const bw = Math.min(48, Math.max(2, tsSlot * 0.6))}
               {@const bh = tsBarH(p.n)}
               <rect x={(tsX(i) - bw / 2).toFixed(1)} y={(TS_PAD_T + tsInner.h - bh).toFixed(1)}
                     width={bw.toFixed(1)} height={bh.toFixed(1)} rx="1.5"
                     class="ts-bar" style="--d:{i * 30}ms">
-                <title>{fmtTimeShort(p.ts)}: {p.n} {p.n === 1 ? $t('metrics.unit.run') : $t('metrics.unit.runs')}, {fmtThroughput(p.avg_throughput_bps)}</title>
+                <title>{fmtDate(p.ts)}: {p.n} {p.n === 1 ? $t('metrics.unit.run') : $t('metrics.unit.runs')}, {fmtThroughput(p.avg_throughput_bps)}</title>
               </rect>
             {/each}
             <!-- throughput line -->
             <path d={tsLinePath} class="ts-line" />
             {#each timeseries as p, i (p.ts)}
               <circle cx={tsX(i).toFixed(1)} cy={tsLineY(p.avg_throughput_bps).toFixed(1)} r="2.5" class="ts-dot">
-                <title>{fmtTimeShort(p.ts)}: {fmtThroughput(p.avg_throughput_bps)}</title>
+                <title>{fmtDate(p.ts)}: {fmtThroughput(p.avg_throughput_bps)}</title>
               </circle>
             {/each}
             <!-- baseline -->
@@ -396,8 +399,8 @@
           </svg>
         </div>
         <div class="ts-xaxis">
-          <span>{fmtTimeShort(timeseries[0].ts)}</span>
-          <span>{fmtTimeShort(timeseries[timeseries.length - 1].ts)}</span>
+          <span>{fmtDate(timeseries[0].ts)}</span>
+          <span>{fmtDate(timeseries[timeseries.length - 1].ts)}</span>
         </div>
       {/if}
     </section>
@@ -418,8 +421,8 @@
             {/each}
           </div>
         {/if}
-        <div class="svg-wrap">
-          <svg viewBox="0 0 {SC_W} {SC_H}" class="chart-svg" role="img" aria-label={$t('metrics.chart.scatter')}>
+        <div class="svg-wrap" bind:clientWidth={scWidth}>
+          <svg viewBox="0 0 {SC_W} {SC_H}" width={SC_W} height={SC_H} class="chart-svg scatter-svg" role="img" aria-label={$t('metrics.chart.scatter')}>
             <!-- y gridlines + labels -->
             {#each scYTicks as tick (tick.label)}
               <line x1={SC_PAD_L} y1={tick.y.toFixed(1)} x2={SC_W - SC_PAD_R} y2={tick.y.toFixed(1)} class="grid-line" />
@@ -540,7 +543,7 @@
                   <div class="hbar-fill" style="--w:{w.toFixed(1)}%;--c:#c084fc;--d:{i * 70}ms">
                     <title>{shortModel(row.model)}: {row.n} {row.n === 1 ? $t('metrics.unit.run') : $t('metrics.unit.runs')}, {fmtMs(row.avg_ms)}</title>
                   </div>
-                  <span class="hbar-val" style="color:#c084fc">{row.n}</span>
+                  <span class="hbar-val" style="color:{w > 70 ? 'var(--color-text-primary)' : '#c084fc'}">{row.n}</span>
                 </div>
                 <span class="hbar-meta">{fmtMs(row.avg_ms)}</span>
               </div>
@@ -567,7 +570,7 @@
                   <div class="hbar-fill" style="--w:{w.toFixed(1)}%;--c:{color};--d:{i * 50}ms">
                     <title>{entityLabel(row.entity)}: {row.n}</title>
                   </div>
-                  <span class="hbar-val" style="color:{color}">{row.n}</span>
+                  <span class="hbar-val" style="color:{w > 70 ? 'var(--color-text-primary)' : color}">{row.n}</span>
                 </div>
               </div>
             {/each}
@@ -660,8 +663,9 @@
   }
 
   .page-header {
-    display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4);
+    display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-4);
   }
+  .page-header .btn { white-space: nowrap; }
   .page-title { margin: 0; font-size: var(--text-xl); font-weight: 800; letter-spacing: -0.03em; }
   .page-sub { margin: var(--space-1) 0 0; font-size: var(--text-xs); font-family: var(--font-mono); color: var(--color-text-secondary); }
 
@@ -697,6 +701,10 @@
     display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);
   }
   @media (max-width: 820px) { .charts-row { grid-template-columns: 1fr; } }
+  @media (max-width: 560px) {
+    .hbar { grid-template-columns: 64px minmax(0, 1fr); row-gap: 2px; }
+    .hbar-meta { grid-column: 2; }
+  }
 
   .chart-card {
     display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6);
@@ -734,7 +742,7 @@
     animation-delay: var(--d, 0ms);
   }
   .hbar-val {
-    position: absolute; right: var(--space-2);
+    position: absolute; right: var(--space-2); white-space: nowrap;
     font-size: var(--text-xs); font-weight: 700; font-family: var(--font-mono);
     font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,0,0,0.6);
   }
@@ -747,6 +755,9 @@
   /* ── Generic SVG chart frame ── */
   .svg-wrap { width: 100%; }
   .chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .scatter-svg { width: 100%; height: auto; }
+  .scatter-svg .axis-text { font-size: 11px; }
+  .scatter-svg .axis-title { font-size: 11px; }
   .trend-svg { height: 200px; }
   .axis-line { stroke: var(--color-border-strong); stroke-width: 1; }
   .grid-line { stroke: var(--color-border); stroke-width: 1; }

@@ -167,6 +167,8 @@ const messages = {
     'model.distil': 'distilbert-multilingual, compact',
     /* status */
     'status.processing': 'Processing…',
+    'eta.remaining': 'about {time} left',
+    'eta.elapsed': 'running for {time}',
     'status.done': 'Anonymization complete',
     'status.error': 'Error',
     'status.entities_replaced': '{n} entities replaced',
@@ -247,7 +249,7 @@ const messages = {
     'adv.s4.desc': 'Add your own regex recognizers for domain-specific identifiers that the built-in detectors do not cover.',
     /* ── metrics dashboard ── */
     'metrics.title': 'Metrics',
-    'metrics.subtitle': 'Aggregated processing stats: collected in-memory, never persisted.',
+    'metrics.subtitle': 'Aggregated processing statistics: sizes, times and entity counts, never file contents.',
     'metrics.back': '← Back to app',
     /* metrics: KPI cards */
     'metrics.kpi.jobs': 'Jobs',
@@ -623,6 +625,8 @@ const messages = {
     'model.distil': 'distilbert-multilingual, compacto',
     /* status */
     'status.processing': 'Processando…',
+    'eta.remaining': 'faltam cerca de {time}',
+    'eta.elapsed': 'em andamento há {time}',
     'status.done': 'Anonimização concluída',
     'status.error': 'Erro',
     'status.entities_replaced': '{n} entidades substituídas',
@@ -703,7 +707,7 @@ const messages = {
     'adv.s4.desc': 'Adicione seus próprios reconhecedores regex para identificadores específicos do seu domínio que os detectores nativos não cobrem.',
     /* ── painel de métricas ── */
     'metrics.title': 'Métricas',
-    'metrics.subtitle': 'Estatísticas agregadas de processamento: coletadas em memória, nunca persistidas.',
+    'metrics.subtitle': 'Estatísticas agregadas de processamento: tamanhos, tempos e contagens de entidades, nunca o conteúdo dos arquivos.',
     'metrics.back': '← Voltar ao app',
     /* métricas: cards de KPI */
     'metrics.kpi.jobs': 'Jobs',

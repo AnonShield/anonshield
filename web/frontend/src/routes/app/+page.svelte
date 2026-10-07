@@ -251,16 +251,21 @@
     }
   });
 
+  function duration(ms: number): string {
+    return ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} s` : `${Math.round(ms / 60000)} min`;
+  }
+  // Measured progress gives the estimate once a few percent are done; before
+  // that, a guess from the file size, and past the guess, the time so far.
   let etaLabel = $derived.by(() => {
+    if (!elapsedMs) return '';
+    if (progress >= 3) {
+      return $t('eta.remaining', { time: duration(elapsedMs * (100 - progress) / progress) });
+    }
     const fileSizeKb = (selectedFile?.size ?? 0) / 1024;
-    if (!fileSizeKb) return '';
-    const strategy = $config.strategy || 'filtered';
-    const kbPerSec = STRATEGY_KB_S[strategy] ?? 1250;
-    const totalMs = (fileSizeKb / kbPerSec) * 1000;
-    const remainMs = Math.max(0, totalMs - elapsedMs);
-    if (remainMs < 1000) return 'almost done…';
-    if (remainMs < 60000) return `~${Math.ceil(remainMs / 1000)}s remaining`;
-    return `~${(remainMs / 60000).toFixed(1)} min remaining`;
+    const kbPerSec = STRATEGY_KB_S[$config.strategy || 'filtered'] ?? 1250;
+    const guessRemainMs = (fileSizeKb / kbPerSec) * 1000 - elapsedMs;
+    if (guessRemainMs > 5000) return $t('eta.remaining', { time: duration(guessRemainMs) });
+    return $t('eta.elapsed', { time: duration(elapsedMs) });
   });
 
 
