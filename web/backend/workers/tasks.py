@@ -43,6 +43,10 @@ def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
         ner_score_threshold=meta.get("ner_score_threshold"),
         ner_aggregation_strategy=meta.get("ner_aggregation_strategy"),
         force_large_xml=os.getenv("ANON_FORCE_LARGE_XML", "false").lower() == "true",
+        # Smaller JSON batches than the CLI's 1000 records, so the progress bar
+        # and Cancel react within a minute or two even when NER takes seconds
+        # per record (long vulnerability reports on a CPU).
+        json_chunk_size=int(os.getenv("ANON_JSON_CHUNK_SIZE", "50")),
     )
 
 
@@ -50,20 +54,30 @@ _PASS_RE = re.compile(r"Pass (\d+)/(\d+)")
 _PROGRESS_EVERY_S = 2.0
 
 
+class JobCancelled(Exception):
+    """The job was cancelled from the interface while it ran."""
+
+
 @contextmanager
-def _progress_to_status(job_id: str):
-    """Publish the engine's file progress bars (tqdm) as the job's progress.
+def _progress_to_status(job_id: str, started_at: float):
+    """Publish the engine's file progress bars (tqdm) as the job's progress,
+    and stop the job when it was cancelled (its status key is gone).
 
     "Pass k/n" bars map to their share of the run; the inner entity-detection
     bars are ignored. Progress never goes back, stays below 100 until the job
-    is done, and is written at most every two seconds.
+    is done, and is written at most every two seconds, with one decimal.
     """
     from tqdm import tqdm
 
     update, iterate = tqdm.update, tqdm.__iter__
-    state = {"sent": 0, "at": 0.0}
+    state = {"sent": 0, "at": 0.0, "checked": 0.0}
 
     def report(bar, done: int) -> None:
+        now = time.monotonic()
+        if now - state["checked"] >= _PROGRESS_EVERY_S:
+            state["checked"] = now
+            if job_service.get_status(job_id) is None:
+                raise JobCancelled(job_id)
         desc = str(getattr(bar, "desc", "") or "")
         if not bar.total or desc.startswith("Detecting Entities"):
             return
@@ -72,11 +86,12 @@ def _progress_to_status(job_id: str):
         if match:
             k, n = int(match.group(1)), int(match.group(2))
             fraction = (k - 1 + fraction) / n
-        percent = min(99, int(100 * fraction))
-        now = time.monotonic()
+        # One decimal: a slow job on a large file shows movement within a
+        # minute or two, which is what the time estimate needs.
+        percent = min(99.9, round(100 * fraction, 1))
         if percent > state["sent"] and now - state["at"] >= _PROGRESS_EVERY_S:
             state.update(sent=percent, at=now)
-            job_service.set_status(job_id, "running", progress=percent)
+            job_service.set_status(job_id, "running", progress=percent, started_at=started_at)
 
     def counted_update(self, n=1):
         self._anon_done = getattr(self, "_anon_done", 0) + (n or 0)
@@ -146,6 +161,8 @@ def _process_zip(zip_path: Path, out_dir: Path, meta: dict, key: str) -> dict:
                 shutil.copy2(processed[0], destination)
                 stats["files_processed"] += 1
                 stats["entity_count"] += result.get("entity_count", 0)
+            except JobCancelled:
+                raise
             except Exception as exc:
                 logger.warning("Could not process %s: %s", relative, exc)
                 message = _public_error(exc, src, str(relative))
@@ -187,7 +204,8 @@ def _execute(job_id: str) -> dict:
         raise RuntimeError(f"No metadata for job {job_id}")
 
     key = job_service.pop_key(job_id)
-    job_service.set_status(job_id, "running", progress=0)
+    started_at = time.time()
+    job_service.set_status(job_id, "running", progress=0, started_at=started_at)
 
     input_file = storage.input_path(job_id, meta["ext"])
     out_dir = storage.output_dir(job_id)
@@ -202,7 +220,7 @@ def _execute(job_id: str) -> dict:
         _ocr_timer = None  # type: ignore
 
     try:
-        with _progress_to_status(job_id):
+        with _progress_to_status(job_id, started_at):
             if meta["ext"] == "zip":
                 result = _process_zip(input_file, out_dir, meta, key)
             else:
@@ -237,6 +255,10 @@ def _execute(job_id: str) -> dict:
             pass
 
         return result
+    except JobCancelled:
+        storage.delete_job(job_id)
+        logger.info("Job %s cancelled while running", job_id)
+        return {"cancelled": True}
     except Exception as exc:
         storage.delete_input(job_id)
         job_service.set_status(job_id, "error", message=_public_error(exc, input_file, meta.get("filename") or input_file.name))

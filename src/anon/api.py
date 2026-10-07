@@ -47,6 +47,7 @@ def anonymize_file(
     ner_score_threshold: float | None = None,
     ner_aggregation_strategy: str | None = None,
     force_large_xml: bool = False,
+    json_chunk_size: int | None = None,
 ) -> dict[str, Any]:
     """Anonymize a single file and write output to output_dir.
 
@@ -157,6 +158,7 @@ def anonymize_file(
         overwrite=True,
         anonymization_config=anonymization_config,
         force_large_xml=force_large_xml,
+        **({"json_chunk_size": json_chunk_size} if json_chunk_size else {}),
     )
     if processor is None:
         raise ValueError(f"No processor available for file type: {input_path.suffix}")

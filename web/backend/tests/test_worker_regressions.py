@@ -79,8 +79,9 @@ def test_engine_progress_bars_become_job_progress(monkeypatch):
     from workers import tasks
     sent = []
     monkeypatch.setattr(tasks.job_service, "set_status", lambda job, status, **extra: sent.append(extra["progress"]))
+    monkeypatch.setattr(tasks.job_service, "get_status", lambda job: {"status": "running"})
     monkeypatch.setattr(tasks, "_PROGRESS_EVERY_S", 0)
-    with tasks._progress_to_status("job"):
+    with tasks._progress_to_status("job", 0.0):
         for _ in tqdm(range(4), desc="Pass 1/2: Reading x", file=io.StringIO()):
             pass
         for _ in tqdm(range(3), desc="Detecting Entities for x", file=io.StringIO()):
@@ -88,5 +89,19 @@ def test_engine_progress_bars_become_job_progress(monkeypatch):
         bar = tqdm(total=100, desc="Pass 2/2: Writing x", file=io.StringIO())
         bar.update(50)
         bar.update(50)
-    assert sent == [12, 25, 37, 50, 75, 99]
+    assert sent == [12.5, 25.0, 37.5, 50.0, 75.0, 99.9]
     assert tqdm.update.__name__ == "update"
+
+
+def test_cancelling_a_running_job_stops_it(monkeypatch):
+    import io
+    from tqdm import tqdm
+    from workers import tasks
+    monkeypatch.setattr(tasks.job_service, "get_status", lambda job: None)
+    monkeypatch.setattr(tasks, "_PROGRESS_EVERY_S", 0)
+    seen = []
+    with pytest.raises(tasks.JobCancelled):
+        with tasks._progress_to_status("job", 0.0):
+            for item in tqdm(range(100), desc="Processing x", file=io.StringIO()):
+                seen.append(item)
+    assert len(seen) < 3
