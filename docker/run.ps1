@@ -185,7 +185,7 @@ if ($args -contains '--web') {
         if ($LASTEXITCODE -ne 0) {
             $null = & docker rm -f $WebName 2>&1
             if ($Out -match 'already allocated|address already in use') {
-                Write-Err "Port $Port is used by another program. Choose another: .\run.ps1 --web --port 8081"
+                Write-Err "Port $Port is used by another program. Choose another: .\run.ps1 --web --port $([int]$Port + 1)"
             } else { Write-Err "Could not start the web interface: $(($Out.Trim() -split "`n")[-1])" }
             exit 1
         }

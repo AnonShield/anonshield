@@ -152,7 +152,7 @@ def test_undecodable_text_is_a_clear_error(tmp_path):
 
 @pytest.mark.parametrize("scenario,expected,code", [
     ("running", "already running: http://localhost:8080", 0),
-    ("port_taken", "Port 8080 is used by another program", 1),
+    ("port_taken", "Port 8080 is used by another program. Choose another: ./run.sh --web --port 8081", 1),
     ("new", "AnonShield is ready: http://localhost:8080", 0),
 ])
 def test_docker_wrapper_web_mode(tmp_path, scenario, expected, code):

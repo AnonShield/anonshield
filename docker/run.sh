@@ -200,7 +200,7 @@ web_main() {
                 -p "127.0.0.1:$port:8080" -v anonshield:/data "$WEB_IMAGE" 2>&1); then
             docker rm -f "$WEB_NAME" >/dev/null 2>&1 || true
             if [[ "$out" == *"already allocated"* || "$out" == *"address already in use"* ]]; then
-                log_error "Port $port is used by another program. Choose another: ./run.sh --web --port 8081"
+                log_error "Port $port is used by another program. Choose another: ./run.sh --web --port $((port + 1))"
             else
                 log_error "Could not start the web interface: $(echo "$out" | tail -n 1)"
             fi
