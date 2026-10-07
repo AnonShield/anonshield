@@ -5,7 +5,10 @@ import os
 from celery import Celery
 from celery.signals import worker_process_init
 
+from services.logs import quiet_third_party_logs
+
 logger = logging.getLogger(__name__)
+quiet_third_party_logs()
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 

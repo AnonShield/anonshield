@@ -10,6 +10,9 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from services.limiter import limiter
+from services.logs import quiet_third_party_logs
+
+quiet_third_party_logs()
 
 app = FastAPI(
     title="AnonShield Web API",
