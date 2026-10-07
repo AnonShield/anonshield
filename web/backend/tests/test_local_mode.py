@@ -96,3 +96,26 @@ def test_long_local_jobs_do_not_expire(monkeypatch):
     job_service.store_key("local-job", "key")
     assert redis.set.call_count == 3
     redis.setex.assert_not_called()
+
+
+def test_local_image_serves_the_interface(tmp_path, monkeypatch):
+    import importlib
+    import main
+
+    static = tmp_path / "static"
+    (static / "_app").mkdir(parents=True)
+    (static / "index.html").write_text("<html>app</html>")
+    (static / "_app" / "start.js").write_text("console.log(1)")
+    (tmp_path / "secret.txt").write_text("outside")
+    monkeypatch.setenv("ANON_STATIC_DIR", str(static))
+    client = TestClient(importlib.reload(main).app)
+    try:
+        assert client.get("/").text == "<html>app</html>"
+        assert client.get("/app/metrics").text == "<html>app</html>"
+        assert client.get("/_app/start.js").text == "console.log(1)"
+        assert client.get("/%2e%2e/secret.txt").text == "<html>app</html>"
+        assert client.get("/api/nope").status_code == 404
+        assert client.get("/api/health").json()["status"] == "ok"
+    finally:
+        monkeypatch.delenv("ANON_STATIC_DIR")
+        importlib.reload(main)

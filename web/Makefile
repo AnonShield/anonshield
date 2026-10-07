@@ -7,7 +7,7 @@
 #   make restart    restart the stack
 #   make warm       preload the NER model so the first request is fast
 #   make down       stop everything
-#   make local      run it on this machine: build, start, http://localhost:8080
+#   make local      build and run the single-container app on this machine: http://localhost:8080
 #
 # This wraps docker compose with the production file plus the host override
 # (docker-compose.host.yml: localhost ports for the host Caddy, reduced memory).
@@ -33,17 +33,17 @@ deploy: build up warm status  ## Build, start, warm the cache, and show status (
 
 LOCAL := docker compose -f docker-compose.local.yml
 
-local:  ## Run locally without upload limits: http://localhost:8080
+local:  ## Build and run the local single-container app from this checkout: http://localhost:8080
 	$(LOCAL) up -d --build
-	@echo "Open http://localhost:$${ANON_LOCAL_PORT:-8080}/app (make local-down to stop)"
+	@echo "Open http://localhost:$${ANON_LOCAL_PORT:-8080} (make local-down to stop)"
 
-local-down:  ## Stop the local stack (preserves the key and model cache)
+local-down:  ## Stop the local app (keeps the key and model cache in the anonshield volume)
 	$(LOCAL) down
 
-local-logs:  ## Follow local logs. Filter with: make local-logs SVC=backend
-	$(LOCAL) logs -f --tail=120 $(SVC)
+local-logs:  ## Follow the local app's messages
+	$(LOCAL) logs -f --tail=120
 
-local-status:  ## Show local container status and health
+local-status:  ## Show whether the local app is running and healthy
 	$(LOCAL) ps
 
 ensure-secret:  ## Generate a random ANON_SECRET_KEY in web/.env if missing (persisted, never regenerated)

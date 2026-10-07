@@ -1,4 +1,5 @@
-import adapter from '@sveltejs/adapter-node';
+import nodeAdapter from '@sveltejs/adapter-node';
+import staticAdapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
@@ -13,7 +14,9 @@ export default defineConfig({
 				runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 			},
 			// Node server (`node build`), as run by the production image.
-			adapter: adapter()
+			// ANON_STATIC_UI=1: plain files that the local image's backend serves
+			// itself, with index.html as the fallback for every page.
+			adapter: process.env.ANON_STATIC_UI ? staticAdapter({ fallback: 'index.html' }) : nodeAdapter()
 		})
 	],
 	server: {

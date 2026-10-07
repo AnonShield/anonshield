@@ -38,6 +38,7 @@ jobs:
       python: ${{ steps.filter.outputs.python }}
       frontend: ${{ steps.filter.outputs.frontend }}
       image: ${{ steps.filter.outputs.image }}
+      web_image: ${{ steps.filter.outputs.web_image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -56,13 +57,13 @@ jobs:
             base="${{ github.event.before }}"
           fi
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base" 2>/dev/null; then
-            printf 'code=true\npython=true\nfrontend=true\nimage=true\n' >> "$GITHUB_OUTPUT"
+            printf 'code=true\npython=true\nfrontend=true\nimage=true\nweb_image=true\n' >> "$GITHUB_OUTPUT"
             echo "Base commit unavailable; treating as a full change."
             exit 0
           fi
           changed="$(git diff --name-only "$base" HEAD)"
           echo "Changed files:"; printf '  %s\n' $changed
-          code=false; python=false; frontend=false; image=false
+          code=false; python=false; frontend=false; image=false; web_image=false
           if printf '%s\n' "$changed" | grep -qE '^(src/|web/|tests/|scripts/|anon\.py|pyproject\.toml|uv\.lock|\.github/workflows/)'; then
             code=true
           fi
@@ -75,8 +76,11 @@ jobs:
           if printf '%s\n' "$changed" | grep -qE '^(docker/Dockerfile|docker/docker-entrypoint\.sh|src/|scripts/|tests/|examples/|anon\.py|pyproject\.toml|uv\.lock|\.github/workflows/(docker-image|ci-cd)\.yml)'; then
             image=true
           fi
-          printf 'code=%s\npython=%s\nfrontend=%s\nimage=%s\n' "$code" "$python" "$frontend" "$image" >> "$GITHUB_OUTPUT"
-          echo "Resolved: code=$code python=$python frontend=$frontend image=$image"
+          if printf '%s\n' "$changed" | grep -qE '^(web/backend/|web/frontend/|src/|anon\.py|pyproject\.toml|uv\.lock|\.dockerignore|\.github/workflows/(docker-image|ci-cd)\.yml)'; then
+            web_image=true
+          fi
+          printf 'code=%s\npython=%s\nfrontend=%s\nimage=%s\nweb_image=%s\n' "$code" "$python" "$frontend" "$image" "$web_image" >> "$GITHUB_OUTPUT"
+          echo "Resolved: code=$code python=$python frontend=$frontend image=$image web_image=$web_image"
 
   test:
     name: Python tests
@@ -226,7 +230,8 @@ jobs:
         name: Run web backend tests
         run: uv run pytest web/backend/tests -q --timeout=300
 
-  # CLI Docker images (docker-image.yml). On a pull request they are built and
+  # Docker Hub images (docker-image.yml): the CLI and the single-container web
+  # app (:web). On a pull request they are built and
   # smoke-tested without pushing; on main they are pushed after the tests pass.
   docker:
     name: Docker image
@@ -235,6 +240,7 @@ jobs:
     uses: ./.github/workflows/docker-image.yml
     with:
       run: ${{ needs.changes.outputs.image == 'true' }}
+      run_web: ${{ needs.changes.outputs.web_image == 'true' }}
       push: false
 
   docker-publish:
@@ -247,6 +253,7 @@ jobs:
     uses: ./.github/workflows/docker-image.yml
     with:
       run: ${{ needs.changes.outputs.image == 'true' }}
+      run_web: ${{ needs.changes.outputs.web_image == 'true' }}
       push: true
     secrets: inherit
 

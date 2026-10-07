@@ -8,7 +8,13 @@ AnonShield lets Computer Security Incident Response Teams share incident data wi
 
 ![AnonShield pipeline](https://anonshield.org/pipeline.png)
 
-> **Prefer a browser?** A hosted web app with the same engine runs at **[anonshield.org](https://anonshield.org)**: drag and drop a file, choose entity types and a strategy, and watch a live metrics dashboard. The Docker image documented below is the command-line tool.
+> **Prefer a browser?** Run the web app on your own computer with one command, no limits and nothing sent anywhere:
+>
+> ```bash
+> docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web
+> ```
+>
+> Then open **http://localhost:8080**, drop a file and click **Anonymize**. Stop it with `docker stop anonshield` and start it again with `docker start anonshield`; the key and model cache stay in the `anonshield` volume ([local guide](https://github.com/AnonShield/anonshield/blob/main/web/LOCAL.md)). A hosted demo runs at **[anonshield.org](https://anonshield.org)**. The rest of this page covers the command-line tool (`latest`, `gpu`, `gpu-cu126`).
 
 ![AnonShield web interface](https://anonshield.org/ui-app.png)
 
@@ -114,13 +120,14 @@ $env:ANON_SECRET_KEY = "<64 hex characters>"         # Windows
 
 ## Available Tags
 
-Three tags are published. `latest` is the CPU image; `gpu` and `gpu-cu126` are the same GPU image with two PyTorch builds, because no single build runs on every NVIDIA GPU and driver.
+`latest` is the CPU command-line image; `gpu` and `gpu-cu126` are the same GPU image with two PyTorch builds, because no single build runs on every NVIDIA GPU and driver. `web` is the web app in one container (see the top of this page).
 
 | Tag | PyTorch build | Use case | Approx. download |
 |-----|---------------|----------|------------------|
 | `latest` | CPU | Any x86_64 machine | ~1.4 GB |
 | `gpu` | CUDA 13.0 | NVIDIA driver 580+ and an RTX 20xx (Turing) or newer GPU; required for RTX 50xx (Blackwell) | ~4.3 GB |
 | `gpu-cu126` | CUDA 12.6 | Older GPUs (GTX 10xx and earlier) or drivers older than 580; no RTX 50xx | ~5 GB |
+| `web` | CPU | The web interface on your computer, no limits | ~1.4 GB |
 
 All images are based on `python:3.12-slim` and include Tesseract OCR (English and Portuguese language data) and the spaCy pipelines for English and Portuguese. The wrapper script picks the right image automatically: plain `./run.sh` uses `latest`; `./run.sh --gpu` reads the GPU and driver from `nvidia-smi` and uses `gpu` or `gpu-cu126` (set `ANON_GPU_IMAGE` to override). If the image does not match the GPU anyway, AnonShield says so at startup and runs on the CPU instead of failing.
 

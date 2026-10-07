@@ -105,3 +105,25 @@ async def analyze_fields(file: UploadFile) -> dict:
         return {"fields": [{"name": n} for n in field_names]}
     except Exception as e:
         return {"fields": [], "error": str(e)}
+
+
+# The local image (web/backend/Dockerfile, target "local") serves the interface
+# itself from the static build of web/frontend, so it needs no proxy and no Node.
+_STATIC_DIR = os.getenv("ANON_STATIC_DIR")
+if _STATIC_DIR:
+    from pathlib import Path
+
+    from fastapi import HTTPException
+    from fastapi.responses import FileResponse
+
+    _static_root = Path(_STATIC_DIR).resolve()
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def interface(path: str) -> FileResponse:
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        for candidate in (_static_root / path, _static_root / f"{path}.html"):
+            candidate = candidate.resolve()
+            if candidate.is_file() and candidate.is_relative_to(_static_root):
+                return FileResponse(candidate)
+        return FileResponse(_static_root / "index.html")

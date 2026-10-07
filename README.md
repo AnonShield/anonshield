@@ -16,12 +16,10 @@ AnonShield replaces personally identifiable information (PII) and network-specif
 **Web interface, running on your computer:**
 
 ```bash
-git clone https://github.com/AnonShield/anonshield.git
-cd anonshield
-docker compose -f web/docker-compose.local.yml up -d --build
+docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web
 ```
 
-Open **[localhost:8080/app](http://localhost:8080/app)**, drop a file, and click **Anonymize**. Local mode has no upload-size or batch-rate limit; disk and RAM are the machine's limits. The key and model cache are created automatically. The first build takes several minutes. Stop with `docker compose -f web/docker-compose.local.yml down`. See the [local guide](web/LOCAL.md) for logs or a different port.
+Open **[localhost:8080](http://localhost:8080)**, drop a file, and click **Anonymize**. One container, no clone and no setup: it has no upload-size or rate limit, only this computer can reach it, and the key, model cache and metrics stay in the `anonshield` volume. Stop with `docker stop anonshield`, start again with `docker start anonshield`. The [local guide](web/LOCAL.md) covers updates, another port and troubleshooting.
 
 **Command-line processing:** download the script and give it a file or folder.
 
@@ -221,15 +219,13 @@ The live app runs at **[anonshield.org](https://anonshield.org)**.
 ![Metrics dashboard](docs/images/metrics.png)
 *Built-in metrics dashboard: throughput by file format and strategy, jobs over time, file size versus throughput, and the entity mix.*
 
-Run the whole web app locally with **Docker Desktop or Docker Engine + Compose**. From the repository root:
+Run the whole web app on your computer, in one container (Docker is the only requirement):
 
 ```bash
-docker compose -f web/docker-compose.local.yml up -d --build
+docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web
 ```
 
-Open **[localhost:8080/app](http://localhost:8080/app)**. Local mode has **no upload-size or batch-rate limit**; available disk and RAM determine what the machine can process. It runs on CPU and is accessible only from this computer. The first build downloads dependencies and can take several minutes. A secret key is generated automatically and kept in a Docker volume, alongside persistent model downloads. There is no `.env`, OpenSSL, Python, or `make` setup step.
-
-Stop with `docker compose -f web/docker-compose.local.yml down`; run the startup command again to resume. See the short [local guide](web/LOCAL.md) for a different port, disk storage, logs, and troubleshooting. `make -C web local` and `make -C web local-down` are equivalent shortcuts.
+Open **[localhost:8080](http://localhost:8080)**. The local app has **no upload-size or rate limit**; disk and RAM are the limits. It runs on CPU, listens only on this computer, and keeps its key, model cache and metrics in the `anonshield` volume. To build the same container from this checkout instead, run `docker compose -f web/docker-compose.local.yml up -d --build` (or `make -C web local`). See the short [local guide](web/LOCAL.md) for updates, another port, logs and troubleshooting.
 
 For frontend development with hot reload, run the dev servers directly instead:
 
