@@ -231,8 +231,8 @@ jobs:
         run: uv run pytest web/backend/tests -q --timeout=300
 
   # Docker Hub images (docker-image.yml): the CLI and the single-container web
-  # app (:web). On a pull request they are built and
-  # smoke-tested without pushing; on main they are pushed after the tests pass.
+  # app (:web, and :web-gpu / :web-gpu-cu126). On a pull request they are built
+  # and smoke-tested without pushing; on main they are pushed after the tests pass.
   docker:
     name: Docker image
     needs: changes

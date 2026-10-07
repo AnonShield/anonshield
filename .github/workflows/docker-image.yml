@@ -5,7 +5,9 @@ name: Docker image
 # 580+, RTX 20xx or newer, needed for RTX 50xx) and :gpu-cu126 (older GPUs and
 # drivers). The Dockerfile itself fails the GPU build if torch has no CUDA.
 # The "web" job builds :web, the whole web app in one container for one computer
-# (web/backend/Dockerfile, target local).
+# (web/backend/Dockerfile, target local), and "web-gpu" the same app on the GPU
+# builds of torch: :web-gpu (CUDA 13.0) and :web-gpu-cu126, chosen per host by
+# docker/run.sh --web --gpu.
 #
 #  - Called from ci-cd.yml (workflow_call):
 #      pull request: build all three and smoke-test the CPU image, without
@@ -14,8 +16,9 @@ name: Docker image
 #    With run false (nothing that goes into the image changed) the job reports
 #    success without building, so it can be a required status check.
 #  - Published release or manual run: build and push, plus version-suffixed tags
-#    (:X.Y.Z, :X.Y.Z-gpu, :X.Y.Z-gpu-cu126 and :X.Y.Z-web). A manual run with
-#    images=web builds and pushes only :web.
+#    (:X.Y.Z, :X.Y.Z-gpu, :X.Y.Z-gpu-cu126, :X.Y.Z-web, :X.Y.Z-web-gpu and
+#    :X.Y.Z-web-gpu-cu126). A manual run with images=web builds and pushes only
+#    the web images.
 #
 # README-only changes are handled by dockerhub-readme.yml (description sync, no build).
 #
@@ -316,4 +319,121 @@ jobs:
           target: local
           push: true
           tags: ${{ steps.tags.outputs.web }}
+          cache-from: type=gha,scope=web-local
+
+  web-gpu:
+    name: Web image (GPU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      RUN: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' || inputs.run_web }}
+      PUSH: ${{ (github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (inputs.run_web && inputs.push)) && github.repository == 'AnonShield/anonshield' }}
+    steps:
+      - if: env.RUN != 'true'
+        run: echo "Nothing that goes into the web image changed; no build."
+      - if: env.RUN == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Free up runner disk space (the GPU images are large)
+        if: env.RUN == 'true'
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af || true
+          df -h /
+      - if: env.RUN == 'true'
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to Docker Hub
+        if: env.PUSH == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Resolve image tags
+        id: tags
+        if: env.RUN == 'true'
+        run: |
+          VER="${{ github.event.release.tag_name || inputs.tag || 'latest' }}"
+          {
+            echo "gpu<<EOF"
+            echo "$IMAGE:web-gpu"
+            if [ "$VER" != "latest" ] && [ -n "$VER" ]; then echo "$IMAGE:$VER-web-gpu"; fi
+            echo "EOF"
+            echo "gpu_cu126<<EOF"
+            echo "$IMAGE:web-gpu-cu126"
+            if [ "$VER" != "latest" ] && [ -n "$VER" ]; then echo "$IMAGE:$VER-web-gpu-cu126"; fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      # Same stages as :web up to the venv, which gets the CUDA build of torch
+      # (the build fails if it is still CPU-only). Reads the :web cache, writes
+      # none (the CUDA layers do not fit the 10 GB cache; see the CLI job).
+      - name: Build GPU web image (CUDA 13.0)
+        if: env.RUN == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: web/backend/Dockerfile
+          target: local
+          build-args: |
+            LOCAL_BASE=runtime-gpu
+            TORCH_CUDA=cu130
+          load: true
+          tags: anon-web-gpu:ci
+          cache-from: type=gha,scope=web-local
+      - name: Smoke test GPU web image
+        if: env.RUN == 'true'
+        # The runner has no GPU: the image must still start, say that it runs
+        # on the CPU and how to give it the GPU, and finish a regex and a NER job.
+        run: |
+          set -euo pipefail
+          docker run -d --name web-gpu -p 127.0.0.1:8080:8080 -v anonshield-ci:/data anon-web-gpu:ci
+          for i in $(seq 90); do [ "$(docker inspect -f '{{.State.Health.Status}}' web-gpu)" = healthy ] && break; sleep 2; done
+          test "$(docker inspect -f '{{.State.Health.Status}}' web-gpu)" = healthy
+          printf 'Contact Maria Oliveira <maria@example.com> from 192.168.10.45.\n' > s.txt
+          for strategy in regex filtered; do
+            id=$(curl -fsS -F file=@s.txt -F "strategy=$strategy" http://localhost:8080/api/jobs | jq -r .job_id)
+            for i in $(seq 300); do
+              state=$(curl -fsS "http://localhost:8080/api/jobs/$id/status" | jq -r .status)
+              if [ "$state" = "done" ] || [ "$state" = "error" ]; then break; fi
+              sleep 2
+            done
+            test "$state" = "done"
+            out=$(curl -fsS "http://localhost:8080/api/jobs/$id/download"); echo "$out"
+            if grep -E 'maria@example.com|192\.168\.10\.45' <<<"$out"; then exit 1; fi
+          done
+          if grep 'Maria Oliveira' <<<"$out"; then exit 1; fi
+          docker logs web-gpu 2>&1 | tee logs.txt
+          grep -q 'no NVIDIA GPU is visible.*--gpus all' logs.txt
+          docker exec web-gpu python -c "import torch; assert torch.version.cuda.startswith('13'), torch.version.cuda"
+      - name: Stop the web container
+        if: always() && env.RUN == 'true'
+        run: docker rm -f web-gpu || true
+      - name: Push GPU web image (CUDA 13.0)
+        if: env.PUSH == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: web/backend/Dockerfile
+          target: local
+          build-args: |
+            LOCAL_BASE=runtime-gpu
+            TORCH_CUDA=cu130
+          push: true
+          tags: ${{ steps.tags.outputs.gpu }}
+          cache-from: type=gha,scope=web-local
+      - name: Free runner disk before the CUDA 12.6 build
+        if: env.RUN == 'true'
+        run: |
+          docker image rm anon-web-gpu:ci || true
+          docker buildx prune -af || true
+      - name: Build GPU web image (CUDA 12.6)
+        if: env.RUN == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: web/backend/Dockerfile
+          target: local
+          build-args: |
+            LOCAL_BASE=runtime-gpu
+            TORCH_CUDA=cu126
+          push: ${{ env.PUSH == 'true' }}
+          tags: ${{ steps.tags.outputs.gpu_cu126 }}
           cache-from: type=gha,scope=web-local
