@@ -105,3 +105,29 @@ def test_cancelling_a_running_job_stops_it(monkeypatch):
             for item in tqdm(range(100), desc="Processing x", file=io.StringIO()):
                 seen.append(item)
     assert len(seen) < 3
+
+
+def test_worker_logs_progress_bars_below_warning():
+    """tqdm bars written to stderr were logged as WARNING lines on every job."""
+    from workers.celery_app import app
+    assert app.conf.worker_redirect_stdouts_level == "INFO"
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_warm_up_flags_the_wait_and_always_clears_it(monkeypatch, fails):
+    from services import job_service
+    from workers import celery_app
+    import src.anon.engine as engine
+
+    calls = []
+    monkeypatch.setattr(job_service, "set_warming", calls.append)
+    monkeypatch.setattr("src.anon.device.activate_gpu", lambda: None)
+
+    def warm_up_model(**_):
+        calls.append("loading")
+        if fails:
+            raise RuntimeError("no network")
+
+    monkeypatch.setattr(engine, "warm_up_model", warm_up_model)
+    celery_app.warm_up_default_model(None)
+    assert calls == [True, "loading", False]

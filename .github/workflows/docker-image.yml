@@ -283,6 +283,13 @@ jobs:
             if grep -E 'maria@example.com|192\.168\.10\.45' <<<"$out"; then exit 1; fi
           done
           if grep 'Maria Oliveira' <<<"$out"; then exit 1; fi
+      - name: Start a copy with a 1 MB size limit
+        if: env.RUN == 'true'
+        # For the size-limit step of the end-to-end test; no model warm-up needed.
+        run: |
+          docker run -d --name web-limited -p 127.0.0.1:8081:8080 -e ANON_MAX_SIZE_MB=1 -e WARMUP_MODEL=none anon-web:ci
+          for i in $(seq 60); do [ "$(docker inspect -f '{{.State.Health.Status}}' web-limited)" = healthy ] && break; sleep 2; done
+          test "$(docker inspect -f '{{.State.Health.Status}}' web-limited)" = healthy
       - if: env.RUN == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
@@ -291,12 +298,15 @@ jobs:
           cache-dependency-path: web/e2e/package-lock.json
       - name: End-to-end test in Chrome
         if: env.RUN == 'true'
-        # The interface driven as a person uses it, against the container above:
+        # The interface driven as a person uses it, against the containers above:
         # field rules, profiles, entities, patterns, batch, ZIP, errors, queue,
-        # Cancel, metrics and phone width (web/e2e/e2e.mjs).
+        # Cancel, a connection drop, the size limit, metrics, Portuguese and
+        # phone width (web/e2e/e2e.mjs). Any console error or unexpected 4xx/5xx
+        # fails the step it happens in.
         working-directory: web/e2e
         env:
           URL: http://localhost:8080
+          URL_LIMITED: http://localhost:8081
           E2E_DIR: ${{ runner.temp }}/e2e
         run: |
           npm ci
@@ -307,9 +317,9 @@ jobs:
         with:
           name: e2e-failures
           path: ${{ runner.temp }}/e2e/out
-      - name: Stop the web container
+      - name: Stop the web containers
         if: always() && env.RUN == 'true'
-        run: docker rm -f web || true
+        run: docker rm -f web web-limited || true
       - name: Push web image
         if: env.PUSH == 'true'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0

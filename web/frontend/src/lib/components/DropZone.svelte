@@ -88,11 +88,11 @@
     </div>
     <div class="chip-info">
       <span class="chip-name" title={file.name}>{file.name}</span>
-      <span class="chip-size">{formatSize(file.size)} · click to change</span>
+      <span class="chip-size">{formatSize(file.size)} · {$t('upload.change')}</span>
     </div>
     <button
       class="chip-clear"
-      aria-label="Remove file"
+      aria-label={$t('upload.remove')}
       onclick={(e) => { e.stopPropagation(); onclear?.(); }}
     >×</button>
   </div>
@@ -103,7 +103,7 @@
     class:dragging={isDragging}
     role="button"
     tabindex="0"
-    aria-label="Drop file or click to select"
+    aria-label={$t('upload.aria')}
     onclick={() => input?.click()}
     onkeydown={handleKeydown}
     ondragover={(e) => { e.preventDefault(); isDragging = true; }}
@@ -111,7 +111,7 @@
     ondrop={handleDrop}
   >
     <span class="icon" aria-hidden="true">↑</span>
-    <p class="label">Drop your file here<br />or <span class="link">click to select</span></p>
+    <p class="label">{$t('upload.drop')}<br />{$t('upload.or')} <span class="link">{$t('upload.click')}</span></p>
     <p class="formats">.txt .csv .json .jsonl .pdf .docx .xlsx .xml .zip · PNG JPG TIFF BMP WEBP GIF</p>
     <p class="limit">{limitMb > 0 ? $t('upload.limit', { mb: limitMb }) : $t('upload.unlimited')}</p>
   </div>

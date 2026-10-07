@@ -8,14 +8,15 @@ export interface ActiveJob {
   id: string;
   filename: string;
   status: JobStatus | null;
-  pollInterval: ReturnType<typeof setInterval> | null;
+  /** Stops following the job's status (watchJob). */
+  stopPolling: (() => void) | null;
 }
 
 export const activeJob = writable<ActiveJob | null>(null);
 
 export function clearJob() {
   activeJob.update(j => {
-    if (j?.pollInterval) clearInterval(j.pollInterval);
+    j?.stopPolling?.();
     return null;
   });
 }

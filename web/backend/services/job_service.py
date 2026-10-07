@@ -70,3 +70,28 @@ def get_meta(job_id: str) -> dict | None:
 def delete_job_keys(job_id: str) -> None:
     r = _client()
     r.delete(f"job:{job_id}:key", f"job:{job_id}:status", f"job:{job_id}:meta")
+
+
+# ── Worker warm-up ─────────────────────────────────────────────────────────────
+# A worker loading the NER model takes no job until it is done, so a job queued
+# meanwhile waits for the model, not for another file; the interface says which.
+# The TTL clears the flag if the worker dies while loading.
+WARMING_KEY = "worker:warming"
+WARMING_TTL = 1800
+
+
+def set_warming(on: bool) -> None:
+    try:
+        if on:
+            _client().setex(WARMING_KEY, WARMING_TTL, "1")
+        else:
+            _client().delete(WARMING_KEY)
+    except redis.RedisError:
+        pass  # only the waiting message depends on it
+
+
+def warming() -> bool:
+    try:
+        return bool(_client().exists(WARMING_KEY))
+    except redis.RedisError:
+        return False

@@ -216,3 +216,33 @@ esac
     run = next(line for line in calls.read_text().splitlines() if line.startswith("run -d"))
     assert "--gpus all" in run and run.endswith(expected_image), run
     assert ("Switching the web interface" in result.stdout) == switched, result.stdout
+
+
+@pytest.mark.parametrize("mode", [["--web"], ["sample.txt"]])
+@pytest.mark.parametrize("error,expected", [
+    # Two of four lab machines had a saved Docker Hub login with an expired
+    # token; Docker sends it for public images too, and the pull failed with
+    # nothing but the daemon's message.
+    ("unauthorized: personal access token is expired", "run docker logout, then try again"),
+    ("dial tcp: lookup registry-1.docker.io: no such host", "check the internet connection"),
+])
+def test_docker_wrapper_explains_a_failed_download(tmp_path, mode, error, expected):
+    calls = tmp_path / "calls.txt"
+    (tmp_path / "docker").write_text(f"""#!/bin/bash
+echo "$*" >> {calls}
+case "$1 $2" in
+  "info "*) exit 0 ;;
+  "image inspect") exit 1 ;;
+  "inspect -f") exit 1 ;;
+  "pull "*) echo "Pulling from anonshield/anon"; echo 'Error response from daemon: Head "https://registry-1.docker.io/v2/": {error}' >&2; exit 1 ;;
+esac
+""")
+    (tmp_path / "docker").chmod(0o755)
+    (tmp_path / "sample.txt").write_text("a@example.com")
+    env = {**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}", "ANON_SECRET_KEY": "test-key"}
+    result = subprocess.run(["bash", str(ROOT / "docker/run.sh"), *mode], cwd=tmp_path, env=env,
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode == 1
+    assert expected in result.stdout, result.stdout + result.stderr
+    assert "Pulling from anonshield/anon" in result.stdout     # the progress still shows
+    assert not any(line.startswith("run") for line in calls.read_text().splitlines())

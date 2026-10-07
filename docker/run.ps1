@@ -127,6 +127,24 @@ if (-not $dockerOk) {
     exit 1
 }
 
+# docker pull, with the fix spelled out for the failures a user can fix. The
+# download progress still shows. Returns $true when the image is there.
+function Invoke-Pull {
+    param([string]$Image)
+    $out = & docker pull $Image 2>&1 | ForEach-Object { Write-Host $_; "$_" }
+    if ($LASTEXITCODE -eq 0) { return $true }
+    $text = $out -join "`n"
+    if ($text -match 'unauthorized') {
+        # A Docker Hub login saved on this machine whose token expired or was
+        # revoked: Docker sends it even for public images, which then fail.
+        Write-Err "Docker Hub refused the login saved on this machine (expired or revoked token)."
+        Write-Err "The AnonShield images are public: run docker logout, then try again."
+    } elseif ($text -match 'no such host|i/o timeout|connection refused|network is unreachable') {
+        Write-Err "Could not reach Docker Hub to download ${Image}: check the internet connection (or Docker's proxy settings)."
+    }
+    return $false
+}
+
 # ---------------------------------------------------------------------------
 # --web: the web interface, one container (anonshield/anon:web) whose key,
 # models and metrics live in the "anonshield" volume
@@ -198,8 +216,7 @@ if ($args -contains '--web') {
         exit 0
     }
     if ($Action -eq "update") {
-        & docker pull $WebImage
-        if ($LASTEXITCODE -ne 0) { exit 1 }
+        if (-not (Invoke-Pull $WebImage)) { exit 1 }
         if ($State) { $null = & docker rm -f $WebName 2>&1 }
         $State = $null
     }
@@ -216,8 +233,7 @@ if ($args -contains '--web') {
         $null = & docker image inspect $WebImage 2>&1
         if ($LASTEXITCODE -ne 0) {
             Write-Info "Downloading $WebImage (about $(if ($WebGpu) { 4 } else { 1.5 }) GB, once)..."
-            & docker pull $WebImage
-            if ($LASTEXITCODE -ne 0) { exit 1 }
+            if (-not (Invoke-Pull $WebImage)) { exit 1 }
         }
         $Out = & docker run -d --name $WebName --restart unless-stopped @WebGpuFlags -p "127.0.0.1:${Port}:8080" -v anonshield:/data $WebImage 2>&1 | Out-String
         if ($LASTEXITCODE -ne 0) {
@@ -284,6 +300,11 @@ if ($UseGpu) {
 } else {
     $Image    = if ($env:ANON_IMAGE) { $env:ANON_IMAGE } else { "anonshield/anon:latest" }
     $GpuFlags = [string[]]@()
+}
+$null = & docker image inspect $Image 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Info "Downloading $Image (once)..."
+    if (-not (Invoke-Pull $Image)) { exit 1 }
 }
 
 # ---------------------------------------------------------------------------

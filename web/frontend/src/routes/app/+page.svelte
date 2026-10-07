@@ -8,7 +8,9 @@
   import FieldSelector from '#lib/components/FieldSelector.svelte';
   import { config, toYaml, fromYaml } from '#lib/stores/config.js';
   import { activeJob, clearJob } from '#lib/stores/job.js';
-  import { createJob, fetchEntities, validateProfile, downloadUrl, pollStatus, cancelJob } from '#lib/api.js';
+  import { jobOptions } from '#lib/jobRequest.js';
+  import { createJob, fetchEntities, validateProfile, downloadUrl, cancelJob } from '#lib/api.js';
+  import { watchJob, type PollEnd } from '#lib/poll.js';
   import type { EntityGroup } from '#lib/api.js';
   import { t } from '#lib/i18n.js';
   import { onDestroy, onMount } from 'svelte';
@@ -117,63 +119,43 @@
     errorMsg = '';
 
     try {
-      // null = all (no filter); empty Set = none; non-empty Set = specific selection
-      const sel = $config.selected_entities;
-      const entities = sel === null ? undefined : [...sel];
+      const job = await createJob(selectedFile, jobOptions($config, groups));
 
-      const yamlConfig = $config.custom_patterns.length > 0 || $config.allow_list.length > 0 || $config.preserve_entities.length > 0
-        ? toYaml($config, groups)
-        : undefined;
-
-      const job = await createJob(selectedFile, {
-        key:            $config.key || undefined,
-        strategy:       $config.strategy,
-        lang:           $config.lang,
-        model:          $config.model || undefined,
-        entities,
-        config:         yamlConfig,
-        anonymization_config: $config.anonymization_config,
-        ner_score_threshold: $config.ner_score_threshold,
-        ner_aggregation_strategy: $config.ner_aggregation_strategy,
-        slug_length: $config.slug_length,
-      });
-
-      activeJob.set({ id: job.job_id, filename: selectedFile.name, status: null, pollInterval: null });
-
-      const interval = setInterval(async () => {
-        try {
-          const status = await pollStatus(job.job_id);
-          activeJob.update(j => j ? { ...j, status } : j);
-          if (status.status === 'done') {
-            clearInterval(interval);
-            screen = 'done';
-          } else if (status.status === 'error') {
-            clearInterval(interval);
-            errorMsg = status.message ?? 'Unknown error';
-            screen = 'error';
-          }
-        } catch {
-          clearInterval(interval);
-          errorMsg = 'Lost connection to server.';
+      activeJob.set({ id: job.job_id, filename: selectedFile.name, status: null, stopPolling: null });
+      const stopPolling = watchJob(job.job_id,
+        (status) => activeJob.update(j => j ? { ...j, status } : j),
+        (end) => {
+          if ('status' in end && end.status.status === 'done') { screen = 'done'; return; }
+          errorMsg = endMessage(end);
           screen = 'error';
-        }
-      }, 2000);
-
-      activeJob.update(j => j ? { ...j, pollInterval: interval } : j);
+        });
+      activeJob.update(j => j ? { ...j, stopPolling } : j);
     } catch (e: unknown) {
-      const msg = (e as Error).message;
-      errorMsg = msg === 'FILE_TOO_LARGE'
-        ? $t('app.error.too_large', { mb: limitMb })
-        : msg === 'INSUFFICIENT_STORAGE'
-        ? $t('app.error.no_storage')
-        : $t('app.error.generic', { msg });
+      errorMsg = startError(e);
       screen = 'error';
     }
   }
 
+  // What to show when a job ends without a result.
+  function endMessage(end: PollEnd): string {
+    if ('lost' in end) return end.lost === 'gone' ? $t('job.lost.gone') : $t('job.lost.unreachable');
+    return end.status.message ?? $t('job.failed');
+  }
+
+  // What to show when the server refused to start a job.
+  function startError(e: unknown): string {
+    const msg = (e as Error).message;
+    return msg === 'FILE_TOO_LARGE' ? $t('app.error.too_large', { mb: limitMb })
+      : msg === 'INSUFFICIENT_STORAGE' ? $t('app.error.no_storage')
+      : msg === 'RATE_LIMITED' ? $t('app.error.rate_limited')
+      : msg === 'START_FAILED' || e instanceof TypeError ? $t('app.error.start_failed')  // TypeError: no connection
+      : $t('app.error.generic', { msg });
+  }
+
   async function cancel() {
-    if ($activeJob?.id) await cancelJob($activeJob.id).catch(() => {});
-    clearJob();
+    const id = $activeJob?.id;
+    clearJob(); // stop polling first: the job's removal must not read as a lost job
+    if (id) await cancelJob(id).catch(() => {});
     screen = 'configure';
     selectedFile = null;
   }
@@ -193,11 +175,11 @@
     try {
       const text = await file.text();
       const result = await validateProfile(text);
-      if (!result.valid) { showToast('err', result.error ?? 'Invalid profile'); return; }
+      if (!result.valid) { showToast('err', result.error ?? $t('profile.invalid')); return; }
       fromYaml(text);
-      showToast('ok', `Profile loaded: ${result.entities_count ?? 0} entities, ${result.patterns_count ?? 0} patterns`);
+      showToast('ok', $t('profile.loaded', { entities: result.entities_count ?? 0, patterns: result.patterns_count ?? 0 }));
     } catch {
-      showToast('err', 'Could not read profile file');
+      showToast('err', $t('profile.unreadable'));
     }
   }
 
@@ -248,6 +230,7 @@
     return `${(ms / 3600000).toFixed(1)} h`;
   }
   let jobState = $derived($activeJob?.status?.status);
+  let warming = $derived(jobState === 'queued' && $activeJob?.status?.warming === true);
   let startedAt = $derived($activeJob?.status?.started_at);
   // The estimate comes only from measured progress (a guess from the file
   // size was off by hours on a CPU). Time in the queue is shown apart.
@@ -313,46 +296,16 @@
       if (item.status !== 'pending') continue;
       batchQueue = batchQueue.map(b => b.id === item.id ? { ...b, status: 'processing' } : b);
       try {
-        const sel = $config.selected_entities;
-        const entities = sel === null ? undefined : [...sel];
-        const yamlConfig = $config.custom_patterns.length > 0 || $config.allow_list.length > 0 || $config.preserve_entities.length > 0 ? toYaml($config, groups) : undefined;
-        const job = await createJob(item.file, {
-          key: $config.key || undefined, strategy: $config.strategy,
-          lang: $config.lang, model: $config.model || undefined,
-          entities, config: yamlConfig,
-          slug_length: $config.slug_length,
-          ner_score_threshold: $config.ner_score_threshold,
-          ner_aggregation_strategy: $config.ner_aggregation_strategy,
-          anonymization_config: $config.anonymization_config,
-        });
-        // poll until done
-        await new Promise<void>((resolve, reject) => {
-          const iv = setInterval(async () => {
-            try {
-            const s = await pollStatus(job.job_id);
-            if (s.status === 'done') {
-              clearInterval(iv);
-              const ec = typeof s.result?.entity_count === 'number' ? s.result.entity_count : 0;
-              batchQueue = batchQueue.map(b => b.id === item.id
-                ? { ...b, status: 'done', jobId: job.job_id, downloadHref: downloadUrl(job.job_id), entityCount: ec }
-                : b);
-              resolve();
-            } else if (s.status === 'error') {
-              clearInterval(iv);
-              batchQueue = batchQueue.map(b => b.id === item.id
-                ? { ...b, status: 'error', errorMsg: s.message ?? 'Error' }
-                : b);
-              resolve();
-            }
-            } catch (error) {
-              clearInterval(iv);
-              reject(error);
-            }
-          }, 2000);
-        });
+        const job = await createJob(item.file, jobOptions($config, groups));
+        const end = await new Promise<PollEnd>((resolve) => watchJob(job.job_id, () => {}, resolve));
+        batchQueue = batchQueue.map(b => b.id !== item.id ? b
+          : 'status' in end && end.status.status === 'done'
+          ? { ...b, status: 'done', jobId: job.job_id, downloadHref: downloadUrl(job.job_id),
+              entityCount: typeof end.status.result?.entity_count === 'number' ? end.status.result.entity_count : 0 }
+          : { ...b, status: 'error', errorMsg: endMessage(end) });
       } catch (e) {
         batchQueue = batchQueue.map(b => b.id === item.id
-          ? { ...b, status: 'error', errorMsg: (e as Error).message }
+          ? { ...b, status: 'error', errorMsg: startError(e) }
           : b);
       }
     }
@@ -411,7 +364,7 @@
           />
           {#if fileTooLarge}
             <p class="file-too-large">
-              File is {(selectedFile!.size / 1024 / 1024).toFixed(1)} MB; demo limit is {limitMb} MB.
+              {$t('app.error.file_size', { size: (selectedFile!.size / 1024 / 1024).toFixed(1), mb: limitMb })}
             </p>
           {/if}
 
@@ -452,13 +405,13 @@
                       <span class="bi-meta">
                         {(item.file.size / 1024).toFixed(0)} KB ·
                         {#if item.status === 'done'}
-                          {item.entityCount ?? 0} entities
+                          {$t('batch.entities', { n: item.entityCount ?? 0 })}
                         {:else if item.status === 'error'}
                           {item.errorMsg}
                         {:else if item.status === 'processing'}
-                          processing…
+                          {$t('batch.processing')}
                         {:else}
-                          queued
+                          {$t('batch.queued')}
                         {/if}
                       </span>
                     </div>
@@ -467,7 +420,7 @@
                         <a class="bi-dl" href={item.downloadHref} download>↓</a>
                       {/if}
                       {#if item.status === 'pending'}
-                        <button class="bi-rm" onclick={() => removeFromBatch(item.id)}>×</button>
+                        <button class="bi-rm" aria-label={$t('batch.remove', { name: item.file.name })} onclick={() => removeFromBatch(item.id)}>×</button>
                       {/if}
                     </div>
                   </div>
@@ -560,12 +513,14 @@
     </div>
     <h2>{$activeJob?.filename ?? selectedFile?.name}</h2>
     <p class="status-label">
-      {jobState === 'queued' ? $t('status.queued') : $t('status.processing')}
+      {warming ? $t('status.warming') : jobState === 'queued' ? $t('status.queued') : $t('status.processing')}
       {#if etaLabel}<span class="eta-label">({etaLabel})</span>{/if}
     </p>
     <ProgressBar {progress} indeterminate={jobState !== 'queued' && progress === 0} label={progressLabel} />
     <p class="cache-hint">
-      {#if jobState === 'queued'}
+      {#if warming}
+        {$t('status.warming_hint')}
+      {:else if jobState === 'queued'}
         {$t('status.queued_hint')}
       {:else if remainMs !== null && remainMs > 20 * 60000 && $config.strategy !== 'regex'}
         {$t('processing.slow')}

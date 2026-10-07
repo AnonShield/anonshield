@@ -137,7 +137,7 @@ jobs:
         run: npm ci
         working-directory: web/frontend
       - if: needs.changes.outputs.frontend == 'true'
-        run: npm run check && npm run build
+        run: npm run check && npm test && npm run build
         working-directory: web/frontend
 
   vuln-scan:

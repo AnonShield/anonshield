@@ -8,6 +8,8 @@
   import { t } from '#lib/i18n.js';
   import type { EntityGroup } from '#lib/api.js';
   import type { AnonymizationConfig } from '#lib/stores/config.js';
+  import { configFromRules, effectiveType as ruleEffectiveType, isHostField, rulesFromConfig, typeName,
+           type FieldMode, type FieldRule, type RuleType } from '#lib/fieldRules.js';
 
   const API_BASE = PUBLIC_API_URL ?? '/api';
 
@@ -24,15 +26,6 @@
     onchange?: (config: AnonymizationConfig | null) => void;
   } = $props();
 
-  type FieldMode = 'all' | 'targeted';
-  type RuleType = 'auto' | 'force' | 'exclude';
-
-  interface FieldRule {
-    name: string;
-    type: RuleType;
-    forcedEntity?: string;
-  }
-
   let mode = $state<FieldMode>('all');
   let fields = $state<string[]>([]);
   let rules = $state<Record<string, FieldRule>>({});
@@ -43,11 +36,7 @@
   const ext = $derived(file.name.split('.').pop()?.toLowerCase() ?? '');
   const supported = $derived(['csv', 'json', 'jsonl', 'xlsx'].includes(ext));
   const flatEntities = $derived(entityGroups.flatMap(g => g.entities));
-  // A field set to Force without a type yet is still scanned automatically.
-  function effectiveType(f: string): RuleType | undefined {
-    const rule = rules[f];
-    return rule?.type === 'force' && !typeName(rule.forcedEntity ?? '') ? 'auto' : rule?.type;
-  }
+  const effectiveType = (f: string) => ruleEffectiveType(rules[f]);
   const counts = $derived({
     auto: fields.filter(f => effectiveType(f) === 'auto').length,
     force: fields.filter(f => effectiveType(f) === 'force').length,
@@ -67,30 +56,12 @@
     onchange?.(cfg);
   }
 
-  // Shows a config as rules: forced fields with their type, excluded fields as
-  // Skip, every other field Auto. A fields_to_anonymize list is not read as
-  // "skip the rest": profiles saved before 2026-10 listed only the first
-  // record's fields, and skipping the others would leave them in clear text.
-  // Fields named by a rule but not detected are added.
+  // Shows a config (e.g. an imported profile) as rules (fieldRules.ts).
   function applyConfig(cfg: AnonymizationConfig | null) {
-    if (!cfg) {
-      mode = 'all';
-      rules = Object.fromEntries(fields.map(f => [f, { name: f, type: 'auto' as RuleType }]));
-      return;
-    }
-    const force = cfg.force_anonymize ?? {};
-    const exclude = cfg.fields_to_exclude ?? [];
-    const covers = (f: string, list: string[]) => list.some(r => f === r || f.startsWith(r + '.'));
-    const missing = [...Object.keys(force), ...exclude].filter(f => !fields.includes(f));
-    if (missing.length) fields = [...fields, ...missing];
-    const next: Record<string, FieldRule> = {};
-    for (const f of fields) {
-      if (force[f]) next[f] = { name: f, type: 'force', forcedEntity: force[f].entity_type };
-      else if (covers(f, exclude)) next[f] = { name: f, type: 'exclude' };
-      else next[f] = { name: f, type: 'auto' };
-    }
-    rules = next;
-    mode = 'targeted';
+    const next = rulesFromConfig(fields, cfg);
+    fields = next.fields;
+    rules = next.rules;
+    mode = next.mode;
   }
 
   async function detectFields(target: File) {
@@ -113,10 +84,10 @@
           rules = initialRules;
         }
       } else {
-        error = 'Could not read file columns.';
+        error = $t('fields.error_read');
       }
     } catch {
-      error = 'Could not detect fields.';
+      error = $t('fields.error_detect');
     }
     if (target !== file) return;  // another file was chosen meanwhile
     loading = false;
@@ -144,20 +115,10 @@
     emit();
   }
 
-  // A bare machine name ("srv-files") reads as an ordinary word, so detection
-  // misses it; fields named like these should be forced as HOSTNAME.
-  const HOST_FIELD = /(host_?name|netbios(_name)?|fqdn|computer_?name|dns_?name)$/i;
   function forceHostname(fieldName: string) {
     rules[fieldName].type = 'force';
     rules[fieldName].forcedEntity = 'HOSTNAME';
     emit();
-  }
-
-  // Any type can be forced; it becomes an entity label in upper case with "_"
-  // between words ("asset.criticality" → "ASSET_CRITICALITY"). Kept as typed and
-  // normalized when sent, so the cursor does not jump while typing.
-  function typeName(raw: string): string {
-    return raw.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   }
 
   function setForcedEntity(fieldName: string, entity: string) {
@@ -166,24 +127,7 @@
   }
 
   function emit() {
-    if (mode === 'all') { send(null); return; }
-    const force: Record<string, { entity_type: string }> = {};
-    const exclude: string[] = [];
-    for (const f of fields) {
-      const rule = rules[f];
-      if (rule.type === 'force' && typeName(rule.forcedEntity ?? '')) force[f] = { entity_type: typeName(rule.forcedEntity ?? '') };
-      else if (rule.type === 'exclude') exclude.push(f);
-    }
-    if (Object.keys(force).length === 0) {
-      // Skips only: every other field, including any not listed here, is scanned.
-      send(exclude.length ? { fields_to_exclude: exclude } : null);
-      return;
-    }
-    // A forced field puts the engine in explicit mode, which ignores unlisted
-    // paths; listing each top-level key keeps the other fields (and any that
-    // only later records have) scanned. Skips and forces take precedence.
-    const roots = [...new Set(fields.map(f => f.split('.')[0]))];
-    send({ force_anonymize: force, fields_to_anonymize: roots, fields_to_exclude: exclude });
+    send(configFromRules(mode, fields, rules));
   }
 
   function setMode(next: FieldMode) {
@@ -230,7 +174,7 @@
     onclick={() => !loading && (showModal = true)}
     role="button"
     tabindex="0"
-    onkeydown={(e) => e.key === 'Enter' && !loading && (showModal = true)}
+    onkeydown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !loading) { e.preventDefault(); showModal = true; } }}
   >
     <div class="st-info">
       <div class="st-text">
@@ -380,7 +324,7 @@
                           </div>
                         {:else if rules[f].type === 'exclude'}
                           <span class="skip-label">{$t('fields.skipped')}</span>
-                        {:else if HOST_FIELD.test(f)}
+                        {:else if isHostField(f)}
                           <button class="btn-link suggest" onclick={() => forceHostname(f)} title={$t('fields.host_hint')}>
                             {$t('fields.host_suggest')}
                           </button>

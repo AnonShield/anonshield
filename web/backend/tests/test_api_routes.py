@@ -212,3 +212,17 @@ def test_a_field_only_in_record_12001_is_listed(client, name):
     data = (json.dumps(records) if name.endswith(".json") else "".join(json.dumps(r) + "\n" for r in records)).encode()
     response = client.post("/api/analyze-fields", files={"file": (name, data)})
     assert [f["name"] for f in response.json()["fields"]] == ["asset.host_name", "asset.netbios_name"]
+
+
+@pytest.mark.parametrize("state, warming, flagged", [
+    ("queued", True, True),     # waiting for the model, not for another file
+    ("queued", False, False),
+    ("running", True, False),
+])
+def test_status_says_when_a_queued_job_waits_for_the_model(client, monkeypatch, state, warming, flagged):
+    from services import job_service
+    monkeypatch.setattr(job_service, "get_status", lambda job: {"status": state})
+    monkeypatch.setattr(job_service, "warming", lambda: warming)
+    body = client.get("/api/jobs/00000000-0000-0000-0000-000000000000/status").json()
+    assert body["status"] == state
+    assert body.get("warming", False) is flagged
