@@ -94,23 +94,23 @@
 
   function emit() {
     if (mode === 'all') { onchange?.(null); return; }
-    const config: AnonymizationConfig = { force_anonymize: {}, fields_to_anonymize: [], fields_to_exclude: [] };
-    let hasRules = false;
+    const force: Record<string, { entity_type: string }> = {};
+    const exclude: string[] = [];
     for (const f of fields) {
       const rule = rules[f];
-      if (rule.type === 'force' && rule.forcedEntity) {
-        config.force_anonymize![f] = { entity_type: rule.forcedEntity };
-        hasRules = true;
-      } else if (effectiveType(f) === 'auto') {
-        config.fields_to_anonymize!.push(f);
-        hasRules = true;
-      } else if (rule.type === 'exclude') {
-        config.fields_to_exclude!.push(f);
-        hasRules = true;
-      }
+      if (rule.type === 'force' && rule.forcedEntity) force[f] = { entity_type: rule.forcedEntity };
+      else if (rule.type === 'exclude') exclude.push(f);
     }
-    if (!hasRules) onchange?.(null);
-    else onchange?.(config);
+    if (Object.keys(force).length === 0) {
+      // Skips only: every other field, including any not listed here, is scanned.
+      onchange?.(exclude.length ? { fields_to_exclude: exclude } : null);
+      return;
+    }
+    // A forced field puts the engine in explicit mode, which ignores unlisted
+    // paths; listing each top-level key keeps the other fields (and any that
+    // only later records have) scanned. Skips and forces take precedence.
+    const roots = [...new Set(fields.map(f => f.split('.')[0]))];
+    onchange?.({ force_anonymize: force, fields_to_anonymize: roots, fields_to_exclude: exclude });
   }
 
   function setMode(next: FieldMode) {
