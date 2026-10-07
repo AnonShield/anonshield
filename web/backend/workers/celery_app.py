@@ -59,6 +59,10 @@ def warm_up_default_model(sender, **kwargs):  # noqa: ARG001
     Set WARMUP_MODEL=<model_id> to pre-load a non-default model.
     Set WARMUP_LANG=pt to also warm up Portuguese spaCy pipeline.
     """
+    # Before any model loads, so a GPU image puts it on the GPU.
+    from src.anon.device import activate_gpu
+    activate_gpu()
+
     model = os.getenv("WARMUP_MODEL", "Davlan/xlm-roberta-base-ner-hrl")
     lang  = os.getenv("WARMUP_LANG", "en")
 

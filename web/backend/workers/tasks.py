@@ -26,6 +26,8 @@ if str(_REPO_ROOT) not in sys.path:
 
 def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
     from src.anon.api import anonymize_file
+    from src.anon.device import activate_gpu
+    activate_gpu()  # once per process; the warm-up usually did it already
     return anonymize_file(
         input_path=input_file,
         output_dir=out_dir,
