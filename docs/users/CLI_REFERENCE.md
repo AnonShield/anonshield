@@ -400,6 +400,8 @@ With this config:
 
 In Tenable exports, `asset_cloud_resource.name` and `container_image.name` repeat the asset's name, and `definition.output` repeats the host's plugin output (with its IPs), so do not exclude it with the public `definition.*` fields.
 
+> **A forced value is replaced only in its own field.** If the same value also appears inside other text, that occurrence is left as it is unless detection finds it, and a machine name without a domain is usually not found. In a 15,177-record Tenable export with the machine-name fields forced, the name stayed in clear text in `asset.tags` values (370 records) and in the plugin output (111). To replace such values everywhere, also pass them in a [`--word-list`](#--word-list-path) under the same entity type.
+
 ```bash
 ./docker/run.sh ./nessus_scan.json --anonymization-config ./anon_config.json
 ```

@@ -26,6 +26,8 @@ if str(_REPO_ROOT) not in sys.path:
 
 def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
     from src.anon.api import anonymize_file
+    from src.anon.device import activate_gpu
+    activate_gpu()  # once per process; the warm-up usually did it already
     return anonymize_file(
         input_path=input_file,
         output_dir=out_dir,
@@ -44,9 +46,9 @@ def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
         ner_aggregation_strategy=meta.get("ner_aggregation_strategy"),
         force_large_xml=os.getenv("ANON_FORCE_LARGE_XML", "false").lower() == "true",
         # Smaller JSON batches than the CLI's 1000 records, so the progress bar
-        # and Cancel react within a minute or two even when NER takes seconds
-        # per record (long vulnerability reports on a CPU).
-        json_chunk_size=int(os.getenv("ANON_JSON_CHUNK_SIZE", "50")),
+        # and Cancel react within half a minute even when NER takes seconds per
+        # record (a Tenable export on a CPU: about 2.3 s per record).
+        json_chunk_size=int(os.getenv("ANON_JSON_CHUNK_SIZE", "10")),
     )
 
 

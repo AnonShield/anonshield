@@ -29,10 +29,11 @@
 if ($args.Count -eq 0 -or $args[0] -in @('-h', '--help')) {
     Write-Host @"
 Usage: .\run.ps1 [--gpu] FILE_OR_FOLDER [OPTIONS]
-       .\run.ps1 --web [--port N | --stop | --update]
+       .\run.ps1 --web [--gpu] [--port N | --stop | --update]
 
 Web interface, in your browser:
   .\run.ps1 --web             Start it, then open http://localhost:8080
+  .\run.ps1 --web --gpu       The same on an NVIDIA GPU (much faster NER)
   .\run.ps1 --web --port 8081 Use another port
   .\run.ps1 --web --stop      Stop it (the key and models are kept)
   .\run.ps1 --web --update    Download the latest version and restart it
@@ -130,27 +131,64 @@ if (-not $dockerOk) {
 # --web: the web interface, one container (anonshield/anon:web) whose key,
 # models and metrics live in the "anonshield" volume
 # ---------------------------------------------------------------------------
+# GPU images come in two PyTorch builds: the plain tag (CUDA 13.0) needs NVIDIA
+# driver 580+ and an RTX 20xx or newer (CUDA 13 dropped older GPUs; RTX 50xx
+# needs it); the -cu126 tag (CUDA 12.6) covers older GPUs and drivers.
+# Usage: Get-GpuImage "anonshield/anon:gpu" (or "anonshield/anon:web-gpu").
+function Get-GpuImage {
+    param([string]$Base)
+    $info = $null
+    try { $info = (& nvidia-smi --query-gpu=compute_cap,driver_version --format=csv,noheader 2>$null | Select-Object -First 1) } catch { }
+    if (-not $info -or $info -notmatch '^\s*(\d+)\.(\d+)\s*,\s*(\d+)') {
+        Write-Info "Could not read the GPU from nvidia-smi; using $Base"
+        return $Base
+    }
+    $cc = [int]$Matches[1] * 10 + [int]$Matches[2]
+    $driverMajor = [int]$Matches[3]
+    if ($cc -ge 75 -and $driverMajor -ge 580) { return $Base }
+    if ($cc -ge 100) {
+        Write-Info "This GPU needs NVIDIA driver 580+ for GPU inference (driver $driverMajor); it will run on CPU"
+    }
+    return "$Base-cu126"
+}
+
 if ($args -contains '--web') {
     $WebImage = if ($env:ANON_WEB_IMAGE) { $env:ANON_WEB_IMAGE } else { "anonshield/anon:web" }
     $WebName  = "anonshield"
     $WebArgs  = @($args)
     $Action   = "start"
     $Port     = "8080"
+    $WebGpu   = $false
     for ($i = 0; $i -lt $WebArgs.Count; $i++) {
         $a = [string]$WebArgs[$i]
         if ($a -eq '--web') { }
-        elseif ($a -eq '--gpu') { Write-Info "The web interface runs on the CPU; --gpu is ignored." }
+        elseif ($a -eq '--gpu') { $WebGpu = $true }
         elseif ($a -eq '--stop') { $Action = "stop" }
         elseif ($a -eq '--update') { $Action = "update" }
         elseif ($a -eq '--port') { $i++; $Port = if ($i -lt $WebArgs.Count) { [string]$WebArgs[$i] } else { "" } }
         elseif ($a -like '--port=*') { $Port = $a.Substring(7) }
-        else { Write-Err "With --web, use --port N, --stop or --update (got: $a)."; exit 2 }
+        else { Write-Err "With --web, use --gpu, --port N, --stop or --update (got: $a)."; exit 2 }
     }
     if ($Port -notmatch '^\d+$') { Write-Err "--port needs a number. Example: .\run.ps1 --web --port 8081"; exit 2 }
 
     $ErrorActionPreference = "Continue"
     function Get-WebPort { ((& docker port $WebName 8080/tcp 2>$null) | Select-Object -First 1) -replace '.*:', '' }
     $State = & docker inspect -f '{{.State.Status}}' $WebName 2>$null
+    $WebGpuFlags = [string[]]@()
+    if ($WebGpu) {
+        if (-not (Get-Command nvidia-smi -ErrorAction SilentlyContinue)) {
+            Write-Err "No NVIDIA driver found (nvidia-smi). Use .\run.ps1 --web for the CPU version."; exit 1
+        }
+        $WebImage = if ($env:ANON_WEB_GPU_IMAGE) { $env:ANON_WEB_GPU_IMAGE } else { Get-GpuImage "anonshield/anon:web-gpu" }
+        $WebGpuFlags = [string[]]@("--gpus", "all")
+    }
+    # Another kind (CPU or GPU) is replaced; the volume keeps the key and models.
+    $Current = & docker inspect -f '{{.Config.Image}}' $WebName 2>$null
+    if ($Action -ne "stop" -and $State -and $Current -ne $WebImage) {
+        Write-Info "Switching the web interface from $Current to $WebImage (the key and models are kept)."
+        $null = & docker rm -f $WebName 2>&1
+        $State = $null
+    }
 
     if ($Action -eq "stop") {
         if ($State -eq "running") {
@@ -167,7 +205,7 @@ if ($args -contains '--web') {
     }
 
     if ($State -eq "running") {
-        Write-Ok "AnonShield is already running: http://localhost:$(Get-WebPort)"
+        Write-Ok "AnonShield ($WebImage) is already running: http://localhost:$(Get-WebPort)"
         Write-Info "Stop it with .\run.ps1 --web --stop"
         exit 0
     } elseif ($State) {
@@ -177,14 +215,16 @@ if ($args -contains '--web') {
     } else {
         $null = & docker image inspect $WebImage 2>&1
         if ($LASTEXITCODE -ne 0) {
-            Write-Info "Downloading the web interface (about 1.5 GB, once)..."
+            Write-Info "Downloading $WebImage (about $(if ($WebGpu) { 4 } else { 1.5 }) GB, once)..."
             & docker pull $WebImage
             if ($LASTEXITCODE -ne 0) { exit 1 }
         }
-        $Out = & docker run -d --name $WebName --restart unless-stopped -p "127.0.0.1:${Port}:8080" -v anonshield:/data $WebImage 2>&1 | Out-String
+        $Out = & docker run -d --name $WebName --restart unless-stopped @WebGpuFlags -p "127.0.0.1:${Port}:8080" -v anonshield:/data $WebImage 2>&1 | Out-String
         if ($LASTEXITCODE -ne 0) {
             $null = & docker rm -f $WebName 2>&1
-            if ($Out -match 'already allocated|address already in use') {
+            if ($Out -match 'could not select device driver|nvidia-container') {
+                Write-Err "Docker cannot use the GPU: enable GPU support in Docker Desktop (WSL 2) or install the NVIDIA Container Toolkit, or use .\run.ps1 --web for the CPU version."
+            } elseif ($Out -match 'already allocated|address already in use') {
                 Write-Err "Port $Port is used by another program. Choose another: .\run.ps1 --web --port $([int]$Port + 1)"
             } else { Write-Err "Could not start the web interface: $(($Out.Trim() -split "`n")[-1])" }
             exit 1
@@ -201,7 +241,7 @@ if ($args -contains '--web') {
         if ((& docker inspect -f '{{.State.Health.Status}}' $WebName 2>$null) -eq "healthy") { break }
         Start-Sleep -Seconds 2
     }
-    Write-Ok "AnonShield is ready: http://localhost:$Port"
+    Write-Ok "AnonShield is ready: http://localhost:$Port ($WebImage)"
     Write-Info "Stop: .\run.ps1 --web --stop    Update: .\run.ps1 --web --update"
     exit 0
 }
@@ -236,28 +276,9 @@ if (-not $SecretKey -and -not $IsInfoCmd -and -not $SlugZero) {
 # ---------------------------------------------------------------------------
 # Select image
 # ---------------------------------------------------------------------------
-# The GPU image comes in two PyTorch builds: :gpu (CUDA 13.0) needs NVIDIA
-# driver 580+ and an RTX 20xx or newer (CUDA 13 dropped older GPUs; RTX 50xx
-# needs it); :gpu-cu126 (CUDA 12.6) covers older GPUs and drivers.
-# $env:ANON_GPU_IMAGE overrides the choice.
-function Get-GpuImage {
-    $info = $null
-    try { $info = (& nvidia-smi --query-gpu=compute_cap,driver_version --format=csv,noheader 2>$null | Select-Object -First 1) } catch { }
-    if (-not $info -or $info -notmatch '^\s*(\d+)\.(\d+)\s*,\s*(\d+)') {
-        Write-Info "Could not read the GPU from nvidia-smi; using anonshield/anon:gpu"
-        return "anonshield/anon:gpu"
-    }
-    $cc = [int]$Matches[1] * 10 + [int]$Matches[2]
-    $driverMajor = [int]$Matches[3]
-    if ($cc -ge 75 -and $driverMajor -ge 580) { return "anonshield/anon:gpu" }
-    if ($cc -ge 100) {
-        Write-Info "This GPU needs NVIDIA driver 580+ for GPU inference (driver $driverMajor); it will run on CPU"
-    }
-    return "anonshield/anon:gpu-cu126"
-}
 
 if ($UseGpu) {
-    $Image    = if ($env:ANON_GPU_IMAGE) { $env:ANON_GPU_IMAGE } else { Get-GpuImage }
+    $Image    = if ($env:ANON_GPU_IMAGE) { $env:ANON_GPU_IMAGE } else { Get-GpuImage "anonshield/anon:gpu" }
     $GpuFlags = [string[]]@("--gpus", "all")
     Write-Info "Using GPU image $Image"
 } else {

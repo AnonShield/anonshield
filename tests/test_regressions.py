@@ -129,6 +129,19 @@ def test_cuda_arch_support_matches_the_build():
     assert _arch_supported(6, 1, cu126)
 
 
+def test_gpu_image_without_gpus_says_so(monkeypatch, caplog):
+    """docker run of a GPU image without --gpus ran NER on the CPU in silence."""
+    import torch
+    from src.anon import device
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.version, "cuda", "13.0")
+    monkeypatch.setattr(device, "_nvidia_gpu_visible", lambda: False)
+    monkeypatch.setattr(device.os.path, "exists", lambda path: path == "/.dockerenv")
+    with caplog.at_level("WARNING", logger="src.anon.device"):
+        assert device.cuda_usable.__wrapped__() is False
+    assert "--gpus all" in caplog.text
+
+
 # ---------------------------------------------------------------------------
 # File processors
 # ---------------------------------------------------------------------------

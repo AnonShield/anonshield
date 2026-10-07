@@ -18,6 +18,14 @@ docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anons
 
 Open **http://localhost:8080**, drop a file and click **Anonymize**. `docker stop anonshield` stops it and `docker start anonshield` starts it again; the key and model cache stay in the `anonshield` volume. For another port, change only the first number: `-p 127.0.0.1:8081:8080`. With the wrapper script below, `./run.sh --web` does all of this (`--stop`, `--update`, `--port 8081`, and a clear message if the port or name is taken). More in the [local guide](https://github.com/AnonShield/anonshield/blob/main/web/LOCAL.md).
 
+**In your browser, on an NVIDIA GPU** (NER about three times faster on an RTX 5060 Ti; needs the [NVIDIA Container Toolkit](#gpu-setup-nvidia-container-toolkit)): `./run.sh --web --gpu` picks the image for your GPU and driver, or run it yourself:
+
+```bash
+docker run -d --gpus all --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web-gpu
+```
+
+For a GTX 10xx or older, or a driver older than 580, use `web-gpu-cu126` instead (see [Available Tags](#available-tags)). It uses the same name and volume as the CPU container: remove that one first (`docker rm -f anonshield`), the key and models stay in the volume; `./run.sh --web --gpu` does this for you.
+
 **On the command line** (files and folders, scripts, NVIDIA GPU): use the wrapper script in the [Quick Start](#quick-start) below; it runs the `latest`, `gpu` or `gpu-cu126` image for you.
 
 A hosted demo runs at **[anonshield.org](https://anonshield.org)**.
@@ -126,7 +134,7 @@ $env:ANON_SECRET_KEY = "<64 hex characters>"         # Windows
 
 ## Available Tags
 
-`latest` is the CPU command-line image; `gpu` and `gpu-cu126` are the same GPU image with two PyTorch builds, because no single build runs on every NVIDIA GPU and driver. `web` is the web app in one container (see the top of this page).
+`latest` is the CPU command-line image; `gpu` and `gpu-cu126` are the same GPU image with two PyTorch builds, because no single build runs on every NVIDIA GPU and driver. `web` is the web app in one container (see the top of this page), and `web-gpu` / `web-gpu-cu126` the same app with the two GPU builds.
 
 | Tag | PyTorch build | Use case | Approx. download |
 |-----|---------------|----------|------------------|
@@ -134,14 +142,16 @@ $env:ANON_SECRET_KEY = "<64 hex characters>"         # Windows
 | `gpu` | CUDA 13.0 | NVIDIA driver 580+ and an RTX 20xx (Turing) or newer GPU; required for RTX 50xx (Blackwell) | ~4.3 GB |
 | `gpu-cu126` | CUDA 12.6 | Older GPUs (GTX 10xx and earlier) or drivers older than 580; no RTX 50xx | ~5 GB |
 | `web` | CPU | The web interface on your computer, no limits | ~1.4 GB |
+| `web-gpu` | CUDA 13.0 | The web interface on an NVIDIA GPU: driver 580+ and an RTX 20xx or newer | ~4.3 GB |
+| `web-gpu-cu126` | CUDA 12.6 | The web interface on older GPUs or drivers; no RTX 50xx | ~5 GB |
 
-All images are based on `python:3.12-slim` and include Tesseract OCR (English and Portuguese language data) and the spaCy pipelines for English and Portuguese. The wrapper script picks the right image automatically: plain `./run.sh` uses `latest`; `./run.sh --gpu` reads the GPU and driver from `nvidia-smi` and uses `gpu` or `gpu-cu126` (set `ANON_GPU_IMAGE` to override). If the image does not match the GPU anyway, AnonShield says so at startup and runs on the CPU instead of failing.
+All images are based on `python:3.12-slim` and include Tesseract OCR (English and Portuguese language data) and the spaCy pipelines for English and Portuguese. The wrapper script picks the right image automatically: plain `./run.sh` uses `latest`; `./run.sh --gpu` reads the GPU and driver from `nvidia-smi` and uses `gpu` or `gpu-cu126` (set `ANON_GPU_IMAGE` to override), and `./run.sh --web --gpu` chooses between `web-gpu` and `web-gpu-cu126` the same way (`ANON_WEB_GPU_IMAGE`). If the image does not match the GPU anyway, AnonShield says so at startup and runs on the CPU instead of failing.
 
 ### Requirements
 
 **CPU (`latest`):** any x86_64 machine with 4 GB or more of RAM.
 
-**GPU (`gpu`):**
+**GPU (`gpu`, `web-gpu` and their `-cu126` builds):**
 - NVIDIA GPU and driver: see the table above (the CUDA runtime comes inside the image; only the driver is needed on the host)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed and configured (see [GPU Setup](#gpu-setup-nvidia-container-toolkit) below)
 
@@ -361,7 +371,7 @@ sudo systemctl restart docker
 docker run --rm --gpus all nvidia/cuda:12.8.0-runtime-ubuntu22.04 nvidia-smi
 ```
 
-Once `nvidia-smi` works inside that test container, `./run.sh --gpu ...` will use your GPU automatically.
+Once `nvidia-smi` works inside that test container, `./run.sh --gpu ...` and `./run.sh --web --gpu` will use your GPU automatically.
 
 ---
 
