@@ -14,7 +14,8 @@ name: Docker image
 #    With run false (nothing that goes into the image changed) the job reports
 #    success without building, so it can be a required status check.
 #  - Published release or manual run: build and push, plus version-suffixed tags
-#    (:X.Y.Z, :X.Y.Z-gpu and :X.Y.Z-gpu-cu126).
+#    (:X.Y.Z, :X.Y.Z-gpu, :X.Y.Z-gpu-cu126 and :X.Y.Z-web). A manual run with
+#    images=web builds and pushes only :web.
 #
 # README-only changes are handled by dockerhub-readme.yml (description sync, no build).
 #
@@ -44,6 +45,11 @@ on:
         description: "Image tag to publish (e.g. v1.0.0)"
         required: false
         default: latest
+      images:
+        description: "Which images to build and push"
+        type: choice
+        options: [all, web]
+        default: all
 
 permissions:
   contents: read
@@ -61,8 +67,8 @@ jobs:
       # pull_request); a release or a manual run always builds and publishes.
       # PUSH needs RUN: on main with no image change, the push step used to run
       # with nothing built and fail the job.
-      RUN: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' || inputs.run }}
-      PUSH: ${{ (github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (inputs.run && inputs.push)) && github.repository == 'AnonShield/anonshield' }}
+      RUN: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.images != 'web') || inputs.run }}
+      PUSH: ${{ (github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.images != 'web') || (inputs.run && inputs.push)) && github.repository == 'AnonShield/anonshield' }}
     steps:
       - if: env.RUN != 'true'
         run: echo "Nothing that goes into the image changed; no build."
