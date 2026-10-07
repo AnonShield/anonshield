@@ -40,10 +40,15 @@
   const ext = $derived(file.name.split('.').pop()?.toLowerCase() ?? '');
   const supported = $derived(['csv', 'tsv', 'json', 'jsonl', 'ndjson', 'xlsx'].includes(ext));
   const flatEntities = $derived(entityGroups.flatMap(g => g.entities));
+  // A field set to Force without a type yet is still scanned automatically.
+  function effectiveType(f: string): RuleType | undefined {
+    const rule = rules[f];
+    return rule?.type === 'force' && !rule.forcedEntity ? 'auto' : rule?.type;
+  }
   const counts = $derived({
-    auto: fields.filter(f => rules[f]?.type === 'auto').length,
-    force: fields.filter(f => rules[f]?.type === 'force').length,
-    skip: fields.filter(f => rules[f]?.type === 'exclude').length,
+    auto: fields.filter(f => effectiveType(f) === 'auto').length,
+    force: fields.filter(f => effectiveType(f) === 'force').length,
+    skip: fields.filter(f => effectiveType(f) === 'exclude').length,
   });
   let filter = $state('');
   let bulkEntity = $state('');
@@ -79,9 +84,6 @@
 
   function setRuleType(fieldName: string, type: RuleType) {
     rules[fieldName].type = type;
-    if (type === 'force' && !rules[fieldName].forcedEntity) {
-      rules[fieldName].forcedEntity = 'PERSON';
-    }
     emit();
   }
 
@@ -99,7 +101,7 @@
       if (rule.type === 'force' && rule.forcedEntity) {
         config.force_anonymize![f] = { entity_type: rule.forcedEntity };
         hasRules = true;
-      } else if (rule.type === 'auto') {
+      } else if (effectiveType(f) === 'auto') {
         config.fields_to_anonymize!.push(f);
         hasRules = true;
       } else if (rule.type === 'exclude') {
@@ -117,7 +119,7 @@
   }
 
   function setShown(type: RuleType) {
-    const entity = bulkEntity.trim().toUpperCase();
+    const entity = bulkEntity;
     if (type === 'force' && !entity) return;
     for (const f of shown) {
       rules[f].type = type;
@@ -166,15 +168,15 @@
   <!-- MODAL OVERLAY -->
   {#if showModal}
     <dialog class="modal-overlay" use:openDialog onclose={() => showModal = false} aria-labelledby="field-dialog-title">
-      <button type="button" class="modal-backdrop" aria-label="Close field settings" onclick={() => showModal = false}></button>
+      <button type="button" class="modal-backdrop" aria-label={$t('fields.close')} onclick={() => showModal = false}></button>
       
       <div class="modal-content card">
         <div class="modal-header">
           <div class="mh-left">
-            <span class="cp-badge">Schema Config</span>
+            <span class="cp-badge">{$t('fields.badge')}</span>
             <h2 id="field-dialog-title">{$t('fields.title')}</h2>
           </div>
-          <button class="close-btn" aria-label="Close field settings" onclick={() => showModal = false}>&times;</button>
+          <button class="close-btn" aria-label={$t('fields.close')} onclick={() => showModal = false}>&times;</button>
         </div>
 
         <div class="modal-tabs">
@@ -201,6 +203,7 @@
               <input
                 class="force-input filter-input"
                 type="search"
+                autocomplete="off"
                 bind:value={filter}
                 placeholder={$t('fields.filter')}
                 aria-label={$t('fields.filter')}
@@ -208,23 +211,17 @@
               <div class="bulk-actions">
                 <span class="bulk-label">{$t('fields.bulk', { n: shown.length })}</span>
                 <div class="segmented-control">
-                  <button onclick={() => setShown('auto')} disabled={shown.length === 0}>Auto</button>
-                  <button onclick={() => setShown('exclude')} disabled={shown.length === 0}>Skip</button>
-                  <button onclick={() => setShown('force')} disabled={shown.length === 0 || !bulkEntity.trim()}
+                  <button onclick={() => setShown('auto')} disabled={shown.length === 0}>{$t('fields.btn.auto')}</button>
+                  <button onclick={() => setShown('exclude')} disabled={shown.length === 0}>{$t('fields.btn.skip')}</button>
+                  <button onclick={() => setShown('force')} disabled={shown.length === 0 || !bulkEntity}
                     title={$t('fields.mode.force.desc')}>{$t('fields.force_as')}</button>
                 </div>
-                <input
-                  class="force-input bulk-entity"
-                  list="entity-suggestions-bulk"
-                  bind:value={bulkEntity}
-                  placeholder="ENTITY_TYPE"
-                  aria-label={$t('fields.force_as')}
-                />
-                <datalist id="entity-suggestions-bulk">
+                <select class="force-input bulk-entity" bind:value={bulkEntity} aria-label={$t('fields.force_as')}>
+                  <option value="">{$t('fields.choose_type')}</option>
                   {#each flatEntities as ent}
                     <option value={ent.id}>{ent.label}</option>
                   {/each}
-                </datalist>
+                </select>
               </div>
             </div>
             {#if shown.length === 0}
@@ -234,9 +231,9 @@
               <table class="field-table">
                 <thead>
                   <tr>
-                    <th>Field Name</th>
-                    <th>Action</th>
-                    <th>Mapping / Force Type</th>
+                    <th>{$t('fields.col.name')}</th>
+                    <th>{$t('fields.col.action')}</th>
+                    <th>{$t('fields.col.detail')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -250,44 +247,44 @@
                             onclick={() => setRuleType(f, 'auto')}
                             title={$t('fields.mode.auto.desc')}
                           >
-                            Auto
+                            {$t('fields.btn.auto')}
                           </button>
                           <button 
                             class:active={rules[f].type === 'force'} 
                             onclick={() => setRuleType(f, 'force')}
                             title={$t('fields.mode.force.desc')}
                           >
-                            Force
+                            {$t('fields.btn.force')}
                           </button>
                           <button 
                             class:active={rules[f].type === 'exclude'} 
                             onclick={() => setRuleType(f, 'exclude')}
                             title={$t('fields.mode.exclude.desc')}
                           >
-                            Skip
+                            {$t('fields.btn.skip')}
                           </button>
                         </div>
                       </td>
                       <td class="td-config">
                         {#if rules[f].type === 'force'}
                           <div class="force-input-group">
-                            <input 
-                              list="entity-suggestions-{f}"
+                            <select
                               class="force-input"
-                              value={rules[f].forcedEntity} 
-                              oninput={(e) => setForcedEntity(f, e.currentTarget.value.toUpperCase())}
-                              placeholder="ENTITY_TYPE"
-                            />
-                            <datalist id="entity-suggestions-{f}">
+                              class:needs-type={!rules[f].forcedEntity}
+                              value={rules[f].forcedEntity ?? ''}
+                              onchange={(e) => setForcedEntity(f, e.currentTarget.value)}
+                              aria-label="{$t('fields.force_as')} {f}"
+                            >
+                              <option value="" disabled>{$t('fields.choose_type')}</option>
                               {#each flatEntities as ent}
                                 <option value={ent.id}>{ent.label}</option>
                               {/each}
-                            </datalist>
+                            </select>
                           </div>
                         {:else if rules[f].type === 'exclude'}
-                          <span class="skip-label">Excluded from scan</span>
+                          <span class="skip-label">{$t('fields.skipped')}</span>
                         {:else}
-                          <span class="auto-label">AI Scanning Active</span>
+                          <span class="auto-label">{$t('fields.detected')}</span>
                         {/if}
                       </td>
                     </tr>
@@ -307,7 +304,7 @@
                <button class="btn-link" onclick={resetAllToAuto}>{$t('fields.clear')}</button>
             {/if}
           </div>
-          <button class="btn btn-primary" onclick={() => showModal = false}>Done</button>
+          <button class="btn btn-primary" onclick={() => showModal = false}>{$t('fields.done')}</button>
         </div>
       </div>
     </dialog>
@@ -460,6 +457,7 @@
     font-size: 0.8rem; outline: none; transition: 150ms;
     font-family: var(--font-mono); font-weight: 600;
   }
+  .force-input.needs-type { border-color: var(--color-warning); }
   .force-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2); }
   .force-input::placeholder { color: var(--color-text-secondary); opacity: 0.5; font-family: var(--font-sans); font-weight: 400; }
   .skip-label { color: var(--color-text-secondary); font-size: 0.75rem; font-style: italic; }
