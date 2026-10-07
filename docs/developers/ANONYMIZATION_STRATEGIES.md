@@ -21,6 +21,7 @@
 7. [Decision Guide](#decision-guide)
 8. [Migration Guide](#migration-guide)
 9. [Advanced Configuration](#advanced-configuration)
+   - [NER aggregation strategy: why `simple`](#ner-aggregation-strategy-why-simple)
 10. [Troubleshooting](#troubleshooting)
 
 ---
@@ -1234,6 +1235,42 @@ If you need:
 ---
 
 ## Advanced Configuration
+
+### NER aggregation strategy: why `simple`
+
+The transformer model labels each subword token (`B-ORG`, `I-ORG`, ...). The aggregation strategy (`--ner-aggregation-strategy`, the `aggregation_strategy` of the Hugging Face `pipeline`) turns those token labels into entities:
+
+- `simple` joins consecutive tokens that carry the same entity label.
+- `first`, `average` and `max` work per word: they first find where each word begins and ends, then give the word one label, taken from its first token, from the average of its tokens' scores, or from its highest-scoring token. `max` settles disagreement between the tokens of one word; it does not widen what is covered.
+
+With the default model, `Davlan/xlm-roberta-base-ner-hrl`, the per-word strategies break entities. The model labels every token correctly; the word boundaries are what go wrong: the tokenizer is SentencePiece (a token that starts a word begins with `▁`) and the pipeline's grouping into words misplaces them. Measured on 2026-10-07 with transformers 5.18.0 and tokenizers 0.23.2:
+
+| Text | Token labels (`aggregation_strategy="none"`, all scores 1.00) | `simple` | `max` |
+|------|------|------|------|
+| works for Goldman Sachs. | `▁Gold` B-ORG, `man` I-ORG, `▁Sach` I-ORG, `s` I-ORG | `Goldman Sachs` | `Goldman` |
+| trabalha na Petrobras. | `▁Petro` B-ORG, `bras` I-ORG | `Petrobras` | nothing |
+| office in Rio de Janeiro. | `▁Rio` B-LOC, `▁de` I-LOC, `▁Janeiro` I-LOC | `Rio de Janeiro` | `Riode` |
+
+In anonymized output (`filtered` strategy, same result at score thresholds 0.4, 0.6 and 0.8):
+
+| Strategy | What stayed in clear text |
+|----------|---------------------------|
+| `simple` | nothing |
+| `max` | `[ORGANIZATION] Sachs`, `Petrobras`, `[PERSON] Ribeiro` (from Ana Paula Ribeiro), `[LOCATION] Janeiro` |
+| `average` | the same as `max`; at 0.6 also `Goldman Sachs` whole |
+| `first` | no names, but the sentence-final period was dropped |
+
+So the default is `simple`, set in `NerDefaults.AGGREGATION_STRATEGY` (`src/anon/config.py`). The artifact of the SBRC 2026 paper ([AnonShield/tool](https://github.com/AnonShield/tool)) sets `aggregation_strategy="max"` in its code.
+
+To check another model or library version:
+
+```python
+from transformers import pipeline
+
+for strategy in ("none", "simple", "max"):
+    ner = pipeline("ner", model="Davlan/xlm-roberta-base-ner-hrl", aggregation_strategy=strategy)
+    print(strategy, ner("office in Rio de Janeiro."))
+```
 
 ### Custom Strategy Implementation
 

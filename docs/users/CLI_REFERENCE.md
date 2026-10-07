@@ -731,6 +731,18 @@ JSON format is also accepted (same fields, wrapped in an array).
 
 > **First run:** The model is downloaded from HuggingFace (~1 GB for the default, ~400 MB for SecureModernBERT) and cached in `./anon/models/` for all subsequent runs.
 
+### `--ner-score-threshold <0-1>`
+
+**Default:** `0.4`
+
+**What it does:** The minimum confidence for a transformer NER detection to be kept. Lower values keep more entities (and more false positives); higher values miss more names. Pattern-based detections (IPs, e-mails, CVEs, ...) do not depend on it.
+
+### `--ner-aggregation-strategy <simple|first|average|max>`
+
+**Default:** `simple`
+
+**What it does:** How the transformer's labels for subword tokens become entities. Keep `simple` with the default model: the per-word modes cut multi-word names (`max` turned "Rio de Janeiro" into "Riode" and missed "Petrobras"). The reasons and the measurements are in [NER aggregation strategy: why `simple`](../developers/ANONYMIZATION_STRATEGIES.md#ner-aggregation-strategy-why-simple).
+
 ---
 
 ## 8. Database Options
@@ -957,6 +969,8 @@ These options switch the tool from *anonymization mode* into *NER training data 
 | `--anonymization-strategy` | `filtered` | Detection engine: `filtered` `presidio` `hybrid` `standalone` `regex` |
 | `--ocr-engine` | `tesseract` | OCR engine (Tesseract) |
 | `--transformer-model` | `Davlan/xlm-roberta-base-ner-hrl` | NER model to use |
+| `--ner-score-threshold` | `0.4` | Minimum confidence for a transformer NER detection |
+| `--ner-aggregation-strategy` | `simple` | How subword labels become entities (keep `simple`) |
 | `--db-mode` | `persistent` | Database mode: `persistent` or `in-memory` |
 | `--db-dir` | `db` | Directory for the database file |
 | `--db-synchronous-mode` | None | SQLite sync PRAGMA: `OFF` `NORMAL` `FULL` `EXTRA` |
