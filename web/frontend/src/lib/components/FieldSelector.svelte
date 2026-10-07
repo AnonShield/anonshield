@@ -46,7 +46,7 @@
   // A field set to Force without a type yet is still scanned automatically.
   function effectiveType(f: string): RuleType | undefined {
     const rule = rules[f];
-    return rule?.type === 'force' && !rule.forcedEntity ? 'auto' : rule?.type;
+    return rule?.type === 'force' && !typeName(rule.forcedEntity ?? '') ? 'auto' : rule?.type;
   }
   const counts = $derived({
     auto: fields.filter(f => effectiveType(f) === 'auto').length,
@@ -153,6 +153,13 @@
     emit();
   }
 
+  // Any type can be forced; it becomes an entity label in upper case with "_"
+  // between words ("asset.criticality" → "ASSET_CRITICALITY"). Kept as typed and
+  // normalized when sent, so the cursor does not jump while typing.
+  function typeName(raw: string): string {
+    return raw.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  }
+
   function setForcedEntity(fieldName: string, entity: string) {
     rules[fieldName].forcedEntity = entity;
     emit();
@@ -164,7 +171,7 @@
     const exclude: string[] = [];
     for (const f of fields) {
       const rule = rules[f];
-      if (rule.type === 'force' && rule.forcedEntity) force[f] = { entity_type: rule.forcedEntity };
+      if (rule.type === 'force' && typeName(rule.forcedEntity ?? '')) force[f] = { entity_type: typeName(rule.forcedEntity ?? '') };
       else if (rule.type === 'exclude') exclude.push(f);
     }
     if (Object.keys(force).length === 0) {
@@ -185,11 +192,20 @@
   }
 
   function setShown(type: RuleType) {
-    const entity = bulkEntity;
+    const entity = typeName(bulkEntity);
     if (type === 'force' && !entity) return;
     for (const f of shown) {
       rules[f].type = type;
       if (type === 'force') rules[f].forcedEntity = entity;
+    }
+    emit();
+  }
+
+  // Each shown field forced as its own column name.
+  function forceShownAsColumn() {
+    for (const f of shown) {
+      rules[f].type = 'force';
+      rules[f].forcedEntity = typeName(f);
     }
     emit();
   }
@@ -279,15 +295,26 @@
                 <div class="segmented-control">
                   <button onclick={() => setShown('auto')} disabled={shown.length === 0}>{$t('fields.btn.auto')}</button>
                   <button onclick={() => setShown('exclude')} disabled={shown.length === 0}>{$t('fields.btn.skip')}</button>
-                  <button onclick={() => setShown('force')} disabled={shown.length === 0 || !bulkEntity}
+                  <button onclick={forceShownAsColumn} disabled={shown.length === 0}
+                    title={$t('fields.bulk_column_hint')}>{$t('fields.bulk_column')}</button>
+                  <button onclick={() => setShown('force')} disabled={shown.length === 0 || !typeName(bulkEntity)}
                     title={$t('fields.mode.force.desc')}>{$t('fields.force_as')}</button>
                 </div>
-                <select class="force-input bulk-entity" bind:value={bulkEntity} aria-label={$t('fields.force_as')}>
-                  <option value="">{$t('fields.choose_type')}</option>
+                <input
+                  type="search"
+                  class="force-input bulk-entity"
+                  list="entity-types"
+                  autocomplete="off"
+                  spellcheck="false"
+                  bind:value={bulkEntity}
+                  placeholder={$t('fields.type_placeholder')}
+                  aria-label={$t('fields.force_as')}
+                />
+                <datalist id="entity-types">
                   {#each flatEntities as ent}
                     <option value={ent.id}>{ent.label}</option>
                   {/each}
-                </select>
+                </datalist>
               </div>
             </div>
             {#if shown.length === 0}
@@ -334,18 +361,22 @@
                       <td class="td-config">
                         {#if rules[f].type === 'force'}
                           <div class="force-input-group">
-                            <select
+                            <input
+                              type="search"
                               class="force-input"
-                              class:needs-type={!rules[f].forcedEntity}
+                              class:needs-type={!typeName(rules[f].forcedEntity ?? '')}
+                              list="entity-types"
+                              autocomplete="off"
+                              spellcheck="false"
                               value={rules[f].forcedEntity ?? ''}
-                              onchange={(e) => setForcedEntity(f, e.currentTarget.value)}
+                              oninput={(e) => setForcedEntity(f, e.currentTarget.value)}
+                              placeholder={$t('fields.type_placeholder')}
                               aria-label="{$t('fields.force_as')} {f}"
-                            >
-                              <option value="" disabled>{$t('fields.choose_type')}</option>
-                              {#each flatEntities as ent}
-                                <option value={ent.id}>{ent.label}</option>
-                              {/each}
-                            </select>
+                            />
+                            <button class="btn-link use-column" onclick={() => setForcedEntity(f, typeName(f))}
+                              title={$t('fields.use_column_hint', { type: typeName(f) })}>
+                              {$t('fields.use_column')}
+                            </button>
                           </div>
                         {:else if rules[f].type === 'exclude'}
                           <span class="skip-label">{$t('fields.skipped')}</span>
@@ -516,10 +547,14 @@
   .bulk-bar .filter-input { flex: 1 1 200px; width: auto; max-width: 300px; }
   .bulk-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
   .bulk-label { font-size: 0.75rem; color: var(--color-text-secondary); }
-  .bulk-actions .bulk-entity { width: 160px; }
+  .bulk-actions .bulk-entity { width: 200px; }
+  .force-input::placeholder { text-transform: none; }
   .segmented-control button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  .force-input-group { width: 100%; max-width: 280px; }
+  .force-input-group { display: flex; align-items: center; gap: 0.5rem; width: 100%; max-width: 320px; }
+  .force-input-group .force-input { flex: 1; min-width: 0; text-transform: uppercase; }
+  .bulk-actions .bulk-entity { text-transform: uppercase; }
+  .use-column { white-space: nowrap; font-size: 0.72rem; }
   .force-input {
     width: 100%;
     background: var(--color-surface-raised); border: 1px solid var(--color-border);
