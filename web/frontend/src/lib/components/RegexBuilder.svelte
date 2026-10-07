@@ -2,6 +2,7 @@
   import { config, type CustomPattern } from '#lib/stores/config.js';
   import { patternError, previewRegex } from '#lib/pyRegex.js';
   import { t } from '#lib/i18n.js';
+  import { onMount } from 'svelte';
 
   let { onclose }: { onclose?: () => void } = $props();
 
@@ -9,6 +10,11 @@
   let pattern = $state('');
   let score = $state(0.9);
   let testInput = $state('');
+
+  // Focus moves into the builder when it opens, as in any modal; otherwise Esc
+  // reached the Advanced dialog behind it and closed both.
+  let typeInput: HTMLInputElement;
+  onMount(() => typeInput.focus());
 
   // Python's `re` decides whether a pattern is valid (the server compiles it
   // the same way the job will), asked a moment after typing stops. The answer
@@ -69,7 +75,7 @@
     </div>
 
     <label>{$t('regex.type')}
-      <input type="text" bind:value={entityType} placeholder="BANK_ACCOUNT" spellcheck="false" />
+      <input type="text" bind:this={typeInput} bind:value={entityType} placeholder="BANK_ACCOUNT" spellcheck="false" />
     </label>
 
     <label>{$t('regex.pattern')} <span class="lang-badge">Python re</span>
