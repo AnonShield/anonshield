@@ -53,6 +53,7 @@
   }
   let selectedFile: File | null = $state(null);
   let groups: EntityGroup[] = $state([]);
+  let entitiesError = $state('');
   let showRegexBuilder = $state(false);
   let errorMsg = $state('');
   let profileToast = $state<'ok' | 'err' | null>(null);
@@ -60,20 +61,21 @@
   let profileToastTimer: ReturnType<typeof setTimeout> | null = null;
 
   // ── File size limits fetched from /api/config ────────────────────────────
-  let limitMb = $state(1); // default 1 MB until config loads
+  let sizeLimits = $state({ withoutKey: 1, withKey: 1 });
+  let limitMb = $derived($config.key ? sizeLimits.withKey : sizeLimits.withoutKey);
   let nerDefaults = $state<{score_threshold: number; aggregation_strategy: string; aggregation_choices: string[]} | null>(null);
   onMount(async () => {
     try {
       const r = await fetch('/api/config');
       if (r.ok) {
         const cfg = await r.json();
-        limitMb = cfg.limit_no_key_mb ?? 1;
+        sizeLimits = { withoutKey: cfg.limit_no_key_mb ?? 1, withKey: cfg.limit_with_key_mb ?? 1 };
         if (cfg.ner_defaults) nerDefaults = cfg.ner_defaults;
       }
     } catch { /* use default */ }
   });
   let limitBytes = $derived(limitMb * 1024 * 1024);
-  let fileTooLarge = $derived(selectedFile !== null && (selectedFile as File).size > limitBytes);
+  let fileTooLarge = $derived(limitMb > 0 && selectedFile !== null && (selectedFile as File).size > limitBytes);
 
   // Entity fetch: re-run when strategy, model, or lang changes
   let entityFetchKey = $derived(`${$config.strategy}||${$config.model}||${$config.lang}`);
@@ -83,11 +85,20 @@
     const key = entityFetchKey; // subscribe only to this derived
     const [strategy, model, lang] = key.split('||');
     groups = []; // clear while loading
-    // Reset entity selection when model/strategy/lang changes; old IDs may not exist in new model
-    config.update(c => ({ ...c, selected_entities: null }));
+    let cancelled = false;
+    entitiesError = '';
     fetchEntities(strategy, model, lang)
-      .then(r => { groups = r.groups; })
-      .catch(() => {});
+      .then(r => {
+        if (cancelled) return;
+        groups = r.groups;
+        const supported = new Set(groups.flatMap(g => g.entities.map(e => e.id)));
+        config.update(c => {
+          for (const pattern of c.custom_patterns) supported.add(pattern.entity_type.toUpperCase());
+          return { ...c, selected_entities: c.selected_entities === null ? null : new Set([...c.selected_entities].filter(id => supported.has(id))) };
+        });
+      })
+      .catch(() => { if (!cancelled) entitiesError = $t('app.error.entities'); });
+    return () => { cancelled = true; };
   });
 
   function onFile(file: File) {
@@ -110,7 +121,7 @@
       const sel = $config.selected_entities;
       const entities = sel === null ? undefined : [...sel];
 
-      const yamlConfig = $config.custom_patterns.length > 0
+      const yamlConfig = $config.custom_patterns.length > 0 || $config.allow_list.length > 0 || $config.preserve_entities.length > 0
         ? toYaml($config, groups)
         : undefined;
 
@@ -212,17 +223,9 @@
   let result = $derived($activeJob?.status?.result as Record<string, unknown> | undefined);
   let entityCount = $derived(result?.entity_count as number | undefined);
   let entityCounts = $derived(result?.entity_counts as Record<string, number> | undefined);
+  let skippedFiles = $derived((result?.skipped_files as string[] | undefined) ?? []);
 
-  // ── Realistic ETA estimation ──────────────────────────────────────────────
-  // Throughput estimates in KB/s per strategy (conservative lower bound from paper)
-  const STRATEGY_KB_S: Record<string, number> = {
-    regex:      34341,  // schema-aware config on D2
-    filtered:   1250,   // baseline D2 standalone
-    standalone: 1250,
-    hybrid:     1250,
-    presidio:   732,
-  };
-
+  // ── Time estimate ──────────────────────────────────────────────────────────
   let processingStart = $state(0);
   let elapsedMs = $state(0);
   let elapsedInterval: ReturnType<typeof setInterval> | null = null;
@@ -239,17 +242,24 @@
     }
   });
 
+  function duration(ms: number): string {
+    if (ms < 60000) return `${Math.max(1, Math.round(ms / 1000))} s`;
+    if (ms < 5400000) return `${Math.round(ms / 60000)} min`;
+    return `${(ms / 3600000).toFixed(1)} h`;
+  }
+  let jobState = $derived($activeJob?.status?.status);
+  let startedAt = $derived($activeJob?.status?.started_at);
+  // The estimate comes only from measured progress (a guess from the file
+  // size was off by hours on a CPU). Time in the queue is shown apart.
+  let runMs = $derived(elapsedMs && startedAt ? Math.max(0, Date.now() - startedAt * 1000) : elapsedMs);
+  let remainMs = $derived(progress > 0 && runMs >= 20000 ? runMs * (100 - progress) / progress : null);
   let etaLabel = $derived.by(() => {
-    const fileSizeKb = (selectedFile?.size ?? 0) / 1024;
-    if (!fileSizeKb) return '';
-    const strategy = $config.strategy || 'filtered';
-    const kbPerSec = STRATEGY_KB_S[strategy] ?? 1250;
-    const totalMs = (fileSizeKb / kbPerSec) * 1000;
-    const remainMs = Math.max(0, totalMs - elapsedMs);
-    if (remainMs < 1000) return 'almost done…';
-    if (remainMs < 60000) return `~${Math.ceil(remainMs / 1000)}s remaining`;
-    return `~${(remainMs / 60000).toFixed(1)} min remaining`;
+    if (!elapsedMs) return '';
+    if (jobState === 'queued') return $t('eta.queued', { time: duration(elapsedMs) });
+    if (remainMs !== null) return $t('eta.remaining', { time: duration(remainMs) });
+    return $t('eta.measuring', { time: duration(runMs) });
   });
+  let progressLabel = $derived(progress > 0 ? `${progress < 10 ? progress.toFixed(1) : Math.floor(progress)}%` : '');
 
 
   const STRATEGIES = [
@@ -304,21 +314,25 @@
       batchQueue = batchQueue.map(b => b.id === item.id ? { ...b, status: 'processing' } : b);
       try {
         const sel = $config.selected_entities;
-        const entities = (sel !== null && sel.size > 0) ? [...sel] : undefined;
-        const yamlConfig = $config.custom_patterns.length > 0 ? toYaml($config, groups) : undefined;
+        const entities = sel === null ? undefined : [...sel];
+        const yamlConfig = $config.custom_patterns.length > 0 || $config.allow_list.length > 0 || $config.preserve_entities.length > 0 ? toYaml($config, groups) : undefined;
         const job = await createJob(item.file, {
           key: $config.key || undefined, strategy: $config.strategy,
           lang: $config.lang, model: $config.model || undefined,
           entities, config: yamlConfig,
+          slug_length: $config.slug_length,
+          ner_score_threshold: $config.ner_score_threshold,
+          ner_aggregation_strategy: $config.ner_aggregation_strategy,
           anonymization_config: $config.anonymization_config,
         });
         // poll until done
-        await new Promise<void>((resolve) => {
+        await new Promise<void>((resolve, reject) => {
           const iv = setInterval(async () => {
+            try {
             const s = await pollStatus(job.job_id);
             if (s.status === 'done') {
               clearInterval(iv);
-              const ec = (s.result as any)?.entity_count as number | undefined;
+              const ec = typeof s.result?.entity_count === 'number' ? s.result.entity_count : 0;
               batchQueue = batchQueue.map(b => b.id === item.id
                 ? { ...b, status: 'done', jobId: job.job_id, downloadHref: downloadUrl(job.job_id), entityCount: ec }
                 : b);
@@ -329,6 +343,10 @@
                 ? { ...b, status: 'error', errorMsg: s.message ?? 'Error' }
                 : b);
               resolve();
+            }
+            } catch (error) {
+              clearInterval(iv);
+              reject(error);
             }
           }, 2000);
         });
@@ -492,7 +510,11 @@
         {#if groups.length > 0}
           <EntitySelector {groups} />
         {:else}
-          <p class="loading-hint">{$t('app.entities_loading')}</p>
+          {#if entitiesError}
+            <p role="alert">{entitiesError}</p>
+          {:else}
+            <p class="loading-hint">{$t('app.entities_loading')}</p>
+          {/if}
         {/if}
       </section>
     </div>
@@ -537,12 +559,16 @@
     </div>
     <h2>{$activeJob?.filename ?? selectedFile?.name}</h2>
     <p class="status-label">
-      {$t('status.processing')}
+      {jobState === 'queued' ? $t('status.queued') : $t('status.processing')}
       {#if etaLabel}<span class="eta-label">({etaLabel})</span>{/if}
     </p>
-    <ProgressBar {progress} label={progress > 0 ? `${progress}%` : ''} />
+    <ProgressBar {progress} indeterminate={jobState !== 'queued' && progress === 0} label={progressLabel} />
     <p class="cache-hint">
-      {#if $config.strategy === 'regex'}
+      {#if jobState === 'queued'}
+        {$t('status.queued_hint')}
+      {:else if remainMs !== null && remainMs > 20 * 60000 && $config.strategy !== 'regex'}
+        {$t('processing.slow')}
+      {:else if $config.strategy === 'regex'}
         {$t('processing.regex_only')}
       {:else}
         {$t('processing.with_strategy', { strategy: $config.strategy })}
@@ -560,6 +586,11 @@
       {#if entityCount !== undefined}
         <p class="stats-label">
           {$t('status.entities_replaced', { n: entityCount })}
+        </p>
+      {/if}
+      {#if skippedFiles.length > 0}
+        <p class="stats-label" title={skippedFiles.join('\n')}>
+          {$t('status.zip_skipped', { n: (result?.files_skipped as number | undefined) ?? skippedFiles.length, files: skippedFiles.slice(0, 3).join(', ') })}
         </p>
       {/if}
       <a
@@ -790,7 +821,8 @@
      tinted surface keeps it attached to the bar without competing with primary content. */
   .profile-help-box {
     flex: 1;
-    min-width: 300px;
+    min-width: 0;
+    flex-basis: 260px;
     font-size: var(--text-xs);
     color: var(--color-text-secondary);
     background: color-mix(in srgb, var(--color-text-primary) 3%, transparent);
@@ -803,13 +835,13 @@
   /* 2-column layout: left = settings, right = entity panel */
   .configure-layout {
     display: grid;
-    grid-template-columns: 300px 1fr;
+    grid-template-columns: 300px minmax(0, 1fr);
     gap: var(--space-6);
     align-items: start;
   }
-  @media (max-width: 760px) { .configure-layout { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) { .configure-layout { grid-template-columns: minmax(0, 1fr); } }
 
-  .settings-col { display: flex; flex-direction: column; gap: var(--space-4); }
+  .settings-col { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 
   /* File too large warning: pop spring matches other feedback moments; mono for exactness */
   .file-too-large {
@@ -1102,7 +1134,7 @@
   select { width: 100%; }
 
   /* Entity panel: stretch naturally, no fixed max-height causing unnecessary inner scroll */
-  .entity-panel { min-height: 200px; overflow-y: visible; }
+  .entity-panel { min-height: 200px; min-width: 0; overflow-y: visible; }
   .loading-hint { color: var(--color-text-secondary); font-size: var(--text-sm); margin: 0; }
 
   /* Patterns */
@@ -1194,11 +1226,15 @@
 
   .submit-row {
     position: sticky;
-    bottom: var(--space-4);
-    z-index: 100;
+    bottom: 0;
+    z-index: 10;
     display: flex; justify-content: flex-end;
+    padding: var(--space-3);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
   }
   .submit-btn { padding: var(--space-3) var(--space-8); font-size: var(--text-base); }
+  @media (max-width: 480px) { .submit-btn { width: 100%; } }
 
   /* ── OCR engine hint → now .adv-hint inside modal ── */
 

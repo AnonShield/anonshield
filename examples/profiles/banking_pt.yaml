@@ -15,8 +15,8 @@ entities:
   - IP_ADDRESS
   - CREDIT_CARD
   - UUID
-  - CPF
-  - CNPJ
+  - BR_CPF
+  - BR_CNPJ
   - BANK_ACCOUNT
   - BANK_AGENCY
   - PIX_KEY_UUID
@@ -25,7 +25,7 @@ entities:
   - RG
 
 # Custom patterns for Brazilian banking
-custom_patterns: examples/patterns/banking_pt.yaml
+custom_patterns: ../patterns/banking_pt.yaml
 
 db_mode: in-memory
 overwrite: true

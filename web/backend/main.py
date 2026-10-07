@@ -51,11 +51,10 @@ def health() -> dict:
 @app.get("/api/config")
 def get_config() -> dict:
     """Public configuration for the frontend (file size limits, etc.)."""
-    import os
     from src.anon.config import NerDefaults
     return {
-        "limit_no_key_mb":   int(os.getenv("ANON_MAX_SIZE_MB",     "1")),
-        "limit_with_key_mb": int(os.getenv("ANON_MAX_SIZE_KEY_MB", "1")),
+        "limit_no_key_mb": jobs.LIMIT_NO_KEY // 1024 // 1024,
+        "limit_with_key_mb": jobs.LIMIT_WITH_KEY // 1024 // 1024,
         "ner_defaults": {
             "score_threshold": NerDefaults.SCORE_THRESHOLD,
             "aggregation_strategy": NerDefaults.AGGREGATION_STRATEGY,
@@ -75,9 +74,9 @@ def validate_profile(body: dict) -> dict:
 async def analyze_fields(file: UploadFile) -> dict:
     """Detect columns/fields from a structured file (CSV, XLSX, JSON, JSONL).
     Returns {fields: [{name, sample_values}]} for field selector UI.
-    Accepts first 256 KB only; lightweight, no disk write.
+    CSV reads its header; JSON and JSONL are streamed through every record, so
+    a field that only some records have is listed; XLSX opens the workbook.
     """
-    import io
     from src.anon.utils import detect_fields_from_stream
 
     ext = (file.filename or "").rsplit(".", 1)[-1].lower()
@@ -86,8 +85,7 @@ async def analyze_fields(file: UploadFile) -> dict:
     if ext == "xlsx":
         import openpyxl
         try:
-            chunk = await file.read(256 * 1024)
-            wb = openpyxl.load_workbook(io.BytesIO(chunk), read_only=True, data_only=True)
+            wb = openpyxl.load_workbook(file.file, read_only=True, data_only=True)
             ws = wb.active
             headers: list[str] = []
             if ws is not None:
@@ -101,9 +99,29 @@ async def analyze_fields(file: UploadFile) -> dict:
 
     # Use unified detection for text formats
     try:
-        # We need to wrap the bytes in a BytesIO for the utility
-        chunk = await file.read(256 * 1024)
-        field_names = detect_fields_from_stream(io.BytesIO(chunk), ext)
+        field_names = detect_fields_from_stream(file.file, ext)
         return {"fields": [{"name": n} for n in field_names]}
     except Exception as e:
         return {"fields": [], "error": str(e)}
+
+
+# The local image (web/backend/Dockerfile, target "local") serves the interface
+# itself from the static build of web/frontend, so it needs no proxy and no Node.
+_STATIC_DIR = os.getenv("ANON_STATIC_DIR")
+if _STATIC_DIR:
+    from pathlib import Path
+
+    from fastapi import HTTPException
+    from fastapi.responses import FileResponse
+
+    _static_root = Path(_STATIC_DIR).resolve()
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def interface(path: str) -> FileResponse:
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        for candidate in (_static_root / path, _static_root / f"{path}.html"):
+            candidate = candidate.resolve()
+            if candidate.is_file() and candidate.is_relative_to(_static_root):
+                return FileResponse(candidate)
+        return FileResponse(_static_root / "index.html")

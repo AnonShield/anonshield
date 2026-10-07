@@ -11,6 +11,27 @@ AnonShield replaces personally identifiable information (PII) and network-specif
 
 > This is the **active development** repository. The frozen artifact that backs the SBRC 2026 paper (selected **Best Artifact**) lives at [AnonShield/tool](https://github.com/AnonShield/tool) and is the version to use for reproducing the published experiments.
 
+## Quick start (Docker)
+
+**Web interface, running on your computer:**
+
+```bash
+docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web
+```
+
+Open **[localhost:8080](http://localhost:8080)**, drop a file, and click **Anonymize**. One container, no clone and no setup: it has no upload-size or rate limit, only this computer can reach it, and the key, model cache and metrics stay in the `anonshield` volume. Stop with `docker stop anonshield`, start again with `docker start anonshield`; `./run.sh --web` (below) does the same with `--stop`, `--update` and `--port`. The [local guide](web/LOCAL.md) covers updates, another port and troubleshooting.
+
+**Command-line processing:** download the script and give it a file or folder.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AnonShield/anonshield/main/docker/run.sh -o run.sh
+chmod +x run.sh
+./run.sh report.csv                    # writes ./anon/output/anon_report.csv
+./run.sh report.csv --anonymization-strategy regex  # no NER model needed
+```
+
+On Windows, use [`run.ps1`](docker/run.ps1) in PowerShell. `./run.sh --help` shows common options without downloading anything; `--cli-help` lists every engine flag. Add `--gpu` for NVIDIA inference. The first NER run downloads a model (about 1 GB) into `./anon/models/`; later runs reuse it. Keep `./anon/secret.key` for stable pseudonyms and `./anon/db/` for re-identification. The [Docker guide](docker/DOCKERHUB_README.md) covers GPU setup and other options.
+
 ![A security report before and after AnonShield: real emails, IPs, a credit card, a CVE and an API token on the left, fully tokenized on the right](docs/images/demo.png)
 
 ![AnonShield pipeline](docs/images/pipeline.png)
@@ -45,13 +66,13 @@ AnonShield replaces personally identifiable information (PII) and network-specif
 
 Vulnerability scan reports (OpenVAS, Tenable, and similar) and security incident tickets are full of identifiers that, taken together, map an organization's network topology and attack surface: IP ranges, hostnames, certificates, service banners, CVE references, e-mail addresses, and personal names. Sharing this data with partners, researchers, or training pipelines is exactly what makes collective defense work, yet it is precisely what privacy regulation restricts.
 
-AnonShield solves this with **pseudonymization rather than redaction**. Instead of deleting sensitive values (which destroys the structure analysts depend on), it substitutes each value with a stable pseudonym, keeping the document usable for correlation, statistics, and machine learning, while the original values stay protected and can be restored on the host with the secret key (controlled re-identification).
+AnonShield solves this with **pseudonymization rather than redaction**. Instead of deleting sensitive values (which destroys the structure analysts depend on), it substitutes each value with a stable pseudonym, keeping the document usable for correlation, statistics, and machine learning, while the original values can be restored from the local mapping database (controlled re-identification).
 
 It is built for **operational CSIRT scale**: evaluated on datasets up to **550 MB / 70,951 vulnerability records**, it brings processing that previously took over **92 hours down to under 10 minutes** (up to **738x** faster) while reaching **F1 = 94.2%** and **Recall = 96.4%** on a specialist-annotated validation set.
 
 ## Highlights
 
-- **Deterministic pseudonyms (HMAC-SHA256).** The same entity always receives the same pseudonym across files and runs, so cross-document references stay intact. Reversible on the host with the secret key.
+- **Deterministic pseudonyms (HMAC-SHA256).** The same entity always receives the same pseudonym across files and runs, so cross-document references stay intact. Reversible on the host with the mapping database.
 - **On-premise by design.** No external API calls and no telemetry. Sensitive data never leaves your network.
 - **Five anonymization strategies** spanning pure regex (no model load) to full Presidio NER, so you trade off speed against coverage per job (see [below](#anonymization-strategies)).
 - **Two focused NER models:** a multilingual general model and a cybersecurity-tuned model.
@@ -112,18 +133,6 @@ Models are downloaded on first use and cached locally. The build uses **CPU PyTo
 uv run anon.py --list-entities
 uv run anon.py --list-languages
 ```
-
-## Quick start (Docker)
-
-The quickest way to run it: Docker is the only requirement (Linux, macOS or Windows). Download the wrapper script and give it a file or a folder:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/AnonShield/anonshield/main/docker/run.sh -o run.sh && chmod +x run.sh
-./run.sh report.csv          # writes ./anon/output/anon_report.csv
-./run.sh --gpu report.csv    # on an NVIDIA GPU
-```
-
-On Windows, use [`run.ps1`](docker/run.ps1) in PowerShell the same way. The first run downloads the image and the NER model (about 1 GB, kept in `./anon/models/`) and creates the secret key in `./anon/secret.key`; later runs reuse both. Every CLI flag below works with the script. The [Docker guide](docker/DOCKERHUB_README.md) covers the image tags, GPU setup and examples.
 
 ## Installation from source
 
@@ -187,7 +196,7 @@ Run `uv run anon.py --help` for the complete reference.
 
 ## Configuration
 
-- **`ANON_SECRET_KEY`** (required): the HMAC key. Keep it stable and protected; it is what links pseudonyms across runs and what allows controlled re-identification. Losing it makes de-anonymization impossible.
+- **`ANON_SECRET_KEY`**: the HMAC key, required unless `--slug-length 0` is used. Docker creates and keeps it automatically. Reusing it keeps pseudonyms consistent across runs; re-identification requires the mapping database, which contains the original values and must remain private.
 - **Schema-aware rules (`--anonymization-config`)**: a JSON file that, per field of a structured file, can force a value to be treated as a given entity, exclude a field entirely, or fall back to automatic detection. Bypassing detection for known fields is also the fastest path at scale.
 - **Custom recognizers (`--custom-patterns`)**: add regular-expression detectors for identifiers specific to your environment.
 - **YAML profiles (`--config`)**: capture an entire run configuration in one file for reproducibility.
@@ -210,15 +219,13 @@ The live app runs at **[anonshield.org](https://anonshield.org)**.
 ![Metrics dashboard](docs/images/metrics.png)
 *Built-in metrics dashboard: throughput by file format and strategy, jobs over time, file size versus throughput, and the entity mix.*
 
-Run the whole stack on your machine in containers (CPU, Docker and `make` only):
+Run the whole web app on your computer, in one container (Docker is the only requirement):
 
 ```bash
-cd web
-make local    # builds the images, starts everything, serves http://localhost:8080
-make down     # stops it
+docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web
 ```
 
-The first run builds the images (several minutes) and saves a random `ANON_SECRET_KEY` in `web/.env`.
+Open **[localhost:8080](http://localhost:8080)**. The local app has **no upload-size or rate limit**; disk and RAM are the limits. It runs on CPU, listens only on this computer, and keeps its key, model cache and metrics in the `anonshield` volume. To build the same container from this checkout instead, run `docker compose -f web/docker-compose.local.yml up -d --build` (or `make -C web local`). See the short [local guide](web/LOCAL.md) for updates, another port, logs and troubleshooting.
 
 For frontend development with hot reload, run the dev servers directly instead:
 

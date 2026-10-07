@@ -5,7 +5,7 @@ export type Para = { a: string; runs: Run[] };
 export type El = {
   kind: 'text' | 'shape' | 'img';
   x: number; y: number; w: number; h: number;
-  anchor?: string; paras?: Para[];
+  anchor?: string; paras?: Para[]; ml?: number; mt?: number;
   sub?: string; fill?: string | null; bw?: number; bc?: string | null; rx?: number;
   src?: string;
 };

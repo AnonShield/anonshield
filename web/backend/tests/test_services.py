@@ -126,6 +126,18 @@ custom_patterns:
         assert result["valid"] is False
         assert "unknown_key" in result["error"]
 
+    @pytest.mark.parametrize("content", [
+        "strategy: []", "entities: null", "allow_list: [12]", "lang: []",
+        "slug_length: huge", "ner_score_threshold: 3",
+        "custom_patterns: [{entity_type: X, pattern: 12}]",
+        "custom_patterns: [{entity_type: X, pattern: test, score: high}]",
+        "12: value\nunknown: value",
+    ])
+    def test_invalid_types_are_actionable_errors(self, content):
+        result = self.validate(content)
+        assert result["valid"] is False
+        assert result["error"]
+
 
 # ── entity endpoint ─────────────────────────────────────────────────────────────
 

@@ -38,9 +38,23 @@
   let showModal = $state(false);
 
   const ext = $derived(file.name.split('.').pop()?.toLowerCase() ?? '');
-  const supported = $derived(['csv', 'tsv', 'json', 'jsonl', 'ndjson', 'xlsx'].includes(ext));
+  const supported = $derived(['csv', 'json', 'jsonl', 'xlsx'].includes(ext));
   const flatEntities = $derived(entityGroups.flatMap(g => g.entities));
-  const activeRulesCount = $derived(Object.values(rules).filter(r => r.type !== 'auto').length);
+  // A field set to Force without a type yet is still scanned automatically.
+  function effectiveType(f: string): RuleType | undefined {
+    const rule = rules[f];
+    return rule?.type === 'force' && !rule.forcedEntity ? 'auto' : rule?.type;
+  }
+  const counts = $derived({
+    auto: fields.filter(f => effectiveType(f) === 'auto').length,
+    force: fields.filter(f => effectiveType(f) === 'force').length,
+    skip: fields.filter(f => effectiveType(f) === 'exclude').length,
+  });
+  let filter = $state('');
+  let bulkEntity = $state('');
+  const shown = $derived(filter.trim()
+    ? fields.filter(f => f.toLowerCase().includes(filter.trim().toLowerCase()))
+    : fields);
 
   async function detectFields() {
     if (!supported) { loading = false; return; }
@@ -70,9 +84,15 @@
 
   function setRuleType(fieldName: string, type: RuleType) {
     rules[fieldName].type = type;
-    if (type === 'force' && !rules[fieldName].forcedEntity) {
-      rules[fieldName].forcedEntity = 'PERSON';
-    }
+    emit();
+  }
+
+  // A bare machine name ("srv-files") reads as an ordinary word, so detection
+  // misses it; fields named like these should be forced as HOSTNAME.
+  const HOST_FIELD = /(host_?name|netbios(_name)?|fqdn|computer_?name|dns_?name)$/i;
+  function forceHostname(fieldName: string) {
+    rules[fieldName].type = 'force';
+    rules[fieldName].forcedEntity = 'HOSTNAME';
     emit();
   }
 
@@ -83,23 +103,38 @@
 
   function emit() {
     if (mode === 'all') { onchange?.(null); return; }
-    const config: AnonymizationConfig = { force_anonymize: {}, fields_to_anonymize: [], fields_to_exclude: [] };
-    let hasRules = false;
+    const force: Record<string, { entity_type: string }> = {};
+    const exclude: string[] = [];
     for (const f of fields) {
       const rule = rules[f];
-      if (rule.type === 'force' && rule.forcedEntity) {
-        config.force_anonymize![f] = { entity_type: rule.forcedEntity };
-        hasRules = true;
-      } else if (rule.type === 'auto') {
-        config.fields_to_anonymize!.push(f);
-        hasRules = true;
-      } else if (rule.type === 'exclude') {
-        config.fields_to_exclude!.push(f);
-        hasRules = true;
-      }
+      if (rule.type === 'force' && rule.forcedEntity) force[f] = { entity_type: rule.forcedEntity };
+      else if (rule.type === 'exclude') exclude.push(f);
     }
-    if (!hasRules) onchange?.(null);
-    else onchange?.(config);
+    if (Object.keys(force).length === 0) {
+      // Skips only: every other field, including any not listed here, is scanned.
+      onchange?.(exclude.length ? { fields_to_exclude: exclude } : null);
+      return;
+    }
+    // A forced field puts the engine in explicit mode, which ignores unlisted
+    // paths; listing each top-level key keeps the other fields (and any that
+    // only later records have) scanned. Skips and forces take precedence.
+    const roots = [...new Set(fields.map(f => f.split('.')[0]))];
+    onchange?.({ force_anonymize: force, fields_to_anonymize: roots, fields_to_exclude: exclude });
+  }
+
+  function setMode(next: FieldMode) {
+    mode = next;
+    emit();
+  }
+
+  function setShown(type: RuleType) {
+    const entity = bulkEntity;
+    if (type === 'force' && !entity) return;
+    for (const f of shown) {
+      rules[f].type = type;
+      if (type === 'force') rules[f].forcedEntity = entity;
+    }
+    emit();
   }
 
   function resetAllToAuto() {
@@ -107,9 +142,9 @@
     emit();
   }
 
-  // Handle ESC key to close modal
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') showModal = false;
+  function openDialog(dialog: HTMLDialogElement) {
+    dialog.showModal();
+    return { destroy: () => dialog.close() };
   }
 </script>
 
@@ -128,7 +163,7 @@
       <div class="st-text">
         <span class="st-title">{$t('fields.title')}</span>
         <span class="st-hint">
-          {mode === 'all' ? 'Global Analysis Active' : $t('fields.hint_n', { n: activeRulesCount })}
+          {mode === 'all' ? $t('fields.hint_none') : $t('fields.summary', { auto: counts.auto, force: counts.force, skip: counts.skip })}
         </span>
       </div>
     </div>
@@ -141,23 +176,23 @@
 
   <!-- MODAL OVERLAY -->
   {#if showModal}
-    <div class="modal-overlay" onkeydown={handleKeydown} tabindex="-1">
-      <div class="modal-backdrop" onclick={() => showModal = false}></div>
+    <dialog class="modal-overlay" use:openDialog onclose={() => showModal = false} aria-labelledby="field-dialog-title">
+      <button type="button" class="modal-backdrop" aria-label={$t('fields.close')} onclick={() => showModal = false}></button>
       
       <div class="modal-content card">
         <div class="modal-header">
           <div class="mh-left">
-            <span class="cp-badge">Schema Config</span>
-            <h2>{$t('fields.title')}</h2>
+            <span class="cp-badge">{$t('fields.badge')}</span>
+            <h2 id="field-dialog-title">{$t('fields.title')}</h2>
           </div>
-          <button class="close-btn" onclick={() => showModal = false}>&times;</button>
+          <button class="close-btn" aria-label={$t('fields.close')} onclick={() => showModal = false}>&times;</button>
         </div>
 
         <div class="modal-tabs">
-          <button class:active={mode === 'all'} onclick={() => mode = 'all'}>
+          <button class:active={mode === 'all'} onclick={() => setMode('all')}>
             {$t('fields.all')}
           </button>
-          <button class:active={mode === 'targeted'} onclick={() => mode = 'targeted'}>
+          <button class:active={mode === 'targeted'} onclick={() => setMode('targeted')}>
             {$t('fields.pick')}
           </button>
         </div>
@@ -168,22 +203,50 @@
               <div class="shield-icon">🛡️</div>
               <h3>{$t('fields.all')}</h3>
               <p>{$t('fields.hint_none')}</p>
-              <button class="btn btn-ghost mt-4" onclick={() => mode = 'targeted'}>
+              <button class="btn btn-ghost mt-4" onclick={() => setMode('targeted')}>
                 {$t('fields.pick')}
               </button>
             </div>
           {:else if fields.length > 0}
+            <div class="bulk-bar">
+              <input
+                class="force-input filter-input"
+                type="search"
+                autocomplete="off"
+                bind:value={filter}
+                placeholder={$t('fields.filter')}
+                aria-label={$t('fields.filter')}
+              />
+              <div class="bulk-actions">
+                <span class="bulk-label">{$t('fields.bulk', { n: shown.length })}</span>
+                <div class="segmented-control">
+                  <button onclick={() => setShown('auto')} disabled={shown.length === 0}>{$t('fields.btn.auto')}</button>
+                  <button onclick={() => setShown('exclude')} disabled={shown.length === 0}>{$t('fields.btn.skip')}</button>
+                  <button onclick={() => setShown('force')} disabled={shown.length === 0 || !bulkEntity}
+                    title={$t('fields.mode.force.desc')}>{$t('fields.force_as')}</button>
+                </div>
+                <select class="force-input bulk-entity" bind:value={bulkEntity} aria-label={$t('fields.force_as')}>
+                  <option value="">{$t('fields.choose_type')}</option>
+                  {#each flatEntities as ent}
+                    <option value={ent.id}>{ent.label}</option>
+                  {/each}
+                </select>
+              </div>
+            </div>
+            {#if shown.length === 0}
+              <p class="empty-msg">{$t('fields.no_match')}</p>
+            {/if}
             <div class="table-container">
               <table class="field-table">
                 <thead>
                   <tr>
-                    <th>Field Name</th>
-                    <th>Action</th>
-                    <th>Mapping / Force Type</th>
+                    <th>{$t('fields.col.name')}</th>
+                    <th>{$t('fields.col.action')}</th>
+                    <th>{$t('fields.col.detail')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {#each fields as f}
+                  {#each shown as f (f)}
                     <tr class:row-excluded={rules[f].type === 'exclude'}>
                       <td class="td-name"><code>{f}</code></td>
                       <td class="td-actions">
@@ -193,44 +256,48 @@
                             onclick={() => setRuleType(f, 'auto')}
                             title={$t('fields.mode.auto.desc')}
                           >
-                            Auto
+                            {$t('fields.btn.auto')}
                           </button>
                           <button 
                             class:active={rules[f].type === 'force'} 
                             onclick={() => setRuleType(f, 'force')}
                             title={$t('fields.mode.force.desc')}
                           >
-                            Force
+                            {$t('fields.btn.force')}
                           </button>
                           <button 
                             class:active={rules[f].type === 'exclude'} 
                             onclick={() => setRuleType(f, 'exclude')}
                             title={$t('fields.mode.exclude.desc')}
                           >
-                            Skip
+                            {$t('fields.btn.skip')}
                           </button>
                         </div>
                       </td>
                       <td class="td-config">
                         {#if rules[f].type === 'force'}
                           <div class="force-input-group">
-                            <input 
-                              list="entity-suggestions-{f}"
+                            <select
                               class="force-input"
-                              value={rules[f].forcedEntity} 
-                              oninput={(e) => setForcedEntity(f, e.currentTarget.value.toUpperCase())}
-                              placeholder="ENTITY_TYPE"
-                            />
-                            <datalist id="entity-suggestions-{f}">
+                              class:needs-type={!rules[f].forcedEntity}
+                              value={rules[f].forcedEntity ?? ''}
+                              onchange={(e) => setForcedEntity(f, e.currentTarget.value)}
+                              aria-label="{$t('fields.force_as')} {f}"
+                            >
+                              <option value="" disabled>{$t('fields.choose_type')}</option>
                               {#each flatEntities as ent}
                                 <option value={ent.id}>{ent.label}</option>
                               {/each}
-                            </datalist>
+                            </select>
                           </div>
                         {:else if rules[f].type === 'exclude'}
-                          <span class="skip-label">Excluded from scan</span>
+                          <span class="skip-label">{$t('fields.skipped')}</span>
+                        {:else if HOST_FIELD.test(f)}
+                          <button class="btn-link suggest" onclick={() => forceHostname(f)} title={$t('fields.host_hint')}>
+                            {$t('fields.host_suggest')}
+                          </button>
                         {:else}
-                          <span class="auto-label">AI Scanning Active</span>
+                          <span class="auto-label">{$t('fields.detected')}</span>
                         {/if}
                       </td>
                     </tr>
@@ -246,14 +313,14 @@
         <div class="modal-footer">
           <div class="mf-left">
             {#if mode === 'targeted'}
-               <span class="rule-count">{$t('fields.hint_n', { n: activeRulesCount })}</span>
+               <span class="rule-count">{$t('fields.summary', { auto: counts.auto, force: counts.force, skip: counts.skip })}</span>
                <button class="btn-link" onclick={resetAllToAuto}>{$t('fields.clear')}</button>
             {/if}
           </div>
-          <button class="btn btn-primary" onclick={() => showModal = false}>Done</button>
+          <button class="btn btn-primary" onclick={() => showModal = false}>{$t('fields.done')}</button>
         </div>
       </div>
-    </div>
+    </dialog>
   {/if}
 {/if}
 
@@ -310,10 +377,12 @@
   .modal-overlay {
     position: fixed; inset: 0; z-index: 1000;
     display: flex; align-items: center; justify-content: center;
-    padding: 2rem;
+    padding: 2rem; margin: 0; border: 0;
+    width: 100%; height: 100%; max-width: none; max-height: none;
+    background: transparent; color: inherit;
   }
   .modal-backdrop {
-    position: absolute; inset: 0;
+    position: absolute; inset: 0; border: 0;
     background: rgba(0,0,0,0.7);
     backdrop-filter: blur(8px);
   }
@@ -382,6 +451,17 @@
   }
   .segmented-control button.active { background: rgba(255,255,255,0.1); color: var(--color-accent); }
   
+  .bulk-bar {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between;
+    padding: 0.75rem 0; background: var(--color-surface); border-bottom: 1px solid var(--color-border);
+  }
+  .bulk-bar .filter-input { flex: 1 1 200px; width: auto; max-width: 300px; }
+  .bulk-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .bulk-label { font-size: 0.75rem; color: var(--color-text-secondary); }
+  .bulk-actions .bulk-entity { width: 160px; }
+  .segmented-control button:disabled { opacity: 0.4; cursor: not-allowed; }
+
   .force-input-group { width: 100%; max-width: 280px; }
   .force-input {
     width: 100%;
@@ -390,9 +470,11 @@
     font-size: 0.8rem; outline: none; transition: 150ms;
     font-family: var(--font-mono); font-weight: 600;
   }
+  .force-input.needs-type { border-color: var(--color-warning); }
   .force-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2); }
   .force-input::placeholder { color: var(--color-text-secondary); opacity: 0.5; font-family: var(--font-sans); font-weight: 400; }
   .skip-label { color: var(--color-text-secondary); font-size: 0.75rem; font-style: italic; }
+  .suggest { color: var(--color-warning); font-weight: 600; text-align: left; }
   .auto-label { color: #4ade80; font-size: 0.75rem; font-weight: 600; }
 
   .modal-footer {

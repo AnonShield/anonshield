@@ -3,6 +3,7 @@
  * All requests go to PUBLIC_API_URL (set via env at build time).
  */
 import { PUBLIC_API_URL } from '$app/env/public';
+import type { AnonymizationConfig } from '#lib/stores/config.js';
 
 const BASE = PUBLIC_API_URL ?? '/api';
 
@@ -32,6 +33,8 @@ export interface JobCreatedResponse {
 export interface JobStatus {
   status: 'queued' | 'running' | 'done' | 'error' | 'downloaded';
   progress?: number;
+  /** Unix time when a worker took the job (absent while it waits in the queue). */
+  started_at?: number;
   eta_seconds?: number;
   output_size_bytes?: number;
   message?: string;
@@ -66,15 +69,23 @@ export async function createJob(
     key?: string;
     strategy?: string;
     lang?: string;
+    model?: string;
+    slug_length?: number;
+    ner_score_threshold?: number;
+    ner_aggregation_strategy?: string;
     entities?: string[];
     config?: string;
     ocr_engine?: string;
     ocr_preprocess?: string[];
-    anonymization_config?: Record<string, unknown> | null;
+    anonymization_config?: AnonymizationConfig | null;
   } = {}
 ): Promise<JobCreatedResponse> {
   const fd = new FormData();
   fd.append('file', file);
+  if (opts.model) fd.append('model', opts.model);
+  if (opts.slug_length !== undefined) fd.append('slug_length', String(opts.slug_length));
+  if (opts.ner_score_threshold !== undefined) fd.append('ner_score_threshold', String(opts.ner_score_threshold));
+  if (opts.ner_aggregation_strategy) fd.append('ner_aggregation_strategy', opts.ner_aggregation_strategy);
   if (opts.key)        fd.append('key', opts.key);
   if (opts.strategy)   fd.append('strategy', opts.strategy);
   if (opts.lang)       fd.append('lang', opts.lang);
@@ -89,7 +100,15 @@ export async function createJob(
   const r = await fetch(`${BASE}/jobs`, { method: 'POST', body: fd });
   if (r.status === 413) throw new Error('FILE_TOO_LARGE');
   if (r.status === 507) throw new Error('INSUFFICIENT_STORAGE');
-  if (!r.ok) throw new Error(`Job creation failed: ${r.status}`);
+  if (!r.ok) {
+    const body = await r.json().catch(() => null);
+    const detail = body?.detail;
+    const message = typeof detail === 'string' ? detail
+      : Array.isArray(detail) ? detail.map(e => `${e.loc?.slice(1).join('.')}: ${e.msg}`).join('; ')
+      : r.status === 429 ? 'Too many requests. Wait one minute and retry.'
+      : 'Could not start processing. Check your connection and retry.';
+    throw new Error(message);
+  }
   return r.json();
 }
 

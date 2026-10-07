@@ -3,6 +3,7 @@
   When `file` prop is set, renders a compact "file selected" chip instead of the full drop area.
 -->
 <script lang="ts">
+  import { t } from '#lib/i18n.js';
   let {
     limitMb = 1,
     onfile,
@@ -22,7 +23,7 @@
   let isDragging = $state(false);
   let input = $state<HTMLInputElement>();
 
-  const ACCEPTED = '.txt,.csv,.json,.pdf,.docx,.xlsx,.xml,.zip,.png,.jpg,.jpeg,.tiff,.bmp,.webp,.gif';
+  const ACCEPTED = '.txt,.log,.csv,.json,.jsonl,.pdf,.docx,.xlsx,.xml,.zip,.png,.jpg,.jpeg,.tiff,.tif,.bmp,.webp,.gif';
 
   function dispatch(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -111,8 +112,8 @@
   >
     <span class="icon" aria-hidden="true">↑</span>
     <p class="label">Drop your file here<br />or <span class="link">click to select</span></p>
-    <p class="formats">.txt .csv .json .pdf .docx .xlsx .xml .zip · PNG JPG TIFF BMP WEBP GIF</p>
-    <p class="limit">Max file size: {limitMb} MB</p>
+    <p class="formats">.txt .csv .json .jsonl .pdf .docx .xlsx .xml .zip · PNG JPG TIFF BMP WEBP GIF</p>
+    <p class="limit">{limitMb > 0 ? $t('upload.limit', { mb: limitMb }) : $t('upload.unlimited')}</p>
   </div>
 {/if}
 

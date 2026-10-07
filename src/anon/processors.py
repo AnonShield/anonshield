@@ -5,6 +5,7 @@ This module uses a Template Method Pattern. The `FileProcessor` base class defin
 the main workflow for processing files, and subclasses implement the specific
 details for extracting text from different file formats (e.g., PDF, DOCX, JSON).
 """
+import codecs
 import copy
 import gc
 import io
@@ -301,32 +302,59 @@ class FileProcessor(ABC):
         output_path: str = ""
         logging.info(f"Starting processing for file: {self.file_path}")
         try:
-            if self.ner_data_generation:
-                logging.info("Mode: NER data generation.")
-                output_path = self.ner_output_file or self._get_ner_output_path()
-                logging.debug(f"NER data output path: {output_path}")
-                if os.path.exists(output_path) and not self.overwrite:
-                    logging.warning(f"Output file '{output_path}' already exists. Use --overwrite to replace it.")
-                    return output_path
-                
-                # Open the file handle here, within the try block
-                os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                self.ner_file_handle = open(output_path, "w", encoding="utf-8")
-
-                ner_items = list(self._extract_texts_for_ner())
-                self._run_ner_pipeline(ner_items)
-                logging.info(f"Successfully generated NER data to: {output_path}")
-            else:
-                logging.info("Mode: Anonymization.")
-                output_path = get_output_path(self.file_path, self._get_output_extension(), output_dir=self.output_dir)
-                logging.debug(f"Anonymized output path: {output_path}")
-                if os.path.exists(output_path) and not self.overwrite:
-                    logging.warning(f"Output file '{output_path}' already exists. Use --overwrite to replace it.")
-                    return output_path
-                self._process_anonymization(output_path)
-                logging.info(f"Successfully anonymized file to: {output_path}")
+            return self._process(output_path)
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Cannot read '{os.path.basename(self.file_path)}' as text ({exc.encoding}). "
+                             "Save it as UTF-8 and retry.") from exc
         finally:
             self._cleanup_optimization()
+
+    def _text_encoding(self) -> str:
+        """UTF-8, UTF-16 when the file starts with its byte-order mark, or else
+        Windows-1252: the "CSV" or text that Excel and Notepad save on Windows in
+        Portuguese, Spanish and other Western locales. Checked once per file."""
+        if getattr(self, "_encoding", None) is None:
+            with open(self.file_path, "rb") as f:
+                head = f.read(2)
+                if head in (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE):
+                    self._encoding = "utf-16"
+                    return self._encoding
+                f.seek(0)
+                decoder = codecs.getincrementaldecoder("utf-8")()
+                try:
+                    for chunk in iter(lambda: f.read(1 << 20), b""):
+                        decoder.decode(chunk)
+                    decoder.decode(b"", final=True)
+                    self._encoding = "utf-8"
+                except UnicodeDecodeError:
+                    self._encoding = "cp1252"
+                    logging.warning(f"'{os.path.basename(self.file_path)}' is not UTF-8; reading it as "
+                                    "Windows-1252. The result is written as UTF-8.")
+        return self._encoding
+
+    def _process(self, output_path: str) -> str:
+        if self.ner_data_generation:
+            logging.info("Mode: NER data generation.")
+            output_path = self.ner_output_file or self._get_ner_output_path()
+            logging.debug(f"NER data output path: {output_path}")
+            if os.path.exists(output_path) and not self.overwrite:
+                raise FileExistsError(f"Output file '{output_path}' already exists. Use --overwrite to replace it or choose another --output-dir.")
+            
+            # Closed by _cleanup_optimization() when process() ends.
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            self.ner_file_handle = open(output_path, "w", encoding="utf-8")
+
+            ner_items = list(self._extract_texts_for_ner())
+            self._run_ner_pipeline(ner_items)
+            logging.info(f"Successfully generated NER data to: {output_path}")
+        else:
+            logging.info("Mode: Anonymization.")
+            output_path = get_output_path(self.file_path, self._get_output_extension(), output_dir=self.output_dir)
+            logging.debug(f"Anonymized output path: {output_path}")
+            if os.path.exists(output_path) and not self.overwrite:
+                raise FileExistsError(f"Output file '{output_path}' already exists. Use --overwrite to replace it or choose another --output-dir.")
+            self._process_anonymization(output_path)
+            logging.info(f"Successfully anonymized file to: {output_path}")
         logging.info(f"Finished processing for file: {self.file_path}")
         return output_path
 
@@ -598,7 +626,7 @@ class TextFileProcessor(FileProcessor):
         return ".txt"
 
     def _extract_texts(self) -> Iterable[str]:
-        with open(self.file_path, "r", encoding="utf-8", newline="") as f:
+        with open(self.file_path, "r", encoding=self._text_encoding(), newline="") as f:
             for line in f:
                 yield line
 
@@ -615,7 +643,7 @@ class TextFileProcessor(FileProcessor):
                 # Sample first 100 lines to estimate text lengths
                 sample_lengths = []
                 lines_sampled = 0
-                with open(self.file_path, "r", encoding="utf-8") as f:
+                with open(self.file_path, "r", encoding=self._text_encoding()) as f:
                     for i, line in enumerate(f):
                         if i >= 100:
                             break
@@ -659,7 +687,7 @@ class TextFileProcessor(FileProcessor):
             seen_texts: Dict[Union[str, Tuple[str, ...]], set] = defaultdict(set)
             all_lines = []
 
-            with open(self.file_path, "r", encoding="utf-8", newline="") as f:
+            with open(self.file_path, "r", encoding=self._text_encoding(), newline="") as f:
                 for line in f:
                     stripped_line = line.rstrip("\r\n")
                     all_lines.append(line)
@@ -980,7 +1008,7 @@ class CsvFileProcessor(FileProcessor):
         if total_rows <= 0:
             if not header_written:
                 try:
-                    df_header = pd.read_csv(self.file_path, nrows=0)
+                    df_header = pd.read_csv(self.file_path, nrows=0, encoding=self._text_encoding())
                     df_header.to_csv(output_path, mode='a', index=False, header=True)
                 except Exception:
                     pass
@@ -990,7 +1018,7 @@ class CsvFileProcessor(FileProcessor):
         if self.batch_size <= 0:
             # Sample first chunk to get column count and text lengths
             try:
-                sample_df = pd.read_csv(self.file_path, nrows=min(100, total_rows), dtype=str, encoding='utf-8')
+                sample_df = pd.read_csv(self.file_path, nrows=min(100, total_rows), dtype=str, encoding=self._text_encoding())
                 num_columns = len(sample_df.columns)
                 
                 # Sample text lengths from all columns - improved sampling
@@ -1044,7 +1072,7 @@ class CsvFileProcessor(FileProcessor):
 
         try:
             bytes_per_row = file_size / total_rows if total_rows > 0 else 0
-            with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
+            with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding=self._text_encoding(), low_memory=False) as reader:
                 progress_bar = tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024,
                                     desc=f"Processing CSV {os.path.basename(self.file_path)}", leave=False,
                                     bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
@@ -1107,7 +1135,7 @@ class CsvFileProcessor(FileProcessor):
             logging.info(f"Successfully anonymized CSV file saved to: {output_path}")
 
         except Exception as e:
-            logging.error(f"Error processing CSV file '{self.file_path}': {e}", exc_info=True)
+            logging.debug(f"Error processing CSV file '{self.file_path}': {e}", exc_info=True)
             if os.path.exists(temp_output_path):
                 os.remove(temp_output_path)
                 logging.info(f"Removed corrupt temporary file: {temp_output_path}")
@@ -1115,7 +1143,7 @@ class CsvFileProcessor(FileProcessor):
 
     def _extract_texts(self) -> Iterable[str]:
         chunk_size = self.csv_chunk_size
-        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
+        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding=self._text_encoding(), low_memory=False) as reader:
             for chunk in reader:
                 batch_values = []
                 for col in chunk.columns:
@@ -1130,7 +1158,7 @@ class CsvFileProcessor(FileProcessor):
     def _extract_texts_for_ner(self) -> Iterable[NERTextItem]:
         """Extracts texts with metadata for NER data generation from CSV files."""
         chunk_size = self.csv_chunk_size
-        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
+        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding=self._text_encoding(), low_memory=False) as reader:
             for chunk in reader:
                 for col in chunk.columns:
                     for val in chunk[col].dropna():
@@ -1199,9 +1227,7 @@ class XlsxFileProcessor(FileProcessor):
         try:
             read_only_wb = openpyxl.load_workbook(self.file_path, read_only=True)
         except Exception as e:
-            logging.error(f"Failed to open XLSX file {self.file_path} in read-only mode: {e}")
-            shutil.copy(self.file_path, output_path) # Copy original on failure to open
-            return
+            raise ValueError("Cannot read XLSX file. Check that it is a valid, unencrypted workbook.") from e
 
         total_rows = sum(sheet.max_row or 0 for sheet in read_only_wb.worksheets)
         file_size = os.path.getsize(self.file_path)
@@ -1254,10 +1280,7 @@ class XlsxFileProcessor(FileProcessor):
         try:
             read_only_wb = openpyxl.load_workbook(self.file_path, read_only=True)
         except Exception as e:
-            logging.error(f"Failed to re-open XLSX file {self.file_path} for pass 2: {e}")
-            # At this point, we can't create the anonymized file, so we copy the original.
-            shutil.copy(self.file_path, output_path)
-            return
+            raise ValueError("Cannot reopen XLSX file. No anonymized workbook was produced.") from e
             
         write_wb = openpyxl.Workbook()
         if "Sheet" in write_wb.sheetnames and len(write_wb.sheetnames) == 1:
@@ -1380,17 +1403,17 @@ class XmlFileProcessor(FileProcessor):
                 "due to --force-large-xml flag. This may lead to high memory usage or Out-of-Memory errors, and PII leakage if processing fails."
             )
 
-        parser = etree.XMLParser(recover=True, strip_cdata=False)
+        parser = etree.XMLParser(recover=False, strip_cdata=False, resolve_entities=False, no_network=True)
         try:
             tree = etree.parse(self.file_path, parser)
             if parser.error_log:
                 for error in parser.error_log:
                     logging.warning(f"XML parsing error in {self.file_path} on line {error.line}: {error.message}")
         except etree.XMLSyntaxError as e:
-            logging.error(f"Fatal XML syntax error in {self.file_path}: {e}", exc_info=True)
-            with open(output_path, "w") as f:
-                f.write(f"<!-- Could not parse XML file {os.path.basename(self.file_path)} due to syntax errors. -->")
-            return
+            raise ValueError(f"Invalid XML in {self.file_path}: check the syntax near line {e.lineno}.") from e
+        internal_dtd = tree.docinfo.internalDTD
+        if internal_dtd is not None and list(internal_dtd.entities()):
+            raise ValueError("XML entity declarations (<!ENTITY>) are not supported: their values would be copied unchanged. Expand the entity references and remove the declarations, then retry.")
 
         use_deduplication = self.orchestrator.cache_manager.use_cache and not self.preserve_row_context
         text_groups: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
@@ -1541,10 +1564,6 @@ class JsonFileProcessor(FileProcessor):
 
                 last_pos = 0
                 for obj_batch in self._batch_iterator(objects_iterator, chunk_size):
-                    current_pos = in_f.tell()
-                    pbar.update(current_pos - last_pos)
-                    last_pos = current_pos
-
                     batch_text_groups = defaultdict(list)
 
                     for obj in obj_batch:
@@ -1580,6 +1599,10 @@ class JsonFileProcessor(FileProcessor):
                         out_f.write(orjson.dumps(reconstructed_obj, option=orjson.OPT_INDENT_2))
 
                     is_first_chunk = False
+                    # Counted once the batch is written, so progress is work done.
+                    current_pos = in_f.tell()
+                    pbar.update(current_pos - last_pos)
+                    last_pos = current_pos
 
                 out_f.write(b'\n]')
 
@@ -1587,7 +1610,7 @@ class JsonFileProcessor(FileProcessor):
             logging.info(f"Finished JSON array streaming for '{self.file_path}'. Anonymized file saved to: {output_path}")
 
         except (ijson.JSONError, MemoryError) as e:
-            logging.error(f"Error streaming JSON file {self.file_path}: {e}", exc_info=True)
+            logging.debug(f"Error streaming JSON file {self.file_path}: {e}", exc_info=True)
             if os.path.exists(temp_output_path):
                 os.remove(temp_output_path)
                 logging.info(f"Removed corrupt temporary file: {temp_output_path}")
@@ -1624,7 +1647,7 @@ class JsonFileProcessor(FileProcessor):
             logging.info(f"In-memory JSON processing complete. Anonymized file saved to: {output_path}")
 
         except Exception as e:
-            logging.error(f"Error processing JSON file '{self.file_path}': {e}", exc_info=True)
+            logging.debug(f"Error processing JSON file '{self.file_path}': {e}", exc_info=True)
             if os.path.exists(temp_output_path):
                 os.remove(temp_output_path)
                 logging.info(f"Removed corrupt temporary file: {temp_output_path}")
@@ -1734,7 +1757,7 @@ class JsonFileProcessor(FileProcessor):
                 pbar = tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024,
                             desc=desc, leave=False,
                             bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
-                for line in in_f:
+                for line_number, line in enumerate(in_f, 1):
                     pbar.update(len(line))
                     if not line.strip(): continue
                     try:
@@ -1743,16 +1766,15 @@ class JsonFileProcessor(FileProcessor):
                         path_aware_map = self._build_path_aware_translation_map(text_groups)
                         processed_data = self._reconstruct_object(data, path_aware_map)
                         out_f.write(orjson.dumps(processed_data) + b'\n')
-                    except orjson.JSONDecodeError:
-                        logging.warning(f"Skipping invalid JSON line in {self.file_path}. Original line written.")
-                        out_f.write(line) # Write original line if parsing fails
+                    except orjson.JSONDecodeError as exc:
+                        raise ValueError(f"Invalid JSON on line {line_number}. Fix the JSONL file and retry; no output was published.") from exc
                 pbar.close()
 
             shutil.move(temp_output_path, output_path)
             logging.info(f"Successfully anonymized JSONL file saved to: {output_path}")
 
         except Exception as e:
-            logging.error(f"Error processing JSONL file '{self.file_path}': {e}", exc_info=True)
+            logging.debug(f"Error processing JSONL file '{self.file_path}': {e}", exc_info=True)
             if os.path.exists(temp_output_path):
                 os.remove(temp_output_path)
                 logging.info(f"Removed corrupt temporary file: {temp_output_path}")

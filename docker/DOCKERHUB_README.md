@@ -8,7 +8,19 @@ AnonShield lets Computer Security Incident Response Teams share incident data wi
 
 ![AnonShield pipeline](https://anonshield.org/pipeline.png)
 
-> **Prefer a browser?** A hosted web app with the same engine runs at **[anonshield.org](https://anonshield.org)**: drag and drop a file, choose entity types and a strategy, and watch a live metrics dashboard. The Docker image documented below is the command-line tool.
+## Two ways to run it
+
+**In your browser** (drag and drop, no size limit, nothing leaves your computer):
+
+```bash
+docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web
+```
+
+Open **http://localhost:8080**, drop a file and click **Anonymize**. `docker stop anonshield` stops it and `docker start anonshield` starts it again; the key and model cache stay in the `anonshield` volume. For another port, change only the first number: `-p 127.0.0.1:8081:8080`. With the wrapper script below, `./run.sh --web` does all of this (`--stop`, `--update`, `--port 8081`, and a clear message if the port or name is taken). More in the [local guide](https://github.com/AnonShield/anonshield/blob/main/web/LOCAL.md).
+
+**On the command line** (files and folders, scripts, NVIDIA GPU): use the wrapper script in the [Quick Start](#quick-start) below; it runs the `latest`, `gpu` or `gpu-cu126` image for you.
+
+A hosted demo runs at **[anonshield.org](https://anonshield.org)**.
 
 ![AnonShield web interface](https://anonshield.org/ui-app.png)
 
@@ -45,7 +57,7 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/anonshield/m
 
 ### Step 2: Anonymize
 
-Pass any file or folder, using a relative or absolute path. No other setup is needed.
+Pass any file or folder, using a relative or absolute path. No other setup is needed. Run the script without arguments for examples, even before Docker is installed.
 
 **Single file (CPU):**
 ```bash
@@ -79,6 +91,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 .\run.ps1 .\your\folder\
 ```
 
+A failed file returns a nonzero exit code. Existing results are kept unless you pass `--overwrite`. For folders, subdirectories are preserved; an incomplete run reports which files failed.
+
 By default the output is written to `./anon/output/`. For example, anonymizing `report.csv` produces `./anon/output/anon_report.csv`. The script creates an `./anon/` folder in your current directory to keep everything together:
 
 ```
@@ -86,6 +100,7 @@ By default the output is written to `./anon/output/`. For example, anonymizing `
 ├── input/      (optional: put files here if you prefer)
 ├── output/     (anonymized files appear here)
 ├── db/         (entity mapping database; keep it to de-anonymize later)
+├── logs/       (performance reports)
 ├── models/     (NER model cached here on first run, about 1 GB, automatic)
 └── secret.key  (secret key, created on the first run)
 ```
@@ -111,13 +126,14 @@ $env:ANON_SECRET_KEY = "<64 hex characters>"         # Windows
 
 ## Available Tags
 
-Three tags are published. `latest` is the CPU image; `gpu` and `gpu-cu126` are the same GPU image with two PyTorch builds, because no single build runs on every NVIDIA GPU and driver.
+`latest` is the CPU command-line image; `gpu` and `gpu-cu126` are the same GPU image with two PyTorch builds, because no single build runs on every NVIDIA GPU and driver. `web` is the web app in one container (see the top of this page).
 
 | Tag | PyTorch build | Use case | Approx. download |
 |-----|---------------|----------|------------------|
 | `latest` | CPU | Any x86_64 machine | ~1.4 GB |
 | `gpu` | CUDA 13.0 | NVIDIA driver 580+ and an RTX 20xx (Turing) or newer GPU; required for RTX 50xx (Blackwell) | ~4.3 GB |
 | `gpu-cu126` | CUDA 12.6 | Older GPUs (GTX 10xx and earlier) or drivers older than 580; no RTX 50xx | ~5 GB |
+| `web` | CPU | The web interface on your computer, no limits | ~1.4 GB |
 
 All images are based on `python:3.12-slim` and include Tesseract OCR (English and Portuguese language data) and the spaCy pipelines for English and Portuguese. The wrapper script picks the right image automatically: plain `./run.sh` uses `latest`; `./run.sh --gpu` reads the GPU and driver from `nvidia-smi` and uses `gpu` or `gpu-cu126` (set `ANON_GPU_IMAGE` to override). If the image does not match the GPU anyway, AnonShield says so at startup and runs on the CPU instead of failing.
 
@@ -136,6 +152,7 @@ All images are based on `python:3.12-slim` and include Tesseract OCR (English an
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--lang <code>` | Document language (`en`, `pt`, `es`, ...) | `en` |
+| `--db-dir <path>` | Local folder for the mapping database | `./anon/db/` |
 | `--output-dir <path>` | Local folder for anonymized files | `./anon/output/` |
 | `--anonymization-strategy <s>` | Detection strategy (see [Anonymization Strategies](#anonymization-strategies)) | `filtered` |
 | `--preserve-entities <types>` | Comma-separated entity types to skip (for example `LOCATION,IP_ADDRESS`) | none |
@@ -146,7 +163,7 @@ All images are based on `python:3.12-slim` and include Tesseract OCR (English an
 | `--transformer-model <id>` | NER model: `Davlan/xlm-roberta-base-ner-hrl` (default) or `attack-vector/SecureModernBERT-NER` | `Davlan/xlm-roberta-base-ner-hrl` |
 | `--optimize` | Turn on all optimizations at once: `standalone` strategy, cache, `min-word-length=3`, in-memory DB | off |
 
-Run `./run.sh --help` (Linux/macOS) or `.\run.ps1 --help` (Windows) for the complete flag list. Every option is explained with examples in the **[CLI reference on GitHub](https://github.com/AnonShield/anonshield/blob/main/docs/users/CLI_REFERENCE.md)**.
+Run `./run.sh --help` (Linux/macOS) or `.\run.ps1 --help` (Windows) for common options, or use `--cli-help` for the complete flag list. Every option is explained with examples in the **[CLI reference on GitHub](https://github.com/AnonShield/anonshield/blob/main/docs/users/CLI_REFERENCE.md)**.
 
 ---
 

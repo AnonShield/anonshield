@@ -36,3 +36,12 @@ output/
 *.swp
 *~
 .DS_Store
+.env
+.env.*
+**/.env
+**/.env.*
+**/node_modules/
+**/.svelte-kit/
+**/build/
+anon/
+*.log

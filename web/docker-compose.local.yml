@@ -1,16 +1,26 @@
-# Local override: the whole web app on one port, http://localhost:8080, with no
-# host reverse proxy. Used by `make local` together with docker-compose.prod.yml
-# and docker-compose.host.yml. The internal Caddy (Caddyfile.a10, the same one
-# the production host runs) sends /api to the backend and the rest to the
-# frontend, which the browser reaches on the same origin (PUBLIC_API_URL=/api).
+# The whole web app on this computer, built from this checkout: the same single
+# container as `docker run anonshield/anon:web` (see web/LOCAL.md). From the
+# repository root: docker compose -f web/docker-compose.local.yml up -d --build
+name: anonshield-local
+
 services:
-  proxy:
-    image: caddy:2-alpine
-    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+  anonshield:
+    image: anonshield/anon:web
+    build:
+      context: ..
+      dockerfile: web/backend/Dockerfile
+      target: local
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${ANON_LOCAL_PORT:-8080}:80"
+      - "127.0.0.1:${ANON_LOCAL_PORT:-8080}:8080"
+    environment:
+      ANON_MAX_SIZE_MB: ${ANON_MAX_SIZE_MB:-0}
+      ANON_MAX_SIZE_KEY_MB: ${ANON_MAX_SIZE_KEY_MB:-0}
+      ANON_MAX_ZIP_SIZE_MB: ${ANON_MAX_ZIP_SIZE_MB:-0}
     volumes:
-      - ./Caddyfile.a10:/etc/caddy/Caddyfile:ro
-    networks: [anon-net]
-    depends_on: [backend, frontend]
+      - anonshield:/data
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  anonshield:
+    name: anonshield

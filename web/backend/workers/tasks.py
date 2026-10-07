@@ -1,10 +1,12 @@
 """Celery tasks: anonymization jobs."""
 import os
+import re
 import shutil
 import sys
 import tempfile
 import time
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
 
 from celery.utils.log import get_task_logger
@@ -29,7 +31,9 @@ def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
         output_dir=out_dir,
         strategy=meta.get("strategy", "filtered"),
         lang=meta.get("lang", "en"),
-        entities=meta.get("entities") or None,
+        entities=meta.get("entities"),
+        allow_list=meta.get("allow_list"),
+        preserve_entities=meta.get("preserve_entities"),
         custom_patterns=meta.get("custom_patterns") or None,
         ocr_engine=meta.get("ocr_engine", "tesseract"),
         secret_key=key,
@@ -38,49 +42,144 @@ def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
         transformer_model=meta.get("model") or "Davlan/xlm-roberta-base-ner-hrl",
         ner_score_threshold=meta.get("ner_score_threshold"),
         ner_aggregation_strategy=meta.get("ner_aggregation_strategy"),
+        force_large_xml=os.getenv("ANON_FORCE_LARGE_XML", "false").lower() == "true",
+        # Smaller JSON batches than the CLI's 1000 records, so the progress bar
+        # and Cancel react within a minute or two even when NER takes seconds
+        # per record (long vulnerability reports on a CPU).
+        json_chunk_size=int(os.getenv("ANON_JSON_CHUNK_SIZE", "50")),
     )
 
 
+_PASS_RE = re.compile(r"Pass (\d+)/(\d+)")
+_PROGRESS_EVERY_S = 2.0
+
+
+class JobCancelled(Exception):
+    """The job was cancelled from the interface while it ran."""
+
+
+@contextmanager
+def _progress_to_status(job_id: str, started_at: float):
+    """Publish the engine's file progress bars (tqdm) as the job's progress,
+    and stop the job when it was cancelled (its status key is gone).
+
+    "Pass k/n" bars map to their share of the run; the inner entity-detection
+    bars are ignored. Progress never goes back, stays below 100 until the job
+    is done, and is written at most every two seconds, with one decimal.
+    """
+    from tqdm import tqdm
+
+    update, iterate = tqdm.update, tqdm.__iter__
+    state = {"sent": 0, "at": 0.0, "checked": 0.0}
+
+    def report(bar, done: int) -> None:
+        now = time.monotonic()
+        if now - state["checked"] >= _PROGRESS_EVERY_S:
+            state["checked"] = now
+            if job_service.get_status(job_id) is None:
+                raise JobCancelled(job_id)
+        desc = str(getattr(bar, "desc", "") or "")
+        if not bar.total or desc.startswith("Detecting Entities"):
+            return
+        fraction = min(1.0, done / bar.total)
+        match = _PASS_RE.search(desc)
+        if match:
+            k, n = int(match.group(1)), int(match.group(2))
+            fraction = (k - 1 + fraction) / n
+        # One decimal: a slow job on a large file shows movement within a
+        # minute or two, which is what the time estimate needs.
+        percent = min(99.9, round(100 * fraction, 1))
+        if percent > state["sent"] and now - state["at"] >= _PROGRESS_EVERY_S:
+            state.update(sent=percent, at=now)
+            job_service.set_status(job_id, "running", progress=percent, started_at=started_at)
+
+    def counted_update(self, n=1):
+        self._anon_done = getattr(self, "_anon_done", 0) + (n or 0)
+        report(self, self._anon_done)
+        return update(self, n)
+
+    def counted_iter(self):
+        for done, item in enumerate(iterate(self), 1):
+            report(self, done)
+            yield item
+
+    tqdm.update, tqdm.__iter__ = counted_update, counted_iter
+    try:
+        yield
+    finally:
+        tqdm.update, tqdm.__iter__ = update, iterate
+
+
+def _public_error(exc: Exception, path: Path, name: str) -> str:
+    """Engine errors name the worker's copy of the file; show the user's name instead."""
+    return str(exc).replace(str(path), name)
+
+
 def _process_zip(zip_path: Path, out_dir: Path, meta: dict, key: str) -> dict:
-    stats: dict = {"files_processed": 0, "files_skipped": 0, "entity_count": 0}
+    from src.anon.processors import ProcessorRegistry
+    stats: dict = {"files_processed": 0, "files_skipped": 0, "skipped_files": [], "entity_count": 0}
+    failures: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:
         extract_dir = Path(tmp) / "extracted"
         extract_dir.mkdir()
 
         with zipfile.ZipFile(zip_path, "r") as zf:
             total = sum(i.file_size for i in zf.infolist())
-            if total > 10 * 1024 ** 3:
-                raise ValueError("ZIP content exceeds 10 GB limit")
+            limit_mb = int(os.getenv("ANON_MAX_ZIP_SIZE_MB", "10240"))
+            if limit_mb > 0 and total > limit_mb * 1024 ** 2:
+                raise ValueError(f"ZIP content exceeds {limit_mb} MB limit")
             for member in zf.infolist():
                 target = (extract_dir / member.filename).resolve()
-                if not str(target).startswith(str(extract_dir)):
+                if not target.is_relative_to(extract_dir):
                     raise ValueError(f"Path traversal blocked: {member.filename}")
             zf.extractall(extract_dir)
 
         repack_dir = Path(tmp) / "repack"
         repack_dir.mkdir()
 
-        for src in extract_dir.rglob("*"):
+        for src in sorted(extract_dir.rglob("*")):
             if not src.is_file():
                 continue
-            per_out = Path(tmp) / f"out_{src.stem}"
-            per_out.mkdir(exist_ok=True)
+            relative = src.relative_to(extract_dir)
+            if relative.parts[0] == "__MACOSX" or src.name == ".DS_Store":
+                continue
+            if src.suffix.lower() not in ProcessorRegistry._processors:
+                stats["files_skipped"] += 1
+                stats["skipped_files"].append(str(relative))
+                continue
+            per_out = Path(tmp) / "processed" / relative
+            per_out.mkdir(parents=True, exist_ok=True)
             try:
                 result = _anonymize(src, per_out, meta, key)
                 processed = list(per_out.iterdir())
-                if processed:
-                    shutil.copy2(processed[0], repack_dir / processed[0].name)
+                if len(processed) != 1:
+                    raise ValueError("Processing did not produce one output file.")
+                destination = repack_dir / relative.parent / processed[0].name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if destination.exists():
+                    raise ValueError(f"Output filename collision: {destination.name}")
+                shutil.copy2(processed[0], destination)
                 stats["files_processed"] += 1
                 stats["entity_count"] += result.get("entity_count", 0)
+            except JobCancelled:
+                raise
             except Exception as exc:
-                logger.warning("Skipping %s: %s", src.name, exc)
-                stats["files_skipped"] += 1
+                logger.warning("Could not process %s: %s", relative, exc)
+                message = _public_error(exc, src, str(relative))
+                failures.append(message if str(relative) in message else f"{relative}: {message}")
+
+        if failures:
+            shown = "; ".join(failures[:3]) + ("; ..." if len(failures) > 3 else "")
+            raise ValueError(f"{len(failures)} file(s) in the ZIP could not be processed, so no archive was published. Fix them and retry. {shown}")
+        if not stats["files_processed"]:
+            raise ValueError("The ZIP has no files in a supported format (" + " ".join(sorted(ProcessorRegistry._processors)) + ").")
+        stats["skipped_files"] = stats["skipped_files"][:20]
 
         zip_out = out_dir / f"anon_{zip_path.stem}.zip"
         with zipfile.ZipFile(zip_out, "w", zipfile.ZIP_DEFLATED) as zf:
             for f in repack_dir.rglob("*"):
                 if f.is_file():
-                    zf.write(f, f.name)
+                    zf.write(f, f.relative_to(repack_dir))
 
     return stats
 
@@ -105,7 +204,8 @@ def _execute(job_id: str) -> dict:
         raise RuntimeError(f"No metadata for job {job_id}")
 
     key = job_service.pop_key(job_id)
-    job_service.set_status(job_id, "running", progress=0)
+    started_at = time.time()
+    job_service.set_status(job_id, "running", progress=0, started_at=started_at)
 
     input_file = storage.input_path(job_id, meta["ext"])
     out_dir = storage.output_dir(job_id)
@@ -120,10 +220,11 @@ def _execute(job_id: str) -> dict:
         _ocr_timer = None  # type: ignore
 
     try:
-        if meta["ext"] == "zip":
-            result = _process_zip(input_file, out_dir, meta, key)
-        else:
-            result = _anonymize(input_file, out_dir, meta, key)
+        with _progress_to_status(job_id, started_at):
+            if meta["ext"] == "zip":
+                result = _process_zip(input_file, out_dir, meta, key)
+            else:
+                result = _anonymize(input_file, out_dir, meta, key)
 
         ms = (time.monotonic() - t0) * 1000
         ocr_stats = _ocr_timer.snapshot() if _ocr_timer else {"ms": 0.0, "calls": 0}
@@ -141,7 +242,7 @@ def _execute(job_id: str) -> dict:
                 file_b=meta.get("size"),
                 strategy=meta.get("strategy"),
                 lang=meta.get("lang"),
-                model=meta.get("model"),
+                model=None if meta.get("strategy") == "regex" else meta.get("model"),
                 queue="fast",
                 entity_cnt=result.get("entity_count"),
                 entity_counts=result.get("entity_counts"),
@@ -154,9 +255,13 @@ def _execute(job_id: str) -> dict:
             pass
 
         return result
+    except JobCancelled:
+        storage.delete_job(job_id)
+        logger.info("Job %s cancelled while running", job_id)
+        return {"cancelled": True}
     except Exception as exc:
         storage.delete_input(job_id)
-        job_service.set_status(job_id, "error", message=str(exc))
+        job_service.set_status(job_id, "error", message=_public_error(exc, input_file, meta.get("filename") or input_file.name))
         raise
     finally:
         # Release VRAM held by cached VLM engines. No-op when no GPU / no VLM

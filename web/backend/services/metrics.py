@@ -152,7 +152,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
     _SKIP = {"/api/health", "/api/metrics", "/api/config"}
 
     async def dispatch(self, request, call_next):
-        if request.url.path in self._SKIP:
+        if request.url.path in self._SKIP or not request.url.path.startswith("/api/"):
             return await call_next(request)
         t0 = time.monotonic()
         req_b = int(request.headers.get("content-length", 0))

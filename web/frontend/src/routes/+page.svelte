@@ -127,6 +127,8 @@ Action items:
 
 </script>
 
+<svelte:window onclick={handlePipelineClick} />
+
 <svelte:head>
   <title>AnonShield: On-premise PII anonymization</title>
   <meta name="description" content="Research-grade sensitive entities redaction. Zero cloud, zero persistence. Built at UNIPAMPA; published at SBSeg 2025, ERRC 2025, SBRC 2026." />
@@ -274,7 +276,7 @@ Action items:
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- PIPELINE ANIMATION                                                     -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<section class="pipeline" onclick={handlePipelineClick}>
+<section class="pipeline">
   <!-- Decorative elements clipped to section bounds -->
   <div class="pipeline-deco" aria-hidden="true">
     <div class="scan-beam"></div>
@@ -1077,10 +1079,8 @@ Action items:
     to   { opacity: 1; transform: translateY(0); }
   }
   .val-pos { color: var(--color-success); }
-  .val-neg { color: var(--color-warning); }
   .val-neutral { color: var(--color-text); }
   .tradeoff-row:has(.val-pos) { border-left-color: var(--color-success); }
-  .tradeoff-row:has(.val-neg) { border-left-color: var(--color-warning); }
 
   /* Legend: inline chip strip, monospaced for alignment */
   .legend {
@@ -1988,25 +1988,24 @@ Action items:
     opacity: 1;
     transform: none;
   }
-  .reveal.revealed {
+  .reveal:global(.revealed) {
     opacity: 1;
     transform: none;
   }
   /* Stagger children inside revealed containers */
-  .reveal.revealed .stat-block,
-  .reveal.revealed .tl-item,
-  .reveal.revealed .team-card {
+  .reveal:global(.revealed) .stat-block,
+  .reveal:global(.revealed) .tl-item {
     animation: stagger-up var(--duration-slow) var(--ease-out) both;
   }
-  .reveal.revealed .stat-block:nth-child(1) { animation-delay: 0ms; }
-  .reveal.revealed .stat-block:nth-child(2) { animation-delay: 60ms; }
-  .reveal.revealed .stat-block:nth-child(3) { animation-delay: 120ms; }
-  .reveal.revealed .stat-block:nth-child(4) { animation-delay: 180ms; }
-  .reveal.revealed .stat-block:nth-child(5) { animation-delay: 240ms; }
-  .reveal.revealed .stat-block:nth-child(6) { animation-delay: 300ms; }
-  .reveal.revealed .tl-item:nth-child(1) { animation-delay: 0ms; }
-  .reveal.revealed .tl-item:nth-child(2) { animation-delay: 100ms; }
-  .reveal.revealed .tl-item:nth-child(3) { animation-delay: 200ms; }
+  .reveal:global(.revealed) .stat-block:nth-child(1) { animation-delay: 0ms; }
+  .reveal:global(.revealed) .stat-block:nth-child(2) { animation-delay: 60ms; }
+  .reveal:global(.revealed) .stat-block:nth-child(3) { animation-delay: 120ms; }
+  .reveal:global(.revealed) .stat-block:nth-child(4) { animation-delay: 180ms; }
+  .reveal:global(.revealed) .stat-block:nth-child(5) { animation-delay: 240ms; }
+  .reveal:global(.revealed) .stat-block:nth-child(6) { animation-delay: 300ms; }
+  .reveal:global(.revealed) .tl-item:nth-child(1) { animation-delay: 0ms; }
+  .reveal:global(.revealed) .tl-item:nth-child(2) { animation-delay: 100ms; }
+  .reveal:global(.revealed) .tl-item:nth-child(3) { animation-delay: 200ms; }
 
   @keyframes stagger-up {
     from { opacity: 0; transform: translateY(20px); }
@@ -2015,11 +2014,11 @@ Action items:
 
   @media (prefers-reduced-motion: reduce) {
     .reveal { opacity: 1; transform: none; transition: none; }
-    .reveal.revealed .stat-block,
-    .reveal.revealed .tl-item { animation: none; }
+    .reveal:global(.revealed) .stat-block,
+    .reveal:global(.revealed) .tl-item { animation: none; }
     .mode-thumb { transition: none; }
     .mode-desc, .tradeoff-val { animation: none; }
-    .live-dot, .scan-beam, .halo, .flow-line,
+    .live-dot, .scan-beam, .node-halo, .flow-line,
     :global(.pm-hero) { animation: none !important; }
   }
 </style>

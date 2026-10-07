@@ -5,12 +5,12 @@
 # flags: IGNORECASE, MULTILINE (default: DOTALL|IGNORECASE)
 
 # Brazilian CPF (tax ID): 123.456.789-09
-- entity_type: CPF
+- entity_type: BR_CPF
   pattern: '\d{3}\.\d{3}\.\d{3}-\d{2}'
   score: 0.95
 
 # Brazilian CNPJ (company tax ID): 12.345.678/0001-90
-- entity_type: CNPJ
+- entity_type: BR_CNPJ
   pattern: '\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}'
   score: 0.95
 

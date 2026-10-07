@@ -7,6 +7,11 @@ type Locale = 'en' | 'pt';
 
 const messages = {
   en: {
+    'app.batch_add': 'Add more files for batch processing',
+    'app.batch_queue': 'Batch queue',
+    'upload.limit': 'Maximum file size: {mb} MB',
+    'upload.unlimited': 'Local processing · no upload size limit',
+    'app.error.entities': 'Could not load entity types. Check the server connection and refresh this page.',
     /* nav */
     'nav.app': 'Launch App',
     'nav.lang_toggle': 'PT',
@@ -67,9 +72,6 @@ const messages = {
     'app.pattern_regex': 'Pattern',
     'app.pattern_score': 'Score',
     'app.advanced': 'Advanced',
-    /* batch */
-    'app.batch_add': 'Add more files for batch processing',
-    'app.batch_queue': 'Batch queue',
     /* ocr */
     'ocr.badge.default': 'Default · CPU',
     'ocr.badge.gpu': 'GPU optional',
@@ -105,11 +107,22 @@ const messages = {
     'preprocess.step.morph_open.desc': 'Removes isolated noise pixels after binarization. Requires OpenCV.',
     'preprocess.step.border': 'Add border',
     'preprocess.step.border.desc': 'Adds 20 px white padding. Prevents Tesseract from missing edge text.',
-    /* batch */
-    'app.batch_add': 'Add more files for batch processing',
-    'app.batch_queue': 'Batch queue',
     /* fields */
-    'fields.title': 'Anonymization Configuration (Data Schema)',
+    'fields.title': 'Rules per field',
+    'fields.badge': 'Structured file',
+    'fields.close': 'Close field rules',
+    'fields.col.name': 'Field',
+    'fields.col.action': 'Action',
+    'fields.col.detail': 'What happens',
+    'fields.btn.auto': 'Auto',
+    'fields.btn.force': 'Force',
+    'fields.btn.skip': 'Skip',
+    'fields.detected': 'Detected automatically',
+    'fields.host_suggest': 'Force as HOSTNAME (recommended)',
+    'fields.host_hint': 'A machine name without a domain reads as an ordinary word, so automatic detection leaves it unchanged.',
+    'fields.skipped': 'Kept as is',
+    'fields.choose_type': 'Choose a type…',
+    'fields.done': 'Done',
     'fields.all': 'Global Scan',
     'fields.pick': 'Targeted Mapping',
     'fields.mode.auto': 'Scanner',
@@ -121,7 +134,11 @@ const messages = {
     'fields.force_label': 'Force Entity as',
     'fields.select_all': 'Select all',
     'fields.clear': 'Clear',
-    'fields.hint_n': '{n} rules defined',
+    'fields.summary': '{auto} scanned · {force} forced · {skip} skipped',
+    'fields.filter': 'Filter fields (e.g. definition.)',
+    'fields.bulk': 'Set the {n} shown to',
+    'fields.force_as': 'Force as',
+    'fields.no_match': 'No field matches this filter.',
     'fields.hint_none': 'global scan active; everything will be analyzed',
     'fields.empty': 'No columns detected; full file will be processed.',
     /* strategies */
@@ -152,9 +169,15 @@ const messages = {
     'model.distil': 'distilbert-multilingual, compact',
     /* status */
     'status.processing': 'Processing…',
+    'eta.remaining': 'about {time} left',
+    'eta.queued': 'waiting for {time}',
+    'eta.measuring': 'estimating the time, running for {time}',
+    'status.queued': 'Waiting in line…',
+    'status.queued_hint': 'Another file is being processed; yours starts next.',
     'status.done': 'Anonymization complete',
     'status.error': 'Error',
     'status.entities_replaced': '{n} entities replaced',
+    'status.zip_skipped': 'Left out of the ZIP (unsupported format): {n} file(s), e.g. {files}',
     'status.download': '↓ Download',
     'status.delete_warning': 'File deleted from server after download.',
     'status.anonymize_another': 'Anonymize another file',
@@ -165,7 +188,7 @@ const messages = {
     'key.optional': '(optional)',
     'key.placeholder': 'Paste your ANON_SECRET_KEY here',
     'key.hint_deterministic': 'Deterministic pseudonyms: same input + key = same token across all runs. Key is used only in-memory, never stored.',
-    'key.hint_random': 'No key: pseudonyms are random per run (non-reproducible across jobs). Useful for one-off anonymization.',
+    'key.hint_random': 'No custom key: uses this installation\'s saved key. The same value produces the same pseudonym across jobs.',
     'key.hint': 'Optional: makes pseudonyms deterministic (same input + key = same token across runs).',
     /* tutorial */
     'tut.skip': 'Skip',
@@ -214,9 +237,10 @@ const messages = {
     'app.error.no_storage': 'Not enough storage on the server to process this file. Try again later.',
     'app.error.generic': 'Something went wrong: {msg}',
     /* ── processing status ── */
-    'processing.regex_only': 'Regex-only mode: no model loading, results in seconds.',
+    'processing.regex_only': 'Regex only: no AI model, the fastest strategy.',
     'processing.with_strategy': 'Running the {strategy} strategy…',
-    'processing.cache_warm': 'The first run warms up the model cache and may take a little longer.',
+    'processing.cache_warm': 'Keep this page open; Cancel stops the job.',
+    'processing.slow': 'This will take a while. To go faster, cancel and skip public fields under Rules per field, or choose the Regex strategy.',
     /* ── advanced tour (coach-marks) ── */
     'adv.close': 'Close',
     'adv.step': 'Step {n} of {total}',
@@ -231,7 +255,7 @@ const messages = {
     'adv.s4.desc': 'Add your own regex recognizers for domain-specific identifiers that the built-in detectors do not cover.',
     /* ── metrics dashboard ── */
     'metrics.title': 'Metrics',
-    'metrics.subtitle': 'Aggregated processing stats: collected in-memory, never persisted.',
+    'metrics.subtitle': 'Aggregated processing statistics: sizes, times and entity counts, never file contents.',
     'metrics.back': '← Back to app',
     /* metrics: KPI cards */
     'metrics.kpi.jobs': 'Jobs',
@@ -447,6 +471,11 @@ const messages = {
     'slides.refs.tools': 'Tools and data',
   },
   pt: {
+    'app.batch_add': 'Adicionar mais arquivos para processamento em lote',
+    'app.batch_queue': 'Fila de processamento',
+    'upload.limit': 'Tamanho máximo: {mb} MB',
+    'upload.unlimited': 'Processamento local · sem limite de tamanho de arquivo',
+    'app.error.entities': 'Não foi possível carregar os tipos de entidade. Verifique a conexão com o servidor e recarregue a página.',
     /* nav */
     'nav.app': 'Abrir App',
     'nav.lang_toggle': 'EN',
@@ -507,9 +536,6 @@ const messages = {
     'app.pattern_regex': 'Padrão',
     'app.pattern_score': 'Score',
     'app.advanced': 'Avançado',
-    /* batch */
-    'app.batch_add': 'Adicionar mais arquivos para processamento em lote',
-    'app.batch_queue': 'Fila de processamento',
     /* ocr */
     'ocr.badge.default': 'Padrão · CPU',
     'ocr.badge.gpu': 'GPU opcional',
@@ -545,11 +571,22 @@ const messages = {
     'preprocess.step.morph_open.desc': 'Remove pixels de ruído isolados após binarização. Requer OpenCV.',
     'preprocess.step.border': 'Adicionar borda',
     'preprocess.step.border.desc': 'Adiciona 20 px de margem branca. Evita que o Tesseract perca texto nas bordas.',
-    /* batch */
-    'app.batch_add': 'Adicionar mais arquivos para processamento em lote',
-    'app.batch_queue': 'Fila de processamento',
     /* fields */
-    'fields.title': 'Configuração de Escopo (Anonymization Config)',
+    'fields.title': 'Regras por campo',
+    'fields.badge': 'Arquivo estruturado',
+    'fields.close': 'Fechar regras por campo',
+    'fields.col.name': 'Campo',
+    'fields.col.action': 'Ação',
+    'fields.col.detail': 'O que acontece',
+    'fields.btn.auto': 'Auto',
+    'fields.btn.force': 'Forçar',
+    'fields.btn.skip': 'Ignorar',
+    'fields.detected': 'Detecção automática',
+    'fields.host_suggest': 'Forçar como HOSTNAME (recomendado)',
+    'fields.host_hint': 'Um nome de máquina sem domínio parece uma palavra comum, e a detecção automática o deixa como está.',
+    'fields.skipped': 'Mantido como está',
+    'fields.choose_type': 'Escolha um tipo…',
+    'fields.done': 'Concluir',
     'fields.all': 'Varredura Global',
     'fields.pick': 'Mapeamento por Coluna',
     'fields.mode.auto': 'Scanner',
@@ -561,7 +598,11 @@ const messages = {
     'fields.force_label': 'Forçar como',
     'fields.select_all': 'Selecionar todas',
     'fields.clear': 'Limpar',
-    'fields.hint_n': '{n} regras definidas',
+    'fields.summary': '{auto} analisados · {force} forçados · {skip} ignorados',
+    'fields.filter': 'Filtrar campos (ex.: definition.)',
+    'fields.bulk': 'Aplicar aos {n} exibidos',
+    'fields.force_as': 'Forçar como',
+    'fields.no_match': 'Nenhum campo corresponde ao filtro.',
     'fields.hint_none': 'varredura global ativa; todos os campos serão analisados',
     'fields.empty': 'Nenhuma coluna detectada; o arquivo será processado integralmente.',
     /* strategies */
@@ -592,9 +633,15 @@ const messages = {
     'model.distil': 'distilbert-multilingual, compacto',
     /* status */
     'status.processing': 'Processando…',
+    'eta.remaining': 'faltam cerca de {time}',
+    'eta.queued': 'esperando há {time}',
+    'eta.measuring': 'calculando o tempo, em andamento há {time}',
+    'status.queued': 'Na fila…',
+    'status.queued_hint': 'Outro arquivo está sendo processado; o seu começa em seguida.',
     'status.done': 'Anonimização concluída',
     'status.error': 'Erro',
     'status.entities_replaced': '{n} entidades substituídas',
+    'status.zip_skipped': 'Fora do ZIP (formato não suportado): {n} arquivo(s), ex.: {files}',
     'status.download': '↓ Baixar',
     'status.delete_warning': 'Arquivo deletado do servidor após o download.',
     'status.anonymize_another': 'Anonimizar outro arquivo',
@@ -605,7 +652,7 @@ const messages = {
     'key.optional': '(opcional)',
     'key.placeholder': 'Cole sua ANON_SECRET_KEY aqui',
     'key.hint_deterministic': 'Pseudônimos determinísticos: mesma entrada + chave = mesmo token em todas as execuções. A chave é usada apenas em memória.',
-    'key.hint_random': 'Sem chave: os pseudônimos são aleatórios por execução (não reprodutíveis entre jobs). Útil para anonimização única.',
+    'key.hint_random': 'Sem chave própria: usa a chave salva nesta instalação. O mesmo valor gera o mesmo pseudônimo entre tarefas.',
     'key.hint': 'Opcional: torna os pseudônimos determinísticos (mesma entrada + chave = mesmo token entre execuções).',
     /* tutorial */
     'tut.skip': 'Pular',
@@ -654,9 +701,10 @@ const messages = {
     'app.error.no_storage': 'Não há espaço suficiente no servidor para processar este arquivo. Tente novamente mais tarde.',
     'app.error.generic': 'Algo deu errado: {msg}',
     /* ── status de processamento ── */
-    'processing.regex_only': 'Modo apenas regex: sem carregar modelo, resultado em segundos.',
+    'processing.regex_only': 'Apenas regex: sem modelo de IA, a estratégia mais rápida.',
     'processing.with_strategy': 'Executando a estratégia {strategy}…',
-    'processing.cache_warm': 'A primeira execução aquece o cache do modelo e pode levar um pouco mais.',
+    'processing.cache_warm': 'Deixe esta página aberta; Cancelar interrompe o processamento.',
+    'processing.slow': 'Isto vai demorar. Para ir mais rápido, cancele e ignore campos públicos em Regras por campo, ou escolha a estratégia Regex.',
     /* ── tour avançado (coach-marks) ── */
     'adv.close': 'Fechar',
     'adv.step': 'Passo {n} de {total}',
@@ -671,7 +719,7 @@ const messages = {
     'adv.s4.desc': 'Adicione seus próprios reconhecedores regex para identificadores específicos do seu domínio que os detectores nativos não cobrem.',
     /* ── painel de métricas ── */
     'metrics.title': 'Métricas',
-    'metrics.subtitle': 'Estatísticas agregadas de processamento: coletadas em memória, nunca persistidas.',
+    'metrics.subtitle': 'Estatísticas agregadas de processamento: tamanhos, tempos e contagens de entidades, nunca o conteúdo dos arquivos.',
     'metrics.back': '← Voltar ao app',
     /* métricas: cards de KPI */
     'metrics.kpi.jobs': 'Jobs',

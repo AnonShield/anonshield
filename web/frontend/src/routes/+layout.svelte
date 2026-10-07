@@ -147,4 +147,8 @@
   :global(.metrics-main) {
     max-width: 1200px !important;
   }
+  @media (max-width: 480px) {
+    header { padding: 0 var(--space-4); }
+    .app-main { padding: var(--space-6) var(--space-4); }
+  }
 </style>

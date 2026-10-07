@@ -1,6 +1,22 @@
 # src/anon/tqdm_handler.py
 import logging
+import os
 from tqdm import tqdm
+
+
+class HostPathFormatter(logging.Formatter):
+    """Names the user's folders instead of the container mounts.
+
+    The Docker wrappers mount the input at /anon_input and the output at
+    /anon_output, and pass the host folders in ANON_HOST_INPUT_DIR and
+    ANON_HOST_OUTPUT_DIR.
+    """
+    def format(self, record):
+        message = super().format(record)
+        for mount, variable in (("/anon_input", "ANON_HOST_INPUT_DIR"), ("/anon_output", "ANON_HOST_OUTPUT_DIR")):
+            if os.environ.get(variable):
+                message = message.replace(mount, os.environ[variable])
+        return message
 
 class TqdmLoggingHandler(logging.Handler):
     """

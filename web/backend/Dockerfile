@@ -1,4 +1,10 @@
 # syntax=docker/dockerfile:1
+# Build from the repository root. Targets:
+#   production (default): the API and worker image of the hosted site, which
+#     runs behind its proxy next to the frontend image.
+#   local: the whole app in one container for one computer, published as
+#     anonshield/anon:web. Redis, the worker and the API run together, and the
+#     API also serves the interface, so it needs no proxy and no Node.
 
 # ---- builder: resolve and install the Python deps into a venv ----
 FROM python:3.12-slim AS builder
@@ -12,12 +18,12 @@ ENV UV_NO_CACHE=1
 # CPU torch. --no-install-project: the source is copied into the runtime stage.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --group web \
-    && find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
-    && find /app/.venv -type d -name tests -exec rm -rf {} + 2>/dev/null || true \
-    && find /app/.venv -name "*.pyc" -delete 2>/dev/null || true
+    && find /app/.venv -type d -name __pycache__ -prune -exec rm -rf {} + \
+    && find /app/.venv -type d -name tests -prune -exec rm -rf {} + \
+    && find /app/.venv -name "*.pyc" -delete
 
 # ---- runtime: slim image with only what is needed to run ----
-FROM python:3.12-slim
+FROM python:3.12-slim AS runtime
 RUN groupadd -r anonuser && useradd -r -g anonuser -d /app -s /sbin/nologin anonuser
 WORKDIR /app
 # Runtime system deps only: Tesseract OCR with its language packs, libmagic for
@@ -48,4 +54,40 @@ COPY web/backend/. /app/
 RUN mkdir -p /anon-jobs /app/.cache && chown anonuser:anonuser /app /app/.cache /anon-jobs
 USER anonuser
 
+# ---- the interface as static files, for the local image ----
+FROM node:22-alpine AS interface
+WORKDIR /app
+COPY web/frontend/package*.json ./
+RUN npm ci
+COPY web/frontend/ ./
+RUN ANON_STATIC_UI=1 npm run build
+
+# ---- local: everything in one container, no limits (anonshield/anon:web) ----
+FROM runtime AS local
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends redis-server \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /data && chown anonuser:anonuser /data
+COPY --from=interface /app/build /app/static
+ENV ANON_DATA_DIR=/data \
+    ANON_JOBS_DIR=/data/jobs \
+    ANON_METRICS_DB=/data/metrics.db \
+    XDG_CACHE_HOME=/data/cache \
+    HF_HOME=/data/cache/huggingface \
+    TMPDIR=/data/cache/tmp \
+    ANON_STATIC_DIR=/app/static \
+    ANON_MAX_SIZE_MB=0 \
+    ANON_MAX_SIZE_KEY_MB=0 \
+    ANON_MAX_ZIP_SIZE_MB=0 \
+    ANON_FORCE_LARGE_XML=true \
+    ANON_RATE_LIMIT_ENABLED=false \
+    ANON_JOB_TTL_SECONDS=0
+USER anonuser
+EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4)"]
+CMD ["python", "/app/local_entrypoint.py"]
+
+# ---- production (default target) ----
+FROM runtime AS production
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
