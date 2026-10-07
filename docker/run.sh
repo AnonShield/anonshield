@@ -34,20 +34,56 @@ log_info()  { echo -e "${BLUE}[anon]${NC} $1"; }
 log_ok()    { echo -e "${GREEN}[anon]${NC} $1"; }
 log_error() { echo -e "${RED}[anon]${NC} $1"; }
 
-# Portable absolute path resolver (works on Linux and macOS)
+usage() {
+    cat <<'HELP'
+Usage: ./run.sh [--gpu] FILE_OR_FOLDER [OPTIONS]
+
+Examples:
+  ./run.sh report.csv
+  ./run.sh "reports for review/" --output-dir ./results
+  ./run.sh report.txt --anonymization-strategy regex
+
+Output: ./anon/output/    Reusable key: ./anon/secret.key
+The first NER run downloads a model (about 1 GB); regex mode needs no model.
+Keep ./anon/db/ to restore original values later.
+
+Common options:
+  --lang pt                Document language (default: en)
+  --output-dir PATH        Where to save results
+  --db-dir PATH            Where to keep the mapping database
+  --slug-length 0          Type-only labels; no key needed
+  --overwrite              Replace existing output files
+  --config FILE            YAML/JSON settings (CLI options take precedence)
+  --list-entities          Show available entity types
+  --cli-help               Show every engine option (requires the Docker image)
+
+ANON_DIR changes the ./anon workspace. ANON_IMAGE overrides the CPU image.
+HELP
+}
+
+if [[ $# -eq 0 || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    usage
+    exit 0
+fi
+
 abs_path() {
-    local p="$1"
-    if [[ -d "$p" ]]; then
-        (cd "$p" && pwd)
-    else
-        echo "$(cd "$(dirname "$p")" 2>/dev/null && pwd || pwd)/$(basename "$p")"
+    case "$1" in
+        /*) printf '%s\n' "$1" ;;
+        *) printf '%s/%s\n' "$PWD" "$1" ;;
+    esac
+}
+
+require_value() {
+    if [[ -z "$2" || "$2" == --* ]]; then
+        log_error "$1 needs a value. Example: $1 ./results"
+        exit 2
     fi
 }
 
 # ---------------------------------------------------------------------------
 # Base directory — everything lives here
 # ---------------------------------------------------------------------------
-ANON_DIR="${ANON_DIR:-$(pwd)/anon}"
+ANON_DIR=$(abs_path "${ANON_DIR:-$PWD/anon}")
 MODELS_DIR="$ANON_DIR/models"
 DEFAULT_OUTPUT="$ANON_DIR/output"
 DB_DIR="$ANON_DIR/db"
@@ -59,7 +95,11 @@ KEY_FILE="$ANON_DIR/secret.key"
 USE_GPU=0
 ARGS=()
 for arg in "$@"; do
-    [[ "$arg" == "--gpu" ]] && USE_GPU=1 || ARGS+=("$arg")
+    case "$arg" in
+        --gpu) USE_GPU=1 ;;
+        --cli-help) ARGS+=(--help) ;;
+        *) ARGS+=("$arg") ;;
+    esac
 done
 
 # ---------------------------------------------------------------------------
@@ -69,7 +109,7 @@ IS_INFO_CMD=0
 SLUG_ZERO=0
 prev=""
 for arg in "${ARGS[@]:-}"; do
-    [[ "$arg" == "--help" || "$arg" == --list-* ]] && IS_INFO_CMD=1
+    [[ "$arg" == "--help" || "$arg" == "-h" || "$arg" == "--list-entities" || "$arg" == "--list-languages" ]] && IS_INFO_CMD=1
     [[ "$arg" == "--slug-length=0" || ( "$prev" == "--slug-length" && "$arg" == "0" ) ]] && SLUG_ZERO=1
     prev="$arg"
 done
@@ -95,7 +135,7 @@ fi
 # ---------------------------------------------------------------------------
 # Create folder structure
 # ---------------------------------------------------------------------------
-mkdir -p "$MODELS_DIR" "$DEFAULT_OUTPUT" "$ANON_DIR/input" "$DB_DIR"
+mkdir -p "$MODELS_DIR" "$DEFAULT_OUTPUT" "$ANON_DIR/input" "$DB_DIR" "$ANON_DIR/logs"
 
 # ---------------------------------------------------------------------------
 # Secret key: ANON_SECRET_KEY if set, otherwise the one kept in
@@ -148,7 +188,7 @@ if [[ $USE_GPU -eq 1 ]]; then
     GPU_FLAGS=(--gpus all)
     log_info "Using GPU image $IMAGE"
 else
-    IMAGE="anonshield/anon:latest"
+    IMAGE="${ANON_IMAGE:-anonshield/anon:latest}"
     GPU_FLAGS=()
 fi
 
@@ -191,7 +231,7 @@ fi
 #   --anonymization-config, --word-list, --custom-patterns, --config
 #                   → /anon_files/<n>/filename
 # ---------------------------------------------------------------------------
-VOLUMES=(-v "$MODELS_DIR":/app/models -v "$DB_DIR":/app/db)
+VOLUMES=(-v "$MODELS_DIR":/app/models -v "$ANON_DIR/logs":/app/logs)
 NEW_ARGS=()
 
 # anon.py flags that take no value (store_true / store_false)
@@ -204,7 +244,7 @@ is_bool_flag() { [[ "$BOOL_FLAGS" == *" $1 "* ]]; }
 # Mount the directory of a file argument read-only and point the flag at it.
 FILE_MOUNTS=0
 mount_file_arg() {
-    local flag="$1" val="$2" host mnt
+    local flag="$1" val="$2" host mnt root relative
     if [[ -z "$val" ]]; then
         log_error "$flag needs a file path."
         exit 1
@@ -216,8 +256,12 @@ mount_file_arg() {
     fi
     FILE_MOUNTS=$((FILE_MOUNTS+1))
     mnt="/anon_files/$FILE_MOUNTS"
-    VOLUMES+=(-v "$(dirname "$host")":"$mnt":ro)
-    NEW_ARGS+=("$flag" "$mnt/$(basename "$host")")
+    host="$(cd "$(dirname "$host")" && pwd)/$(basename "$host")"
+    root="$(dirname "$host")"
+    if [[ "$host" == "$PWD/"* ]]; then root="$PWD"; fi
+    relative="${host#"$root"/}"
+    VOLUMES+=(-v "$root":"$mnt":ro)
+    NEW_ARGS+=("$flag" "$mnt/$relative")
 }
 INPUT_SET=0
 OUTPUT_SET=0
@@ -231,7 +275,8 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
 
         --output-dir)
             i=$((i+1))
-            val="${ARGS[$i]}"
+            val="${ARGS[$i]:-}"
+            require_value "$arg" "$val"
             host=$(abs_path "$val")
             mkdir -p "$host"
             VOLUMES+=(-v "$host":/anon_output)
@@ -242,12 +287,25 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
 
         --output-dir=*)
             val="${arg#--output-dir=}"
+            require_value --output-dir "$val"
             host=$(abs_path "$val")
             mkdir -p "$host"
             VOLUMES+=(-v "$host":/anon_output)
             NEW_ARGS+=(--output-dir /anon_output)
             OUTPUT_SET=1
             OUTPUT_HOST="$host"
+            ;;
+
+        --db-dir|--db-dir=*)
+            if [[ "$arg" == --db-dir=* ]]; then
+                val="${arg#*=}"
+            else
+                i=$((i+1))
+                val="${ARGS[$i]:-}"
+            fi
+            require_value --db-dir "$val"
+            DB_DIR=$(abs_path "$val")
+            mkdir -p "$DB_DIR"
             ;;
 
         --anonymization-config|--word-list|--custom-patterns|--config)
@@ -287,12 +345,13 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
                     exit 1
                 fi
                 if [[ -d "$host" ]]; then
-                    VOLUMES+=(-v "$host":/anon_input:ro)
+                    INPUT_HOST="$host"
                     NEW_ARGS+=(/anon_input)
                 else
-                    VOLUMES+=(-v "$(dirname "$host")":/anon_input:ro)
+                    INPUT_HOST="$(dirname "$host")"
                     NEW_ARGS+=(/anon_input/"$(basename "$host")")
                 fi
+                VOLUMES+=(-v "$INPUT_HOST":/anon_input:ro)
             else
                 NEW_ARGS+=("$arg")
             fi
@@ -301,6 +360,13 @@ while [[ $i -lt ${#ARGS[@]} ]]; do
 
     i=$((i+1))
 done
+
+if [[ $INPUT_SET -eq 0 ]]; then
+    log_error "Choose a file or folder. Example: ./run.sh report.csv (use --help for more)."
+    exit 2
+fi
+VOLUMES+=(-v "$DB_DIR":/app/db)
+NEW_ARGS+=(--db-dir /app/db)
 
 # Default output: ./anon/output/
 if [[ $OUTPUT_SET -eq 0 ]]; then
@@ -318,6 +384,8 @@ docker run --rm \
     ${USER_FLAGS[@]+"${USER_FLAGS[@]}"} \
     ${GPU_FLAGS[@]+"${GPU_FLAGS[@]}"} \
     -e ANON_SECRET_KEY \
+    -e ANON_HOST_INPUT_DIR="$INPUT_HOST" \
+    -e ANON_HOST_OUTPUT_DIR="$OUTPUT_HOST" \
     "${VOLUMES[@]}" \
     "$IMAGE" \
     ${NEW_ARGS[@]+"${NEW_ARGS[@]}"}

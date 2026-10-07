@@ -26,6 +26,24 @@
       $env:ANON_DIR = ".\my-project"; .\run.ps1 .\my-project\input\file.csv
 #>
 
+if ($args.Count -eq 0 -or $args[0] -in @('-h', '--help')) {
+    Write-Host @"
+Usage: .\run.ps1 [--gpu] FILE_OR_FOLDER [OPTIONS]
+
+  .\run.ps1 report.csv
+  .\run.ps1 "reports for review" --output-dir .\results
+  .\run.ps1 report.txt --anonymization-strategy regex
+
+Results: .\anon\output   Key: .\anon\secret.key   Mapping: .\anon\db
+First NER run downloads a model (about 1 GB); regex needs no model.
+Use --lang pt for Portuguese, --overwrite to replace existing results,
+--slug-length 0 for type-only labels, or --config FILE for YAML/JSON settings.
+Use --cli-help for all engine options (requires Docker).
+ANON_DIR changes the workspace; ANON_IMAGE overrides the CPU image.
+"@
+    exit 0
+}
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -51,7 +69,7 @@ function Get-HostPath {
 # ---------------------------------------------------------------------------
 # Base directory — everything lives here
 # ---------------------------------------------------------------------------
-$AnonDir       = if ($env:ANON_DIR) { $env:ANON_DIR } else { Join-Path (Get-Location).Path "anon" }
+$AnonDir       = Get-HostPath $(if ($env:ANON_DIR) { $env:ANON_DIR } else { Join-Path (Get-Location).Path "anon" })
 $ModelsDir     = Join-Path $AnonDir "models"
 $DefaultOutput = Join-Path $AnonDir "output"
 $DbDir         = Join-Path $AnonDir "db"
@@ -64,7 +82,8 @@ $UseGpu     = $false
 $ScriptArgs = [System.Collections.Generic.List[string]]::new()
 foreach ($a in $args) {
     if ($a -eq "--gpu") { $UseGpu = $true }
-    else                { $ScriptArgs.Add([string]$a) }
+    elseif ($a -eq "--cli-help") { $ScriptArgs.Add("--help") }
+    else { $ScriptArgs.Add([string]$a) }
 }
 
 # ---------------------------------------------------------------------------
@@ -106,6 +125,7 @@ $null = New-Item -ItemType Directory -Force -Path $ModelsDir
 $null = New-Item -ItemType Directory -Force -Path $DefaultOutput
 $null = New-Item -ItemType Directory -Force -Path (Join-Path $AnonDir "input")
 $null = New-Item -ItemType Directory -Force -Path $DbDir
+$null = New-Item -ItemType Directory -Force -Path (Join-Path $AnonDir "logs")
 
 # ---------------------------------------------------------------------------
 # Secret key: $env:ANON_SECRET_KEY if set, otherwise the one kept in
@@ -153,7 +173,7 @@ if ($UseGpu) {
     $GpuFlags = [string[]]@("--gpus", "all")
     Write-Info "Using GPU image $Image"
 } else {
-    $Image    = "anonshield/anon:latest"
+    $Image    = if ($env:ANON_IMAGE) { $env:ANON_IMAGE } else { "anonshield/anon:latest" }
     $GpuFlags = [string[]]@()
 }
 
@@ -186,7 +206,7 @@ if ($IsInfoCmd) {
 #                   → /anon_files/<n>/filename
 # ---------------------------------------------------------------------------
 $Volumes    = [System.Collections.Generic.List[string]]::new()
-$Volumes.AddRange([string[]]@("-v", "${ModelsDir}:/app/models", "-v", "${DbDir}:/app/db"))
+$Volumes.AddRange([string[]]@("-v", "${ModelsDir}:/app/models", "-v", "${AnonDir}/logs:/app/logs"))
 
 $NewArgs    = [System.Collections.Generic.List[string]]::new()
 
@@ -199,6 +219,7 @@ $BoolFlags = @("--help", "--list-entities", "--list-languages", "--overwrite", "
 $FileFlags = @("--anonymization-config", "--word-list", "--custom-patterns", "--config")
 $script:FileMounts = 0
 function Add-FileArg([string]$flag, [string]$val) {
+    if (-not $val) { Write-Err "$flag needs a file path."; exit 2 }
     $hostPath = Get-HostPath $val
     if (-not (Test-Path $hostPath -PathType Leaf)) {
         Write-Err "File not found for ${flag}: $val"
@@ -208,6 +229,11 @@ function Add-FileArg([string]$flag, [string]$val) {
     $mnt  = "/anon_files/$($script:FileMounts)"
     $dir  = Split-Path $hostPath -Parent
     $leaf = Split-Path $hostPath -Leaf
+    $root = (Get-Location).Path
+    if ($hostPath.StartsWith($root + [System.IO.Path]::DirectorySeparatorChar)) {
+        $dir = $root
+        $leaf = $hostPath.Substring($root.Length + 1).Replace('\', '/')
+    }
     $Volumes.AddRange([string[]]@("-v", "${dir}:${mnt}:ro"))
     $NewArgs.AddRange([string[]]@($flag, "$mnt/$leaf"))
 }
@@ -222,6 +248,7 @@ while ($i -lt $ScriptArgs.Count) {
 
     if ($arg -eq "--output-dir") {
         $i++
+        if ($i -ge $ScriptArgs.Count -or -not $ScriptArgs[$i] -or $ScriptArgs[$i].StartsWith("--")) { Write-Err "--output-dir needs a path. Example: --output-dir .\results"; exit 2 }
         $val  = $ScriptArgs[$i]
         $hostPath = Get-HostPath $val
         $null = New-Item -ItemType Directory -Force -Path $hostPath
@@ -232,6 +259,7 @@ while ($i -lt $ScriptArgs.Count) {
 
     } elseif ($arg -like "--output-dir=*") {
         $val  = $arg.Substring("--output-dir=".Length)
+        if (-not $val) { Write-Err "--output-dir needs a path. Example: --output-dir .\results"; exit 2 }
         $hostPath = Get-HostPath $val
         $null = New-Item -ItemType Directory -Force -Path $hostPath
         $Volumes.AddRange([string[]]@("-v", "${hostPath}:/anon_output"))
@@ -239,6 +267,16 @@ while ($i -lt $ScriptArgs.Count) {
         $OutputSet  = $true
         $OutputHost = $hostPath
 
+    } elseif ($arg -eq '--db-dir' -or $arg -like '--db-dir=*') {
+        if ($arg -like '--db-dir=*') { $val = $arg.Substring('--db-dir='.Length) }
+        else {
+            $i++
+            if ($i -ge $ScriptArgs.Count) { Write-Err "--db-dir needs a path."; exit 2 }
+            $val = $ScriptArgs[$i]
+        }
+        if (-not $val -or $val.StartsWith('--')) { Write-Err "--db-dir needs a path."; exit 2 }
+        $DbDir = Get-HostPath $val
+        $null = New-Item -ItemType Directory -Force -Path $DbDir
     } elseif ($FileFlags -contains $arg) {
         $i++
         if ($i -ge $ScriptArgs.Count) { Write-Err "$arg needs a file path."; exit 1 }
@@ -271,14 +309,14 @@ while ($i -lt $ScriptArgs.Count) {
                 exit 1
             }
             if (Test-Path $hostPath -PathType Container) {
-                $Volumes.AddRange([string[]]@("-v", "${hostPath}:/anon_input:ro"))
+                $InputHost = $hostPath
                 $NewArgs.Add("/anon_input")
             } else {
-                $dir  = Split-Path $hostPath -Parent
+                $InputHost = Split-Path $hostPath -Parent
                 $leaf = Split-Path $hostPath -Leaf
-                $Volumes.AddRange([string[]]@("-v", "${dir}:/anon_input:ro"))
                 $NewArgs.Add("/anon_input/$leaf")
             }
+            $Volumes.AddRange([string[]]@("-v", "${InputHost}:/anon_input:ro"))
         } else {
             $NewArgs.Add($arg)
         }
@@ -286,6 +324,10 @@ while ($i -lt $ScriptArgs.Count) {
 
     $i++
 }
+
+if (-not $InputSet) { Write-Err "Choose a file or folder. Example: .\run.ps1 report.csv (use --help for more)."; exit 2 }
+$Volumes.AddRange([string[]]@("-v", "${DbDir}:/app/db"))
+$NewArgs.AddRange([string[]]@("--db-dir", "/app/db"))
 
 # Default output: .\anon\output\
 if (-not $OutputSet) {
@@ -303,6 +345,8 @@ $NewArgsArr  = $NewArgs.ToArray()
 $env:ANON_SECRET_KEY = $SecretKey
 & docker run --rm @GpuFlags `
     -e ANON_SECRET_KEY `
+    -e "ANON_HOST_INPUT_DIR=$InputHost" `
+    -e "ANON_HOST_OUTPUT_DIR=$OutputHost" `
     @VolumesArr `
     $Image `
     @NewArgsArr

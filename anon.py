@@ -30,7 +30,7 @@ from src.anon.processors import ProcessorRegistry
 from src.anon.cache_manager import CacheManager
 from src.anon.hash_generator import HashGenerator
 from src.anon.entity_detector import EntityDetector
-from src.anon.tqdm_handler import TqdmLoggingHandler
+from src.anon.tqdm_handler import HostPathFormatter, TqdmLoggingHandler
 
 warnings.filterwarnings("ignore")
 logging.getLogger("transformers").setLevel(logging.ERROR)
@@ -158,7 +158,7 @@ def _handle_list_entities(strategy_name: str = "filtered", transformer_model: st
 
 def _parse_arguments():
     """Parses command-line arguments."""
-    parser = argparse.ArgumentParser(description="Anonymize sensitive information or generate NER training data.")
+    parser = argparse.ArgumentParser(description="Anonymize sensitive information or generate NER training data.", allow_abbrev=False)
     parser.add_argument("file_path", nargs='?', help="Path to the file or directory to be processed.")
 
     # Config file (processed before all other args)
@@ -242,7 +242,11 @@ def _parse_arguments():
         try:
             from src.anon.core.run_config import load_run_config, merge_with_args as _merge
             cfg = load_run_config(args.config)
-            _merge(cfg, args)
+            explicit_args = {
+                action.dest for action in parser._actions
+                if any(token.split("=", 1)[0] in action.option_strings for token in sys.argv[1:])
+            }
+            _merge(cfg, args, explicit_args)
             # Inject custom_patterns list from config into args for later processing
             if cfg.custom_patterns and not getattr(args, '_config_custom_patterns', None):
                 args._config_custom_patterns = cfg.custom_patterns
@@ -260,8 +264,24 @@ def _parse_arguments():
     if args.list_languages:
         _handle_list_languages()
 
-    if args.slug_length is not None and not (0 <= args.slug_length <= 64):
+    if args.slug_length is not None and (type(args.slug_length) is not int or not 0 <= args.slug_length <= 64):
         parser.error("--slug-length must be between 0 and 64.")
+
+    for action in parser._actions:
+        value = getattr(args, action.dest, None)
+        if action.choices and value is not None and value not in action.choices:
+            parser.error(f"--{action.dest.replace('_', '-')} must be one of: {', '.join(action.choices)}")
+    for name in ("csv_chunk_size", "json_chunk_size", "ner_chunk_size", "nlp_batch_size"):
+        if getattr(args, name) <= 0:
+            parser.error(f"--{name.replace('_', '-')} must be greater than zero.")
+    if not isinstance(args.ner_score_threshold, (int, float)) or not 0 <= args.ner_score_threshold <= 1:
+        parser.error("--ner-score-threshold must be between 0 and 1.")
+    if str(args.batch_size).lower() != "auto":
+        try:
+            if int(args.batch_size) <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            parser.error("--batch-size must be 'auto' or an integer greater than zero.")
 
     if not args.file_path and not (args.list_entities or args.list_languages):
         parser.error("A file path must be provided.")
@@ -279,7 +299,7 @@ def _parse_arguments():
     # Portuguese docs benefit from a PT-BR fine-tuned model (better person-name
     # recall on certidões, extratos, cheques). CLI and config file can still
     # override by setting transformer_model explicitly.
-    user_set_model = "--transformer-model" in sys.argv
+    user_set_model = any(token.split("=", 1)[0] == "--transformer-model" for token in sys.argv[1:])
     if not user_set_model and args.transformer_model == TRANSFORMER_MODEL:
         from src.anon.model_registry import default_transformer_for_lang
         lang_default = default_transformer_for_lang(args.lang)
@@ -409,7 +429,7 @@ def main():
         
     # Add our Tqdm-friendly handler
     tqdm_handler = TqdmLoggingHandler()
-    tqdm_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    tqdm_handler.setFormatter(HostPathFormatter('%(asctime)s - %(levelname)s - %(message)s'))
     root_logger.addHandler(tqdm_handler)
     
     logging.debug(f"Resolved log level to: {numeric_level} and configured TqdmLoggingHandler.")
@@ -436,7 +456,9 @@ def main():
 
     # --- Load Anonymization Config ---
     anonymization_config = None
-    if args.anonymization_config:
+    if isinstance(args.anonymization_config, dict):
+        anonymization_config = args.anonymization_config
+    elif args.anonymization_config:
         if not os.path.exists(args.anonymization_config):
             logging.error(f"Anonymization config file not found at '{args.anonymization_config}'")
             sys.exit(1)
@@ -699,36 +721,49 @@ def main():
             mode_str = "Generating NER data from" if args.generate_ner_data else "Processing"
             logging.info(f"{mode_str} directory: {args.file_path}...")
             processed_files_count = 0
+            failed_files_count = 0
+            skipped_files_count = 0
+            output_root = Path(args.output_dir).resolve()
+            input_root = Path(args.file_path).resolve()
+            if output_root == input_root:
+                raise ValueError("Choose an --output-dir outside the input directory or in a separate subfolder.")
             
-            for root, _, files in os.walk(args.file_path):
-                for file_name in files:
+            for root, dirs, files in os.walk(args.file_path):
+                dirs[:] = sorted(d for d in dirs if (Path(root) / d).resolve() != output_root)
+                for file_name in sorted(files):
                     file_full_path = os.path.join(root, file_name)
                     logging.debug(f"Attempting to get processor for file: {file_full_path}")
                     try:
-                        processor = ProcessorRegistry.get_processor(file_full_path, orchestrator, **processor_factory_args)
+                        file_args = {**processor_factory_args, "output_dir": str(output_root / Path(root).resolve().relative_to(input_root))}
+                        processor = ProcessorRegistry.get_processor(file_full_path, orchestrator, **file_args)
                         if not processor:
-                            logging.debug(f"No suitable processor found for file: {file_full_path}. Skipping.")
+                            skipped_files_count += 1
+                            logging.warning(f"Unsupported file skipped: {file_full_path}")
                             continue
 
                         _bt_start = time.time()
                         output_file = processor.process()
                         _bt_elapsed = time.time() - _bt_start
                         _bt_size = os.path.getsize(file_full_path) if os.path.isfile(file_full_path) else 0
-                        print(f"[BENCHMARK_TIMING] file={file_name} elapsed={_bt_elapsed:.6f} size_bytes={_bt_size}")
+                        logging.debug(f"[BENCHMARK_TIMING] file={file_name} elapsed={_bt_elapsed:.6f} size_bytes={_bt_size}")
                         processed_files_count += 1
                         if args.generate_ner_data:
                             logging.info(f"NER data for '{file_name}' saved at: {output_file}")
                         else:
                             logging.info(f"Anonymized file for '{file_name}' saved at: {output_file}")
                     except ValueError as ve:
-                        logging.warning(f"Skipping file '{file_full_path}': {ve}")
+                        failed_files_count += 1
+                        logging.error(f"Could not process '{file_full_path}': {ve}")
                     except Exception as e:
-                        logging.error(f"An error occurred processing file '{file_full_path}': {e}", exc_info=True)
+                        failed_files_count += 1
+                        logging.error(f"Could not process '{file_full_path}': {e}", exc_info=args.log_level == "DEBUG")
             
             if processed_files_count == 0:
-                logging.warning(f"No files were processed in the directory: {args.file_path}")
+                raise ValueError(f"No files were processed in {args.file_path}. Check the file formats and errors above.")
             else:
-                logging.info(f"Finished processing {processed_files_count} files in directory: {args.file_path}")
+                print(f"Processed {processed_files_count} file(s); skipped {skipped_files_count}; failed {failed_files_count}.")
+            if failed_files_count:
+                raise ValueError("Some files failed. The output is incomplete; correct the errors above and retry.")
 
         else:
             mode_str = "Generating NER data for" if args.generate_ner_data else "Processing"
@@ -741,7 +776,7 @@ def main():
                 else:
                     logging.info(f"Anonymized file saved at: {output_file}")
             else:
-                logging.warning(f"Skipping unsupported file: {args.file_path}")
+                raise ValueError(f"Unsupported file: {args.file_path}. Use --help to see the available options.")
 
         logging.info("Processing complete.")
 
@@ -787,7 +822,7 @@ def main():
             write_report(args.file_path, start_time)
 
     except Exception as e:
-        logging.error(f"An error occurred during processing: {e}", exc_info=True)
+        logging.error(f"Processing failed: {e}", exc_info=args.log_level == "DEBUG")
         sys.exit(1)
     finally:
         if db_context:

@@ -28,7 +28,7 @@ services:
     image: anonshield/anon:latest
     container_name: anon-cpu
     environment:
-      - ANON_SECRET_KEY=${ANON_SECRET_KEY:-change-me-in-production}
+      - ANON_SECRET_KEY=${ANON_SECRET_KEY:?Set ANON_SECRET_KEY or use docker/run.sh to create a private key automatically}
       - ANON_LAZY_LOADING=1
     volumes:
       - anon-models:/app/models
@@ -51,7 +51,7 @@ services:
     image: anonshield/anon:gpu
     container_name: anon-gpu
     environment:
-      - ANON_SECRET_KEY=${ANON_SECRET_KEY:-change-me-in-production}
+      - ANON_SECRET_KEY=${ANON_SECRET_KEY:?Set ANON_SECRET_KEY or use docker/run.sh to create a private key automatically}
       - ANON_LAZY_LOADING=1
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility

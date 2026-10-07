@@ -8,6 +8,7 @@ most of the regressions fixed alongside these tests showed up: the run
 Images are left out (OCR needs Tesseract, see the "ocr" marker).
 """
 import csv
+from xml.sax.saxutils import escape
 import json
 import os
 import subprocess
@@ -51,7 +52,7 @@ def data_dir(tmp_path_factory):
     (d / "tickets.json").write_text(json.dumps({"tickets": tickets}), encoding="utf-8")
     (d / "events.jsonl").write_text("".join(json.dumps(t) + "\n" for t in tickets), encoding="utf-8")
     (d / "tickets.xml").write_text(
-        "<tickets>" + "".join(f'<ticket reporter="{EMAILS[i]}"><notes>{LINES[i]}</notes></ticket>' for i in range(2))
+        "<tickets>" + "".join(f'<ticket reporter="{EMAILS[i]}"><notes>{escape(LINES[i])}</notes></ticket>' for i in range(2))
         + "</tickets>", encoding="utf-8")
     wb = openpyxl.Workbook()
     for row in rows:

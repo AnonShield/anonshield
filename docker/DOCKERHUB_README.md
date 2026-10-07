@@ -45,7 +45,7 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/AnonShield/anonshield/m
 
 ### Step 2: Anonymize
 
-Pass any file or folder, using a relative or absolute path. No other setup is needed.
+Pass any file or folder, using a relative or absolute path. No other setup is needed. Run the script without arguments for examples, even before Docker is installed.
 
 **Single file (CPU):**
 ```bash
@@ -79,6 +79,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 .\run.ps1 .\your\folder\
 ```
 
+A failed file returns a nonzero exit code. Existing results are kept unless you pass `--overwrite`. For folders, subdirectories are preserved; an incomplete run reports which files failed.
+
 By default the output is written to `./anon/output/`. For example, anonymizing `report.csv` produces `./anon/output/anon_report.csv`. The script creates an `./anon/` folder in your current directory to keep everything together:
 
 ```
@@ -86,6 +88,7 @@ By default the output is written to `./anon/output/`. For example, anonymizing `
 ├── input/      (optional: put files here if you prefer)
 ├── output/     (anonymized files appear here)
 ├── db/         (entity mapping database; keep it to de-anonymize later)
+├── logs/       (performance reports)
 ├── models/     (NER model cached here on first run, about 1 GB, automatic)
 └── secret.key  (secret key, created on the first run)
 ```
@@ -136,6 +139,7 @@ All images are based on `python:3.12-slim` and include Tesseract OCR (English an
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--lang <code>` | Document language (`en`, `pt`, `es`, ...) | `en` |
+| `--db-dir <path>` | Local folder for the mapping database | `./anon/db/` |
 | `--output-dir <path>` | Local folder for anonymized files | `./anon/output/` |
 | `--anonymization-strategy <s>` | Detection strategy (see [Anonymization Strategies](#anonymization-strategies)) | `filtered` |
 | `--preserve-entities <types>` | Comma-separated entity types to skip (for example `LOCATION,IP_ADDRESS`) | none |
@@ -146,7 +150,7 @@ All images are based on `python:3.12-slim` and include Tesseract OCR (English an
 | `--transformer-model <id>` | NER model: `Davlan/xlm-roberta-base-ner-hrl` (default) or `attack-vector/SecureModernBERT-NER` | `Davlan/xlm-roberta-base-ner-hrl` |
 | `--optimize` | Turn on all optimizations at once: `standalone` strategy, cache, `min-word-length=3`, in-memory DB | off |
 
-Run `./run.sh --help` (Linux/macOS) or `.\run.ps1 --help` (Windows) for the complete flag list. Every option is explained with examples in the **[CLI reference on GitHub](https://github.com/AnonShield/anonshield/blob/main/docs/users/CLI_REFERENCE.md)**.
+Run `./run.sh --help` (Linux/macOS) or `.\run.ps1 --help` (Windows) for common options, or use `--cli-help` for the complete flag list. Every option is explained with examples in the **[CLI reference on GitHub](https://github.com/AnonShield/anonshield/blob/main/docs/users/CLI_REFERENCE.md)**.
 
 ---
 

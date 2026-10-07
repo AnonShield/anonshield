@@ -39,82 +39,6 @@ log_error() {
 }
 
 # =============================================================================
-# Feature Detection Functions
-# =============================================================================
-
-needs_spacy_model() {
-    # spaCy is needed for all NER operations
-    # Check if we're doing any anonymization or NER
-    local args="$*"
-
-    # If just --help, --list-entities, etc., no models needed
-    if [[ "$args" == *"--help"* ]] || [[ "$args" == *"--list-entities"* ]] || [[ "$args" == *"--list-languages"* ]]; then
-        return 1
-    fi
-
-    # Regex-only anonymization runs without NLP models
-    if [[ "$args" =~ --anonymization-strategy[=\ ]regex ]] && [[ "$args" != *"--generate-ner-data"* ]]; then
-        return 1
-    fi
-
-    # If there's a file path argument, we need NER models
-    for arg in "$@"; do
-        if [[ -f "$arg" ]] || [[ -d "$arg" ]]; then
-            return 0
-        fi
-    done
-
-    return 1
-}
-
-needs_transformer_model() {
-    local args="$*"
-
-    # Not needed for regex-only mode, nor for NER data generation (which runs
-    # on the spaCy pipeline)
-    if [[ "$args" =~ --anonymization-strategy[=\ ]regex ]] || [[ "$args" == *"--generate-ner-data"* ]]; then
-        return 1
-    fi
-
-    # Not needed for help/info commands
-    if [[ "$args" == *"--help"* ]] || [[ "$args" == *"--list-"* ]]; then
-        return 1
-    fi
-
-    # Needed if processing files
-    for arg in "$@"; do
-        if [[ -f "$arg" ]] || [[ -d "$arg" ]]; then
-            return 0
-        fi
-    done
-
-    return 1
-}
-
-get_transformer_model() {
-    local args="$*"
-    local model="Davlan/xlm-roberta-base-ner-hrl"
-
-    if [[ "$args" =~ --transformer-model[=\ ]([^ ]+) ]]; then
-        model="${BASH_REMATCH[1]}"
-    fi
-
-    echo "$model"
-}
-
-get_language() {
-    local args="$*"
-    local lang="en"
-
-    # Extract --lang argument
-    if [[ "$args" =~ --lang[=\ ]([a-z]{2}) ]]; then
-        lang="${BASH_REMATCH[1]}"
-    fi
-
-    echo "$lang"
-}
-
-# =============================================================================
 # Model Provisioning Functions
 # =============================================================================
 
@@ -153,12 +77,26 @@ ensure_transformer_model() {
     # Cached = config plus weights present (the download skips formats that are
     # not needed, so the snapshot is not "complete" by huggingface_hub's measure).
     if ANON_MODEL="$model" /app/.venv/bin/python -c "
-import os, sys
+import json, os, sys
+from pathlib import Path
 from huggingface_hub import try_to_load_from_cache
 repo = os.environ['ANON_MODEL']
 cached = lambda f: isinstance(try_to_load_from_cache(repo, f), str)
 weights = ('model.safetensors', 'model.safetensors.index.json', 'pytorch_model.bin', 'pytorch_model.bin.index.json')
-sys.exit(0 if cached('config.json') and any(cached(w) for w in weights) else 1)
+complete_weights = False
+for name in weights:
+    path = try_to_load_from_cache(repo, name)
+    if not isinstance(path, str):
+        continue
+    if name.endswith('.index.json'):
+        shards = json.loads(Path(path).read_text()).get('weight_map', {}).values()
+        complete_weights = bool(shards) and all(cached(shard) for shard in shards)
+    else:
+        complete_weights = True
+    if complete_weights:
+        break
+tokenizer = any(cached(name) for name in ('tokenizer.json', 'sentencepiece.bpe.model', 'spiece.model', 'vocab.txt'))
+sys.exit(0 if cached('config.json') and tokenizer and complete_weights else 1)
 " >/dev/null 2>&1; then
         log_success "Transformer model '$model' is available"
         return 0
@@ -184,7 +122,7 @@ print('Download complete')
         log_success "Transformer model '$model' downloaded successfully"
         return 0
     else
-        log_error "Failed to download transformer model '$model'"
+        log_error "Could not download '$model'. Check your connection and model name, then retry. The cache is kept. Use --anonymization-strategy regex to process without an NER model."
         return 1
     fi
 }
@@ -242,22 +180,46 @@ main() {
         exec /app/.venv/bin/python anon.py "$@"
     fi
 
-    # Determine required models based on arguments. The engine loads
-    # pt_core_news_lg for Portuguese and en_core_web_lg for every other
-    # language; both ship in the image.
-    local lang=$(get_language "$@")
+    if [[ $# -eq 0 ]]; then set -- --help; fi
+    for arg in "$@"; do
+        case "$arg" in
+            -h|--help|--list-entities|--list-languages)
+                exec /app/.venv/bin/python anon.py "$@" ;;
+        esac
+    done
+
+    # Use the CLI's resolved configuration before downloading anything.
+    local resolved
+    resolved=$(/app/.venv/bin/python - "$@" <<'PYTHON'
+import os
+import sys
+from anon import _parse_arguments
+from src.anon.config import SECRET_KEY
+try:
+    args = _parse_arguments()
+except (TypeError, ValueError) as exc:
+    sys.exit(f"Invalid configuration: {exc}")
+if not os.path.exists(args.file_path):
+    sys.exit(f"Input not found: {args.file_path}")
+if not args.generate_ner_data and args.slug_length != 0 and not SECRET_KEY:
+    sys.exit("Set ANON_SECRET_KEY, use docker/run.sh to create one, or use --slug-length 0 for type-only labels.")
+print(args.anonymization_strategy)
+print(args.lang)
+print(args.transformer_model)
+print(int(args.generate_ner_data))
+PYTHON
+    ) || exit $?
+    local settings
+    mapfile -t settings <<< "$resolved"
+    local strategy="${settings[0]}" lang="${settings[1]}" model="${settings[2]}" ner="${settings[3]}"
     local spacy_model="en_core_web_lg"
     [[ "$lang" == "pt" ]] && spacy_model="pt_core_news_lg"
 
-    # Provision models as needed
-    if needs_spacy_model "$@"; then
+    if [[ "$strategy" != "regex" || "$ner" == "1" ]]; then
         ensure_spacy_model "$spacy_model" || exit 1
     fi
-
-    if needs_transformer_model "$@"; then
-        ensure_transformer_model "$(get_transformer_model "$@")" || exit 1
-        # The model is in the cache now: load it without asking the Hub for
-        # updates, so a run makes no network call (and none fails offline).
+    if [[ "$strategy" != "regex" && "$ner" != "1" ]]; then
+        ensure_transformer_model "$model" || exit 1
         export HF_HUB_OFFLINE=1
     fi
 

@@ -306,8 +306,7 @@ class FileProcessor(ABC):
                 output_path = self.ner_output_file or self._get_ner_output_path()
                 logging.debug(f"NER data output path: {output_path}")
                 if os.path.exists(output_path) and not self.overwrite:
-                    logging.warning(f"Output file '{output_path}' already exists. Use --overwrite to replace it.")
-                    return output_path
+                    raise FileExistsError(f"Output file '{output_path}' already exists. Use --overwrite to replace it or choose another --output-dir.")
                 
                 # Open the file handle here, within the try block
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -321,8 +320,7 @@ class FileProcessor(ABC):
                 output_path = get_output_path(self.file_path, self._get_output_extension(), output_dir=self.output_dir)
                 logging.debug(f"Anonymized output path: {output_path}")
                 if os.path.exists(output_path) and not self.overwrite:
-                    logging.warning(f"Output file '{output_path}' already exists. Use --overwrite to replace it.")
-                    return output_path
+                    raise FileExistsError(f"Output file '{output_path}' already exists. Use --overwrite to replace it or choose another --output-dir.")
                 self._process_anonymization(output_path)
                 logging.info(f"Successfully anonymized file to: {output_path}")
         finally:
@@ -1107,7 +1105,7 @@ class CsvFileProcessor(FileProcessor):
             logging.info(f"Successfully anonymized CSV file saved to: {output_path}")
 
         except Exception as e:
-            logging.error(f"Error processing CSV file '{self.file_path}': {e}", exc_info=True)
+            logging.debug(f"Error processing CSV file '{self.file_path}': {e}", exc_info=True)
             if os.path.exists(temp_output_path):
                 os.remove(temp_output_path)
                 logging.info(f"Removed corrupt temporary file: {temp_output_path}")
@@ -1199,9 +1197,7 @@ class XlsxFileProcessor(FileProcessor):
         try:
             read_only_wb = openpyxl.load_workbook(self.file_path, read_only=True)
         except Exception as e:
-            logging.error(f"Failed to open XLSX file {self.file_path} in read-only mode: {e}")
-            shutil.copy(self.file_path, output_path) # Copy original on failure to open
-            return
+            raise ValueError("Cannot read XLSX file. Check that it is a valid, unencrypted workbook.") from e
 
         total_rows = sum(sheet.max_row or 0 for sheet in read_only_wb.worksheets)
         file_size = os.path.getsize(self.file_path)
@@ -1254,10 +1250,7 @@ class XlsxFileProcessor(FileProcessor):
         try:
             read_only_wb = openpyxl.load_workbook(self.file_path, read_only=True)
         except Exception as e:
-            logging.error(f"Failed to re-open XLSX file {self.file_path} for pass 2: {e}")
-            # At this point, we can't create the anonymized file, so we copy the original.
-            shutil.copy(self.file_path, output_path)
-            return
+            raise ValueError("Cannot reopen XLSX file. No anonymized workbook was produced.") from e
             
         write_wb = openpyxl.Workbook()
         if "Sheet" in write_wb.sheetnames and len(write_wb.sheetnames) == 1:
@@ -1380,17 +1373,17 @@ class XmlFileProcessor(FileProcessor):
                 "due to --force-large-xml flag. This may lead to high memory usage or Out-of-Memory errors, and PII leakage if processing fails."
             )
 
-        parser = etree.XMLParser(recover=True, strip_cdata=False)
+        parser = etree.XMLParser(recover=False, strip_cdata=False, resolve_entities=False, no_network=True)
         try:
             tree = etree.parse(self.file_path, parser)
             if parser.error_log:
                 for error in parser.error_log:
                     logging.warning(f"XML parsing error in {self.file_path} on line {error.line}: {error.message}")
         except etree.XMLSyntaxError as e:
-            logging.error(f"Fatal XML syntax error in {self.file_path}: {e}", exc_info=True)
-            with open(output_path, "w") as f:
-                f.write(f"<!-- Could not parse XML file {os.path.basename(self.file_path)} due to syntax errors. -->")
-            return
+            raise ValueError(f"Invalid XML in {self.file_path}: check the syntax near line {e.lineno}.") from e
+        internal_dtd = tree.docinfo.internalDTD
+        if internal_dtd is not None and list(internal_dtd.entities()):
+            raise ValueError("XML entity declarations (<!ENTITY>) are not supported: their values would be copied unchanged. Expand the entity references and remove the declarations, then retry.")
 
         use_deduplication = self.orchestrator.cache_manager.use_cache and not self.preserve_row_context
         text_groups: Dict[Union[str, Tuple[str, ...]], List[str]] = defaultdict(list)
@@ -1587,7 +1580,7 @@ class JsonFileProcessor(FileProcessor):
             logging.info(f"Finished JSON array streaming for '{self.file_path}'. Anonymized file saved to: {output_path}")
 
         except (ijson.JSONError, MemoryError) as e:
-            logging.error(f"Error streaming JSON file {self.file_path}: {e}", exc_info=True)
+            logging.debug(f"Error streaming JSON file {self.file_path}: {e}", exc_info=True)
             if os.path.exists(temp_output_path):
                 os.remove(temp_output_path)
                 logging.info(f"Removed corrupt temporary file: {temp_output_path}")
@@ -1624,7 +1617,7 @@ class JsonFileProcessor(FileProcessor):
             logging.info(f"In-memory JSON processing complete. Anonymized file saved to: {output_path}")
 
         except Exception as e:
-            logging.error(f"Error processing JSON file '{self.file_path}': {e}", exc_info=True)
+            logging.debug(f"Error processing JSON file '{self.file_path}': {e}", exc_info=True)
             if os.path.exists(temp_output_path):
                 os.remove(temp_output_path)
                 logging.info(f"Removed corrupt temporary file: {temp_output_path}")
@@ -1734,7 +1727,7 @@ class JsonFileProcessor(FileProcessor):
                 pbar = tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024,
                             desc=desc, leave=False,
                             bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
-                for line in in_f:
+                for line_number, line in enumerate(in_f, 1):
                     pbar.update(len(line))
                     if not line.strip(): continue
                     try:
@@ -1743,16 +1736,15 @@ class JsonFileProcessor(FileProcessor):
                         path_aware_map = self._build_path_aware_translation_map(text_groups)
                         processed_data = self._reconstruct_object(data, path_aware_map)
                         out_f.write(orjson.dumps(processed_data) + b'\n')
-                    except orjson.JSONDecodeError:
-                        logging.warning(f"Skipping invalid JSON line in {self.file_path}. Original line written.")
-                        out_f.write(line) # Write original line if parsing fails
+                    except orjson.JSONDecodeError as exc:
+                        raise ValueError(f"Invalid JSON on line {line_number}. Fix the JSONL file and retry; no output was published.") from exc
                 pbar.close()
 
             shutil.move(temp_output_path, output_path)
             logging.info(f"Successfully anonymized JSONL file saved to: {output_path}")
 
         except Exception as e:
-            logging.error(f"Error processing JSONL file '{self.file_path}': {e}", exc_info=True)
+            logging.debug(f"Error processing JSONL file '{self.file_path}': {e}", exc_info=True)
             if os.path.exists(temp_output_path):
                 os.remove(temp_output_path)
                 logging.info(f"Removed corrupt temporary file: {temp_output_path}")
