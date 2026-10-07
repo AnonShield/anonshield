@@ -49,7 +49,16 @@ def cuda_usable() -> bool:
         return False
 
     if not torch.cuda.is_available():
-        if _nvidia_gpu_visible():
+        if torch.version.cuda is not None and not _nvidia_gpu_visible():
+            # A GPU build (the project itself pins the CPU wheels) that sees no
+            # GPU: in Docker, a GPU image started without --gpus.
+            in_docker = os.path.exists("/.dockerenv")
+            logger.warning(
+                "This is a GPU build (CUDA %s) but no NVIDIA GPU is visible; running on CPU.%s",
+                torch.version.cuda,
+                " Start the container with --gpus all (./run.sh --gpu and ./run.sh --web --gpu do)."
+                if in_docker else "")
+        elif _nvidia_gpu_visible():
             if torch.version.cuda is None:
                 logger.info("An NVIDIA GPU is present but this PyTorch build is CPU-only; running on CPU. "
                             + _GPU_IMAGE_HINT)
