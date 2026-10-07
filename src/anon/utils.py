@@ -5,6 +5,8 @@ import re
 import logging
 from typing import List, Dict, Any, Optional, Union, Iterable
 
+import ijson
+
 logger = logging.getLogger(__name__)
 
 def flatten_keys(obj: Any, prefix: str = "", depth: int = 0, max_depth: int = 2) -> List[str]:
@@ -29,7 +31,21 @@ def detect_fields_from_stream(stream: io.IOBase, ext: str, max_bytes: int = 256 
     Supports CSV, TSV, JSON, JSONL.
     """
     ext = ext.lower().lstrip(".")
-    
+
+    # A top-level array is streamed up to the end of its first record, so a
+    # pretty-printed file or a record larger than the sample still has fields.
+    if ext == "json":
+        head = stream.read(64)
+        stream.seek(0)
+        if head.lstrip(b"\xef\xbb\xbf \t\r\n")[:1] == b"[":
+            try:
+                first = next(ijson.items(stream, "item"), None)
+            except Exception:
+                first = None
+            if isinstance(first, dict):
+                return flatten_keys(first)
+            stream.seek(0)
+
     # Read a sample chunk for analysis
     chunk_bytes = stream.read(max_bytes)
     if not chunk_bytes:

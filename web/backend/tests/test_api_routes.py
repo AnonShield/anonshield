@@ -173,3 +173,12 @@ def test_download_supports_unicode_filename(client, tmp_path):
     assert r.text == "[EMAIL_ADDRESS]"
     assert "filename*=UTF-8''" in r.headers["content-disposition"]
     assert not storage.output_dir(job_id).exists()
+
+
+def test_pretty_printed_json_array_with_a_large_first_record_has_fields(client):
+    import json
+    records = [{"output": "x" * (300 * 1024), "id": 1, "asset": {"id": 2, "name": "host", "tags": [{"value": "a"}]}}] * 2
+    body = json.dumps(records, indent=2).replace("\n", "\r\n").encode()
+    response = client.post("/api/analyze-fields", files={"file": ("tickets.json", body)})
+    assert response.status_code == 200
+    assert [f["name"] for f in response.json()["fields"]] == ["output", "id", "asset.id", "asset.name", "asset.tags"]

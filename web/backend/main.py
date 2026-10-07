@@ -74,9 +74,9 @@ def validate_profile(body: dict) -> dict:
 async def analyze_fields(file: UploadFile) -> dict:
     """Detect columns/fields from a structured file (CSV, XLSX, JSON, JSONL).
     Returns {fields: [{name, sample_values}]} for field selector UI.
-    Text formats use the first 256 KB; XLSX uses the seekable upload.
+    CSV and JSONL use the first 256 KB; a JSON array is streamed to the end of
+    its first record; XLSX opens the whole workbook.
     """
-    import io
     from src.anon.utils import detect_fields_from_stream
 
     ext = (file.filename or "").rsplit(".", 1)[-1].lower()
@@ -99,9 +99,7 @@ async def analyze_fields(file: UploadFile) -> dict:
 
     # Use unified detection for text formats
     try:
-        # We need to wrap the bytes in a BytesIO for the utility
-        chunk = await file.read(256 * 1024)
-        field_names = detect_fields_from_stream(io.BytesIO(chunk), ext)
+        field_names = detect_fields_from_stream(file.file, ext)
         return {"fields": [{"name": n} for n in field_names]}
     except Exception as e:
         return {"fields": [], "error": str(e)}

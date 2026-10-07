@@ -40,7 +40,16 @@
   const ext = $derived(file.name.split('.').pop()?.toLowerCase() ?? '');
   const supported = $derived(['csv', 'tsv', 'json', 'jsonl', 'ndjson', 'xlsx'].includes(ext));
   const flatEntities = $derived(entityGroups.flatMap(g => g.entities));
-  const activeRulesCount = $derived(Object.values(rules).filter(r => r.type !== 'auto').length);
+  const counts = $derived({
+    auto: fields.filter(f => rules[f]?.type === 'auto').length,
+    force: fields.filter(f => rules[f]?.type === 'force').length,
+    skip: fields.filter(f => rules[f]?.type === 'exclude').length,
+  });
+  let filter = $state('');
+  let bulkEntity = $state('');
+  const shown = $derived(filter.trim()
+    ? fields.filter(f => f.toLowerCase().includes(filter.trim().toLowerCase()))
+    : fields);
 
   async function detectFields() {
     if (!supported) { loading = false; return; }
@@ -102,6 +111,21 @@
     else onchange?.(config);
   }
 
+  function setMode(next: FieldMode) {
+    mode = next;
+    emit();
+  }
+
+  function setShown(type: RuleType) {
+    const entity = bulkEntity.trim().toUpperCase();
+    if (type === 'force' && !entity) return;
+    for (const f of shown) {
+      rules[f].type = type;
+      if (type === 'force') rules[f].forcedEntity = entity;
+    }
+    emit();
+  }
+
   function resetAllToAuto() {
     for (const f of fields) rules[f].type = 'auto';
     emit();
@@ -128,7 +152,7 @@
       <div class="st-text">
         <span class="st-title">{$t('fields.title')}</span>
         <span class="st-hint">
-          {mode === 'all' ? 'Global Analysis Active' : $t('fields.hint_n', { n: activeRulesCount })}
+          {mode === 'all' ? $t('fields.hint_none') : $t('fields.summary', { auto: counts.auto, force: counts.force, skip: counts.skip })}
         </span>
       </div>
     </div>
@@ -154,10 +178,10 @@
         </div>
 
         <div class="modal-tabs">
-          <button class:active={mode === 'all'} onclick={() => mode = 'all'}>
+          <button class:active={mode === 'all'} onclick={() => setMode('all')}>
             {$t('fields.all')}
           </button>
-          <button class:active={mode === 'targeted'} onclick={() => mode = 'targeted'}>
+          <button class:active={mode === 'targeted'} onclick={() => setMode('targeted')}>
             {$t('fields.pick')}
           </button>
         </div>
@@ -168,11 +192,44 @@
               <div class="shield-icon">🛡️</div>
               <h3>{$t('fields.all')}</h3>
               <p>{$t('fields.hint_none')}</p>
-              <button class="btn btn-ghost mt-4" onclick={() => mode = 'targeted'}>
+              <button class="btn btn-ghost mt-4" onclick={() => setMode('targeted')}>
                 {$t('fields.pick')}
               </button>
             </div>
           {:else if fields.length > 0}
+            <div class="bulk-bar">
+              <input
+                class="force-input filter-input"
+                type="search"
+                bind:value={filter}
+                placeholder={$t('fields.filter')}
+                aria-label={$t('fields.filter')}
+              />
+              <div class="bulk-actions">
+                <span class="bulk-label">{$t('fields.bulk', { n: shown.length })}</span>
+                <div class="segmented-control">
+                  <button onclick={() => setShown('auto')} disabled={shown.length === 0}>Auto</button>
+                  <button onclick={() => setShown('exclude')} disabled={shown.length === 0}>Skip</button>
+                  <button onclick={() => setShown('force')} disabled={shown.length === 0 || !bulkEntity.trim()}
+                    title={$t('fields.mode.force.desc')}>{$t('fields.force_as')}</button>
+                </div>
+                <input
+                  class="force-input bulk-entity"
+                  list="entity-suggestions-bulk"
+                  bind:value={bulkEntity}
+                  placeholder="ENTITY_TYPE"
+                  aria-label={$t('fields.force_as')}
+                />
+                <datalist id="entity-suggestions-bulk">
+                  {#each flatEntities as ent}
+                    <option value={ent.id}>{ent.label}</option>
+                  {/each}
+                </datalist>
+              </div>
+            </div>
+            {#if shown.length === 0}
+              <p class="empty-msg">{$t('fields.no_match')}</p>
+            {/if}
             <div class="table-container">
               <table class="field-table">
                 <thead>
@@ -183,7 +240,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {#each fields as f}
+                  {#each shown as f (f)}
                     <tr class:row-excluded={rules[f].type === 'exclude'}>
                       <td class="td-name"><code>{f}</code></td>
                       <td class="td-actions">
@@ -246,7 +303,7 @@
         <div class="modal-footer">
           <div class="mf-left">
             {#if mode === 'targeted'}
-               <span class="rule-count">{$t('fields.hint_n', { n: activeRulesCount })}</span>
+               <span class="rule-count">{$t('fields.summary', { auto: counts.auto, force: counts.force, skip: counts.skip })}</span>
                <button class="btn-link" onclick={resetAllToAuto}>{$t('fields.clear')}</button>
             {/if}
           </div>
@@ -384,6 +441,17 @@
   }
   .segmented-control button.active { background: rgba(255,255,255,0.1); color: var(--color-accent); }
   
+  .bulk-bar {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between;
+    padding: 0.75rem 0; background: var(--color-surface); border-bottom: 1px solid var(--color-border);
+  }
+  .bulk-bar .filter-input { flex: 1 1 200px; width: auto; max-width: 300px; }
+  .bulk-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .bulk-label { font-size: 0.75rem; color: var(--color-text-secondary); }
+  .bulk-actions .bulk-entity { width: 160px; }
+  .segmented-control button:disabled { opacity: 0.4; cursor: not-allowed; }
+
   .force-input-group { width: 100%; max-width: 280px; }
   .force-input {
     width: 100%;
