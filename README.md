@@ -19,7 +19,7 @@ AnonShield replaces personally identifiable information (PII) and network-specif
 docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web
 ```
 
-Open **[localhost:8080](http://localhost:8080)**, drop a file, and click **Anonymize**. One container, no clone and no setup: it has no upload-size or rate limit, only this computer can reach it, and the key, model cache and metrics stay in the `anonshield` volume. Stop with `docker stop anonshield`, start again with `docker start anonshield`; `./run.sh --web` (below) does the same with `--stop`, `--update` and `--port`. The [local guide](web/LOCAL.md) covers updates, another port and troubleshooting.
+Open **[localhost:8080](http://localhost:8080)**, drop a file, and click **Anonymize**. One container, no clone and no setup: it has no upload-size or rate limit, only this computer can reach it, and the key, model cache and metrics stay in the `anonshield` volume. Stop with `docker stop anonshield`, start again with `docker start anonshield`; `./run.sh --web` (below) does the same with `--stop`, `--update` and `--port`. The [local guide](web/LOCAL.md) covers updates, another port and troubleshooting. With an NVIDIA GPU, `./run.sh --web --gpu` (or `--gpus all` and `anonshield/anon:web-gpu`) runs the NER on the GPU.
 
 **Command-line processing:** download the script and give it a file or folder.
 
@@ -225,7 +225,7 @@ Run the whole web app on your computer, in one container (Docker is the only req
 docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web
 ```
 
-Open **[localhost:8080](http://localhost:8080)**. The local app has **no upload-size or rate limit**; disk and RAM are the limits. It runs on CPU, listens only on this computer, and keeps its key, model cache and metrics in the `anonshield` volume. To build the same container from this checkout instead, run `docker compose -f web/docker-compose.local.yml up -d --build` (or `make -C web local`). See the short [local guide](web/LOCAL.md) for updates, another port, logs and troubleshooting.
+Open **[localhost:8080](http://localhost:8080)**. The local app has **no upload-size or rate limit**; disk and RAM are the limits. It runs on CPU (on an NVIDIA GPU with `--gpus all` and `anonshield/anon:web-gpu`, see the guide), listens only on this computer, and keeps its key, model cache and metrics in the `anonshield` volume. To build the same container from this checkout instead, run `docker compose -f web/docker-compose.local.yml up -d --build` (or `make -C web local`). See the short [local guide](web/LOCAL.md) for updates, another port, logs and troubleshooting.
 
 For frontend development with hot reload, run the dev servers directly instead:
 

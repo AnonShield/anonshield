@@ -8,9 +8,19 @@ docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anons
 
 Open **http://localhost:8080**. The first start downloads the image (a few GB) and, in the background, the default NER model (about 1 GB); later starts reuse both. Choose **Regex** for emails, IP addresses and other structured identifiers when you do not need names or locations.
 
-Everything runs in this one container on your CPU. Uploaded documents never leave your computer, and the interface listens only on `127.0.0.1`, so other machines on your network cannot reach it. There is no upload-size, ZIP-size or rate limit; disk space and memory are the limits.
+Everything runs in this one container, on your CPU (or on an NVIDIA GPU, below). Uploaded documents never leave your computer, and the interface listens only on `127.0.0.1`, so other machines on your network cannot reach it. There is no upload-size, ZIP-size or rate limit; disk space and memory are the limits.
 
 With the command-line wrapper ([`docker/run.sh`](../docker/run.sh), or `run.ps1` on Windows), `./run.sh --web` does the same: it downloads the image, starts the container, waits until it is ready and prints the address; `--port 8081`, `--stop` and `--update` cover the rest.
+
+## On an NVIDIA GPU
+
+With an NVIDIA GPU and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), the GPU image runs NER on the GPU (about three times faster than the CPU on an RTX 5060 Ti):
+
+```sh
+docker run -d --gpus all --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web-gpu
+```
+
+`web-gpu` needs NVIDIA driver 580 or newer and an RTX 20xx or newer GPU (RTX 50xx included); for a GTX 10xx or older, or an older driver, use `anonshield/anon:web-gpu-cu126`. `./run.sh --web --gpu` reads the GPU and driver from `nvidia-smi`, picks between the two and replaces a CPU container of the same name; the key and models stay in the volume. Use the GPU tag in place of `web` in the commands below.
 
 ## Everyday commands
 
@@ -53,5 +63,7 @@ To build the same container from this repository instead of downloading it, run 
 | `The container name "/anonshield" is already in use` | It already exists: `docker start anonshield`, or remove it with `docker rm -f anonshield` and run the command again. |
 | The page does not open right after the command | Wait a few seconds: `docker ps` shows `healthy` when it is ready. |
 | `docker ps -a` shows `Exited (1)` | Run `docker logs anonshield`: the last line says which part stopped and why. A process killed for lack of memory asks for more Docker memory, a split file, or Regex. |
+| `could not select device driver "" with capabilities: [[gpu]]` | Docker cannot reach the GPU: install the NVIDIA Container Toolkit, or run `anonshield/anon:web` without `--gpus all`. |
+| `docker logs anonshield` says `no NVIDIA GPU is visible` | The GPU image was started without the GPU: recreate it with `--gpus all`. It works meanwhile, on the CPU. |
 | `Cannot write to /data` | Mount a named volume as in the command above, not a host folder. |
 | Not enough disk space | Free space or increase Docker Desktop's disk size; leave room for the input, the temporary files and the result. |
