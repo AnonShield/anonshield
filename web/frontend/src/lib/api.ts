@@ -65,6 +65,15 @@ export async function fetchEntities(
 
 // ── Job lifecycle ─────────────────────────────────────────────────────────────
 
+/** A request the server answered with an error status. */
+export class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export async function createJob(
   file: File,
   opts: {
@@ -107,8 +116,8 @@ export async function createJob(
     const detail = body?.detail;
     const message = typeof detail === 'string' ? detail
       : Array.isArray(detail) ? detail.map(e => `${e.loc?.slice(1).join('.')}: ${e.msg}`).join('; ')
-      : r.status === 429 ? 'Too many requests. Wait one minute and retry.'
-      : 'Could not start processing. Check your connection and retry.';
+      : r.status === 429 ? 'RATE_LIMITED'
+      : 'START_FAILED';
     throw new Error(message);
   }
   return r.json();
@@ -116,7 +125,7 @@ export async function createJob(
 
 export async function pollStatus(jobId: string): Promise<JobStatus> {
   const r = await fetch(`${BASE}/jobs/${jobId}/status`);
-  if (!r.ok) throw new Error(`Status check failed: ${r.status}`);
+  if (!r.ok) throw new HttpError(r.status, `Status check failed: ${r.status}`);
   return r.json();
 }
 
