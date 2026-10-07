@@ -38,7 +38,7 @@
   let showModal = $state(false);
 
   const ext = $derived(file.name.split('.').pop()?.toLowerCase() ?? '');
-  const supported = $derived(['csv', 'tsv', 'json', 'jsonl', 'ndjson', 'xlsx'].includes(ext));
+  const supported = $derived(['csv', 'json', 'jsonl', 'xlsx'].includes(ext));
   const flatEntities = $derived(entityGroups.flatMap(g => g.entities));
   // A field set to Force without a type yet is still scanned automatically.
   function effectiveType(f: string): RuleType | undefined {

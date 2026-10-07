@@ -130,3 +130,21 @@ def test_docker_wrapper_maps_new_nested_directories(tmp_path):
     assert result.returncode == 2
     assert "needs a value" in result.stdout + result.stderr
     assert "unbound variable" not in result.stdout + result.stderr
+
+
+def test_windows_and_utf16_text_files_are_read(tmp_path):
+    windows = tmp_path / "planilha.csv"
+    windows.write_bytes("nome;email\nJoão;joao@example.com\n".encode("cp1252"))
+    utf16 = tmp_path / "notas.txt"
+    utf16.write_text("Contato: maria@example.com, São Paulo", encoding="utf-16")
+    for source in (windows, utf16):
+        content = process(source, regex_orchestrator(), tmp_path / "out").read_text(encoding="utf-8")
+        assert "@example.com" not in content
+        assert "Jo\u00e3o" in content or "S\u00e3o Paulo" in content
+
+
+def test_undecodable_text_is_a_clear_error(tmp_path):
+    source = tmp_path / "broken.txt"
+    source.write_bytes(b"caf\xc3 \x81 a@example.com")
+    with pytest.raises(ValueError, match="Save it as UTF-8"):
+        process(source, regex_orchestrator(), tmp_path / "out")

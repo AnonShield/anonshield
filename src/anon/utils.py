@@ -25,6 +25,24 @@ def flatten_keys(obj: Any, prefix: str = "", depth: int = 0, max_depth: int = 2)
         return out
     return [prefix] if prefix else []
 
+def _object_keys(stream, max_bytes: int = 64 * 1024 * 1024) -> List[str]:
+    """Field paths of a top-level JSON object, as flatten_keys names them,
+    streamed so that a large array inside it is never loaded."""
+    order: List[str] = []
+    children: Dict[str, List[str]] = {}
+    for prefix, event, value in ijson.parse(stream):
+        if event == "map_key":
+            if prefix == "":
+                order.append(value)
+            elif prefix in order and "." not in prefix:
+                children.setdefault(prefix, []).append(f"{prefix}.{value}")
+        elif event == "end_map" and prefix == "":
+            break
+        if stream.tell() > max_bytes:
+            break
+    return [path for key in order for path in children.get(key, [key])]
+
+
 def detect_fields_from_stream(stream: io.IOBase, ext: str, max_bytes: int = 256 * 1024) -> List[str]:
     """
     Robustly detects fields/columns from a file stream.
@@ -32,19 +50,33 @@ def detect_fields_from_stream(stream: io.IOBase, ext: str, max_bytes: int = 256 
     """
     ext = ext.lower().lstrip(".")
 
-    # A top-level array is streamed up to the end of its first record, so a
-    # pretty-printed file or a record larger than the sample still has fields.
+    # Records are read whole, however long or pretty-printed: the first element
+    # of a top-level array, the top-level object, or the first JSONL line.
     if ext == "json":
         head = stream.read(64)
         stream.seek(0)
-        if head.lstrip(b"\xef\xbb\xbf \t\r\n")[:1] == b"[":
-            try:
+        start = head.lstrip(b"\xef\xbb\xbf \t\r\n")[:1]
+        try:
+            if start == b"[":
                 first = next(ijson.items(stream, "item"), None)
-            except Exception:
-                first = None
-            if isinstance(first, dict):
-                return flatten_keys(first)
-            stream.seek(0)
+                if isinstance(first, dict):
+                    return flatten_keys(first)
+            elif start == b"{":
+                return _object_keys(stream)
+        except Exception:
+            pass
+        stream.seek(0)
+    elif ext in ("jsonl", "ndjson"):
+        for line in iter(lambda: stream.readline(64 * 1024 * 1024), b""):
+            if line.strip():
+                try:
+                    first = json.loads(line)
+                except ValueError:
+                    break
+                if isinstance(first, dict):
+                    return flatten_keys(first)
+                break
+        stream.seek(0)
 
     # Read a sample chunk for analysis
     chunk_bytes = stream.read(max_bytes)

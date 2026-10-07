@@ -54,6 +54,13 @@ async def create_job(
 ) -> dict:
     limit = LIMIT_WITH_KEY if key else LIMIT_NO_KEY
 
+    # Refused here, not after the file waited in the queue.
+    from src.anon.processors import ProcessorRegistry
+    supported = sorted({ext.lstrip(".") for ext in ProcessorRegistry._processors} | {"zip"})
+    ext = (Path(file.filename or "upload").suffix.lstrip(".") or "bin").lower()
+    if ext not in supported:
+        raise HTTPException(status_code=415, detail=f"AnonShield cannot read .{ext} files. Supported: {', '.join(supported)}.")
+
     if limit and file.size is not None and file.size > limit:
         raise HTTPException(status_code=413, detail=f"File too large. Limit: {limit // 1024 // 1024} MB")
 
@@ -65,7 +72,6 @@ async def create_job(
             detail="Not enough free disk space to process this file. Free space on the machine running AnonShield or upload a smaller file.",
         )
 
-    ext = (Path(file.filename or "upload").suffix.lstrip(".") or "bin").lower()
     job_id = str(uuid.uuid4())
     inp = storage.input_path(job_id, ext)
 

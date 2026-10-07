@@ -182,3 +182,24 @@ def test_pretty_printed_json_array_with_a_large_first_record_has_fields(client):
     response = client.post("/api/analyze-fields", files={"file": ("tickets.json", body)})
     assert response.status_code == 200
     assert [f["name"] for f in response.json()["fields"]] == ["output", "id", "asset.id", "asset.name", "asset.tags"]
+
+
+def test_unsupported_upload_is_refused_before_queueing(client):
+    with patch("services.job_service.store_meta") as store:
+        r = client.post("/api/jobs", files={"file": ("dados.tsv", b"id\tmail\n")})
+    assert r.status_code == 415
+    assert ".tsv" in r.json()["detail"] and "csv" in r.json()["detail"]
+    store.assert_not_called()
+
+
+@pytest.mark.parametrize("name,body,fields", [
+    ("report.json", {"scan": {"target": "10.0.0.1", "id": 7}, "findings": [{"host": "x"}] * 20000, "owner": "a@example.com"},
+     ["scan.target", "scan.id", "findings", "owner"]),
+    ("events.jsonl", {"message": "x" * (300 * 1024), "user": {"email": "a@example.com"}}, ["message", "user.email"]),
+])
+def test_large_json_object_and_long_jsonl_line_have_their_fields(client, name, body, fields):
+    import json
+    data = json.dumps(body).encode() + (b"\n" if name.endswith("jsonl") else b"")
+    assert len(data) > 256 * 1024
+    response = client.post("/api/analyze-fields", files={"file": (name, data)})
+    assert [f["name"] for f in response.json()["fields"]] == fields

@@ -5,6 +5,7 @@ This module uses a Template Method Pattern. The `FileProcessor` base class defin
 the main workflow for processing files, and subclasses implement the specific
 details for extracting text from different file formats (e.g., PDF, DOCX, JSON).
 """
+import codecs
 import copy
 import gc
 import io
@@ -301,30 +302,59 @@ class FileProcessor(ABC):
         output_path: str = ""
         logging.info(f"Starting processing for file: {self.file_path}")
         try:
-            if self.ner_data_generation:
-                logging.info("Mode: NER data generation.")
-                output_path = self.ner_output_file or self._get_ner_output_path()
-                logging.debug(f"NER data output path: {output_path}")
-                if os.path.exists(output_path) and not self.overwrite:
-                    raise FileExistsError(f"Output file '{output_path}' already exists. Use --overwrite to replace it or choose another --output-dir.")
-                
-                # Open the file handle here, within the try block
-                os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                self.ner_file_handle = open(output_path, "w", encoding="utf-8")
-
-                ner_items = list(self._extract_texts_for_ner())
-                self._run_ner_pipeline(ner_items)
-                logging.info(f"Successfully generated NER data to: {output_path}")
-            else:
-                logging.info("Mode: Anonymization.")
-                output_path = get_output_path(self.file_path, self._get_output_extension(), output_dir=self.output_dir)
-                logging.debug(f"Anonymized output path: {output_path}")
-                if os.path.exists(output_path) and not self.overwrite:
-                    raise FileExistsError(f"Output file '{output_path}' already exists. Use --overwrite to replace it or choose another --output-dir.")
-                self._process_anonymization(output_path)
-                logging.info(f"Successfully anonymized file to: {output_path}")
+            return self._process(output_path)
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Cannot read '{os.path.basename(self.file_path)}' as text ({exc.encoding}). "
+                             "Save it as UTF-8 and retry.") from exc
         finally:
             self._cleanup_optimization()
+
+    def _text_encoding(self) -> str:
+        """UTF-8, UTF-16 when the file starts with its byte-order mark, or else
+        Windows-1252: the "CSV" or text that Excel and Notepad save on Windows in
+        Portuguese, Spanish and other Western locales. Checked once per file."""
+        if getattr(self, "_encoding", None) is None:
+            with open(self.file_path, "rb") as f:
+                head = f.read(2)
+                if head in (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE):
+                    self._encoding = "utf-16"
+                    return self._encoding
+                f.seek(0)
+                decoder = codecs.getincrementaldecoder("utf-8")()
+                try:
+                    for chunk in iter(lambda: f.read(1 << 20), b""):
+                        decoder.decode(chunk)
+                    decoder.decode(b"", final=True)
+                    self._encoding = "utf-8"
+                except UnicodeDecodeError:
+                    self._encoding = "cp1252"
+                    logging.warning(f"'{os.path.basename(self.file_path)}' is not UTF-8; reading it as "
+                                    "Windows-1252. The result is written as UTF-8.")
+        return self._encoding
+
+    def _process(self, output_path: str) -> str:
+        if self.ner_data_generation:
+            logging.info("Mode: NER data generation.")
+            output_path = self.ner_output_file or self._get_ner_output_path()
+            logging.debug(f"NER data output path: {output_path}")
+            if os.path.exists(output_path) and not self.overwrite:
+                raise FileExistsError(f"Output file '{output_path}' already exists. Use --overwrite to replace it or choose another --output-dir.")
+            
+            # Closed by _cleanup_optimization() when process() ends.
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            self.ner_file_handle = open(output_path, "w", encoding="utf-8")
+
+            ner_items = list(self._extract_texts_for_ner())
+            self._run_ner_pipeline(ner_items)
+            logging.info(f"Successfully generated NER data to: {output_path}")
+        else:
+            logging.info("Mode: Anonymization.")
+            output_path = get_output_path(self.file_path, self._get_output_extension(), output_dir=self.output_dir)
+            logging.debug(f"Anonymized output path: {output_path}")
+            if os.path.exists(output_path) and not self.overwrite:
+                raise FileExistsError(f"Output file '{output_path}' already exists. Use --overwrite to replace it or choose another --output-dir.")
+            self._process_anonymization(output_path)
+            logging.info(f"Successfully anonymized file to: {output_path}")
         logging.info(f"Finished processing for file: {self.file_path}")
         return output_path
 
@@ -596,7 +626,7 @@ class TextFileProcessor(FileProcessor):
         return ".txt"
 
     def _extract_texts(self) -> Iterable[str]:
-        with open(self.file_path, "r", encoding="utf-8", newline="") as f:
+        with open(self.file_path, "r", encoding=self._text_encoding(), newline="") as f:
             for line in f:
                 yield line
 
@@ -613,7 +643,7 @@ class TextFileProcessor(FileProcessor):
                 # Sample first 100 lines to estimate text lengths
                 sample_lengths = []
                 lines_sampled = 0
-                with open(self.file_path, "r", encoding="utf-8") as f:
+                with open(self.file_path, "r", encoding=self._text_encoding()) as f:
                     for i, line in enumerate(f):
                         if i >= 100:
                             break
@@ -657,7 +687,7 @@ class TextFileProcessor(FileProcessor):
             seen_texts: Dict[Union[str, Tuple[str, ...]], set] = defaultdict(set)
             all_lines = []
 
-            with open(self.file_path, "r", encoding="utf-8", newline="") as f:
+            with open(self.file_path, "r", encoding=self._text_encoding(), newline="") as f:
                 for line in f:
                     stripped_line = line.rstrip("\r\n")
                     all_lines.append(line)
@@ -978,7 +1008,7 @@ class CsvFileProcessor(FileProcessor):
         if total_rows <= 0:
             if not header_written:
                 try:
-                    df_header = pd.read_csv(self.file_path, nrows=0)
+                    df_header = pd.read_csv(self.file_path, nrows=0, encoding=self._text_encoding())
                     df_header.to_csv(output_path, mode='a', index=False, header=True)
                 except Exception:
                     pass
@@ -988,7 +1018,7 @@ class CsvFileProcessor(FileProcessor):
         if self.batch_size <= 0:
             # Sample first chunk to get column count and text lengths
             try:
-                sample_df = pd.read_csv(self.file_path, nrows=min(100, total_rows), dtype=str, encoding='utf-8')
+                sample_df = pd.read_csv(self.file_path, nrows=min(100, total_rows), dtype=str, encoding=self._text_encoding())
                 num_columns = len(sample_df.columns)
                 
                 # Sample text lengths from all columns - improved sampling
@@ -1042,7 +1072,7 @@ class CsvFileProcessor(FileProcessor):
 
         try:
             bytes_per_row = file_size / total_rows if total_rows > 0 else 0
-            with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
+            with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding=self._text_encoding(), low_memory=False) as reader:
                 progress_bar = tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024,
                                     desc=f"Processing CSV {os.path.basename(self.file_path)}", leave=False,
                                     bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
@@ -1113,7 +1143,7 @@ class CsvFileProcessor(FileProcessor):
 
     def _extract_texts(self) -> Iterable[str]:
         chunk_size = self.csv_chunk_size
-        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
+        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding=self._text_encoding(), low_memory=False) as reader:
             for chunk in reader:
                 batch_values = []
                 for col in chunk.columns:
@@ -1128,7 +1158,7 @@ class CsvFileProcessor(FileProcessor):
     def _extract_texts_for_ner(self) -> Iterable[NERTextItem]:
         """Extracts texts with metadata for NER data generation from CSV files."""
         chunk_size = self.csv_chunk_size
-        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding='utf-8', low_memory=False) as reader:
+        with pd.read_csv(self.file_path, dtype=str, chunksize=chunk_size, on_bad_lines='warn', encoding=self._text_encoding(), low_memory=False) as reader:
             for chunk in reader:
                 for col in chunk.columns:
                     for val in chunk[col].dropna():
