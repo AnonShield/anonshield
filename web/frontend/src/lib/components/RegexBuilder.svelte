@@ -1,5 +1,7 @@
 <script lang="ts">
   import { config, type CustomPattern } from '#lib/stores/config.js';
+  import { patternError, previewRegex } from '#lib/pyRegex.js';
+  import { t } from '#lib/i18n.js';
 
   let { onclose }: { onclose?: () => void } = $props();
 
@@ -8,26 +10,43 @@
   let score = $state(0.9);
   let testInput = $state('');
 
-  type MatchState = 'none' | 'match' | 'error';
-  let matchResult: MatchState = $derived.by(() => {
-    if (!pattern) return 'none';
-    try {
-      const rx = new RegExp(pattern, 'i');
-      return testInput ? (rx.test(testInput) ? 'match' : 'none') : 'none';
-    } catch {
-      return 'error';
-    }
+  // Python's `re` decides whether a pattern is valid (the server compiles it
+  // the same way the job will), asked a moment after typing stops. The answer
+  // is kept with the pattern it is about, so a slow reply never applies to a
+  // newer pattern.
+  let check = $state<{ pattern: string; error: string } | null>(null);
+  const current = $derived(pattern.trim());
+  const checked = $derived(check !== null && check.pattern === current);
+  const errorMsg = $derived(checked ? check!.error : '');
+  $effect(() => {
+    const p = current;
+    if (!p) return;
+    const timer = setTimeout(async () => {
+      let error: string;
+      try {
+        error = await patternError(p);
+      } catch {
+        // Server unreachable: fall back to what the browser can tell.
+        error = previewRegex(p) ? '' : $t('regex.unchecked');
+      }
+      check = { pattern: p, error };
+    }, 300);
+    return () => clearTimeout(timer);
   });
 
-  let errorMsg = $derived.by(() => {
-    if (!pattern) return '';
-    try { new RegExp(pattern, 'i'); return ''; }
-    catch (e) { return (e as Error).message; }
+  const preview = $derived(current ? previewRegex(current) : null);
+  type MatchState = 'none' | 'match' | 'nopreview';
+  let matchResult: MatchState = $derived.by(() => {
+    if (!current || !testInput || errorMsg) return 'none';
+    if (!preview) return 'nopreview';
+    return preview.test(testInput) ? 'match' : 'none';
   });
+
+  const canAdd = $derived(!!entityType.trim() && !!current && checked && !errorMsg);
 
   function add() {
-    if (!entityType.trim() || !pattern.trim() || matchResult === 'error') return;
-    const p: CustomPattern = { entity_type: entityType.trim().toUpperCase(), pattern: pattern.trim(), score };
+    if (!canAdd) return;
+    const p: CustomPattern = { entity_type: entityType.trim().toUpperCase(), pattern: current, score };
     config.update(c => ({ ...c, custom_patterns: [...c.custom_patterns, p] }));
     onclose?.();
   }
@@ -42,44 +61,45 @@
   }
 </script>
 
-<div class="overlay" role="dialog" aria-modal="true" aria-label="Add custom pattern" onkeydown={handleKeydown} tabindex="-1">
+<div class="overlay" role="dialog" aria-modal="true" aria-label={$t('regex.dialog')} onkeydown={handleKeydown} tabindex="-1">
   <div class="modal card">
     <div class="modal-header">
-      <h2>New Custom Pattern</h2>
-      <button class="close" type="button" aria-label="Close" onclick={onclose}>×</button>
+      <h2>{$t('regex.title')}</h2>
+      <button class="close" type="button" aria-label={$t('regex.close')} onclick={onclose}>×</button>
     </div>
 
-    <label>Entity type name
+    <label>{$t('regex.type')}
       <input type="text" bind:value={entityType} placeholder="BANK_ACCOUNT" spellcheck="false" />
     </label>
 
-    <label>Regular expression <span class="lang-badge">Python re</span>
-      <input type="text" bind:value={pattern} placeholder="\d{4}[\s-]?\d{4}" class="mono"
-        spellcheck="false" class:has-error={matchResult === 'error'} />
-      {#if matchResult === 'error'}
-        <span class="error-msg">{errorMsg}</span>
+    <label>{$t('regex.pattern')} <span class="lang-badge">Python re</span>
+      <input type="text" bind:value={pattern} placeholder={'\\d{4}[\\s-]?\\d{4}'} class="mono"
+        spellcheck="false" class:has-error={!!errorMsg} aria-invalid={!!errorMsg} />
+      {#if errorMsg}
+        <span class="error-msg" role="alert">{errorMsg}</span>
+      {:else if current && !checked}
+        <span class="hint">{$t('regex.checking')}</span>
       {/if}
-      <span class="hint">Python <code>re</code> syntax. Quantifiers: <code>\d+</code> <code>\w*</code> <code>[A-Z]</code>. Case-insensitive: <code>(?i)</code>.</span>
+      <span class="hint">{$t('regex.hint')}</span>
     </label>
 
-    <label>Confidence score: {score.toFixed(2)}
+    <label>{$t('regex.score', { score: score.toFixed(2) })}
       <input type="range" min="0" max="1" step="0.05" bind:value={score} />
     </label>
 
-    <label>Test input
-      <input type="text" bind:value={testInput} placeholder="Paste a sample value here..." class="mono" />
-      {#if testInput && matchResult !== 'error'}
+    <label>{$t('regex.test')}
+      <input type="text" bind:value={testInput} placeholder={$t('regex.test_placeholder')} class="mono" />
+      {#if testInput && current && !errorMsg}
         <span class="feedback" class:match={matchResult === 'match'}>
-          {matchResult === 'match' ? '✓ Match' : '○ No match'}
+          {matchResult === 'match' ? $t('regex.match') : matchResult === 'nopreview' ? $t('regex.no_preview') : $t('regex.no_match')}
         </span>
       {/if}
     </label>
 
     <div class="actions">
-      <button class="btn btn-ghost" type="button" onclick={onclose}>Cancel</button>
-      <button class="btn btn-primary" type="button"
-        disabled={!entityType || !pattern || matchResult === 'error'} onclick={add}>
-        Add Pattern
+      <button class="btn btn-ghost" type="button" onclick={onclose}>{$t('regex.cancel')}</button>
+      <button class="btn btn-primary" type="button" disabled={!canAdd} onclick={add}>
+        {$t('regex.add')}
       </button>
     </div>
   </div>
@@ -124,13 +144,5 @@
     font-size: 0.72rem;
     color: var(--color-text-secondary);
     margin-top: 2px;
-  }
-  .hint code {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    background: var(--color-border);
-    padding: 1px 4px;
-    border-radius: 3px;
-    color: var(--color-text-primary);
   }
 </style>

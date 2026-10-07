@@ -265,6 +265,8 @@ await step('custom regex pattern: builder usable inside Advanced, Esc closes onl
   const inputs = await page.$$('.adv-dialog .overlay .modal input[type=text]');
   await inputs[0].click(); await page.keyboard.type('TICKET_ID');
   await inputs[1].click(); await page.keyboard.type('TICKET-\\d+');
+  // Add waits for Python to accept the pattern (checked by the server).
+  await page.waitForFunction(() => !document.querySelector('.adv-dialog .overlay .actions .btn-primary').disabled);
   await page.click('.adv-dialog .overlay .actions .btn-primary');
   await page.waitForSelector('.patterns-table');
   assert.match(await page.$eval('.patterns-table', (e) => e.innerText), /TICKET_ID/);
