@@ -33,7 +33,12 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') onclose?.();
+    if (e.key === 'Escape') {
+      // Close only the builder, not the Advanced dialog it sits in.
+      e.preventDefault();
+      e.stopPropagation();
+      onclose?.();
+    }
   }
 </script>
 

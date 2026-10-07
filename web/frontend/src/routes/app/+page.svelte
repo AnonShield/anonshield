@@ -782,11 +782,11 @@
       </div>
     </div>
   </div>
+  <!-- Inside the modal dialog: outside it the builder was inert (no typing). -->
+  {#if showRegexBuilder}
+    <RegexBuilder onclose={() => (showRegexBuilder = false)} />
+  {/if}
 </dialog>
-
-{#if showRegexBuilder}
-  <RegexBuilder onclose={() => (showRegexBuilder = false)} />
-{/if}
 
 <style>
   /* ── Profile toast ── */
