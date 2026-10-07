@@ -40,3 +40,5 @@ first = [f"{k}.{s}" if isinstance(v, dict) else k for k, v in records[0].items()
 (out / "ip-only-profile.yaml").write_text("strategy: regex\nlang: en\nslug_length: 8\nentities:\n  - IP_ADDRESS\n")
 (out / "big.txt").write_text("".join(
     f"Line {i}: Maria Souza works at Acme Corp in Porto Alegre with John Smith.\n" for i in range(6000)))
+# Over the 1 MB limit of the limited instance (URL_LIMITED in e2e.mjs).
+(out / "large.txt").write_text("".join(f"Line {i}: contact maria{i}@example.com\n" for i in range(50000)))
