@@ -8,6 +8,7 @@
   import FieldSelector from '#lib/components/FieldSelector.svelte';
   import { config, toYaml, fromYaml } from '#lib/stores/config.js';
   import { activeJob, clearJob } from '#lib/stores/job.js';
+  import { jobOptions } from '#lib/jobRequest.js';
   import { createJob, fetchEntities, validateProfile, downloadUrl, pollStatus, cancelJob } from '#lib/api.js';
   import type { EntityGroup } from '#lib/api.js';
   import { t } from '#lib/i18n.js';
@@ -117,26 +118,7 @@
     errorMsg = '';
 
     try {
-      // null = all (no filter); empty Set = none; non-empty Set = specific selection
-      const sel = $config.selected_entities;
-      const entities = sel === null ? undefined : [...sel];
-
-      const yamlConfig = $config.custom_patterns.length > 0 || $config.allow_list.length > 0 || $config.preserve_entities.length > 0
-        ? toYaml($config, groups)
-        : undefined;
-
-      const job = await createJob(selectedFile, {
-        key:            $config.key || undefined,
-        strategy:       $config.strategy,
-        lang:           $config.lang,
-        model:          $config.model || undefined,
-        entities,
-        config:         yamlConfig,
-        anonymization_config: $config.anonymization_config,
-        ner_score_threshold: $config.ner_score_threshold,
-        ner_aggregation_strategy: $config.ner_aggregation_strategy,
-        slug_length: $config.slug_length,
-      });
+      const job = await createJob(selectedFile, jobOptions($config, groups));
 
       activeJob.set({ id: job.job_id, filename: selectedFile.name, status: null, pollInterval: null });
 
@@ -313,18 +295,7 @@
       if (item.status !== 'pending') continue;
       batchQueue = batchQueue.map(b => b.id === item.id ? { ...b, status: 'processing' } : b);
       try {
-        const sel = $config.selected_entities;
-        const entities = sel === null ? undefined : [...sel];
-        const yamlConfig = $config.custom_patterns.length > 0 || $config.allow_list.length > 0 || $config.preserve_entities.length > 0 ? toYaml($config, groups) : undefined;
-        const job = await createJob(item.file, {
-          key: $config.key || undefined, strategy: $config.strategy,
-          lang: $config.lang, model: $config.model || undefined,
-          entities, config: yamlConfig,
-          slug_length: $config.slug_length,
-          ner_score_threshold: $config.ner_score_threshold,
-          ner_aggregation_strategy: $config.ner_aggregation_strategy,
-          anonymization_config: $config.anonymization_config,
-        });
+        const job = await createJob(item.file, jobOptions($config, groups));
         // poll until done
         await new Promise<void>((resolve, reject) => {
           const iv = setInterval(async () => {

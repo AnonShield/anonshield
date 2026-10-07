@@ -62,13 +62,19 @@ export function resetConfig() {
   config.set({ ...DEFAULTS, selected_entities: null });
 }
 
+/** The entity types to anonymize: undefined for all of them, otherwise the
+ *  selection plus the types of the custom patterns. Those are not in the entity
+ *  list, so they cannot be unchecked there; left out, the server skipped the
+ *  pattern and its matches stayed in clear text. */
+export function selectedTypes(cfg: Config): string[] | undefined {
+  if (cfg.selected_entities === null) return undefined;
+  return [...new Set([...cfg.selected_entities, ...cfg.custom_patterns.map(p => p.entity_type.toUpperCase())])];
+}
+
 /** Serialize config to YAML profile string (compatible with CLI --config). */
 export function toYaml(cfg: Config, allGroups: EntityGroup[]): string {
   const allIds = [...new Set([...allGroups.flatMap(g => g.entities.map(e => e.id)), ...cfg.custom_patterns.map(p => p.entity_type.toUpperCase())])];
-  // null  → all selected (no filter) → use allIds
-  // Set() → none selected            → []
-  // Set(…)→ specific selection       → [...ids]
-  const entities = cfg.selected_entities === null ? allIds : [...cfg.selected_entities];
+  const entities = selectedTypes(cfg) ?? allIds;
 
   const data: Record<string, unknown> = {
     strategy: cfg.strategy,
