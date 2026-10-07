@@ -125,6 +125,8 @@ const messages = {
     'preprocess.step.border.desc': 'Adds 20 px white padding. Prevents Tesseract from missing edge text.',
     /* fields */
     'fields.title': 'Rules per field',
+    'fields.error_read': 'Could not read the file\'s columns.',
+    'fields.error_detect': 'Could not detect the fields; check the connection to the server.',
     'fields.badge': 'Structured file',
     'fields.close': 'Close field rules',
     'fields.col.name': 'Field',
@@ -629,6 +631,8 @@ const messages = {
     'preprocess.step.border.desc': 'Adiciona 20 px de margem branca. Evita que o Tesseract perca texto nas bordas.',
     /* fields */
     'fields.title': 'Regras por campo',
+    'fields.error_read': 'Não foi possível ler as colunas do arquivo.',
+    'fields.error_detect': 'Não foi possível detectar os campos; confira a conexão com o servidor.',
     'fields.badge': 'Arquivo estruturado',
     'fields.close': 'Fechar regras por campo',
     'fields.col.name': 'Campo',
