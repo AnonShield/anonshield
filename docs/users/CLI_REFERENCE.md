@@ -382,6 +382,8 @@ Numeric values (JSON numbers, numeric XLSX cells) are anonymized only when their
     "asset.name":           { "entity_type": "HOSTNAME" },
     "asset.host_name":      { "entity_type": "HOSTNAME" },
     "asset.netbios_name":   { "entity_type": "HOSTNAME" },
+    "asset_cloud_resource.name": { "entity_type": "HOSTNAME" },
+    "container_image.name": { "entity_type": "HOSTNAME" },
     "asset.display_fqdn":   { "entity_type": "HOSTNAME" },
     "asset.display_mac_address": { "entity_type": "MAC_ADDRESS" },
     "scan.target":          { "entity_type": "HOSTNAME" }
@@ -392,11 +394,11 @@ Numeric values (JSON numbers, numeric XLSX cells) are anonymized only when their
 With this config:
 - `severity`, `port`, `cvss_score`, etc. are preserved as-is
 - `asset.ipv4_addresses` is always pseudonymized as `IP_ADDRESS`, no matter its format
-- `asset.name`, `asset.host_name` and `asset.netbios_name` are always pseudonymized as `HOSTNAME`: a machine name without a domain (`srv-files`) reads as an ordinary word, and detection alone leaves most of them unchanged
+- the machine-name fields are always pseudonymized as `HOSTNAME`: a machine name without a domain (`srv-files`) reads as an ordinary word, and detection alone leaves most of them unchanged
 - `output` and `description` go through full NER analysis
 - Everything else is ignored, including fields absent from the list (list every field that may hold identifiers)
 
-In Tenable exports, `definition.output` repeats the host's plugin output (with its IPs), so do not exclude it with the public `definition.*` fields.
+In Tenable exports, `asset_cloud_resource.name` and `container_image.name` repeat the asset's name, and `definition.output` repeats the host's plugin output (with its IPs), so do not exclude it with the public `definition.*` fields.
 
 ```bash
 ./docker/run.sh ./nessus_scan.json --anonymization-config ./anon_config.json
