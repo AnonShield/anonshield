@@ -158,7 +158,7 @@ jobs:
           unset ANON_SECRET_KEY
           out="anon/output/anon_nota final.txt"
           "$GITHUB_WORKSPACE/docker/run.sh" "nota final.txt" --db-mode in-memory
-          cat "$out"; ! grep -E 'maria@example.com|192\.168\.10\.45|212 555|Maria Oliveira' "$out"
+          cat "$out"; if grep -E 'maria@example.com|192\.168\.10\.45|212 555|Maria Oliveira' "$out"; then exit 1; fi
           test -s anon/secret.key
           test -z "$(find anon ! -user "$(id -u)" -print -quit)"
           first=$(cat "$out")
@@ -166,7 +166,7 @@ jobs:
           test "$first" = "$(cat "$out")"
           mkdir "$W/ps" && cd "$W/ps" && cp "$W/nota final.txt" .
           pwsh -NoProfile -File "$GITHUB_WORKSPACE/docker/run.ps1" "nota final.txt" --anonymization-strategy regex --db-mode in-memory
-          cat "$out"; ! grep -E 'maria@example.com|192\.168\.10\.45|212 555' "$out"
+          cat "$out"; if grep -E 'maria@example.com|192\.168\.10\.45|212 555' "$out"; then exit 1; fi
           test -s anon/secret.key
           docker image rm anonshield/anon:latest
       - name: Push CPU image
@@ -258,7 +258,8 @@ jobs:
       - name: Smoke test web image
         if: env.RUN == 'true'
         # Started the way the README says, then a regex job and a NER job through
-        # the API the interface uses, and the interface itself.
+        # the API the interface uses, and the interface itself. Leak checks use
+        # "if grep; then exit 1": under set -e a bare "! grep" never fails the step.
         run: |
           set -euo pipefail
           docker run -d --name web -p 127.0.0.1:8080:8080 -v anonshield-ci:/data anon-web:ci
@@ -268,17 +269,17 @@ jobs:
           curl -fsS http://localhost:8080/app | grep -q '<html'
           printf 'Contact Maria Oliveira <maria@example.com> from 192.168.10.45.\n' > s.txt
           for strategy in regex filtered; do
-            id=$(curl -fsS -F file=@s.txt -F strategy=$strategy http://localhost:8080/api/jobs | jq -r .job_id)
+            id=$(curl -fsS -F file=@s.txt -F "strategy=$strategy" http://localhost:8080/api/jobs | jq -r .job_id)
             for i in $(seq 300); do
-              state=$(curl -fsS http://localhost:8080/api/jobs/$id/status | jq -r .status)
-              if [ "$state" = done ] || [ "$state" = error ]; then break; fi
+              state=$(curl -fsS "http://localhost:8080/api/jobs/$id/status" | jq -r .status)
+              if [ "$state" = "done" ] || [ "$state" = "error" ]; then break; fi
               sleep 2
             done
-            test "$state" = done
-            out=$(curl -fsS http://localhost:8080/api/jobs/$id/download); echo "$out"
-            ! grep -E 'maria@example.com|192\.168\.10\.45' <<<"$out"
+            test "$state" = "done"
+            out=$(curl -fsS "http://localhost:8080/api/jobs/$id/download"); echo "$out"
+            if grep -E 'maria@example.com|192\.168\.10\.45' <<<"$out"; then exit 1; fi
           done
-          ! grep -q 'Maria Oliveira' <<<"$out"
+          if grep 'Maria Oliveira' <<<"$out"; then exit 1; fi
       - if: env.RUN == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
