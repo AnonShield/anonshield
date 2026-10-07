@@ -74,8 +74,8 @@ def validate_profile(body: dict) -> dict:
 async def analyze_fields(file: UploadFile) -> dict:
     """Detect columns/fields from a structured file (CSV, XLSX, JSON, JSONL).
     Returns {fields: [{name, sample_values}]} for field selector UI.
-    CSV and JSONL use the first 256 KB; a JSON array is streamed to the end of
-    its first record; XLSX opens the whole workbook.
+    CSV reads its header; JSON and JSONL are streamed through every record, so
+    a field that only some records have is listed; XLSX opens the workbook.
     """
     from src.anon.utils import detect_fields_from_stream
 

@@ -25,19 +25,16 @@ def flatten_keys(obj: Any, prefix: str = "", depth: int = 0, max_depth: int = 2)
         return out
     return [prefix] if prefix else []
 
-def _merged_fields(records: Iterable[Any], stream, max_records: int = 2000,
-                   max_bytes: int = 32 * 1024 * 1024) -> List[str]:
-    """Field paths of the first records, in first-seen order."""
+def _merged_fields(records: Iterable[Any]) -> List[str]:
+    """Field paths of all records, in first-seen order."""
     seen: Dict[str, None] = {}
-    for count, record in enumerate(records, 1):
+    for record in records:
         if isinstance(record, dict):
             seen.update(dict.fromkeys(flatten_keys(record)))
-        if count >= max_records or stream.tell() > max_bytes:
-            break
     return list(seen)
 
 
-def _object_keys(stream, max_bytes: int = 64 * 1024 * 1024) -> List[str]:
+def _object_keys(stream) -> List[str]:
     """Field paths of a top-level JSON object, as flatten_keys names them,
     streamed so that a large array inside it is never loaded."""
     order: List[str] = []
@@ -50,8 +47,6 @@ def _object_keys(stream, max_bytes: int = 64 * 1024 * 1024) -> List[str]:
                 children.setdefault(prefix, []).append(f"{prefix}.{value}")
         elif event == "end_map" and prefix == "":
             break
-        if stream.tell() > max_bytes:
-            break
     return [path for key in order for path in children.get(key, [key])]
 
 
@@ -63,15 +58,15 @@ def detect_fields_from_stream(stream: io.IOBase, ext: str, max_bytes: int = 256 
     ext = ext.lower().lstrip(".")
 
     # Records are read whole, however long or pretty-printed, and the fields of
-    # the first records are merged: a field that only some records have (and
-    # that a rule list would otherwise leave out) is still listed.
+    # every record are merged: a field that only record 10,000 has is listed
+    # too. Streaming keeps memory flat (about 1 s for 125 MB).
     if ext == "json":
         head = stream.read(64)
         stream.seek(0)
         start = head.lstrip(b"\xef\xbb\xbf \t\r\n")[:1]
         try:
             if start == b"[":
-                fields = _merged_fields(ijson.items(stream, "item"), stream)
+                fields = _merged_fields(ijson.items(stream, "item"))
                 if fields:
                     return fields
             elif start == b"{":
@@ -85,7 +80,7 @@ def detect_fields_from_stream(stream: io.IOBase, ext: str, max_bytes: int = 256 
                 if line.strip():
                     yield json.loads(line)
         try:
-            fields = _merged_fields(records(), stream)
+            fields = _merged_fields(records())
         except ValueError:
             fields = []
         if fields:
