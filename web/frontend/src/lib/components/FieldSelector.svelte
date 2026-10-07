@@ -3,7 +3,7 @@
   Includes compact summary bar and high-fidelity modal overlay.
 -->
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { untrack } from 'svelte';
   import { PUBLIC_API_URL } from '$app/env/public';
   import { t } from '#lib/i18n.js';
   import type { EntityGroup } from '#lib/api.js';
@@ -14,10 +14,13 @@
   let {
     file,
     entityGroups = [],
+    initial = null,
     onchange,
   }: {
     file: File;
     entityGroups: EntityGroup[];
+    /** The config in use (e.g. from an imported profile), shown as rules. */
+    initial?: AnonymizationConfig | null;
     onchange?: (config: AnonymizationConfig | null) => void;
   } = $props();
 
@@ -56,11 +59,49 @@
     ? fields.filter(f => f.toLowerCase().includes(filter.trim().toLowerCase()))
     : fields);
 
-  async function detectFields() {
+  // JSON of the last config this component sent, to tell a config that comes
+  // from outside (an imported profile) from the echo of its own changes.
+  let lastSent = 'null';
+  function send(cfg: AnonymizationConfig | null) {
+    lastSent = JSON.stringify(cfg);
+    onchange?.(cfg);
+  }
+
+  // Shows a config as rules: forced fields with their type, excluded fields as
+  // Skip, every other field Auto. A fields_to_anonymize list is not read as
+  // "skip the rest": profiles saved before 2026-10 listed only the first
+  // record's fields, and skipping the others would leave them in clear text.
+  // Fields named by a rule but not detected are added.
+  function applyConfig(cfg: AnonymizationConfig | null) {
+    if (!cfg) {
+      mode = 'all';
+      rules = Object.fromEntries(fields.map(f => [f, { name: f, type: 'auto' as RuleType }]));
+      return;
+    }
+    const force = cfg.force_anonymize ?? {};
+    const exclude = cfg.fields_to_exclude ?? [];
+    const covers = (f: string, list: string[]) => list.some(r => f === r || f.startsWith(r + '.'));
+    const missing = [...Object.keys(force), ...exclude].filter(f => !fields.includes(f));
+    if (missing.length) fields = [...fields, ...missing];
+    const next: Record<string, FieldRule> = {};
+    for (const f of fields) {
+      if (force[f]) next[f] = { name: f, type: 'force', forcedEntity: force[f].entity_type };
+      else if (covers(f, exclude)) next[f] = { name: f, type: 'exclude' };
+      else next[f] = { name: f, type: 'auto' };
+    }
+    rules = next;
+    mode = 'targeted';
+  }
+
+  async function detectFields(target: File) {
+    loading = true;
+    error = '';
+    fields = [];
+    rules = {};
     if (!supported) { loading = false; return; }
     try {
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', target);
       const r = await fetch(`${API_BASE}/analyze-fields`, { method: 'POST', body: fd });
       if (r.ok) {
         const data = await r.json();
@@ -77,10 +118,26 @@
     } catch {
       error = 'Could not detect fields.';
     }
+    if (target !== file) return;  // another file was chosen meanwhile
     loading = false;
+    if (initial) { applyConfig(initial); emit(); }
   }
 
-  onMount(detectFields);
+  // Detect again whenever another file is chosen.
+  $effect(() => {
+    const target = file;
+    untrack(() => detectFields(target));
+  });
+
+  // A profile imported while this file is open.
+  $effect(() => {
+    const incoming = initial ?? null;
+    untrack(() => {
+      if (loading || JSON.stringify(incoming) === lastSent) return;
+      applyConfig(incoming);
+      emit();
+    });
+  });
 
   function setRuleType(fieldName: string, type: RuleType) {
     rules[fieldName].type = type;
@@ -102,7 +159,7 @@
   }
 
   function emit() {
-    if (mode === 'all') { onchange?.(null); return; }
+    if (mode === 'all') { send(null); return; }
     const force: Record<string, { entity_type: string }> = {};
     const exclude: string[] = [];
     for (const f of fields) {
@@ -112,14 +169,14 @@
     }
     if (Object.keys(force).length === 0) {
       // Skips only: every other field, including any not listed here, is scanned.
-      onchange?.(exclude.length ? { fields_to_exclude: exclude } : null);
+      send(exclude.length ? { fields_to_exclude: exclude } : null);
       return;
     }
     // A forced field puts the engine in explicit mode, which ignores unlisted
     // paths; listing each top-level key keeps the other fields (and any that
     // only later records have) scanned. Skips and forces take precedence.
     const roots = [...new Set(fields.map(f => f.split('.')[0]))];
-    onchange?.({ force_anonymize: force, fields_to_anonymize: roots, fields_to_exclude: exclude });
+    send({ force_anonymize: force, fields_to_anonymize: roots, fields_to_exclude: exclude });
   }
 
   function setMode(next: FieldMode) {

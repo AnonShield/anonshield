@@ -82,7 +82,7 @@ def main() -> None:
     signal.signal(signal.SIGINT, stop)
 
     if wait_until(lambda: socket.create_connection(("127.0.0.1", 6379), timeout=1).close() is None, children, 30):
-        worker = subprocess.Popen(["celery", "-A", "workers.celery_app", "worker", "-Q", "fast",
+        worker = subprocess.Popen(["celery", "-A", "workers.celery_app", "--quiet", "worker", "-Q", "fast",
                                    "--pool=solo", "--loglevel=warning"])
         # All interfaces of the container, so that `docker run -p` reaches it;
         # the documented command publishes it on the host's 127.0.0.1 only.

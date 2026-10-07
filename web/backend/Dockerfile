@@ -41,7 +41,9 @@ ENV VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH="/app" \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    HF_HUB_VERBOSITY=error \
+    HF_HUB_DISABLE_PROGRESS_BARS=1
 
 # Application source.
 COPY src ./src
