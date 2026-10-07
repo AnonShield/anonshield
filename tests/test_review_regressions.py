@@ -148,3 +148,34 @@ def test_undecodable_text_is_a_clear_error(tmp_path):
     source.write_bytes(b"caf\xc3 \x81 a@example.com")
     with pytest.raises(ValueError, match="Save it as UTF-8"):
         process(source, regex_orchestrator(), tmp_path / "out")
+
+
+@pytest.mark.parametrize("scenario,expected,code", [
+    ("running", "already running: http://localhost:8080", 0),
+    ("port_taken", "Port 8080 is used by another program", 1),
+    ("new", "AnonShield is ready: http://localhost:8080", 0),
+])
+def test_docker_wrapper_web_mode(tmp_path, scenario, expected, code):
+    docker = tmp_path / "docker"
+    docker.write_text(f"""#!/bin/bash
+case "$1 $2" in
+  "info "*) exit 0 ;;
+  "inspect -f")
+    case "$3" in
+      *Status*) [ "{scenario}" = running ] && echo running || {{ [ -f {tmp_path}/started ] && echo healthy || exit 1; }} ;;
+      *Running*) echo true ;;
+    esac ;;
+  "port "*) echo 127.0.0.1:8080 ;;
+  "image inspect") exit 0 ;;
+  "run -d")
+    [ "{scenario}" = port_taken ] && {{ echo "Bind for 127.0.0.1:8080 failed: port is already allocated" >&2; exit 125; }}
+    touch {tmp_path}/started; echo abc ;;
+  *) exit 0 ;;
+esac
+""")
+    docker.chmod(0o755)
+    env = {**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"}
+    result = subprocess.run(["bash", str(ROOT / "docker/run.sh"), "--web"], cwd=tmp_path, env=env,
+                            capture_output=True, text=True, timeout=30)
+    assert expected in result.stdout + result.stderr
+    assert result.returncode == code

@@ -16,6 +16,7 @@
 #   ./run.sh ./YOUR_FILE.csv
 #   ./run.sh ./your/folder/                     # entire folder
 #   ./run.sh --gpu ./YOUR_FILE.csv              # GPU
+#   ./run.sh --web                              # web interface, http://localhost:8080
 #   ./run.sh --help
 #   ./run.sh --list-entities
 #
@@ -37,8 +38,15 @@ log_error() { echo -e "${RED}[anon]${NC} $1"; }
 usage() {
     cat <<'HELP'
 Usage: ./run.sh [--gpu] FILE_OR_FOLDER [OPTIONS]
+       ./run.sh --web [--port N | --stop | --update]
 
-Examples:
+Web interface, in your browser:
+  ./run.sh --web             Start it, then open http://localhost:8080
+  ./run.sh --web --port 8081 Use another port
+  ./run.sh --web --stop      Stop it (the key and models are kept)
+  ./run.sh --web --update    Download the latest version and restart it
+
+Command line, examples:
   ./run.sh report.csv
   ./run.sh "reports for review/" --output-dir ./results
   ./run.sh report.txt --anonymization-strategy regex
@@ -131,6 +139,95 @@ if ! docker_err=$(docker info 2>&1 >/dev/null); then
     fi
     exit 1
 fi
+
+# ---------------------------------------------------------------------------
+# --web: the web interface, one container (anonshield/anon:web) whose key,
+# models and metrics live in the "anonshield" volume
+# ---------------------------------------------------------------------------
+WEB_IMAGE="${ANON_WEB_IMAGE:-anonshield/anon:web}"
+WEB_NAME="anonshield"
+
+web_port() { docker port "$WEB_NAME" 8080/tcp 2>/dev/null | head -n 1 | sed 's/.*://'; }
+
+web_main() {
+    local action=start port=8080 state out
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --web) ;;
+            --gpu) log_info "The web interface runs on the CPU; --gpu is ignored." ;;
+            --stop) action=stop ;;
+            --update) action=update ;;
+            --port) port="${2:-}"; shift ;;
+            --port=*) port="${1#*=}" ;;
+            *) log_error "With --web, use --port N, --stop or --update (got: $1)."; return 2 ;;
+        esac
+        shift
+    done
+    if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+        log_error "--port needs a number. Example: ./run.sh --web --port 8081"
+        return 2
+    fi
+    state=$(docker inspect -f '{{.State.Status}}' "$WEB_NAME" 2>/dev/null || true)
+
+    if [[ "$action" == stop ]]; then
+        if [[ "$state" == running ]]; then
+            docker stop "$WEB_NAME" >/dev/null
+            log_ok "Stopped. The key and models are kept; start again with ./run.sh --web"
+        else
+            log_info "The web interface is not running."
+        fi
+        return 0
+    fi
+    if [[ "$action" == update ]]; then
+        docker pull "$WEB_IMAGE"
+        if [[ -n "$state" ]]; then docker rm -f "$WEB_NAME" >/dev/null; fi
+        state=""
+    fi
+
+    if [[ "$state" == running ]]; then
+        log_ok "AnonShield is already running: http://localhost:$(web_port)"
+        log_info "Stop it with ./run.sh --web --stop"
+        return 0
+    elif [[ -n "$state" ]]; then
+        docker start "$WEB_NAME" >/dev/null
+        port=$(web_port)
+    else
+        if ! docker image inspect "$WEB_IMAGE" >/dev/null 2>&1; then
+            log_info "Downloading the web interface (about 1.5 GB, once)..."
+            docker pull "$WEB_IMAGE"
+        fi
+        if ! out=$(docker run -d --name "$WEB_NAME" --restart unless-stopped \
+                -p "127.0.0.1:$port:8080" -v anonshield:/data "$WEB_IMAGE" 2>&1); then
+            docker rm -f "$WEB_NAME" >/dev/null 2>&1 || true
+            if [[ "$out" == *"already allocated"* || "$out" == *"address already in use"* ]]; then
+                log_error "Port $port is used by another program. Choose another: ./run.sh --web --port 8081"
+            else
+                log_error "Could not start the web interface: $(echo "$out" | tail -n 1)"
+            fi
+            return 1
+        fi
+    fi
+
+    log_info "Starting..."
+    for _ in $(seq 90); do
+        if [[ "$(docker inspect -f '{{.State.Running}}' "$WEB_NAME" 2>/dev/null)" != true ]]; then
+            log_error "It stopped while starting. Its last messages:"
+            docker logs --tail 5 "$WEB_NAME" 2>&1
+            return 1
+        fi
+        [[ "$(docker inspect -f '{{.State.Health.Status}}' "$WEB_NAME" 2>/dev/null)" == healthy ]] && break
+        sleep 2
+    done
+    log_ok "AnonShield is ready: http://localhost:$port"
+    log_info "Stop: ./run.sh --web --stop    Update: ./run.sh --web --update"
+}
+
+for arg in "$@"; do
+    if [[ "$arg" == --web ]]; then
+        web_main "$@"
+        exit $?
+    fi
+done
 
 # ---------------------------------------------------------------------------
 # Create folder structure

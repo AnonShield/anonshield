@@ -29,7 +29,15 @@
 if ($args.Count -eq 0 -or $args[0] -in @('-h', '--help')) {
     Write-Host @"
 Usage: .\run.ps1 [--gpu] FILE_OR_FOLDER [OPTIONS]
+       .\run.ps1 --web [--port N | --stop | --update]
 
+Web interface, in your browser:
+  .\run.ps1 --web             Start it, then open http://localhost:8080
+  .\run.ps1 --web --port 8081 Use another port
+  .\run.ps1 --web --stop      Stop it (the key and models are kept)
+  .\run.ps1 --web --update    Download the latest version and restart it
+
+Command line, examples:
   .\run.ps1 report.csv
   .\run.ps1 "reports for review" --output-dir .\results
   .\run.ps1 report.txt --anonymization-strategy regex
@@ -116,6 +124,86 @@ $ErrorActionPreference = "Stop"
 if (-not $dockerOk) {
     Write-Err "Docker is not running. Start Docker Desktop and try again."
     exit 1
+}
+
+# ---------------------------------------------------------------------------
+# --web: the web interface, one container (anonshield/anon:web) whose key,
+# models and metrics live in the "anonshield" volume
+# ---------------------------------------------------------------------------
+if ($args -contains '--web') {
+    $WebImage = if ($env:ANON_WEB_IMAGE) { $env:ANON_WEB_IMAGE } else { "anonshield/anon:web" }
+    $WebName  = "anonshield"
+    $WebArgs  = @($args)
+    $Action   = "start"
+    $Port     = "8080"
+    for ($i = 0; $i -lt $WebArgs.Count; $i++) {
+        $a = [string]$WebArgs[$i]
+        if ($a -eq '--web') { }
+        elseif ($a -eq '--gpu') { Write-Info "The web interface runs on the CPU; --gpu is ignored." }
+        elseif ($a -eq '--stop') { $Action = "stop" }
+        elseif ($a -eq '--update') { $Action = "update" }
+        elseif ($a -eq '--port') { $i++; $Port = if ($i -lt $WebArgs.Count) { [string]$WebArgs[$i] } else { "" } }
+        elseif ($a -like '--port=*') { $Port = $a.Substring(7) }
+        else { Write-Err "With --web, use --port N, --stop or --update (got: $a)."; exit 2 }
+    }
+    if ($Port -notmatch '^\d+$') { Write-Err "--port needs a number. Example: .\run.ps1 --web --port 8081"; exit 2 }
+
+    $ErrorActionPreference = "Continue"
+    function Get-WebPort { ((& docker port $WebName 8080/tcp 2>$null) | Select-Object -First 1) -replace '.*:', '' }
+    $State = & docker inspect -f '{{.State.Status}}' $WebName 2>$null
+
+    if ($Action -eq "stop") {
+        if ($State -eq "running") {
+            $null = & docker stop $WebName 2>&1
+            Write-Ok "Stopped. The key and models are kept; start again with .\run.ps1 --web"
+        } else { Write-Info "The web interface is not running." }
+        exit 0
+    }
+    if ($Action -eq "update") {
+        & docker pull $WebImage
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        if ($State) { $null = & docker rm -f $WebName 2>&1 }
+        $State = $null
+    }
+
+    if ($State -eq "running") {
+        Write-Ok "AnonShield is already running: http://localhost:$(Get-WebPort)"
+        Write-Info "Stop it with .\run.ps1 --web --stop"
+        exit 0
+    } elseif ($State) {
+        $Out = & docker start $WebName 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) { Write-Err "Could not start the web interface: $($Out.Trim())"; exit 1 }
+        $Port = Get-WebPort
+    } else {
+        $null = & docker image inspect $WebImage 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Info "Downloading the web interface (about 1.5 GB, once)..."
+            & docker pull $WebImage
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+        }
+        $Out = & docker run -d --name $WebName --restart unless-stopped -p "127.0.0.1:${Port}:8080" -v anonshield:/data $WebImage 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) {
+            $null = & docker rm -f $WebName 2>&1
+            if ($Out -match 'already allocated|address already in use') {
+                Write-Err "Port $Port is used by another program. Choose another: .\run.ps1 --web --port 8081"
+            } else { Write-Err "Could not start the web interface: $(($Out.Trim() -split "`n")[-1])" }
+            exit 1
+        }
+    }
+
+    Write-Info "Starting..."
+    for ($n = 0; $n -lt 90; $n++) {
+        if ((& docker inspect -f '{{.State.Running}}' $WebName 2>$null) -ne "true") {
+            Write-Err "It stopped while starting. Its last messages:"
+            & docker logs --tail 5 $WebName
+            exit 1
+        }
+        if ((& docker inspect -f '{{.State.Health.Status}}' $WebName 2>$null) -eq "healthy") { break }
+        Start-Sleep -Seconds 2
+    }
+    Write-Ok "AnonShield is ready: http://localhost:$Port"
+    Write-Info "Stop: .\run.ps1 --web --stop    Update: .\run.ps1 --web --update"
+    exit 0
 }
 
 # ---------------------------------------------------------------------------
