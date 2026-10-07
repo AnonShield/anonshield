@@ -203,3 +203,12 @@ def test_large_json_object_and_long_jsonl_line_have_their_fields(client, name, b
     assert len(data) > 256 * 1024
     response = client.post("/api/analyze-fields", files={"file": (name, data)})
     assert [f["name"] for f in response.json()["fields"]] == fields
+
+
+@pytest.mark.parametrize("name", ["hosts.json", "hosts.jsonl"])
+def test_fields_present_only_in_later_records_are_listed(client, name):
+    import json
+    records = [{"asset": {"host_name": "a"}}, {"asset": {"host_name": "b"}}, {"asset": {"host_name": "c", "netbios_name": "C"}}]
+    data = (json.dumps(records) if name.endswith(".json") else "".join(json.dumps(r) + "\n" for r in records)).encode()
+    response = client.post("/api/analyze-fields", files={"file": (name, data)})
+    assert [f["name"] for f in response.json()["fields"]] == ["asset.host_name", "asset.netbios_name"]

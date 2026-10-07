@@ -25,6 +25,18 @@ def flatten_keys(obj: Any, prefix: str = "", depth: int = 0, max_depth: int = 2)
         return out
     return [prefix] if prefix else []
 
+def _merged_fields(records: Iterable[Any], stream, max_records: int = 2000,
+                   max_bytes: int = 32 * 1024 * 1024) -> List[str]:
+    """Field paths of the first records, in first-seen order."""
+    seen: Dict[str, None] = {}
+    for count, record in enumerate(records, 1):
+        if isinstance(record, dict):
+            seen.update(dict.fromkeys(flatten_keys(record)))
+        if count >= max_records or stream.tell() > max_bytes:
+            break
+    return list(seen)
+
+
 def _object_keys(stream, max_bytes: int = 64 * 1024 * 1024) -> List[str]:
     """Field paths of a top-level JSON object, as flatten_keys names them,
     streamed so that a large array inside it is never loaded."""
@@ -50,32 +62,34 @@ def detect_fields_from_stream(stream: io.IOBase, ext: str, max_bytes: int = 256 
     """
     ext = ext.lower().lstrip(".")
 
-    # Records are read whole, however long or pretty-printed: the first element
-    # of a top-level array, the top-level object, or the first JSONL line.
+    # Records are read whole, however long or pretty-printed, and the fields of
+    # the first records are merged: a field that only some records have (and
+    # that a rule list would otherwise leave out) is still listed.
     if ext == "json":
         head = stream.read(64)
         stream.seek(0)
         start = head.lstrip(b"\xef\xbb\xbf \t\r\n")[:1]
         try:
             if start == b"[":
-                first = next(ijson.items(stream, "item"), None)
-                if isinstance(first, dict):
-                    return flatten_keys(first)
+                fields = _merged_fields(ijson.items(stream, "item"), stream)
+                if fields:
+                    return fields
             elif start == b"{":
                 return _object_keys(stream)
         except Exception:
             pass
         stream.seek(0)
     elif ext in ("jsonl", "ndjson"):
-        for line in iter(lambda: stream.readline(64 * 1024 * 1024), b""):
-            if line.strip():
-                try:
-                    first = json.loads(line)
-                except ValueError:
-                    break
-                if isinstance(first, dict):
-                    return flatten_keys(first)
-                break
+        def records():
+            for line in iter(lambda: stream.readline(64 * 1024 * 1024), b""):
+                if line.strip():
+                    yield json.loads(line)
+        try:
+            fields = _merged_fields(records(), stream)
+        except ValueError:
+            fields = []
+        if fields:
+            return fields
         stream.seek(0)
 
     # Read a sample chunk for analysis
