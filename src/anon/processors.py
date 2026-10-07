@@ -711,7 +711,14 @@ class TextFileProcessor(FileProcessor):
                 
                 if unique_texts:
                     logging.debug(f"Anonymizing {len(unique_texts)} unique lines for group '{group_key}'.")
-                    anonymized_texts = self._process_batch_smart(unique_texts, forced_entity_type=current_forced_type)
+                    # In blocks of lines, so a large file reports progress (and
+                    # the web app can stop it) instead of one silent call.
+                    anonymized_texts = []
+                    block = 500
+                    for start in tqdm(range(0, len(unique_texts), block), unit="block", leave=False,
+                                      desc=f"Anonymizing {os.path.basename(self.file_path)}"):
+                        anonymized_texts.extend(self._process_batch_smart(unique_texts[start:start + block],
+                                                                          forced_entity_type=current_forced_type))
                     translation_map.update(dict(zip(unique_texts, anonymized_texts)))
             
             # Pass 2: Write output using translation map, keeping each line's own ending
