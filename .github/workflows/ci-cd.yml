@@ -76,7 +76,7 @@ jobs:
           if printf '%s\n' "$changed" | grep -qE '^(docker/Dockerfile|docker/docker-entrypoint\.sh|src/|scripts/|tests/|examples/|anon\.py|pyproject\.toml|uv\.lock|\.github/workflows/(docker-image|ci-cd)\.yml)'; then
             image=true
           fi
-          if printf '%s\n' "$changed" | grep -qE '^(web/backend/|web/frontend/|src/|anon\.py|pyproject\.toml|uv\.lock|\.dockerignore|\.github/workflows/(docker-image|ci-cd)\.yml)'; then
+          if printf '%s\n' "$changed" | grep -qE '^(web/backend/|web/frontend/|web/e2e/|src/|anon\.py|pyproject\.toml|uv\.lock|\.dockerignore|\.github/workflows/(docker-image|ci-cd)\.yml)'; then
             web_image=true
           fi
           printf 'code=%s\npython=%s\nfrontend=%s\nimage=%s\nweb_image=%s\n' "$code" "$python" "$frontend" "$image" "$web_image" >> "$GITHUB_OUTPUT"
