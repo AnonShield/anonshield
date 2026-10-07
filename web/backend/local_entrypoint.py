@@ -6,6 +6,7 @@ ANON_DATA_DIR, the one volume to mount. The container stops when any of the thre
 processes stops, so Docker's restart policy and `docker ps` see the failure.
 """
 import fcntl
+import http.client
 import os
 import secrets
 import signal
@@ -13,7 +14,6 @@ import socket
 import subprocess
 import sys
 import time
-import urllib.request
 from pathlib import Path
 
 
@@ -29,6 +29,15 @@ def persistent_key(path: Path) -> str:
             stream.flush()
             os.fsync(stream.fileno())
         return key
+
+
+def healthy(port: str) -> bool:
+    connection = http.client.HTTPConnection("127.0.0.1", int(port), timeout=2)
+    try:
+        connection.request("GET", "/api/health")
+        return connection.getresponse().status == 200
+    finally:
+        connection.close()
 
 
 def wait_until(ready, children: list[subprocess.Popen], seconds: float) -> bool:
@@ -75,12 +84,14 @@ def main() -> None:
     if wait_until(lambda: socket.create_connection(("127.0.0.1", 6379), timeout=1).close() is None, children, 30):
         worker = subprocess.Popen(["celery", "-A", "workers.celery_app", "worker", "-Q", "fast",
                                    "--pool=solo", "--loglevel=warning"])
-        server = subprocess.Popen(["uvicorn", "main:app", "--host", "0.0.0.0", "--port", port,
+        # All interfaces of the container, so that `docker run -p` reaches it;
+        # the documented command publishes it on the host's 127.0.0.1 only.
+        host = "0.0.0.0"  # nosec B104
+        server = subprocess.Popen(["uvicorn", "main:app", "--host", host, "--port", port,
                                    "--log-level", "warning"])
         children += [worker, server]
         names.update({worker.pid: "the worker", server.pid: "the web server"})
-        health = f"http://127.0.0.1:{port}/api/health"
-        if wait_until(lambda: urllib.request.urlopen(health, timeout=2).status == 200, children, 120):
+        if wait_until(lambda: healthy(port), children, 120):
             print(f"AnonShield is ready. Open http://localhost:{port} "
                   "(or the host port you published with -p).", flush=True)
 
