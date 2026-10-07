@@ -162,6 +162,7 @@ case "$1 $2" in
   "info "*) exit 0 ;;
   "inspect -f")
     case "$3" in
+      *Config.Image*) echo anonshield/anon:web ;;
       *Status*) [ "{scenario}" = running ] && echo running || {{ [ -f {tmp_path}/started ] && echo healthy || exit 1; }} ;;
       *Running*) echo true ;;
     esac ;;
@@ -179,3 +180,39 @@ esac
                             capture_output=True, text=True, timeout=30)
     assert expected in result.stdout + result.stderr
     assert result.returncode == code
+
+
+@pytest.mark.parametrize("gpu,existing,expected_image,switched", [
+    ("12.0, 595.91", None, "anonshield/anon:web-gpu", False),
+    ("6.1, 535.10", None, "anonshield/anon:web-gpu-cu126", False),
+    ("12.0, 595.91", "anonshield/anon:web", "anonshield/anon:web-gpu", True),
+])
+def test_docker_wrapper_web_gpu(tmp_path, gpu, existing, expected_image, switched):
+    calls = tmp_path / "calls.txt"
+    (tmp_path / "nvidia-smi").write_text(f"#!/bin/bash\necho '{gpu}'\n")
+    (tmp_path / "docker").write_text(f"""#!/bin/bash
+echo "$*" >> {calls}
+case "$1 $2" in
+  "info "*) exit 0 ;;
+  "inspect -f")
+    case "$3" in
+      *State.Status*) [ -n "{existing or ''}" ] && [ ! -f {tmp_path}/removed ] && echo running || {{ [ -f {tmp_path}/started ] && echo running || exit 1; }} ;;
+      *Config.Image*) [ -n "{existing or ''}" ] && [ ! -f {tmp_path}/removed ] && echo "{existing or ''}" || exit 1 ;;
+      *Health*) echo healthy ;;
+      *Running*) echo true ;;
+    esac ;;
+  "rm -f") touch {tmp_path}/removed ;;
+  "port "*) echo 127.0.0.1:8080 ;;
+  "image inspect") exit 0 ;;
+  "run -d") touch {tmp_path}/started; echo abc ;;
+esac
+""")
+    for tool in ("docker", "nvidia-smi"):
+        (tmp_path / tool).chmod(0o755)
+    env = {**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"}
+    result = subprocess.run(["bash", str(ROOT / "docker/run.sh"), "--web", "--gpu"], cwd=tmp_path, env=env,
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stdout + result.stderr
+    run = next(line for line in calls.read_text().splitlines() if line.startswith("run -d"))
+    assert "--gpus all" in run and run.endswith(expected_image), run
+    assert ("Switching the web interface" in result.stdout) == switched, result.stdout

@@ -38,10 +38,11 @@ log_error() { echo -e "${RED}[anon]${NC} $1"; }
 usage() {
     cat <<'HELP'
 Usage: ./run.sh [--gpu] FILE_OR_FOLDER [OPTIONS]
-       ./run.sh --web [--port N | --stop | --update]
+       ./run.sh --web [--gpu] [--port N | --stop | --update]
 
 Web interface, in your browser:
   ./run.sh --web             Start it, then open http://localhost:8080
+  ./run.sh --web --gpu       The same on an NVIDIA GPU (much faster NER)
   ./run.sh --web --port 8081 Use another port
   ./run.sh --web --stop      Stop it (the key and models are kept)
   ./run.sh --web --update    Download the latest version and restart it
@@ -141,6 +142,33 @@ if ! docker_err=$(docker info 2>&1 >/dev/null); then
 fi
 
 # ---------------------------------------------------------------------------
+# GPU images come in two PyTorch builds: the plain tag (CUDA 13.0) needs NVIDIA
+# driver 580+ and an RTX 20xx or newer (CUDA 13 dropped older GPUs; RTX 50xx
+# needs it); the -cu126 tag (CUDA 12.6) covers older GPUs and drivers.
+# Usage: pick_gpu_image anonshield/anon:gpu (or anonshield/anon:web-gpu).
+pick_gpu_image() {
+    local info cc drv cc_num drv_major
+    info=$(nvidia-smi --query-gpu=compute_cap,driver_version --format=csv,noheader 2>/dev/null | head -n1 || true)
+    cc=$(echo "$info" | cut -d, -f1 | tr -d ' ')
+    drv=$(echo "$info" | cut -d, -f2 | tr -d ' ')
+    if [[ ! "$cc" =~ ^[0-9]+\.[0-9]+$ || ! "$drv" =~ ^[0-9]+ ]]; then
+        log_info "Could not read the GPU from nvidia-smi; using $1" >&2
+        echo "$1"
+        return
+    fi
+    cc_num=$(( ${cc%%.*} * 10 + ${cc##*.} ))
+    drv_major=${drv%%.*}
+    if (( cc_num >= 75 && drv_major >= 580 )); then
+        echo "$1"
+    else
+        if (( cc_num >= 100 )); then
+            log_info "This GPU (compute capability $cc) needs NVIDIA driver 580+ for GPU inference; driver is $drv, it will run on CPU" >&2
+        fi
+        echo "$1-cu126"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # --web: the web interface, one container (anonshield/anon:web) whose key,
 # models and metrics live in the "anonshield" volume
 # ---------------------------------------------------------------------------
@@ -150,16 +178,17 @@ WEB_NAME="anonshield"
 web_port() { docker port "$WEB_NAME" 8080/tcp 2>/dev/null | head -n 1 | sed 's/.*://'; }
 
 web_main() {
-    local action=start port=8080 state out
+    local action=start port=8080 state out gpu=0 image current
+    local gpu_flags=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --web) ;;
-            --gpu) log_info "The web interface runs on the CPU; --gpu is ignored." ;;
+            --gpu) gpu=1 ;;
             --stop) action=stop ;;
             --update) action=update ;;
             --port) port="${2:-}"; shift ;;
             --port=*) port="${1#*=}" ;;
-            *) log_error "With --web, use --port N, --stop or --update (got: $1)."; return 2 ;;
+            *) log_error "With --web, use --gpu, --port N, --stop or --update (got: $1)."; return 2 ;;
         esac
         shift
     done
@@ -168,6 +197,23 @@ web_main() {
         return 2
     fi
     state=$(docker inspect -f '{{.State.Status}}' "$WEB_NAME" 2>/dev/null || true)
+    if [[ $gpu -eq 1 ]]; then
+        if ! command -v nvidia-smi >/dev/null 2>&1; then
+            log_error "No NVIDIA driver found (nvidia-smi). Use ./run.sh --web for the CPU version."
+            return 1
+        fi
+        image="${ANON_WEB_GPU_IMAGE:-$(pick_gpu_image anonshield/anon:web-gpu)}"
+        gpu_flags=(--gpus all)
+    else
+        image="$WEB_IMAGE"
+    fi
+    # Another kind (CPU or GPU) is replaced; the volume keeps the key and models.
+    current=$(docker inspect -f '{{.Config.Image}}' "$WEB_NAME" 2>/dev/null || true)
+    if [[ "$action" != stop && -n "$state" && "$current" != "$image" ]]; then
+        log_info "Switching the web interface from $current to $image (the key and models are kept)."
+        docker rm -f "$WEB_NAME" >/dev/null
+        state=""
+    fi
 
     if [[ "$action" == stop ]]; then
         if [[ "$state" == running ]]; then
@@ -179,27 +225,29 @@ web_main() {
         return 0
     fi
     if [[ "$action" == update ]]; then
-        docker pull "$WEB_IMAGE"
+        docker pull "$image"
         if [[ -n "$state" ]]; then docker rm -f "$WEB_NAME" >/dev/null; fi
         state=""
     fi
 
     if [[ "$state" == running ]]; then
-        log_ok "AnonShield is already running: http://localhost:$(web_port)"
+        log_ok "AnonShield ($image) is already running: http://localhost:$(web_port)"
         log_info "Stop it with ./run.sh --web --stop"
         return 0
     elif [[ -n "$state" ]]; then
         docker start "$WEB_NAME" >/dev/null
         port=$(web_port)
     else
-        if ! docker image inspect "$WEB_IMAGE" >/dev/null 2>&1; then
-            log_info "Downloading the web interface (about 1.5 GB, once)..."
-            docker pull "$WEB_IMAGE"
+        if ! docker image inspect "$image" >/dev/null 2>&1; then
+            log_info "Downloading $image (about $([[ $gpu -eq 1 ]] && echo 4 || echo 1.5) GB, once)..."
+            docker pull "$image"
         fi
-        if ! out=$(docker run -d --name "$WEB_NAME" --restart unless-stopped \
-                -p "127.0.0.1:$port:8080" -v anonshield:/data "$WEB_IMAGE" 2>&1); then
+        if ! out=$(docker run -d --name "$WEB_NAME" --restart unless-stopped ${gpu_flags[@]+"${gpu_flags[@]}"} \
+                -p "127.0.0.1:$port:8080" -v anonshield:/data "$image" 2>&1); then
             docker rm -f "$WEB_NAME" >/dev/null 2>&1 || true
-            if [[ "$out" == *"already allocated"* || "$out" == *"address already in use"* ]]; then
+            if [[ "$out" == *"could not select device driver"* || "$out" == *"nvidia-container"* ]]; then
+                log_error "Docker cannot use the GPU: install the NVIDIA Container Toolkit, or use ./run.sh --web for the CPU version."
+            elif [[ "$out" == *"already allocated"* || "$out" == *"address already in use"* ]]; then
                 log_error "Port $port is used by another program. Choose another: ./run.sh --web --port $((port + 1))"
             else
                 log_error "Could not start the web interface: $(echo "$out" | tail -n 1)"
@@ -218,7 +266,7 @@ web_main() {
         [[ "$(docker inspect -f '{{.State.Health.Status}}' "$WEB_NAME" 2>/dev/null)" == healthy ]] && break
         sleep 2
     done
-    log_ok "AnonShield is ready: http://localhost:$port"
+    log_ok "AnonShield is ready: http://localhost:$port ($image)"
     log_info "Stop: ./run.sh --web --stop    Update: ./run.sh --web --update"
 }
 
@@ -254,34 +302,9 @@ export ANON_SECRET_KEY="${ANON_SECRET_KEY:-}"
 # ---------------------------------------------------------------------------
 # Select image
 # ---------------------------------------------------------------------------
-# The GPU image comes in two PyTorch builds: :gpu (CUDA 13.0) needs NVIDIA
-# driver 580+ and an RTX 20xx or newer (CUDA 13 dropped older GPUs; RTX 50xx
-# needs it); :gpu-cu126 (CUDA 12.6) covers older GPUs and drivers.
-# ANON_GPU_IMAGE overrides the choice.
-pick_gpu_image() {
-    local info cc drv cc_num drv_major
-    info=$(nvidia-smi --query-gpu=compute_cap,driver_version --format=csv,noheader 2>/dev/null | head -n1 || true)
-    cc=$(echo "$info" | cut -d, -f1 | tr -d ' ')
-    drv=$(echo "$info" | cut -d, -f2 | tr -d ' ')
-    if [[ ! "$cc" =~ ^[0-9]+\.[0-9]+$ || ! "$drv" =~ ^[0-9]+ ]]; then
-        log_info "Could not read the GPU from nvidia-smi; using anonshield/anon:gpu" >&2
-        echo "anonshield/anon:gpu"
-        return
-    fi
-    cc_num=$(( ${cc%%.*} * 10 + ${cc##*.} ))
-    drv_major=${drv%%.*}
-    if (( cc_num >= 75 && drv_major >= 580 )); then
-        echo "anonshield/anon:gpu"
-    else
-        if (( cc_num >= 100 )); then
-            log_info "This GPU (compute capability $cc) needs NVIDIA driver 580+ for GPU inference; driver is $drv, it will run on CPU" >&2
-        fi
-        echo "anonshield/anon:gpu-cu126"
-    fi
-}
 
 if [[ $USE_GPU -eq 1 ]]; then
-    IMAGE="${ANON_GPU_IMAGE:-$(pick_gpu_image)}"
+    IMAGE="${ANON_GPU_IMAGE:-$(pick_gpu_image anonshield/anon:gpu)}"
     GPU_FLAGS=(--gpus all)
     log_info "Using GPU image $IMAGE"
 else
