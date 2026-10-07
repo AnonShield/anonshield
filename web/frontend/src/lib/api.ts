@@ -33,6 +33,8 @@ export interface JobCreatedResponse {
 export interface JobStatus {
   status: 'queued' | 'running' | 'done' | 'error' | 'downloaded';
   progress?: number;
+  /** Unix time when a worker took the job (absent while it waits in the queue). */
+  started_at?: number;
   eta_seconds?: number;
   output_size_bytes?: number;
   message?: string;

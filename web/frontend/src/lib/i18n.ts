@@ -168,7 +168,10 @@ const messages = {
     /* status */
     'status.processing': 'Processing…',
     'eta.remaining': 'about {time} left',
-    'eta.elapsed': 'running for {time}',
+    'eta.queued': 'waiting for {time}',
+    'eta.measuring': 'estimating the time, running for {time}',
+    'status.queued': 'Waiting in line…',
+    'status.queued_hint': 'Another file is being processed; yours starts next.',
     'status.done': 'Anonymization complete',
     'status.error': 'Error',
     'status.entities_replaced': '{n} entities replaced',
@@ -232,9 +235,10 @@ const messages = {
     'app.error.no_storage': 'Not enough storage on the server to process this file. Try again later.',
     'app.error.generic': 'Something went wrong: {msg}',
     /* ── processing status ── */
-    'processing.regex_only': 'Regex-only mode: no model loading, results in seconds.',
+    'processing.regex_only': 'Regex only: no AI model, the fastest strategy.',
     'processing.with_strategy': 'Running the {strategy} strategy…',
-    'processing.cache_warm': 'The first run warms up the model cache and may take a little longer.',
+    'processing.cache_warm': 'Keep this page open; Cancel stops the job.',
+    'processing.slow': 'This will take a while. To go faster, cancel and skip public fields under Rules per field, or choose the Regex strategy.',
     /* ── advanced tour (coach-marks) ── */
     'adv.close': 'Close',
     'adv.step': 'Step {n} of {total}',
@@ -626,7 +630,10 @@ const messages = {
     /* status */
     'status.processing': 'Processando…',
     'eta.remaining': 'faltam cerca de {time}',
-    'eta.elapsed': 'em andamento há {time}',
+    'eta.queued': 'esperando há {time}',
+    'eta.measuring': 'calculando o tempo, em andamento há {time}',
+    'status.queued': 'Na fila…',
+    'status.queued_hint': 'Outro arquivo está sendo processado; o seu começa em seguida.',
     'status.done': 'Anonimização concluída',
     'status.error': 'Erro',
     'status.entities_replaced': '{n} entidades substituídas',
@@ -690,9 +697,10 @@ const messages = {
     'app.error.no_storage': 'Não há espaço suficiente no servidor para processar este arquivo. Tente novamente mais tarde.',
     'app.error.generic': 'Algo deu errado: {msg}',
     /* ── status de processamento ── */
-    'processing.regex_only': 'Modo apenas regex: sem carregar modelo, resultado em segundos.',
+    'processing.regex_only': 'Apenas regex: sem modelo de IA, a estratégia mais rápida.',
     'processing.with_strategy': 'Executando a estratégia {strategy}…',
-    'processing.cache_warm': 'A primeira execução aquece o cache do modelo e pode levar um pouco mais.',
+    'processing.cache_warm': 'Deixe esta página aberta; Cancelar interrompe o processamento.',
+    'processing.slow': 'Isto vai demorar. Para ir mais rápido, cancele e ignore campos públicos em Regras por campo, ou escolha a estratégia Regex.',
     /* ── tour avançado (coach-marks) ── */
     'adv.close': 'Fechar',
     'adv.step': 'Passo {n} de {total}',

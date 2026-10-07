@@ -225,16 +225,7 @@
   let entityCounts = $derived(result?.entity_counts as Record<string, number> | undefined);
   let skippedFiles = $derived((result?.skipped_files as string[] | undefined) ?? []);
 
-  // ── Realistic ETA estimation ──────────────────────────────────────────────
-  // Throughput estimates in KB/s per strategy (conservative lower bound from paper)
-  const STRATEGY_KB_S: Record<string, number> = {
-    regex:      34341,  // schema-aware config on D2
-    filtered:   1250,   // baseline D2 standalone
-    standalone: 1250,
-    hybrid:     1250,
-    presidio:   732,
-  };
-
+  // ── Time estimate ──────────────────────────────────────────────────────────
   let processingStart = $state(0);
   let elapsedMs = $state(0);
   let elapsedInterval: ReturnType<typeof setInterval> | null = null;
@@ -252,21 +243,23 @@
   });
 
   function duration(ms: number): string {
-    return ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} s` : `${Math.round(ms / 60000)} min`;
+    if (ms < 60000) return `${Math.max(1, Math.round(ms / 1000))} s`;
+    if (ms < 5400000) return `${Math.round(ms / 60000)} min`;
+    return `${(ms / 3600000).toFixed(1)} h`;
   }
-  // Measured progress gives the estimate once a few percent are done; before
-  // that, a guess from the file size, and past the guess, the time so far.
+  let jobState = $derived($activeJob?.status?.status);
+  let startedAt = $derived($activeJob?.status?.started_at);
+  // The estimate comes only from measured progress (a guess from the file
+  // size was off by hours on a CPU). Time in the queue is shown apart.
+  let runMs = $derived(elapsedMs && startedAt ? Math.max(0, Date.now() - startedAt * 1000) : elapsedMs);
+  let remainMs = $derived(progress > 0 && runMs >= 20000 ? runMs * (100 - progress) / progress : null);
   let etaLabel = $derived.by(() => {
     if (!elapsedMs) return '';
-    if (progress >= 3) {
-      return $t('eta.remaining', { time: duration(elapsedMs * (100 - progress) / progress) });
-    }
-    const fileSizeKb = (selectedFile?.size ?? 0) / 1024;
-    const kbPerSec = STRATEGY_KB_S[$config.strategy || 'filtered'] ?? 1250;
-    const guessRemainMs = (fileSizeKb / kbPerSec) * 1000 - elapsedMs;
-    if (guessRemainMs > 5000) return $t('eta.remaining', { time: duration(guessRemainMs) });
-    return $t('eta.elapsed', { time: duration(elapsedMs) });
+    if (jobState === 'queued') return $t('eta.queued', { time: duration(elapsedMs) });
+    if (remainMs !== null) return $t('eta.remaining', { time: duration(remainMs) });
+    return $t('eta.measuring', { time: duration(runMs) });
   });
+  let progressLabel = $derived(progress > 0 ? `${progress < 10 ? progress.toFixed(1) : Math.floor(progress)}%` : '');
 
 
   const STRATEGIES = [
@@ -566,12 +559,16 @@
     </div>
     <h2>{$activeJob?.filename ?? selectedFile?.name}</h2>
     <p class="status-label">
-      {$t('status.processing')}
+      {jobState === 'queued' ? $t('status.queued') : $t('status.processing')}
       {#if etaLabel}<span class="eta-label">({etaLabel})</span>{/if}
     </p>
-    <ProgressBar {progress} label={progress > 0 ? `${progress}%` : ''} />
+    <ProgressBar {progress} indeterminate={jobState !== 'queued' && progress === 0} label={progressLabel} />
     <p class="cache-hint">
-      {#if $config.strategy === 'regex'}
+      {#if jobState === 'queued'}
+        {$t('status.queued_hint')}
+      {:else if remainMs !== null && remainMs > 20 * 60000 && $config.strategy !== 'regex'}
+        {$t('processing.slow')}
+      {:else if $config.strategy === 'regex'}
         {$t('processing.regex_only')}
       {:else}
         {$t('processing.with_strategy', { strategy: $config.strategy })}
