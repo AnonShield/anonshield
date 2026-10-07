@@ -195,6 +195,9 @@ def job_status(job_id: UUID) -> dict:
     status = job_service.get_status(job_id)
     if status is None:
         raise HTTPException(status_code=404, detail="Job not found")
+    if status.get("status") == "queued" and job_service.warming():
+        # Waiting for the model to load, not for another file.
+        status = {**status, "warming": True}
     return status
 
 

@@ -230,6 +230,7 @@
     return `${(ms / 3600000).toFixed(1)} h`;
   }
   let jobState = $derived($activeJob?.status?.status);
+  let warming = $derived(jobState === 'queued' && $activeJob?.status?.warming === true);
   let startedAt = $derived($activeJob?.status?.started_at);
   // The estimate comes only from measured progress (a guess from the file
   // size was off by hours on a CPU). Time in the queue is shown apart.
@@ -531,12 +532,14 @@
     </div>
     <h2>{$activeJob?.filename ?? selectedFile?.name}</h2>
     <p class="status-label">
-      {jobState === 'queued' ? $t('status.queued') : $t('status.processing')}
+      {warming ? $t('status.warming') : jobState === 'queued' ? $t('status.queued') : $t('status.processing')}
       {#if etaLabel}<span class="eta-label">({etaLabel})</span>{/if}
     </p>
     <ProgressBar {progress} indeterminate={jobState !== 'queued' && progress === 0} label={progressLabel} />
     <p class="cache-hint">
-      {#if jobState === 'queued'}
+      {#if warming}
+        {$t('status.warming_hint')}
+      {:else if jobState === 'queued'}
         {$t('status.queued_hint')}
       {:else if remainMs !== null && remainMs > 20 * 60000 && $config.strategy !== 'regex'}
         {$t('processing.slow')}

@@ -26,6 +26,11 @@ app.conf.update(
     timezone="UTC",
     enable_utc=True,
     worker_prefetch_multiplier=1,
+    # The engine's progress bars (tqdm) write to stderr, which the worker
+    # logs; at the default level, WARNING, every job filled the container log
+    # with progress lines that looked like problems. Job progress reaches the
+    # interface through the job status, not this log.
+    worker_redirect_stdouts_level="INFO",
     task_acks_late=True,
     # Recycle worker after N tasks to release VRAM held by VLM OCR engines
     # (models stay cached on the engine instance + PyTorch allocator keeps
@@ -69,10 +74,14 @@ def warm_up_default_model(sender, **kwargs):  # noqa: ARG001
     if model.lower() == "none":
         return
 
+    from services import job_service
     logger.info("Worker process init: warming up '%s' (lang=%s) …", model, lang)
+    job_service.set_warming(True)
     try:
         from src.anon.engine import warm_up_model
         warm_up_model(transformer_model=model, lang=lang)
         logger.info("Warm-up complete for '%s'.", model)
     except Exception as exc:
         logger.warning("Warm-up failed; first job will be slow: %s", exc)
+    finally:
+        job_service.set_warming(False)

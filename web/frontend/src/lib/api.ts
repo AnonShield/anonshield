@@ -35,6 +35,8 @@ export interface JobStatus {
   progress?: number;
   /** Unix time when a worker took the job (absent while it waits in the queue). */
   started_at?: number;
+  /** Queued while the worker loads the NER model (after a start), not behind another file. */
+  warming?: boolean;
   eta_seconds?: number;
   output_size_bytes?: number;
   message?: string;
