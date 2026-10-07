@@ -164,6 +164,33 @@ await step('rules per field: late fields listed, suggestion, filter, bulk, row a
   assert(!out[25].notes.includes('ana.late@example.com') && !out[25].notes.includes('10.9.9.9'), 'late field scanned: ' + out[25].notes);
   assert.equal(out[0].id, 0);
 });
+await step('rules per field: any typed type, column-name button, bulk column names, with an entity unchecked', async () => {
+  await fresh(); await strategy('regex');
+  const mail = await page.$$eval('label.entity-chip input', (e) => e.map((x) => x.getAttribute('aria-label')).find((l) => /mail/i.test(l)));
+  await page.$eval(`label.entity-chip input[aria-label="${mail}"]`, (e) => e.click());
+  await upload('scan.json'); await fieldsReady(); await openRules();
+  const rowEl = async (f, sel) => (await page.evaluateHandle((f, sel) => [...document.querySelectorAll('.field-table tbody tr')]
+    .find((r) => r.querySelector('code').textContent.trim() === f).querySelector(sel), f, sel)).asElement();
+  await rowButton('asset.ipv4_addresses', 2);
+  await (await rowEl('asset.ipv4_addresses', '.force-input')).type('internal address');
+  await rowButton('scan.target', 2);
+  await (await rowEl('scan.target', '.use-column')).click();
+  await page.type('.filter-input', 'definition.');
+  await page.click('.bulk-actions .segmented-control button:nth-child(3)');
+  await page.click('.filter-input', { clickCount: 3 }); await page.keyboard.press('Backspace');
+  assert.match(await summary(), /5 (forced|forçados)/);
+  await closeRules();
+  const r = await submit(); assert(!r.error, r.error);
+  assert.deepEqual(r.fields.force_anonymize, {
+    'asset.ipv4_addresses': { entity_type: 'INTERNAL_ADDRESS' }, 'scan.target': { entity_type: 'SCAN_TARGET' },
+    'definition.name': { entity_type: 'DEFINITION_NAME' }, 'definition.description': { entity_type: 'DEFINITION_DESCRIPTION' },
+    'definition.output': { entity_type: 'DEFINITION_OUTPUT' } });
+  const out = JSON.parse(r.content);
+  assert.match(out[0].asset.ipv4_addresses[0], /^\[INTERNAL_ADDRESS_/);
+  assert.match(out[0].scan.target, /^\[SCAN_TARGET_/);
+  assert.match(out[0].definition.name, /^\[DEFINITION_NAME_/);
+  assert(out[0].output.includes('joao0@example.com') && !out[0].output.includes('10.0.0.0'), 'unchecked e-mail kept, IP replaced: ' + out[0].output);
+});
 await step('Global Scan tab sends no field rules', async () => {
   await fresh(); await strategy('regex'); await upload('scan.json'); await fieldsReady(); await openRules();
   await rowButton('id', 3);
