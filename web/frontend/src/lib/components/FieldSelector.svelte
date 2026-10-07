@@ -527,6 +527,13 @@
   }
   .field-table td { padding: 1rem; border-bottom: 1px dashed var(--color-border); }
   .td-name { font-family: var(--font-mono); font-size: 0.85rem; color: var(--color-accent); }
+  /* Phones: each field as a stack (name, action, type) instead of cut-off columns. */
+  @media (max-width: 560px) {
+    .field-table thead { display: none; }
+    .field-table tr { display: grid; gap: 0.5rem; padding: 0.75rem 0; border-bottom: 1px dashed var(--color-border); }
+    .field-table td { padding: 0; border-bottom: 0; }
+    .bulk-actions .bulk-entity { width: 100%; }
+  }
   .row-excluded { opacity: 0.6; }
 
   .segmented-control {
@@ -548,6 +555,8 @@
   .bulk-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
   .bulk-label { font-size: 0.75rem; color: var(--color-text-secondary); }
   .bulk-actions .bulk-entity { width: 200px; }
+  .bulk-actions .segmented-control { flex-wrap: wrap; }
+  .segmented-control button { white-space: nowrap; }
   .force-input::placeholder { text-transform: none; }
   .segmented-control button:disabled { opacity: 0.4; cursor: not-allowed; }
 
