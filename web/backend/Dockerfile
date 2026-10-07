@@ -5,6 +5,11 @@
 #   local: the whole app in one container for one computer, published as
 #     anonshield/anon:web. Redis, the worker and the API run together, and the
 #     API also serves the interface, so it needs no proxy and no Node.
+#   local with --build-arg LOCAL_BASE=runtime-gpu: the same app with the CUDA
+#     build of PyTorch (run with --gpus all), published as :web-gpu
+#     (TORCH_CUDA=cu130: NVIDIA driver >= 580, RTX 20xx or newer, needed for
+#     RTX 50xx) and :web-gpu-cu126 (TORCH_CUDA=cu126: older GPUs and drivers).
+ARG LOCAL_BASE=runtime
 
 # ---- builder: resolve and install the Python deps into a venv ----
 FROM python:3.12-slim AS builder
@@ -22,8 +27,23 @@ RUN uv sync --frozen --no-install-project --group web \
     && find /app/.venv -type d -name tests -prune -exec rm -rf {} + \
     && find /app/.venv -name "*.pyc" -delete
 
-# ---- runtime: slim image with only what is needed to run ----
-FROM python:3.12-slim AS runtime
+# ---- builder-gpu: the same venv with the CUDA build of torch/torchvision ----
+# The exact versions of uv.lock from the CUDA index, as docker/Dockerfile does
+# for the command-line GPU images; the build fails if torch is still CPU-only.
+FROM builder AS builder-gpu
+ARG TORCH_CUDA=cu130
+RUN TORCH_VER="$(.venv/bin/python -c "import importlib.metadata as m; print(m.version('torch').split('+')[0])")" \
+    && TV_VER="$(.venv/bin/python -c "import importlib.metadata as m; print(m.version('torchvision').split('+')[0])")" \
+    && uv pip install --python .venv/bin/python \
+       --index-url "https://download.pytorch.org/whl/${TORCH_CUDA}" \
+       --reinstall-package torch --reinstall-package torchvision \
+       "torch==${TORCH_VER}+${TORCH_CUDA}" "torchvision==${TV_VER}+${TORCH_CUDA}" \
+    && .venv/bin/python -c "import torch; assert torch.version.cuda, 'CPU torch in the GPU image'; print('torch', torch.__version__, 'CUDA', torch.version.cuda)" \
+    && find .venv -type d -name __pycache__ -prune -exec rm -rf {} + \
+    && find .venv -type d -name tests -prune -exec rm -rf {} +
+
+# ---- runtime-base: system packages and the app user, shared by CPU and GPU ----
+FROM python:3.12-slim AS runtime-base
 RUN groupadd -r anonuser && useradd -r -g anonuser -d /app -s /sbin/nologin anonuser
 WORKDIR /app
 # Runtime system deps only: Tesseract OCR with its language packs, libmagic for
@@ -35,8 +55,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the prebuilt virtual environment from the builder (no compilers in runtime).
-COPY --from=builder /app/.venv /app/.venv
 ENV VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH="/app" \
@@ -45,14 +63,26 @@ ENV VIRTUAL_ENV=/app/.venv \
     HF_HUB_VERBOSITY=error \
     HF_HUB_DISABLE_PROGRESS_BARS=1
 
-# Application source.
+# ---- runtime: the CPU venv and the application ----
+# The venv comes prebuilt (no compilers here). Only the directories the app
+# writes to change owner: a recursive chown of /app rewrote the whole venv into
+# a second layer and doubled the image (~5 GB).
+FROM runtime-base AS runtime
+COPY --from=builder /app/.venv /app/.venv
 COPY src ./src
 COPY anon.py ./anon.py
 COPY web/backend/. /app/
+RUN mkdir -p /anon-jobs /app/.cache && chown anonuser:anonuser /app /app/.cache /anon-jobs
+USER anonuser
 
-# Only the directories the app writes to change owner. A recursive chown of /app
-# rewrote the whole venv into a second layer and doubled the image (~5 GB); the
-# code and the venv stay root-owned and read-only for the app user.
+# ---- runtime-gpu: the same with the CUDA venv ----
+FROM runtime-base AS runtime-gpu
+ENV NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+COPY --from=builder-gpu /app/.venv /app/.venv
+COPY src ./src
+COPY anon.py ./anon.py
+COPY web/backend/. /app/
 RUN mkdir -p /anon-jobs /app/.cache && chown anonuser:anonuser /app /app/.cache /anon-jobs
 USER anonuser
 
@@ -65,7 +95,7 @@ COPY web/frontend/ ./
 RUN ANON_STATIC_UI=1 npm run build
 
 # ---- local: everything in one container, no limits (anonshield/anon:web) ----
-FROM runtime AS local
+FROM ${LOCAL_BASE} AS local
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends redis-server \
     && rm -rf /var/lib/apt/lists/* \
