@@ -97,7 +97,7 @@ jobs:
           enable-cache: true
       - if: needs.changes.outputs.python == 'true'
         name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --frozen --group web-dev
       - if: needs.changes.outputs.python == 'true'
         name: Cache Hugging Face models
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
@@ -106,7 +106,7 @@ jobs:
           key: hf-models-v1
       - if: needs.changes.outputs.python == 'true'
         name: Run tests
-        run: uv run pytest -m "not slow and not ocr" -q --timeout=300
+        run: uv run --frozen --group web-dev pytest tests web/backend/tests -m "not slow and not ocr" -q --timeout=300
 
   frontend:
     name: Frontend build
@@ -133,7 +133,7 @@ jobs:
         run: npm ci
         working-directory: web/frontend
       - if: needs.changes.outputs.frontend == 'true'
-        run: npm run build
+        run: npm run check && npm run build
         working-directory: web/frontend
 
   vuln-scan:

@@ -19,7 +19,7 @@ SVC      ?=
 
 .DEFAULT_GOAL := help
 
-.PHONY: help deploy local ensure-secret build up down restart status ps health logs stats warm shell clean
+.PHONY: help deploy local local-down local-logs local-status ensure-secret build up down restart status ps health logs stats warm shell clean
 
 help:  ## List the available commands
 	@echo "AnonShield ops. Usage: make <target>"
@@ -31,11 +31,20 @@ deploy: build up warm status  ## Build, start, warm the cache, and show status (
 	@docker builder prune -f >/dev/null 2>&1 || true
 	@echo "Deployed (pruned old images and stale build cache). Public URL: https://anonshield.org"
 
-LOCAL := $(COMPOSE) -f docker-compose.local.yml
+LOCAL := docker compose -f docker-compose.local.yml
 
-local: ensure-secret  ## Run on this machine (no reverse proxy needed): http://localhost:8080
-	$(LOCAL) up -d --build $(SERVICES) proxy
-	@echo "AnonShield is starting on http://localhost:$${ANON_LOCAL_PORT:-8080} (make down to stop)"
+local:  ## Run locally without upload limits: http://localhost:8080
+	$(LOCAL) up -d --build
+	@echo "Open http://localhost:$${ANON_LOCAL_PORT:-8080}/app (make local-down to stop)"
+
+local-down:  ## Stop the local stack (preserves the key and model cache)
+	$(LOCAL) down
+
+local-logs:  ## Follow local logs. Filter with: make local-logs SVC=backend
+	$(LOCAL) logs -f --tail=120 $(SVC)
+
+local-status:  ## Show local container status and health
+	$(LOCAL) ps
 
 ensure-secret:  ## Generate a random ANON_SECRET_KEY in web/.env if missing (persisted, never regenerated)
 	@touch .env
@@ -51,7 +60,7 @@ up: ensure-secret  ## Start the stack (no rebuild)
 	$(COMPOSE) up -d $(SERVICES)
 
 down:  ## Stop and remove the containers
-	$(LOCAL) down
+	$(COMPOSE) down
 
 restart:  ## Restart the stack
 	$(COMPOSE) restart $(SERVICES)

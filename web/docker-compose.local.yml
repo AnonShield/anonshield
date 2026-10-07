@@ -1,16 +1,87 @@
-# Local override: the whole web app on one port, http://localhost:8080, with no
-# host reverse proxy. Used by `make local` together with docker-compose.prod.yml
-# and docker-compose.host.yml. The internal Caddy (Caddyfile.a10, the same one
-# the production host runs) sends /api to the backend and the rest to the
-# frontend, which the browser reaches on the same origin (PUBLIC_API_URL=/api).
+name: anonshield-local
+
+x-backend: &backend
+  image: ${COMPOSE_PROJECT_NAME:-anonshield-local}-backend:local
+  build:
+    context: ..
+    dockerfile: web/backend/Dockerfile
+  entrypoint: [python, /app/local_entrypoint.py]
+  restart: unless-stopped
+  environment:
+    REDIS_URL: redis://redis:6379/0
+    ANON_JOBS_DIR: /anon-jobs
+    ANON_METRICS_DB: /anon-jobs/metrics.db
+    ANON_SECRET_KEY: ${ANON_SECRET_KEY:-}
+    ANON_MAX_SIZE_MB: ${ANON_MAX_SIZE_MB:-0}
+    ANON_MAX_SIZE_KEY_MB: ${ANON_MAX_SIZE_KEY_MB:-0}
+    ANON_MAX_ZIP_SIZE_MB: ${ANON_MAX_ZIP_SIZE_MB:-0}
+    ANON_FORCE_LARGE_XML: "true"
+    ANON_RATE_LIMIT_ENABLED: "false"
+    ANON_JOB_TTL_SECONDS: "0"
+    XDG_CACHE_HOME: /app/.cache
+    HF_HOME: /app/.cache/huggingface
+    TMPDIR: /app/.cache/tmp
+  volumes:
+    - jobs:/anon-jobs
+    - models:/app/.cache
+  security_opt: [no-new-privileges:true]
+  read_only: true
+  depends_on:
+    redis:
+      condition: service_healthy
+
 services:
   proxy:
     image: caddy:2-alpine
-    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
     restart: unless-stopped
     ports:
       - "127.0.0.1:${ANON_LOCAL_PORT:-8080}:80"
     volumes:
-      - ./Caddyfile.a10:/etc/caddy/Caddyfile:ro
-    networks: [anon-net]
-    depends_on: [backend, frontend]
+      - ./Caddyfile.local:/etc/caddy/Caddyfile:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    environment:
+      PUBLIC_API_URL: /api
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+
+  backend:
+    <<: *backend
+    command: [uvicorn, main:app, --host, 0.0.0.0, --port, "8000"]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=5)"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  worker-fast:
+    <<: *backend
+    command: [celery, -A, workers.celery_app, worker, -Q, fast, --pool=solo, --loglevel=warning]
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --save, "", --appendonly, "no"]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  jobs:
+  models:

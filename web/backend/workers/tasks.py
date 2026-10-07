@@ -29,7 +29,9 @@ def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
         output_dir=out_dir,
         strategy=meta.get("strategy", "filtered"),
         lang=meta.get("lang", "en"),
-        entities=meta.get("entities") or None,
+        entities=meta.get("entities"),
+        allow_list=meta.get("allow_list"),
+        preserve_entities=meta.get("preserve_entities"),
         custom_patterns=meta.get("custom_patterns") or None,
         ocr_engine=meta.get("ocr_engine", "tesseract"),
         secret_key=key,
@@ -38,49 +40,78 @@ def _anonymize(input_file: Path, out_dir: Path, meta: dict, key: str) -> dict:
         transformer_model=meta.get("model") or "Davlan/xlm-roberta-base-ner-hrl",
         ner_score_threshold=meta.get("ner_score_threshold"),
         ner_aggregation_strategy=meta.get("ner_aggregation_strategy"),
+        force_large_xml=os.getenv("ANON_FORCE_LARGE_XML", "false").lower() == "true",
     )
 
 
+def _public_error(exc: Exception, path: Path, name: str) -> str:
+    """Engine errors name the worker's copy of the file; show the user's name instead."""
+    return str(exc).replace(str(path), name)
+
+
 def _process_zip(zip_path: Path, out_dir: Path, meta: dict, key: str) -> dict:
-    stats: dict = {"files_processed": 0, "files_skipped": 0, "entity_count": 0}
+    from src.anon.processors import ProcessorRegistry
+    stats: dict = {"files_processed": 0, "files_skipped": 0, "skipped_files": [], "entity_count": 0}
+    failures: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:
         extract_dir = Path(tmp) / "extracted"
         extract_dir.mkdir()
 
         with zipfile.ZipFile(zip_path, "r") as zf:
             total = sum(i.file_size for i in zf.infolist())
-            if total > 10 * 1024 ** 3:
-                raise ValueError("ZIP content exceeds 10 GB limit")
+            limit_mb = int(os.getenv("ANON_MAX_ZIP_SIZE_MB", "10240"))
+            if limit_mb > 0 and total > limit_mb * 1024 ** 2:
+                raise ValueError(f"ZIP content exceeds {limit_mb} MB limit")
             for member in zf.infolist():
                 target = (extract_dir / member.filename).resolve()
-                if not str(target).startswith(str(extract_dir)):
+                if not target.is_relative_to(extract_dir):
                     raise ValueError(f"Path traversal blocked: {member.filename}")
             zf.extractall(extract_dir)
 
         repack_dir = Path(tmp) / "repack"
         repack_dir.mkdir()
 
-        for src in extract_dir.rglob("*"):
+        for src in sorted(extract_dir.rglob("*")):
             if not src.is_file():
                 continue
-            per_out = Path(tmp) / f"out_{src.stem}"
-            per_out.mkdir(exist_ok=True)
+            relative = src.relative_to(extract_dir)
+            if relative.parts[0] == "__MACOSX" or src.name == ".DS_Store":
+                continue
+            if src.suffix.lower() not in ProcessorRegistry._processors:
+                stats["files_skipped"] += 1
+                stats["skipped_files"].append(str(relative))
+                continue
+            per_out = Path(tmp) / "processed" / relative
+            per_out.mkdir(parents=True, exist_ok=True)
             try:
                 result = _anonymize(src, per_out, meta, key)
                 processed = list(per_out.iterdir())
-                if processed:
-                    shutil.copy2(processed[0], repack_dir / processed[0].name)
+                if len(processed) != 1:
+                    raise ValueError("Processing did not produce one output file.")
+                destination = repack_dir / relative.parent / processed[0].name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if destination.exists():
+                    raise ValueError(f"Output filename collision: {destination.name}")
+                shutil.copy2(processed[0], destination)
                 stats["files_processed"] += 1
                 stats["entity_count"] += result.get("entity_count", 0)
             except Exception as exc:
-                logger.warning("Skipping %s: %s", src.name, exc)
-                stats["files_skipped"] += 1
+                logger.warning("Could not process %s: %s", relative, exc)
+                message = _public_error(exc, src, str(relative))
+                failures.append(message if str(relative) in message else f"{relative}: {message}")
+
+        if failures:
+            shown = "; ".join(failures[:3]) + ("; ..." if len(failures) > 3 else "")
+            raise ValueError(f"{len(failures)} file(s) in the ZIP could not be processed, so no archive was published. Fix them and retry. {shown}")
+        if not stats["files_processed"]:
+            raise ValueError("The ZIP has no files in a supported format (" + " ".join(sorted(ProcessorRegistry._processors)) + ").")
+        stats["skipped_files"] = stats["skipped_files"][:20]
 
         zip_out = out_dir / f"anon_{zip_path.stem}.zip"
         with zipfile.ZipFile(zip_out, "w", zipfile.ZIP_DEFLATED) as zf:
             for f in repack_dir.rglob("*"):
                 if f.is_file():
-                    zf.write(f, f.name)
+                    zf.write(f, f.relative_to(repack_dir))
 
     return stats
 
@@ -156,7 +187,7 @@ def _execute(job_id: str) -> dict:
         return result
     except Exception as exc:
         storage.delete_input(job_id)
-        job_service.set_status(job_id, "error", message=str(exc))
+        job_service.set_status(job_id, "error", message=_public_error(exc, input_file, meta.get("filename") or input_file.name))
         raise
     finally:
         # Release VRAM held by cached VLM engines. No-op when no GPU / no VLM

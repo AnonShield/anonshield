@@ -9,6 +9,10 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 KEY_TTL = 3600       # 1h; user secret key
 META_TTL = 7200      # 2h; job metadata
 STATUS_TTL = 7200
+if "ANON_JOB_TTL_SECONDS" in os.environ:
+    KEY_TTL = META_TTL = STATUS_TTL = int(os.environ["ANON_JOB_TTL_SECONDS"])
+    if STATUS_TTL < 0:
+        raise ValueError("ANON_JOB_TTL_SECONDS must be non-negative; use 0 for no expiry.")
 
 _pool: redis.ConnectionPool | None = None
 
@@ -23,7 +27,14 @@ def _client() -> redis.Redis:
 # ── Key management ─────────────────────────────────────────────────────────────
 
 def store_key(job_id: str, key: str) -> None:
-    _client().setex(f"job:{job_id}:key", KEY_TTL, key)
+    _store(f"job:{job_id}:key", key, KEY_TTL)
+
+
+def _store(name: str, value: str, ttl: int) -> None:
+    if ttl:
+        _client().setex(name, ttl, value)
+    else:
+        _client().set(name, value)
 
 
 def pop_key(job_id: str) -> str:
@@ -37,7 +48,7 @@ def pop_key(job_id: str) -> str:
 
 def set_status(job_id: str, status: str, **extra: Any) -> None:
     data = {"status": status, **extra}
-    _client().setex(f"job:{job_id}:status", STATUS_TTL, json.dumps(data))
+    _store(f"job:{job_id}:status", json.dumps(data), STATUS_TTL)
 
 
 def get_status(job_id: str) -> dict | None:
@@ -48,7 +59,7 @@ def get_status(job_id: str) -> dict | None:
 # ── Metadata ───────────────────────────────────────────────────────────────────
 
 def store_meta(job_id: str, meta: dict) -> None:
-    _client().setex(f"job:{job_id}:meta", META_TTL, json.dumps(meta))
+    _store(f"job:{job_id}:meta", json.dumps(meta), META_TTL)
 
 
 def get_meta(job_id: str) -> dict | None:

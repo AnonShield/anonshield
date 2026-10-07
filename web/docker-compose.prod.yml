@@ -59,6 +59,7 @@ services:
       - ANON_METRICS_DB=/anon-jobs/metrics.db
       - ANON_SECRET_KEY=${ANON_SECRET_KEY:?ANON_SECRET_KEY must be set in web/.env (no insecure default)}
       - ANON_MAX_SIZE_MB=${ANON_MAX_SIZE_MB:-10}
+      - ANON_MAX_SIZE_KEY_MB=${ANON_MAX_SIZE_KEY_MB:-10}
       - XDG_CACHE_HOME=/app/.cache
       - HF_HOME=/app/.cache/huggingface
     volumes:

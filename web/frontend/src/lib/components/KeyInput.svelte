@@ -32,9 +32,8 @@
 <style>
   .key-field { display: flex; flex-direction: column; gap: var(--space-2); }
   label { font-size: var(--text-sm); color: var(--color-text-secondary); font-weight: 500; }
-  .optional { font-weight: 400; }
   .input-wrap { display: flex; gap: var(--space-2); }
-  .input-wrap input { flex: 1; font-family: var(--font-mono); font-size: var(--text-sm); }
+  .input-wrap input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: var(--text-sm); }
   .toggle {
     background: var(--color-surface-raised);
     border: 1px solid var(--color-border);
@@ -44,5 +43,4 @@
   }
   .hint { margin: 0; font-size: 0.75rem; color: var(--color-text-secondary); line-height: 1.5; }
   .hint-good { color: #4ade80; font-weight: 600; }
-  .hint-warn { color: #fbbf24; font-weight: 600; }
 </style>

@@ -23,6 +23,8 @@ export interface Config {
   lang: string;
   model: string;
   slug_length: number;
+  ner_score_threshold?: number;
+  ner_aggregation_strategy?: string;
   ocr_engine: string;
   /** Named preset (none | scan | photo | fax) or 'custom' for manual step selection */
   ocr_preprocess_preset: string;
@@ -33,6 +35,8 @@ export interface Config {
   /** Structural rules for structured files (CSV/JSON/XLSX) */
   anonymization_config: AnonymizationConfig | null;
   custom_patterns: CustomPattern[];
+  allow_list: string[];
+  preserve_entities: string[];
   key: string;
 }
 
@@ -47,6 +51,8 @@ const DEFAULTS: Config = {
   selected_entities: null,
   anonymization_config: null,
   custom_patterns: [],
+  allow_list: [],
+  preserve_entities: [],
   key: '',
 };
 
@@ -58,7 +64,7 @@ export function resetConfig() {
 
 /** Serialize config to YAML profile string (compatible with CLI --config). */
 export function toYaml(cfg: Config, allGroups: EntityGroup[]): string {
-  const allIds = allGroups.flatMap(g => g.entities.map(e => e.id));
+  const allIds = [...new Set([...allGroups.flatMap(g => g.entities.map(e => e.id)), ...cfg.custom_patterns.map(p => p.entity_type.toUpperCase())])];
   // null  → all selected (no filter) → use allIds
   // Set() → none selected            → []
   // Set(…)→ specific selection       → [...ids]
@@ -70,6 +76,11 @@ export function toYaml(cfg: Config, allGroups: EntityGroup[]): string {
     slug_length: cfg.slug_length,
     entities,
   };
+
+  if (cfg.ner_score_threshold !== undefined) data.ner_score_threshold = cfg.ner_score_threshold;
+  if (cfg.ner_aggregation_strategy) data.ner_aggregation_strategy = cfg.ner_aggregation_strategy;
+  if (cfg.allow_list.length) data.allow_list = cfg.allow_list;
+  if (cfg.preserve_entities.length) data.preserve_entities = cfg.preserve_entities;
 
   if (cfg.model && cfg.model !== DEFAULTS.model) {
     data['transformer_model'] = cfg.model;
@@ -120,6 +131,8 @@ export function fromYaml(raw: string): void {
       strategy: (data['strategy'] as string) ?? c.strategy,
       lang: (data['lang'] as string) ?? c.lang,
       slug_length: (data['slug_length'] as number) ?? c.slug_length,
+      ner_score_threshold: data['ner_score_threshold'] as number | undefined,
+      ner_aggregation_strategy: data['ner_aggregation_strategy'] as string | undefined,
       model: (data['transformer_model'] as string) ?? c.model,
       ocr_engine: (data['ocr_engine'] as string) ?? c.ocr_engine,
       ocr_preprocess_preset: (data['ocr_preprocess_preset'] as string) ?? 'none',
@@ -127,6 +140,8 @@ export function fromYaml(raw: string): void {
       selected_entities: entityList ? new Set(entityList) : null,
       anonymization_config: finalAnonConfig,
       custom_patterns: (data['custom_patterns'] as CustomPattern[]) ?? [],
+      allow_list: (data['allow_list'] as string[]) ?? [],
+      preserve_entities: (data['preserve_entities'] as string[]) ?? [],
     };
   });
 }

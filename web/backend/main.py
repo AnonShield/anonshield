@@ -51,11 +51,10 @@ def health() -> dict:
 @app.get("/api/config")
 def get_config() -> dict:
     """Public configuration for the frontend (file size limits, etc.)."""
-    import os
     from src.anon.config import NerDefaults
     return {
-        "limit_no_key_mb":   int(os.getenv("ANON_MAX_SIZE_MB",     "1")),
-        "limit_with_key_mb": int(os.getenv("ANON_MAX_SIZE_KEY_MB", "1")),
+        "limit_no_key_mb": jobs.LIMIT_NO_KEY // 1024 // 1024,
+        "limit_with_key_mb": jobs.LIMIT_WITH_KEY // 1024 // 1024,
         "ner_defaults": {
             "score_threshold": NerDefaults.SCORE_THRESHOLD,
             "aggregation_strategy": NerDefaults.AGGREGATION_STRATEGY,
@@ -75,7 +74,7 @@ def validate_profile(body: dict) -> dict:
 async def analyze_fields(file: UploadFile) -> dict:
     """Detect columns/fields from a structured file (CSV, XLSX, JSON, JSONL).
     Returns {fields: [{name, sample_values}]} for field selector UI.
-    Accepts first 256 KB only; lightweight, no disk write.
+    Text formats use the first 256 KB; XLSX uses the seekable upload.
     """
     import io
     from src.anon.utils import detect_fields_from_stream
@@ -86,8 +85,7 @@ async def analyze_fields(file: UploadFile) -> dict:
     if ext == "xlsx":
         import openpyxl
         try:
-            chunk = await file.read(256 * 1024)
-            wb = openpyxl.load_workbook(io.BytesIO(chunk), read_only=True, data_only=True)
+            wb = openpyxl.load_workbook(file.file, read_only=True, data_only=True)
             ws = wb.active
             headers: list[str] = []
             if ws is not None:

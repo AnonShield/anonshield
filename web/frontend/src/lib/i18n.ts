@@ -7,6 +7,11 @@ type Locale = 'en' | 'pt';
 
 const messages = {
   en: {
+    'app.batch_add': 'Add more files for batch processing',
+    'app.batch_queue': 'Batch queue',
+    'upload.limit': 'Maximum file size: {mb} MB',
+    'upload.unlimited': 'Local processing · no upload size limit',
+    'app.error.entities': 'Could not load entity types. Check the server connection and refresh this page.',
     /* nav */
     'nav.app': 'Launch App',
     'nav.lang_toggle': 'PT',
@@ -67,9 +72,6 @@ const messages = {
     'app.pattern_regex': 'Pattern',
     'app.pattern_score': 'Score',
     'app.advanced': 'Advanced',
-    /* batch */
-    'app.batch_add': 'Add more files for batch processing',
-    'app.batch_queue': 'Batch queue',
     /* ocr */
     'ocr.badge.default': 'Default · CPU',
     'ocr.badge.gpu': 'GPU optional',
@@ -105,9 +107,6 @@ const messages = {
     'preprocess.step.morph_open.desc': 'Removes isolated noise pixels after binarization. Requires OpenCV.',
     'preprocess.step.border': 'Add border',
     'preprocess.step.border.desc': 'Adds 20 px white padding. Prevents Tesseract from missing edge text.',
-    /* batch */
-    'app.batch_add': 'Add more files for batch processing',
-    'app.batch_queue': 'Batch queue',
     /* fields */
     'fields.title': 'Anonymization Configuration (Data Schema)',
     'fields.all': 'Global Scan',
@@ -155,6 +154,7 @@ const messages = {
     'status.done': 'Anonymization complete',
     'status.error': 'Error',
     'status.entities_replaced': '{n} entities replaced',
+    'status.zip_skipped': 'Left out of the ZIP (unsupported format): {n} file(s), e.g. {files}',
     'status.download': '↓ Download',
     'status.delete_warning': 'File deleted from server after download.',
     'status.anonymize_another': 'Anonymize another file',
@@ -165,7 +165,7 @@ const messages = {
     'key.optional': '(optional)',
     'key.placeholder': 'Paste your ANON_SECRET_KEY here',
     'key.hint_deterministic': 'Deterministic pseudonyms: same input + key = same token across all runs. Key is used only in-memory, never stored.',
-    'key.hint_random': 'No key: pseudonyms are random per run (non-reproducible across jobs). Useful for one-off anonymization.',
+    'key.hint_random': 'No custom key: uses this installation\'s saved key. The same value produces the same pseudonym across jobs.',
     'key.hint': 'Optional: makes pseudonyms deterministic (same input + key = same token across runs).',
     /* tutorial */
     'tut.skip': 'Skip',
@@ -447,6 +447,11 @@ const messages = {
     'slides.refs.tools': 'Tools and data',
   },
   pt: {
+    'app.batch_add': 'Adicionar mais arquivos para processamento em lote',
+    'app.batch_queue': 'Fila de processamento',
+    'upload.limit': 'Tamanho máximo: {mb} MB',
+    'upload.unlimited': 'Processamento local · sem limite de tamanho de arquivo',
+    'app.error.entities': 'Não foi possível carregar os tipos de entidade. Verifique a conexão com o servidor e recarregue a página.',
     /* nav */
     'nav.app': 'Abrir App',
     'nav.lang_toggle': 'EN',
@@ -507,9 +512,6 @@ const messages = {
     'app.pattern_regex': 'Padrão',
     'app.pattern_score': 'Score',
     'app.advanced': 'Avançado',
-    /* batch */
-    'app.batch_add': 'Adicionar mais arquivos para processamento em lote',
-    'app.batch_queue': 'Fila de processamento',
     /* ocr */
     'ocr.badge.default': 'Padrão · CPU',
     'ocr.badge.gpu': 'GPU opcional',
@@ -545,9 +547,6 @@ const messages = {
     'preprocess.step.morph_open.desc': 'Remove pixels de ruído isolados após binarização. Requer OpenCV.',
     'preprocess.step.border': 'Adicionar borda',
     'preprocess.step.border.desc': 'Adiciona 20 px de margem branca. Evita que o Tesseract perca texto nas bordas.',
-    /* batch */
-    'app.batch_add': 'Adicionar mais arquivos para processamento em lote',
-    'app.batch_queue': 'Fila de processamento',
     /* fields */
     'fields.title': 'Configuração de Escopo (Anonymization Config)',
     'fields.all': 'Varredura Global',
@@ -595,6 +594,7 @@ const messages = {
     'status.done': 'Anonimização concluída',
     'status.error': 'Erro',
     'status.entities_replaced': '{n} entidades substituídas',
+    'status.zip_skipped': 'Fora do ZIP (formato não suportado): {n} arquivo(s), ex.: {files}',
     'status.download': '↓ Baixar',
     'status.delete_warning': 'Arquivo deletado do servidor após o download.',
     'status.anonymize_another': 'Anonimizar outro arquivo',
@@ -605,7 +605,7 @@ const messages = {
     'key.optional': '(opcional)',
     'key.placeholder': 'Cole sua ANON_SECRET_KEY aqui',
     'key.hint_deterministic': 'Pseudônimos determinísticos: mesma entrada + chave = mesmo token em todas as execuções. A chave é usada apenas em memória.',
-    'key.hint_random': 'Sem chave: os pseudônimos são aleatórios por execução (não reprodutíveis entre jobs). Útil para anonimização única.',
+    'key.hint_random': 'Sem chave própria: usa a chave salva nesta instalação. O mesmo valor gera o mesmo pseudônimo entre tarefas.',
     'key.hint': 'Opcional: torna os pseudônimos determinísticos (mesma entrada + chave = mesmo token entre execuções).',
     /* tutorial */
     'tut.skip': 'Pular',

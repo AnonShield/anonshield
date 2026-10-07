@@ -176,8 +176,8 @@
 <style>
   .entity-selector { display: flex; flex-direction: column; gap: var(--space-3); }
 
-  .toolbar { display: flex; gap: var(--space-2); align-items: center; }
-  .search { flex: 1; font-size: var(--text-sm); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+  .search { flex: 1 1 160px; min-width: 0; font-size: var(--text-sm); }
 
   .btn-chip {
     padding: var(--space-1) var(--space-3);

@@ -12,9 +12,9 @@ ENV UV_NO_CACHE=1
 # CPU torch. --no-install-project: the source is copied into the runtime stage.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --group web \
-    && find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
-    && find /app/.venv -type d -name tests -exec rm -rf {} + 2>/dev/null || true \
-    && find /app/.venv -name "*.pyc" -delete 2>/dev/null || true
+    && find /app/.venv -type d -name __pycache__ -prune -exec rm -rf {} + \
+    && find /app/.venv -type d -name tests -prune -exec rm -rf {} + \
+    && find /app/.venv -name "*.pyc" -delete
 
 # ---- runtime: slim image with only what is needed to run ----
 FROM python:3.12-slim

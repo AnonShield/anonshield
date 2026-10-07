@@ -239,7 +239,7 @@
   const scatterStrats = $derived([...new Set(scatterPts.map((j) => j.strategy).filter(Boolean))]);
 
   // ── Derived: latency percentiles ─────────────────────────────────────────────
-  const lat = $derived(percentiles?.ms ?? null);
+  const lat = $derived.by((): Pctl | null => percentiles?.ms ?? null);
   const latMax = $derived(Math.max(lat?.max ?? 0, lat?.p99 ?? 0, 1));
   function latX(ms: number | null): number {
     const w = 100;

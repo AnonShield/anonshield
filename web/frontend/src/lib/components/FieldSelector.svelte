@@ -107,9 +107,9 @@
     emit();
   }
 
-  // Handle ESC key to close modal
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') showModal = false;
+  function openDialog(dialog: HTMLDialogElement) {
+    dialog.showModal();
+    return { destroy: () => dialog.close() };
   }
 </script>
 
@@ -141,16 +141,16 @@
 
   <!-- MODAL OVERLAY -->
   {#if showModal}
-    <div class="modal-overlay" onkeydown={handleKeydown} tabindex="-1">
-      <div class="modal-backdrop" onclick={() => showModal = false}></div>
+    <dialog class="modal-overlay" use:openDialog onclose={() => showModal = false} aria-labelledby="field-dialog-title">
+      <button type="button" class="modal-backdrop" aria-label="Close field settings" onclick={() => showModal = false}></button>
       
       <div class="modal-content card">
         <div class="modal-header">
           <div class="mh-left">
             <span class="cp-badge">Schema Config</span>
-            <h2>{$t('fields.title')}</h2>
+            <h2 id="field-dialog-title">{$t('fields.title')}</h2>
           </div>
-          <button class="close-btn" onclick={() => showModal = false}>&times;</button>
+          <button class="close-btn" aria-label="Close field settings" onclick={() => showModal = false}>&times;</button>
         </div>
 
         <div class="modal-tabs">
@@ -253,7 +253,7 @@
           <button class="btn btn-primary" onclick={() => showModal = false}>Done</button>
         </div>
       </div>
-    </div>
+    </dialog>
   {/if}
 {/if}
 
@@ -310,10 +310,12 @@
   .modal-overlay {
     position: fixed; inset: 0; z-index: 1000;
     display: flex; align-items: center; justify-content: center;
-    padding: 2rem;
+    padding: 2rem; margin: 0; border: 0;
+    width: 100%; height: 100%; max-width: none; max-height: none;
+    background: transparent; color: inherit;
   }
   .modal-backdrop {
-    position: absolute; inset: 0;
+    position: absolute; inset: 0; border: 0;
     background: rgba(0,0,0,0.7);
     backdrop-filter: blur(8px);
   }
