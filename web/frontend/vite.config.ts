@@ -1,7 +1,7 @@
 import nodeAdapter from '@sveltejs/adapter-node';
 import staticAdapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 // In Docker dev, BACKEND_URL=http://backend:8000; locally defaults to localhost.
 const backendUrl = process.env.BACKEND_URL ?? 'http://localhost:8000';
@@ -19,6 +19,10 @@ export default defineConfig({
 			adapter: process.env.ANON_STATIC_UI ? staticAdapter({ fallback: 'index.html' }) : nodeAdapter()
 		})
 	],
+	test: {
+		// The logic modules (src/lib/*.ts); the screens are covered by web/e2e.
+		include: ['src/**/*.test.ts']
+	},
 	server: {
 		proxy: {
 			'/api': {
