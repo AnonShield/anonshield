@@ -10,6 +10,8 @@ Open **http://localhost:8080**. The first start downloads the image (a few GB) a
 
 Everything runs in this one container on your CPU. Uploaded documents never leave your computer, and the interface listens only on `127.0.0.1`, so other machines on your network cannot reach it. There is no upload-size, ZIP-size or rate limit; disk space and memory are the limits.
 
+With the command-line wrapper ([`docker/run.sh`](../docker/run.sh), or `run.ps1` on Windows), `./run.sh --web` does the same: it downloads the image, starts the container, waits until it is ready and prints the address; `--port 8081`, `--stop` and `--update` cover the rest.
+
 ## Everyday commands
 
 ```sh
@@ -36,7 +38,7 @@ Add these to the `docker run` command:
 
 | Option | Effect |
 | --- | --- |
-| `-p 127.0.0.1:8081:8080` instead of `-p 127.0.0.1:8080:8080` | Use port 8081 (then open http://localhost:8081). |
+| `-p 127.0.0.1:8081:8080` instead of `-p 127.0.0.1:8080:8080` | Use port 8081 (then open http://localhost:8081). Change only the first number: the app listens on 8080 inside the container. |
 | `-e ANON_MAX_SIZE_MB=100` | Limit uploads to 100 MB (`ANON_MAX_SIZE_KEY_MB` when a custom key is entered, `ANON_MAX_ZIP_SIZE_MB` for the unpacked size of a ZIP). `0`, the default, means no limit. |
 | `--restart unless-stopped` | Start it again with Docker. |
 

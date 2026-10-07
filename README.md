@@ -19,7 +19,7 @@ AnonShield replaces personally identifiable information (PII) and network-specif
 docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web
 ```
 
-Open **[localhost:8080](http://localhost:8080)**, drop a file, and click **Anonymize**. One container, no clone and no setup: it has no upload-size or rate limit, only this computer can reach it, and the key, model cache and metrics stay in the `anonshield` volume. Stop with `docker stop anonshield`, start again with `docker start anonshield`. The [local guide](web/LOCAL.md) covers updates, another port and troubleshooting.
+Open **[localhost:8080](http://localhost:8080)**, drop a file, and click **Anonymize**. One container, no clone and no setup: it has no upload-size or rate limit, only this computer can reach it, and the key, model cache and metrics stay in the `anonshield` volume. Stop with `docker stop anonshield`, start again with `docker start anonshield`; `./run.sh --web` (below) does the same with `--stop`, `--update` and `--port`. The [local guide](web/LOCAL.md) covers updates, another port and troubleshooting.
 
 **Command-line processing:** download the script and give it a file or folder.
 

@@ -8,13 +8,19 @@ AnonShield lets Computer Security Incident Response Teams share incident data wi
 
 ![AnonShield pipeline](https://anonshield.org/pipeline.png)
 
-> **Prefer a browser?** Run the web app on your own computer with one command, no limits and nothing sent anywhere:
->
-> ```bash
-> docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web
-> ```
->
-> Then open **http://localhost:8080**, drop a file and click **Anonymize**. Stop it with `docker stop anonshield` and start it again with `docker start anonshield`; the key and model cache stay in the `anonshield` volume ([local guide](https://github.com/AnonShield/anonshield/blob/main/web/LOCAL.md)). A hosted demo runs at **[anonshield.org](https://anonshield.org)**. The rest of this page covers the command-line tool (`latest`, `gpu`, `gpu-cu126`).
+## Two ways to run it
+
+**In your browser** (drag and drop, no size limit, nothing leaves your computer):
+
+```bash
+docker run -d --name anonshield -p 127.0.0.1:8080:8080 -v anonshield:/data anonshield/anon:web
+```
+
+Open **http://localhost:8080**, drop a file and click **Anonymize**. `docker stop anonshield` stops it and `docker start anonshield` starts it again; the key and model cache stay in the `anonshield` volume. For another port, change only the first number: `-p 127.0.0.1:8081:8080`. With the wrapper script below, `./run.sh --web` does all of this (`--stop`, `--update`, `--port 8081`, and a clear message if the port or name is taken). More in the [local guide](https://github.com/AnonShield/anonshield/blob/main/web/LOCAL.md).
+
+**On the command line** (files and folders, scripts, NVIDIA GPU): use the wrapper script in the [Quick Start](#quick-start) below; it runs the `latest`, `gpu` or `gpu-cu126` image for you.
+
+A hosted demo runs at **[anonshield.org](https://anonshield.org)**.
 
 ![AnonShield web interface](https://anonshield.org/ui-app.png)
 
