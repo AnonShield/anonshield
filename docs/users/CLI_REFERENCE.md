@@ -114,7 +114,7 @@ Supported entity types (strategy=filtered, model=Davlan/xlm-roberta-base-ner-hrl
  - UUID
 ```
 
-> **Strategy differences:** `presidio` includes all Presidio built-in recognizers (~46 entities, including `AU_ABN`, `US_SSN`, `IBAN_CODE`, `UK_NHS`, etc.). All other strategies (`filtered`, `hybrid`, `standalone`) use only the curated cybersecurity recognizer set shown above.
+> **Strategy differences:** `presidio` includes all Presidio built-in recognizers (~46 entities, including `AU_ABN`, `US_SSN`, `IBAN_CODE`, `UK_NHS`, etc.). All other strategies (`filtered`, `standalone`) use only the curated cybersecurity recognizer set shown above.
 
 ---
 
@@ -653,7 +653,6 @@ JSON format is also accepted (same fields, wrapped in an array).
 |----------|-------------|---------|
 | `filtered` | Presidio pipeline with a curated, optimized recognizer set | **Default: best accuracy** |
 | `presidio` | Full Presidio pipeline with all recognizers enabled | Broadest detection, more false positives |
-| `hybrid` | Presidio detection + manual text replacement (no Presidio anonymizer) | When Presidio's anonymizer causes issues |
 | `standalone` | Loads NER models directly, bypasses Presidio entirely | **Maximum GPU throughput (4× faster)** |
 | `regex` | Pure regex only, zero NLP/NER model loading | **Fastest of all; domain-specific pipelines with `--custom-patterns`** |
 
@@ -662,7 +661,6 @@ JSON format is also accepted (same fields, wrapped in an array).
 | Strategy | CSV (KB/s) | JSON (KB/s) |
 |----------|-----------|------------|
 | `standalone` | 732 | 1,250 |
-| `hybrid` | 248 | 632 |
 | `filtered` (default) | 240 | 627 |
 | `presidio` | 171 | 575 |
 
@@ -671,9 +669,10 @@ JSON format is also accepted (same fields, wrapped in an array).
 | Strategy | Precision | Recall | F1 |
 |----------|-----------|--------|----|
 | `filtered` (default) | 91.9 % | 96.7 % | **94.2 %** |
-| `hybrid` | 91.9 % | 96.7 % | **94.2 %** |
 | `standalone` | 87.9 % | 94.5 % | 91.1 % |
 | `presidio` | 71.6 % | 96.7 % | 82.3 % |
+
+`hybrid` was removed in October 2026: it ran the same detection as `filtered` and gave the same results (SBRC 2026 paper, Table 8: F1 94.2% for both; throughput within 3%). `--anonymization-strategy hybrid` and profiles with `strategy: hybrid` still run, as `filtered`, with a warning.
 
 ```bash
 # Best accuracy (default, no flag needed)
@@ -968,7 +967,7 @@ These options switch the tool from *anonymization mode* into *NER training data 
 | `--regex-priority` | off | Prioritize regex over model detections |
 | `--force-large-xml` | off | Override XML memory safety limits |
 | `--disable-gc` | off | Disable Python garbage collection |
-| `--anonymization-strategy` | `filtered` | Detection engine: `filtered` `presidio` `hybrid` `standalone` `regex` |
+| `--anonymization-strategy` | `filtered` | Detection engine: `filtered` `presidio` `standalone` `regex` |
 | `--ocr-engine` | `tesseract` | OCR engine (Tesseract) |
 | `--transformer-model` | `Davlan/xlm-roberta-base-ner-hrl` | NER model to use |
 | `--ner-score-threshold` | `0.4` | Minimum confidence for a transformer NER detection |

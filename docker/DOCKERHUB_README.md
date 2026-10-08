@@ -235,12 +235,11 @@ When `--lang pt` is set, additional Brazilian recognizers are enabled (for examp
 
 ## Anonymization Strategies
 
-Choose with `--anonymization-strategy <name>`. The four production strategies are `filtered` (default), `hybrid`, `standalone`, and `presidio`. A `regex` strategy (pure pattern matching, no ML) is also available; see the [strategies guide](https://github.com/AnonShield/anonshield/blob/main/docs/developers/ANONYMIZATION_STRATEGIES.md).
+Choose with `--anonymization-strategy <name>`. The three production strategies are `filtered` (default), `standalone`, and `presidio`. A `regex` strategy (pure pattern matching, no ML) is also available; see the [strategies guide](https://github.com/AnonShield/anonshield/blob/main/docs/developers/ANONYMIZATION_STRATEGIES.md).
 
 | Strategy | What it does | Best for |
 |----------|--------------|----------|
 | `filtered` *(default)* | Presidio pipeline scoped to a curated recognizer set; handles overlapping entity merges correctly | Best accuracy; the safe default |
-| `hybrid` | Presidio detection with custom text replacement | Same accuracy as `filtered`, different replacement path |
 | `standalone` | Zero Presidio dependency, fastest on GPU | Maximum throughput |
 | `presidio` | Full upstream Presidio pipeline | Comparison and baseline use |
 
@@ -253,7 +252,6 @@ The numbers below come from the AnonShield benchmark suite. See [benchmark/BENCH
 | Strategy | CSV (KB/s) | JSON (KB/s) | vs. slowest |
 |----------|-----------|------------|-------------|
 | `standalone` | **732** | **1,250** | **4.3x** faster |
-| `hybrid` | 248 | 632 | 1.5x faster |
 | `filtered` *(default)* | 240 | 627 | 1.4x faster |
 | `presidio` | 171 | 575 | baseline |
 
@@ -262,7 +260,6 @@ The numbers below come from the AnonShield benchmark suite. See [benchmark/BENCH
 | Strategy | CSV (KB/s) | JSON (KB/s) | vs. slowest |
 |----------|-----------|------------|-------------|
 | `standalone` | **526** | **518** | CSV: **4x** faster |
-| `hybrid` | 134 | 461 | similar |
 | `filtered` *(default)* | 132 | 459 | similar |
 | `presidio` | 130 | 439 | baseline |
 
@@ -271,7 +268,6 @@ The numbers below come from the AnonShield benchmark suite. See [benchmark/BENCH
 | Strategy | CSV (KB/s) | XML (KB/s) | PDF (KB/s) | vs. slowest |
 |----------|-----------|-----------|-----------|------------|
 | `standalone` | **0.94** | **2.05** | **4.26** | about 15% faster |
-| `hybrid` | 0.85 | 1.83 | 3.57 | similar |
 | `presidio` | 0.85 | 1.85 | 3.56 | similar |
 | `filtered` *(default)* | 0.81 | 1.82 | 3.83 | baseline |
 
@@ -282,9 +278,10 @@ The numbers below come from the AnonShield benchmark suite. See [benchmark/BENCH
 | Strategy | Precision | Recall | F1 | Notes |
 |----------|-----------|--------|----|-------|
 | `filtered` *(default)* | 91.9% | 96.7% | **94.2%** | Best accuracy. Curated recognizer set; handles overlapping merges correctly. |
-| `hybrid` | 91.9% | 96.7% | **94.2%** | Same accuracy as `filtered`. Uses manual replacement instead of Presidio's anonymizer. |
 | `standalone` | 87.9% | 94.5% | 91.1% | Slightly lower precision. Fastest on GPU. |
 | `presidio` | 71.6% | 96.7% | 82.3% | Many false positives. Rarely the best choice. |
+
+`hybrid` was removed in October 2026: it ran the same detection as `filtered` and gave the same results (SBRC 2026 paper, Table 8: F1 94.2% for both; throughput within 3%). `--anonymization-strategy hybrid` and profiles with `strategy: hybrid` still run, as `filtered`, with a warning.
 
 ---
 
@@ -346,7 +343,6 @@ Save the config anywhere and pass its path:
 |----------|------------|---------|---------|-------------|----------|----------|
 | `standalone` | 732 KB/s | **34,341 KB/s** | **47x** | 1,250 KB/s | **31,272 KB/s** | **25x** |
 | `filtered` | 240 KB/s | 32,115 KB/s | 134x | 627 KB/s | 29,937 KB/s | 48x |
-| `hybrid` | 248 KB/s | 31,902 KB/s | 129x | 632 KB/s | 29,924 KB/s | 47x |
 | `presidio` | 171 KB/s | 32,034 KB/s | 188x | 575 KB/s | 29,855 KB/s | 52x |
 
 The config gain is largest for the Presidio-based strategies because they have a higher per-record baseline cost to eliminate. `standalone` stays the fastest even with config (34,341 KB/s vs. about 32,000 KB/s for the others). When you use only `force_anonymize` and `fields_to_exclude` (with no `fields_to_anonymize`), NER inference is bypassed entirely and the strategy choice no longer affects throughput.

@@ -14,8 +14,8 @@
 4. [Detailed Strategy Specifications](#detailed-strategy-specifications)
    - [FullPresidio Strategy](#1-fullpresidio-strategy-presidio)
    - [FilteredPresidio Strategy](#2-filteredpresidio-strategy-filtered)
-   - [HybridPresidio Strategy](#3-hybridpresidio-strategy-hybrid)
-   - [Standalone Strategy](#4-standalone-strategy-standalone)
+   - [Standalone Strategy](#3-standalone-strategy-standalone)
+   - [Removed: HybridPresidio (`hybrid`)](#removed-hybridpresidio-hybrid)
 5. [Pattern Recognition System](#pattern-recognition-system)
 6. [Performance Benchmarks](#performance-benchmarks)
 7. [Decision Guide](#decision-guide)
@@ -28,7 +28,7 @@
 
 ## Overview
 
-AnonShield implements **five distinct anonymization strategies**. All strategies share a common **DRY (Don't Repeat Yourself)** architecture where regex patterns are centralized in `engine.RegexPatterns`, ensuring consistency across implementations.
+AnonShield implements **four anonymization strategies** (`presidio`, `filtered`, `standalone`, `regex`). All strategies share a common **DRY (Don't Repeat Yourself)** architecture where regex patterns are centralized in `engine.RegexPatterns`, ensuring consistency across implementations.
 
 ### Available Strategies
 
@@ -39,7 +39,6 @@ AnonShield implements **five distinct anonymization strategies**. All strategies
 │                                                                   │
 │  FullPresidio      → Complete Presidio (100+ recognizers)        │
 │  FilteredPresidio  → Presidio with filtered scope                │
-│  HybridPresidio    → Presidio detection + manual replacement     │
 │  Standalone        → Zero Presidio dependencies                  │
 │                                                                   │
 │  All strategies use centralized RegexPatterns (DRY principle)    │
@@ -117,7 +116,6 @@ orchestrator = AnonymizationOrchestrator(
 |----------|----------------|-------------|---------------|
 | **FullPresidio** | Complete pipeline | ✅ | Transformers + All recognizers |
 | **FilteredPresidio** | Filtered entities | ✅ | Transformers + Filtered recognizers |
-| **HybridPresidio** | Detection only | ✅ | Transformers + Filtered recognizers |
 | **Standalone** | None | ✅ | Transformers only |
 
 ### Entity Coverage
@@ -126,22 +124,21 @@ orchestrator = AnonymizationOrchestrator(
 |----------|--------------|--------|
 | **FullPresidio** | 100+ | All Presidio recognizers + custom regex |
 | **FilteredPresidio** | 25+ | Filtered Presidio recognizers + custom regex |
-| **HybridPresidio** | 25+ | Same as FilteredPresidio (detection) |
 | **Standalone** | 20+ | Transformers NER + custom regex only |
 
 ### Feature Differences
 
-| Feature | FullPresidio | FilteredPresidio | HybridPresidio | Standalone |
-|---------|--------------|------------------|----------------|------------|
-| **Context-Aware Detection** | ✅ | ✅ | ✅ | ❌ |
-| **Score Boosting** | ✅ | ✅ | ✅ | ❌ |
-| **Custom Operators** | ✅ | ✅ | ✅ | ✅ |
-| **Multi-Language** | ✅ | ✅ | ✅ | ✅ |
-| **Allow/Deny Lists** | ✅ | ✅ | ✅ | ✅ |
-| **Batch Processing** | ✅ | ✅ | ✅ | ✅ |
-| **Entity Validation** | ✅ | ✅ | ❌ | ❌ |
-| **Luhn Check (CC)** | ✅ | ✅ | ❌ | ❌ |
-| **Country-Specific** | ✅ | ✅ | ❌ | ❌ |
+| Feature | FullPresidio | FilteredPresidio | Standalone |
+|---------|--------------|------------------|------------|
+| **Context-Aware Detection** | ✅ | ✅ | ❌ |
+| **Score Boosting** | ✅ | ✅ | ❌ |
+| **Custom Operators** | ✅ | ✅ | ✅ |
+| **Multi-Language** | ✅ | ✅ | ✅ |
+| **Allow/Deny Lists** | ✅ | ✅ | ✅ |
+| **Batch Processing** | ✅ | ✅ | ✅ |
+| **Entity Validation** | ✅ | ✅ | ❌ |
+| **Luhn Check (CC)** | ✅ | ✅ | ❌ |
+| **Country-Specific** | ✅ | ✅ | ❌ |
 
 ---
 
@@ -390,124 +387,7 @@ python anon.py data.txt
 
 ---
 
-### 3. HybridPresidio Strategy (`hybrid`)
-
-**Architecture:** Presidio detection + custom Python replacement logic.
-
-#### Technical Details
-
-```python
-# Implementation: src/anon/strategies.py
-class HybridPresidioStrategy:
-    """
-    Uses Presidio for detection, manual Python for anonymization.
-    
-    Detection Pipeline:
-    1. TransformersNlpEngine (same as FilteredPresidio)
-    2. Filtered Presidio recognizers (25 types)
-    3. Custom regex recognizers (40+ patterns)
-    
-    Anonymization:
-    - Custom Python implementation
-    - Direct string replacement (no Presidio operators)
-    - Allows custom replacement logic per entity type
-    - No entity validation (faster but less safe)
-    """
-```
-
-#### Why Hybrid?
-
-**Use Cases:**
-1. **Custom Anonymization Logic**: Different replacement strategy per entity
-2. **Integration with External Systems**: Call APIs during replacement
-3. **Conditional Anonymization**: Replace based on runtime conditions
-4. **Performance Optimization**: Skip Presidio operator overhead
-
-#### Execution Flow
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                 HybridPresidio Execution Flow                 │
-└──────────────────────────────────────────────────────────────┘
-
-Input Text
-    │
-    ├──> Presidio Detection (same as FilteredPresidio)
-    │       │
-    │       └──> Returns: List[RecognizerResult]
-    │                 ├─ entity_type
-    │                 ├─ start, end positions
-    │                 ├─ score
-    │                 └─ matched_text
-    │
-    └──> Custom Python Replacement
-            │
-            ├──> Sort entities by position (reverse)
-            │
-            ├──> For each entity:
-            │       │
-            │       ├──> Generate HMAC slug
-            │       ├──> Build replacement: [TYPE_hash]
-            │       └──> Replace in text (string slicing)
-            │
-            └──> Result: Anonymized text
-```
-
-#### Custom Replacement Example
-
-```python
-# Extend HybridPresidioStrategy for custom logic
-class CustomHybridStrategy(HybridPresidioStrategy):
-    def _generate_anonymized_text(self, text: str, results: List) -> str:
-        """Override replacement logic."""
-        for result in sorted(results, key=lambda x: x.start, reverse=True):
-            if result.entity_type == "EMAIL_ADDRESS":
-                # Custom: Keep domain for emails
-                email = text[result.start:result.end]
-                username, domain = email.split("@")
-                replacement = f"[USER_{self._hash(username)}]@{domain}"
-            elif result.entity_type == "CREDIT_CARD":
-                # Custom: Keep last 4 digits
-                cc = text[result.start:result.end]
-                replacement = f"****-****-****-{cc[-4:]}"
-            else:
-                # Default anonymization
-                replacement = self._default_replacement(result)
-            
-            text = text[:result.start] + replacement + text[result.end:]
-        return text
-```
-
-#### Implementation Notes
-
-```yaml
-Detection: Same as FilteredPresidio (Presidio analyzer)
-Replacement: Custom Python implementation
-Operators: Not used (manual string replacement)
-Validation: Not performed (no Presidio validation step)
-```
-
-#### Use Cases
-
-**Designed for:**
-- Custom anonymization logic per entity type
-- Integration with external systems during replacement
-- Conditional anonymization based on runtime conditions
-- Custom replacement formats not available in Presidio operators
-
-#### Limitations vs Presidio Operators
-
-| Feature | HybridPresidio | FilteredPresidio |
-|---------|----------------|------------------|
-| **Entity Validation** | ❌ | ✅ |
-| **Context-Aware Replacement** | ❌ | ✅ |
-| **Built-in Operators** | ❌ | ✅ (mask, encrypt, redact, etc.) |
-| **Operator Chaining** | ❌ | ✅ |
-| **Score-based Filtering** | ✅ | ✅ |
-
----
-
-### 4. Standalone Strategy (`standalone`)
+### 3. Standalone Strategy (`standalone`)
 
 **Architecture:** Zero Presidio dependencies - pure Python NLP pipeline.
 
@@ -736,6 +616,20 @@ INFO - Device set to use cuda:0
 
 ---
 
+### Removed: HybridPresidio (`hybrid`)
+
+`hybrid` ran the same Presidio detection as `filtered` and replaced the matches
+with its own loop instead of Presidio's AnonymizerEngine. It gave the same
+results: identical entity counts and time in the benchmark below (53,887
+entities, 285.38 s for both), the same accuracy in the SBRC 2026 paper (Table 8:
+733 TP, 63 FP, 27 FN, F1 94.2% for both) and throughput within 3% (RTX 5060 Ti,
+70,951 Tenable records: CSV 248 vs 240 KB/s, JSON 632 vs 627 KB/s; Ryzen CPU:
+134 vs 132 and 461 vs 459). It was removed in October 2026. `--anonymization-strategy hybrid`
+and profiles with `strategy: hybrid` still work: they run `filtered`, with a
+warning (`src/anon/strategy_names.py`).
+
+---
+
 ## Pattern Recognition System
 
 ### RegexPatterns Class: Single Source of Truth
@@ -931,7 +825,6 @@ Execution:
 |----------|-----------|------------|----------|-------------------|-------------|
 | **FullPresidio** | 5:13.98 (313.98s) | 815.67 KB/s | 3.08 GB | 55,426 | 24 |
 | **FilteredPresidio** | 4:45.38 (285.38s) | 898.50 KB/s | 3.08 GB | 53,887 | 19 |
-| **HybridPresidio** | 4:45.38 (285.38s) | 898.50 KB/s | 3.08 GB | 53,887 | 19 |
 | **Standalone** | 1:13.36 (73.36s) | 3612.17 KB/s | 2.35 GB | 55,228 | 19 |
 
 ### Speedup Analysis
@@ -943,12 +836,6 @@ FilteredPresidio:
   Wall Time: 285.38s (90.9% of baseline)
   Speedup: 1.10x faster
   Entity Coverage: 97.2% (53,887 / 55,426)
-
-HybridPresidio:
-  Wall Time: 285.38s (90.9% of baseline)
-  Speedup: 1.10x faster
-  Entity Coverage: 97.2% (53,887 / 55,426)
-  Note: Identical to FilteredPresidio (uses same detection)
 
 Standalone:
   Wall Time: 73.36s (23.4% of baseline)
@@ -990,47 +877,47 @@ The 4.28x speedup for Standalone is achieved despite cache benefits applying to 
 
 #### Summary Statistics
 
-| Entity Category | FullPresidio | FilteredPresidio | HybridPresidio | Standalone | Δ Full vs Filtered | Δ Standalone vs Filtered |
-|-----------------|--------------|------------------|----------------|------------|--------------------|-------------------------|
-| **Total Entities** | 55,426 | 53,887 | 53,887 | 55,228 | +1,539 (+2.9%) | +1,341 (+2.5%) |
-| **Entity Types** | 24 | 19 | 19 | 19 | +5 types | 0 types |
+| Entity Category | FullPresidio | FilteredPresidio | Standalone | Δ Full vs Filtered | Δ Standalone vs Filtered |
+|-----------------|--------------|------------------|------------|--------------------|-------------------------|
+| **Total Entities** | 55,426 | 53,887 | 55,228 | +1,539 (+2.9%) | +1,341 (+2.5%) |
+| **Entity Types** | 24 | 19 | 19 | +5 types | 0 types |
 
 #### Detailed Entity Breakdown
 
-| Entity Type | FullPresidio | FilteredPresidio | HybridPresidio | Standalone | Notes |
-|-------------|--------------|------------------|----------------|------------|-------|
-| URL | 23,934 | 23,994 | 23,994 | 23,449 | Filtered +0.25% |
-| CVE_ID | 9,110 | 9,120 | 9,120 | 9,140 | Standalone +0.33% |
-| UUID | 8,869 | 8,869 | 8,869 | 8,869 | Identical |
-| ORGANIZATION | 3,767 | 3,786 | 3,786 | 3,937 | Standalone +4.5% |
-| HOSTNAME | 1,592 | 1,553 | 1,553 | 3,243 | **Standalone +108.9%** |
-| EMAIL_ADDRESS | 1,465 | 1,465 | 1,465 | 1,465 | Identical |
-| DATE_TIME | 1,438 | 0 | 0 | 0 | **Full only** |
-| IP_ADDRESS | 1,160 | 1,165 | 1,165 | 1,461 | **Standalone +25.4%** |
-| HASH | 860 | 860 | 860 | 876 | Standalone +1.9% |
-| OID | 488 | 382 | 382 | 33 | Full +27.7%, Standalone -91.4% |
-| PERSON | 251 | 251 | 251 | 268 | Standalone +6.8% |
-| CERT_SERIAL | 219 | 220 | 220 | 9 | Standalone -95.9% |
-| PHONE_NUMBER | 29 | 31 | 31 | 196 | **Standalone +532.3%** |
-| LOCATION | 25 | 25 | 25 | 84 | **Standalone +236.0%** |
-| US_DRIVER_LICENSE | 34 | 0 | 0 | 0 | **Full only** |
-| FILE_PATH | 14 | 8 | 8 | 6 | Full +75%, Filtered baseline |
-| CPE_STRING | 2,145 | 2,145 | 2,145 | 2,145 | Identical |
-| AU_ACN | 7 | 0 | 0 | 0 | **Full only** (Australian Company Number) |
-| CREDIT_CARD | 6 | 6 | 6 | 6 | Identical |
-| AU_TFN | 5 | 0 | 0 | 0 | **Full only** (Australian Tax File Number) |
-| AUTH_TOKEN | 0 | 4 | 4 | 38 | **Standalone +850%** |
-| MEDICAL_LICENSE | 3 | 0 | 0 | 0 | **Full only** |
-| PORT | 2 | 2 | 2 | 2 | Identical |
-| IN_VEHICLE_REGISTRATION | 2 | 0 | 0 | 0 | **Full only** (Indian vehicle) |
-| MAC_ADDRESS | 1 | 1 | 1 | 1 | Identical |
+| Entity Type | FullPresidio | FilteredPresidio | Standalone | Notes |
+|-------------|--------------|------------------|------------|-------|
+| URL | 23,934 | 23,994 | 23,449 | Filtered +0.25% |
+| CVE_ID | 9,110 | 9,120 | 9,140 | Standalone +0.33% |
+| UUID | 8,869 | 8,869 | 8,869 | Identical |
+| ORGANIZATION | 3,767 | 3,786 | 3,937 | Standalone +4.5% |
+| HOSTNAME | 1,592 | 1,553 | 3,243 | **Standalone +108.9%** |
+| EMAIL_ADDRESS | 1,465 | 1,465 | 1,465 | Identical |
+| DATE_TIME | 1,438 | 0 | 0 | **Full only** |
+| IP_ADDRESS | 1,160 | 1,165 | 1,461 | **Standalone +25.4%** |
+| HASH | 860 | 860 | 876 | Standalone +1.9% |
+| OID | 488 | 382 | 33 | Full +27.7%, Standalone -91.4% |
+| PERSON | 251 | 251 | 268 | Standalone +6.8% |
+| CERT_SERIAL | 219 | 220 | 9 | Standalone -95.9% |
+| PHONE_NUMBER | 29 | 31 | 196 | **Standalone +532.3%** |
+| LOCATION | 25 | 25 | 84 | **Standalone +236.0%** |
+| US_DRIVER_LICENSE | 34 | 0 | 0 | **Full only** |
+| FILE_PATH | 14 | 8 | 6 | Full +75%, Filtered baseline |
+| CPE_STRING | 2,145 | 2,145 | 2,145 | Identical |
+| AU_ACN | 7 | 0 | 0 | **Full only** (Australian Company Number) |
+| CREDIT_CARD | 6 | 6 | 6 | Identical |
+| AU_TFN | 5 | 0 | 0 | **Full only** (Australian Tax File Number) |
+| AUTH_TOKEN | 0 | 4 | 38 | **Standalone +850%** |
+| MEDICAL_LICENSE | 3 | 0 | 0 | **Full only** |
+| PORT | 2 | 2 | 2 | Identical |
+| IN_VEHICLE_REGISTRATION | 2 | 0 | 0 | **Full only** (Indian vehicle) |
+| MAC_ADDRESS | 1 | 1 | 1 | Identical |
 
 #### Key Findings
 
-**1. FilteredPresidio vs HybridPresidio:**
+**1. FilteredPresidio vs HybridPresidio (since removed):**
 - **Identical detection results** (53,887 entities, 19 types)
 - **Identical processing time** (285.38s)
-- Confirms: Hybrid uses Presidio for detection, only differs in replacement logic
+- Hybrid used Presidio for detection and differed only in replacement logic; this is why it was removed (see [Removed: HybridPresidio](#removed-hybridpresidio-hybrid)). It is left out of the other tables of this run.
 
 **2. FullPresidio Unique Detections:**
 
@@ -1084,7 +971,6 @@ The 4.28x speedup for Standalone is achieved despite cache benefits applying to 
 *FilteredPresidio:*
 - Excludes regional recognizers (no US_DRIVER_LICENSE, AU_ACN, etc.)
 - Balanced detection without regional types
-- Identical to HybridPresidio in detection
 
 *Standalone:*
 - More aggressive on common patterns (HOSTNAME, PHONE_NUMBER, IP_ADDRESS)
@@ -1107,12 +993,6 @@ FilteredPresidio:
   Per-record: Entity detection + validation + operator application
   Validation: Luhn check, limited country formats, context scoring
   Result: Balanced accuracy and performance
-
-HybridPresidio:
-  Initialization: Same as FilteredPresidio
-  Per-record: Presidio detection + manual Python replacement
-  Validation: Detection only (no anonymization validation)
-  Result: Identical to FilteredPresidio (detection dominates time)
 
 Standalone:
   Initialization: Transformer only (no Presidio overhead)
@@ -1137,11 +1017,6 @@ Standalone:
 - Context-aware scoring and validation
 - **Observation**: Balanced detection across 19 common entity types
 - **Trade-off**: Moderate processing time, focused entity coverage
-
-**HybridPresidio:**
-- Same detection as FilteredPresidio (identical entity counts)
-- Only differs in replacement mechanism (manual vs Presidio operators)
-- Processing time identical to FilteredPresidio (detection dominates)
 
 **Standalone Strategy:**
 - Pure pattern matching without Presidio framework
@@ -1213,9 +1088,6 @@ If you need:
   │
   ├─ 25 common entity types with Presidio validation
   │  └─ FilteredPresidio
-  │
-  ├─ Custom replacement logic per entity
-  │  └─ HybridPresidio
   │
   └─ Only basic entities without Presidio overhead
      └─ Standalone
@@ -1445,7 +1317,6 @@ python anon.py file.txt --anonymization-strategy <strategy>
 # Available strategies
 --anonymization-strategy filtered      # FilteredPresidio (default, filtered scope)
 --anonymization-strategy presidio      # FullPresidio (maximum coverage)
---anonymization-strategy hybrid        # HybridPresidio (custom logic)
 --anonymization-strategy standalone    # Standalone (maximum speed)
 --anonymization-strategy regex         # Regex only (no NLP models)
 
@@ -1464,7 +1335,7 @@ python anon.py file.txt --anonymization-strategy <strategy>
 
 ```yaml
 AnonShield (Current):
-  - Strategy names: filtered (default), presidio, hybrid, standalone, regex
+  - Strategy names: filtered (default), presidio, standalone, regex ('hybrid', removed in 2026-10, runs filtered)
   - Centralized RegexPatterns class (DRY principle)
   - Standalone strategy implementation (no Presidio dependencies)
   - Automatic GPU detection via torch.cuda.is_available()

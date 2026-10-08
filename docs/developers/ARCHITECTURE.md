@@ -18,7 +18,7 @@ graph TD
     subgraph "2. Anonymization Core"
         RawText -- "orchestrator.anonymize()" --> Orch;
         Orch -- "Selects Strategy (--strategy)" --> STR_CHOICE{Strategy};
-        STR_CHOICE -- "'presidio', 'filtered', 'hybrid', 'standalone', 'regex'" --> PRESIDIO_STR(Traditional Strategy);
+        STR_CHOICE -- "'presidio', 'filtered', 'standalone', 'regex'" --> PRESIDIO_STR(Traditional Strategy);
     end
 
     subgraph "3. Traditional Engine (Presidio/Regex)"
@@ -233,7 +233,7 @@ After batch processing, the orchestrator verifies input count == output count. O
 ├── src/anon/                        # Core library
 │   ├── config.py                    # Entity mappings, language lists
 │   ├── engine.py                    # AnonymizationOrchestrator
-│   ├── strategies.py                # FullPresidio, Filtered, Hybrid strategies
+│   ├── strategies.py                # FullPresidio and Filtered strategies
 │   ├── standalone_strategy.py       # StandaloneStrategy + RegexOnlyStrategy
 │   ├── model_registry.py            # Transformer model registry
 │   ├── entity_detector.py           # NER entity detection + regex-only extraction
