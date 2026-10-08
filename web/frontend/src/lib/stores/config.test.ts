@@ -35,6 +35,11 @@ describe('profiles (Save / Load profile)', () => {
     expect(get(config).selected_entities).toBeNull();
   });
 
+  it('loads a profile saved with the removed hybrid strategy as filtered', () => {
+    fromYaml('strategy: hybrid\n');
+    expect(get(config).strategy).toBe('filtered');
+  });
+
   it('reads the old "fields" list as fields to anonymize', () => {
     fromYaml('fields: [name, email]\n');
     expect(get(config).anonymization_config).toEqual({ fields_to_anonymize: ['name', 'email'] });

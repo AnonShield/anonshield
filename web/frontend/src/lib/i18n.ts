@@ -170,8 +170,6 @@ const messages = {
     'strategy.standalone.desc': 'Direct transformer inference: highest throughput for large batches',
     'strategy.regex': 'Regex only',
     'strategy.regex.desc': 'No model loading: fastest, ideal for structured data',
-    'strategy.hybrid': 'Hybrid',
-    'strategy.hybrid.desc': 'Filtered detection plus lightweight replacement; same accuracy, lower overhead',
     'strategy.presidio': 'Presidio',
     'strategy.presidio.desc': 'Full Presidio pipeline: maximum entity coverage',
     /* languages */
@@ -677,8 +675,6 @@ const messages = {
     'strategy.standalone.desc': 'Inferência direta via transformer: maior throughput para grandes volumes',
     'strategy.regex': 'Apenas regex',
     'strategy.regex.desc': 'Sem carregamento de modelo: mais rápido, ideal para dados estruturados',
-    'strategy.hybrid': 'Híbrido',
-    'strategy.hybrid.desc': 'Detecção Filtered mais substituição customizada; mesma acurácia, menor overhead',
     'strategy.presidio': 'Presidio',
     'strategy.presidio.desc': 'Pipeline completo do Presidio: cobertura máxima de entidades',
     /* languages */

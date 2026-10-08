@@ -249,7 +249,6 @@
     { v: 'filtered',   lk: 'strategy.filtered',   dk: 'strategy.filtered.desc'   },
     { v: 'standalone', lk: 'strategy.standalone',  dk: 'strategy.standalone.desc' },
     { v: 'regex',      lk: 'strategy.regex',       dk: 'strategy.regex.desc'      },
-    { v: 'hybrid',     lk: 'strategy.hybrid',      dk: 'strategy.hybrid.desc'     },
     { v: 'presidio',   lk: 'strategy.presidio',    dk: 'strategy.presidio.desc'   },
   ] as const;
 
