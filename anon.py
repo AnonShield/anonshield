@@ -22,8 +22,9 @@ from src.anon.config import (
     ProcessingLimits,
     DefaultSizes,
     Global,
-    NerDefaults
+    NerDefaults,
 )
+from src.anon.strategy_names import STRATEGIES, canonical_strategy
 from src.anon.database import DatabaseContext
 from src.anon.engine import AnonymizationOrchestrator, load_custom_recognizers, SUPPORTED_LANGUAGES
 from src.anon.processors import ProcessorRegistry
@@ -107,11 +108,11 @@ def get_supported_entities(
     """Return a sorted list of entity types detectable for a given strategy + model combination.
 
     Args:
-        strategy_name: One of presidio / filtered / hybrid / standalone / regex.
+        strategy_name: One of presidio / filtered / standalone / regex.
         transformer_model: HuggingFace model ID used for NER.
 
     Entity sources per strategy:
-        presidio / filtered / hybrid  → custom regex + Presidio built-ins + NER model labels
+        presidio / filtered  → custom regex + Presidio built-ins + NER model labels
         standalone / regex            → custom regex + NER model labels  (no Presidio engine)
     """
     from src.anon.model_registry import get_entity_mapping
@@ -200,12 +201,12 @@ def _parse_arguments():
     parser.add_argument("--max-cache-size", type=int, default=ProcessingLimits.MAX_CACHE_SIZE, help=f"Maximum number of items to store in the in-memory cache. Default: {ProcessingLimits.MAX_CACHE_SIZE}")
     parser.add_argument("--min-word-length", type=int, default=DefaultSizes.DEFAULT_MIN_WORD_LENGTH, help=f"Minimum character length for a word to be processed. Default: {DefaultSizes.DEFAULT_MIN_WORD_LENGTH} (no limit).")
     parser.add_argument("--skip-numeric", action="store_true", help="If set, numeric-only strings will not be anonymized.")
-    parser.add_argument("--anonymization-strategy", type=str, default="filtered",
-                       choices=["presidio", "filtered", "hybrid", "standalone", "regex"],
+    # canonical_strategy: the removed 'hybrid' still runs, as 'filtered', with a warning.
+    parser.add_argument("--anonymization-strategy", type=canonical_strategy, default="filtered",
+                       choices=STRATEGIES,
                        help="Anonymization strategy. "
                             "'filtered': Presidio pipeline with curated recognizer scope (default, best accuracy). "
                             "'presidio': Full Presidio pipeline. "
-                            "'hybrid': Presidio detection + custom replacement. "
                             "'standalone': Zero Presidio dependencies, fastest on GPU. "
                             "'regex': Pure regex matching only, zero NLP/ML overhead (fastest).")
     parser.add_argument("--regex-priority", action="store_true", help="Give priority to custom regex recognizers over model-based ones.")
@@ -257,6 +258,11 @@ def _parse_arguments():
             parser.error(str(e))
         except Exception as e:
             parser.error(f"Failed to load config file '{args.config}': {e}")
+        # The profile's strategy skipped argparse's own check.
+        args.anonymization_strategy = canonical_strategy(str(args.anonymization_strategy))
+        if args.anonymization_strategy not in STRATEGIES:
+            parser.error(f"Unknown strategy '{args.anonymization_strategy}' in {args.config}. "
+                         f"Choose one of: {', '.join(STRATEGIES)}.")
 
     if args.list_entities:
         _handle_list_entities(args.anonymization_strategy, args.transformer_model, args.lang)

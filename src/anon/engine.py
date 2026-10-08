@@ -649,7 +649,7 @@ class AnonymizationOrchestrator:
             self.anonymizer_engine = None
             logging.info(f"Skipping Presidio initialization for '{strategy_name}' strategy (Presidio-free mode).")
         else:
-            # Initialize Presidio for presidio, filtered, and hybrid strategies
+            # Initialize Presidio for the presidio and filtered strategies
             self.analyzer_engine, self.anonymizer_engine = self._setup_engines()
 
         # If entity_detector was not provided, create a default one.
@@ -692,7 +692,7 @@ class AnonymizationOrchestrator:
                 entity_detector=self.entity_detector,
                 hash_generator=self.hash_generator,
                 cache_manager=self.cache_manager,
-                lang=self.presidio_lang if strategy_name in ("presidio", "filtered", "hybrid") else self.lang,
+                lang=self.presidio_lang if strategy_name in ("presidio", "filtered") else self.lang,
                 entities_to_preserve=self.entities_to_preserve,
                 entities_to_anonymize=self.entities_to_anonymize,
                 allow_list=self.allow_list,

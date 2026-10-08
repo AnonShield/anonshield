@@ -226,7 +226,7 @@ def get_supported_entities(
             logger.warning("Could not load Presidio for entity list (%s); using custom + model entities", exc)
             result = sorted(set(custom) | model_ner_entities)
     else:
-        # filtered / standalone / hybrid use a curated set: custom regex + NER model entities only.
+        # filtered / standalone use a curated set: custom regex + NER model entities only.
         # These strategies do NOT use Presidio's broad built-in recognizers (CREDIT_CARD,
         # IBAN, US_DRIVER_LICENSE, etc.); those generate many false positives in practice.
         if strategy == "standalone":

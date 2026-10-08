@@ -246,3 +246,34 @@ esac
     assert expected in result.stdout, result.stdout + result.stderr
     assert "Pulling from anonshield/anon" in result.stdout     # the progress still shows
     assert not any(line.startswith("run") for line in calls.read_text().splitlines())
+
+
+@pytest.mark.parametrize("source", ["cli", "profile"])
+def test_removed_hybrid_strategy_runs_as_filtered(tmp_path, monkeypatch, caplog, source):
+    """hybrid gave the same results as filtered and was removed; old scripts and
+    profiles that name it keep working, with a warning."""
+    from anon import _parse_arguments
+    profile = tmp_path / "profile.yaml"
+    profile.write_text("strategy: hybrid\n")
+    extra = ["--anonymization-strategy", "hybrid"] if source == "cli" else ["--config", str(profile)]
+    monkeypatch.setattr(sys, "argv", ["anon.py", "sample.txt", *extra])
+    with caplog.at_level("WARNING"):
+        assert _parse_arguments().anonymization_strategy == "filtered"
+    assert "'hybrid' strategy was removed" in caplog.text
+
+
+def test_unknown_strategy_in_a_profile_is_a_clear_error(tmp_path, monkeypatch, capsys):
+    from anon import _parse_arguments
+    profile = tmp_path / "profile.yaml"
+    profile.write_text("strategy: fastest\n")
+    monkeypatch.setattr(sys, "argv", ["anon.py", "sample.txt", "--config", str(profile)])
+    with pytest.raises(SystemExit):
+        _parse_arguments()
+    assert "Unknown strategy 'fastest'" in capsys.readouterr().err
+
+
+def test_strategy_factory_maps_the_removed_name():
+    from src.anon.strategy_names import RETIRED_STRATEGIES, STRATEGIES, canonical_strategy
+    assert canonical_strategy("Hybrid") == "filtered"
+    assert all(canonical_strategy(s) == s for s in STRATEGIES)
+    assert not set(RETIRED_STRATEGIES) & set(STRATEGIES)

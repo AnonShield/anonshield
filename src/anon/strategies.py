@@ -10,7 +10,7 @@ from presidio_anonymizer import OperatorConfig
 from .entity_selection import is_entity_excluded
 
 if TYPE_CHECKING:
-    from .core.protocols import CacheStrategy, HashingStrategy
+    from .core.protocols import CacheStrategy
     from .entity_detector import EntityDetector
     from presidio_analyzer.batch_analyzer_engine import BatchAnalyzerEngine
     from presidio_anonymizer import AnonymizerEngine
@@ -191,169 +191,6 @@ class FullPresidioStrategy(AnonymizationStrategy):
         
         return anonymized_results, collected_entities
 
-class HybridPresidioStrategy(AnonymizationStrategy):
-    """
-    Hybrid strategy using Presidio for detection with custom text replacement.
-    
-    Architecture:
-    - Detection: Presidio AnalyzerEngine with filtered entity scope (same as Filtered)
-    - Replacement: Manual Python implementation (custom logic)
-    
-    Performance: FAST (filtered detection + lightweight replacement)
-    Accuracy: HIGH (same detection scope as FilteredPresidio)
-    Trade-off: Avoids Presidio's AnonymizerEngine overhead but loses its battle-tested logic
-    Use case: When you need control over the replacement logic
-    """
-    def __init__(self, 
-                 nlp_engine,  # TransformersNlpEngine with xlm-roberta + spaCy
-                 entity_detector: EntityDetector,
-                 hash_generator: HashingStrategy,
-                 cache_manager: CacheStrategy,
-                 lang: str,
-                 nlp_batch_size: int,
-                 transformer_model: str,
-                 entities_to_preserve: Set[str],
-                 score_threshold: Optional[float] = None,
-                 entities_to_anonymize: Optional[Set[str]] = None):
-        super().__init__()
-        self.nlp_engine = nlp_engine
-        self.entities_to_anonymize = entities_to_anonymize
-        self.entity_detector = entity_detector
-        self.hash_generator = hash_generator
-        self.cache_manager = cache_manager
-        self.lang = lang
-        self.nlp_batch_size = nlp_batch_size
-        self.transformer_model = transformer_model
-        self.entities_to_preserve = entities_to_preserve
-        from .config import NerDefaults
-        self.score_threshold = score_threshold if score_threshold is not None else NerDefaults.SCORE_THRESHOLD
-        self.core_entities = self._get_core_entities()
-    
-    def _get_core_entities(self) -> List[str]:
-        """Returns a curated list of entities supported by our core recognizers (NLP + Custom Regex)."""
-        from .engine import load_custom_recognizers
-        from .model_registry import get_entity_mapping
-
-        entity_mapping = get_entity_mapping(self.transformer_model)
-        core_entities = set(entity_mapping.values())
-        for recognizer in load_custom_recognizers(langs=[self.lang]):
-            core_entities.update(recognizer.supported_entities)
-        return list(core_entities)
-    
-    def _get_entities_to_anonymize(self) -> List[str]:
-        """Returns the list of entities to be analyzed. Preserved types are
-        analyzed too, so they keep their span (see EntityDetector.finalize)."""
-        return list(self.core_entities)
-    
-    def _generate_anonymized_text_and_collect_entities(self, original_doc_text: str, merged_entities: List[Dict], operator_params: Dict) -> Tuple[str, List[Tuple]]:
-        """Generates the anonymized text and collects entities based on merged entities."""
-        new_text_parts = []
-        current_idx = 0
-        collected_entities_for_text: List[Tuple] = []
-        slug_length = operator_params.get("custom_slug_length", 64)
-
-        for ent in merged_entities:
-            new_text_parts.append(original_doc_text[current_idx:ent["start"]])
-            clean_text = " ".join(ent["text"].split()).strip()
-            
-            display_hash, full_hash = self.hash_generator.generate_slug(clean_text, slug_length)
-
-            # Sempre coleta a entidade para estatísticas (com slug_length como flag)
-            # Tupla: (entity_type, text, display_hash, full_hash, should_persist)
-            should_persist = slug_length > 0
-            collected_entities_for_text.append((ent["label"], clean_text, display_hash, full_hash, should_persist))
-
-            if slug_length == 0:
-                new_text_parts.append(f"[{ent['label']}]")
-            else:
-                new_text_parts.append(f"[{ent['label']}_{display_hash}]")
-            current_idx = ent["end"]
-        
-        new_text_parts.append(original_doc_text[current_idx:])
-        return "".join(new_text_parts), collected_entities_for_text
-
-    def anonymize(self, texts: List[str], operator_params: Dict) -> Tuple[List[str], List[Tuple]]:
-        """Anonymize a batch of texts using the filtered/hybrid NER pipeline.
-
-        Uses a filtered entity scope and a custom replacement loop instead of
-        Presidio's AnonymizerEngine.
-
-        Args:
-            texts: Raw input strings to anonymize.
-            operator_params: Configuration including hash_generator and
-                custom_slug_length.
-
-        Returns:
-            A tuple of (anonymized_texts, collected_entities).
-        """
-        self.logger.debug("Executing HybridPresidioStrategy")
-        if not texts: return [], []
-
-        original_texts = [str(text) if pd.notna(text) else "" for text in texts]
-        
-        anonymized_results = ["" for _ in original_texts]
-        collected_entities_total: List[Tuple] = []
-        texts_to_process_in_batch = []
-        indices_map = [] 
-
-        for i, text in enumerate(original_texts):
-            if not text:
-                continue
-
-            cached_value = self.cache_manager.get(text)
-            if cached_value:
-                anonymized_results[i] = cached_value
-            else:
-                texts_to_process_in_batch.append(text)
-                indices_map.append(i)
-
-        if not texts_to_process_in_batch:
-            return anonymized_results, collected_entities_total
-
-        self.logger.debug(f"Processing batch of {len(texts_to_process_in_batch)} texts in fast path.")
-
-        # Get the filtered list of entities to analyze
-        entities_to_use = self._get_entities_to_anonymize()
-        self.logger.debug(f"Entities to use for analysis: {entities_to_use}")
-
-        # Detect entities using xlm-roberta transformer via Presidio's batch analyzer
-        # Now with entity filtering to reduce unnecessary processing
-        analyzer_results_iterator = self.nlp_engine.analyze_iterator(
-            texts_to_process_in_batch, language=self.lang,
-            entities=entities_to_use, score_threshold=analysis_floor(self.score_threshold),
-            batch_size=self.nlp_batch_size
-        )
-        
-        analyzer_results_list = list(analyzer_results_iterator)
-
-        for idx, (original_doc_text, analyzer_results) in enumerate(zip(texts_to_process_in_batch, analyzer_results_list)):
-            
-            # Convert Presidio results (transformer NER + registry recognizers) to entity format
-            detected_entities = [{
-                "start": result.start,
-                "end": result.end,
-                "label": result.entity_type,
-                "text": original_doc_text[result.start:result.end],
-                "score": result.score,
-            } for result in filter_ner_threshold(analyzer_results, self.score_threshold)]
-
-            # Word-list and custom patterns are not in the Presidio registry.
-            detected_entities.extend(self.entity_detector.extract_custom_entities(original_doc_text))
-
-            # Merge all collected entities
-            merged_entities = self.entity_detector.finalize(original_doc_text, detected_entities)
-            
-            anonymized_text, collected_entities_for_text = self._generate_anonymized_text_and_collect_entities(original_doc_text, merged_entities, operator_params)
-            collected_entities_total.extend(collected_entities_for_text)
-
-            self.cache_manager.add(original_doc_text, anonymized_text)
-            
-            original_index = indices_map[idx]
-            anonymized_results[original_index] = anonymized_text
-        
-        return anonymized_results, collected_entities_total
-
-
 class FilteredPresidioStrategy(FullPresidioStrategy):
     """
     Optimized strategy using complete Presidio pipeline with filtered entity scope.
@@ -398,12 +235,12 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
     Strategy naming convention (semantic architecture):
     - FullPresidio: Complete Presidio pipeline, no filtering (slowest, highest coverage)
     - FilteredPresidio: Complete Presidio pipeline with filtered scope (FASTEST, RECOMMENDED)
-    - HybridPresidio: Presidio detection + manual replacement (fast, custom logic)
     - Standalone: Zero Presidio dependencies (theoretical maximum performance)
     
     Args:
         strategy_name: The name of the strategy to create
-                      ('presidio', 'filtered', 'hybrid', 'standalone')
+                      ('presidio', 'filtered', 'standalone', 'regex'; a retired
+                      name runs its replacement, see strategy_names.py)
         **kwargs: Dependencies required by the strategies.
     
     Returns:
@@ -412,7 +249,8 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
     Raises:
         ValueError: If strategy_name is unknown
     """
-    strategy_name = strategy_name.lower()
+    from .strategy_names import canonical_strategy
+    strategy_name = canonical_strategy(strategy_name)
 
     if strategy_name == "presidio":
         # Full Presidio: Complete pipeline without filtering
@@ -445,21 +283,6 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             entity_detector=kwargs.get("entity_detector"),
         )
 
-    elif strategy_name == "hybrid":
-        # Hybrid: Presidio detection + manual text replacement
-        return HybridPresidioStrategy(
-            nlp_engine=kwargs["analyzer_engine"],
-            entity_detector=kwargs["entity_detector"],
-            hash_generator=kwargs["hash_generator"],
-            cache_manager=kwargs["cache_manager"],
-            lang=kwargs["lang"],
-            nlp_batch_size=kwargs["nlp_batch_size"],
-            transformer_model=kwargs["transformer_model"],
-            entities_to_preserve=kwargs["entities_to_preserve"],
-            score_threshold=kwargs.get("score_threshold"),
-            entities_to_anonymize=kwargs.get("entities_to_anonymize"),
-        )
-    
     elif strategy_name == "standalone":
         # Standalone: Zero Presidio dependencies
         from .standalone_strategy import StandaloneStrategy
@@ -487,7 +310,7 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
     else:
         raise ValueError(
             f"Unknown anonymization strategy: {strategy_name}. "
-            f"Available strategies: 'presidio', 'filtered' (recommended), 'hybrid', 'standalone', 'regex'."
+            f"Available strategies: 'presidio', 'filtered' (recommended), 'standalone', 'regex'."
         )
 
 

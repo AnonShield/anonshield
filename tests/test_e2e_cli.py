@@ -108,7 +108,7 @@ def assert_no_leak(outputs, needles):
     assert not any(leaks.values()), {f: l for f, l in leaks.items() if l}
 
 
-STRATEGIES = ["filtered", "presidio", "hybrid", "standalone", "regex"]
+STRATEGIES = ["filtered", "presidio", "standalone", "regex"]
 
 
 @pytest.mark.parametrize("strategy", STRATEGIES)
