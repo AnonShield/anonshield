@@ -10,7 +10,6 @@ lang: en
 # Anonymization strategy:
 #   filtered   - Presidio pipeline, curated entity scope (default, best accuracy)
 #   presidio   - Full Presidio pipeline (maximum coverage, slowest)
-#   hybrid     - Presidio detection + custom replacement (GPU-optimized)
 #   standalone - Zero Presidio, direct model execution (fastest with NER)
 #   regex      - Pure regex only, zero NLP/ML overhead (fastest of all)
 strategy: filtered

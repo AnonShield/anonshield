@@ -85,7 +85,6 @@ class AnonymizationStrategy(ABC):
 |---|---|---|
 | `FullPresidioStrategy` | `strategies.py` | Full Presidio pipeline with all recognizers |
 | `FilteredPresidioStrategy` | `strategies.py` | Presidio with a curated entity scope (recommended) |
-| `HybridPresidioStrategy` | `strategies.py` | Presidio detection + custom replacement logic |
 | `StandaloneStrategy` | `standalone_strategy.py` | Zero Presidio dependencies; GPU-optimised NER |
 
 ### 2.3 Registration
@@ -99,8 +98,6 @@ def strategy_factory(strategy_name: str, **kwargs) -> AnonymizationStrategy:
             return FullPresidioStrategy(...)
         case "filtered":
             return FilteredPresidioStrategy(...)
-        case "hybrid":
-            return HybridPresidioStrategy(...)
         case "standalone":
             return StandaloneStrategy(...)
         case _:

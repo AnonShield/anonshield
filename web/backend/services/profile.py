@@ -4,8 +4,10 @@ from typing import Any
 
 import yaml
 
+from src.anon.strategy_names import RETIRED_STRATEGIES, STRATEGIES
 
-VALID_STRATEGIES = {"filtered", "standalone", "regex", "hybrid", "presidio"}
+
+VALID_STRATEGIES = set(STRATEGIES)
 VALID_KEYS = {
     "strategy", "lang", "slug_length", "ocr_engine", "entities",
     "preserve_entities", "allow_list", "custom_patterns", "word_list",
@@ -33,7 +35,9 @@ def validate_profile(content: str) -> dict[str, Any]:
     if unknown:
         return {"valid": False, "error": f"Unknown keys: {sorted(map(str, unknown))}"}
 
-    if "strategy" in data and (not isinstance(data["strategy"], str) or data["strategy"] not in VALID_STRATEGIES):
+    # A retired strategy (hybrid) is accepted: the job runs its replacement.
+    if "strategy" in data and (not isinstance(data["strategy"], str)
+                               or data["strategy"] not in VALID_STRATEGIES | RETIRED_STRATEGIES.keys()):
         return {
             "valid": False,
             "error": f"Invalid strategy '{data['strategy']}'. Valid: {sorted(VALID_STRATEGIES)}",

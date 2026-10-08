@@ -40,7 +40,7 @@
     filtered:   '#6366f1',
     standalone: '#c084fc',
     regex:      '#4ade80',
-    hybrid:     '#fbbf24',
+    hybrid:     '#fbbf24',  // jobs recorded before the strategy was removed
     presidio:   '#f87171',
   };
   const EXT_COLORS = ['#60a5fa','#34d399','#fbbf24','#f87171','#c084fc','#f472b6','#38bdf8','#fb923c'];

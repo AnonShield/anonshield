@@ -55,10 +55,9 @@ class Strategy(Enum):
     DEFAULT = "default"
     PRESIDIO = "presidio"
     FILTERED = "filtered"  # Formerly "balanced" - Presidio with filtered scope (FASTEST)
-    HYBRID = "hybrid"      # Formerly "fast" - Presidio detection + custom replacement
     STANDALONE = "standalone"  # NEW - Zero Presidio dependencies
-    # Legacy aliases for backwards compatibility
-    FAST = "hybrid"        # Alias for HYBRID
+    # Legacy alias for backwards compatibility. "hybrid" (formerly "fast") was
+    # removed: the same results as filtered (SBRC 2026, Table 8).
     BALANCED = "filtered"  # Alias for FILTERED
 
 
@@ -129,7 +128,7 @@ VERSION_CONFIGS = {
         ),
         supports_directory=True,
         requires_secret_key=True,
-        strategies=(Strategy.PRESIDIO, Strategy.FILTERED, Strategy.HYBRID, Strategy.STANDALONE)
+        strategies=(Strategy.PRESIDIO, Strategy.FILTERED, Strategy.STANDALONE)
     ),
 }
 
@@ -3122,11 +3121,11 @@ Examples:
                                  "invocation to eliminate per-file model loading overhead (~55-77s). "
                                  "v1.0 falls back to single-file mode. Records aggregate metrics.")
     bench_group.add_argument("--strategies", nargs="+",
-                            choices=["presidio", "filtered", "hybrid", "standalone", "fast", "balanced"],
+                            choices=["presidio", "filtered", "standalone", "balanced"],
                             help="Strategies to benchmark for AnonShield (default: all strategies). "
-                                 "New names: 'filtered' (fastest, recommended), 'hybrid', 'standalone'. "
-                                 "Legacy names 'fast' (=hybrid) and 'balanced' (=filtered) still work. "
-                                 "Example: --strategies filtered hybrid")
+                                 "'filtered' (recommended), 'standalone', 'presidio'. "
+                                 "The legacy name 'balanced' (=filtered) still works; 'hybrid' was removed. "
+                                 "Example: --strategies filtered standalone")
     bench_group.add_argument("--transformer-model", type=str,
                             help="Transformer model for NER detection (AnonShield only). "
                                  "Example: 'attack-vector/SecureModernBERT-NER'. "
@@ -3237,10 +3236,8 @@ def main():
         strategy_map = {
             "presidio": Strategy.PRESIDIO,
             "filtered": Strategy.FILTERED,
-            "hybrid": Strategy.HYBRID,
             "standalone": Strategy.STANDALONE,
             # Legacy aliases
-            "fast": Strategy.HYBRID,
             "balanced": Strategy.FILTERED
         }
         for s in args.strategies:

@@ -59,6 +59,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Removed
 
+- The `hybrid` strategy: it ran the same Presidio detection as `filtered` with its own replacement loop and gave the same results (SBRC 2026 paper, Table 8: 733 TP, 63 FP, 27 FN, F1 94.2% for both; throughput within 3%). `--anonymization-strategy hybrid`, profiles with `strategy: hybrid` and the web API still accept the name and run `filtered`, with a warning; the interface no longer offers it.
 - SLM/Ollama integration: the `slm` strategy, the `--slm-*` and `--ollama-*` flags, `src/anon/slm/`, `scripts/slm_regex_generator.py`, and the Ollama services in `docker/docker-compose.yml`.
 - `curl` from the runtime image (only the Ollama integration used it).
 

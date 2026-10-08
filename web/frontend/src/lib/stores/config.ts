@@ -117,6 +117,10 @@ export function toYaml(cfg: Config, allGroups: EntityGroup[]): string {
   return yaml.dump(data, { lineWidth: 120 });
 }
 
+/** Strategies removed after they proved equivalent to another, and the one
+ *  that replaces them (src/anon/strategy_names.py); old profiles still load. */
+const RETIRED_STRATEGIES: Record<string, string> = { hybrid: 'filtered' };
+
 /** Load a YAML profile into the config store. */
 export function fromYaml(raw: string): void {
   const data = yaml.load(raw) as Record<string, unknown>;
@@ -134,7 +138,7 @@ export function fromYaml(raw: string): void {
 
     return {
       ...c,
-      strategy: (data['strategy'] as string) ?? c.strategy,
+      strategy: RETIRED_STRATEGIES[data['strategy'] as string] ?? (data['strategy'] as string) ?? c.strategy,
       lang: (data['lang'] as string) ?? c.lang,
       slug_length: (data['slug_length'] as number) ?? c.slug_length,
       ner_score_threshold: data['ner_score_threshold'] as number | undefined,

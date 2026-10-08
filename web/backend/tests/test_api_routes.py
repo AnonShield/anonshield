@@ -1,4 +1,5 @@
 """Integration tests for FastAPI routes using TestClient (no real Redis/Celery)."""
+import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -226,3 +227,17 @@ def test_status_says_when_a_queued_job_waits_for_the_model(client, monkeypatch, 
     body = client.get("/api/jobs/00000000-0000-0000-0000-000000000000/status").json()
     assert body["status"] == state
     assert body.get("warming", False) is flagged
+
+
+def test_removed_hybrid_strategy_is_accepted_and_runs_as_filtered(client):
+    """Profiles saved with strategy: hybrid (removed: same results as filtered) still load and run."""
+    from services import job_service
+    from services.profile import validate_profile
+    assert validate_profile("strategy: hybrid\n")["valid"]
+    assert not validate_profile("strategy: fastest\n")["valid"]
+    for form in ({"strategy": "hybrid"}, {"strategy": "filtered", "config": "strategy: hybrid\n"}):
+        r = client.post("/api/jobs", files={"file": ("t.txt", b"a@example.com", "text/plain")}, data=form)
+        assert r.status_code == 202, r.text
+        meta = json.loads(next(c.args[2] for c in reversed(job_service._client().setex.call_args_list)
+                               if c.args[0].endswith(":meta")))
+        assert meta["strategy"] == "filtered"

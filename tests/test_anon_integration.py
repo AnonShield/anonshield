@@ -238,17 +238,15 @@ class TestAnonIntegration(unittest.TestCase):
         """
         Tests the behavior of --slug-length 0.
         Ensures entities are anonymized without a slug in the text and are NOT saved to the database.
-        This test uses a specific file and the 'hybrid' strategy to ensure the logic is tested
-        on an entity type that this strategy can detect.
+        This test uses a specific file that only contains an e-mail address.
         """
-        # This specific file only contains an email, which the 'hybrid' strategy can detect.
+        # This specific file only contains an email, which the 'filtered' strategy detects.
         test_file = os.path.join(self.test_data_dir, "test_slug_zero.txt")
         if not os.path.exists(test_file):
             with open(test_file, "w") as f:
                 f.write("My email is test@example.com.")
 
-        # Use hybrid strategy as it's the one we modified for this behavior.
-        self._run_anon_py(test_file, slug_length=0, anonymization_strategy="hybrid", extra_args=["--overwrite"])
+        self._run_anon_py(test_file, slug_length=0, anonymization_strategy="filtered", extra_args=["--overwrite"])
         output_file = self._get_output_file_path(test_file)
 
         self.assertTrue(os.path.exists(output_file))

@@ -107,10 +107,11 @@ Choose with `--anonymization-strategy` (CLI) or the strategy selector (web).
 | Strategy | What it does | When to use |
 |---|---|---|
 | **`filtered`** (default) | Presidio pipeline with a curated recognizer scope (transformer NER + regex), tuned for CSIRT data | Best balance of accuracy and performance; the recommended default |
-| **`hybrid`** | Filtered detection plus a lightweight replacement path | Same detection accuracy as `filtered` with lower overhead |
 | **`standalone`** | Direct transformer inference | Highest throughput for large batches |
 | **`presidio`** | The full Presidio pipeline | Maximum entity coverage |
 | **`regex`** | Pure regular expressions, no model is loaded | Fastest path; ideal for structured data and CI pipelines |
+
+`hybrid` was removed in October 2026: it ran the same detection as `filtered` and gave the same results (SBRC 2026 paper, Table 8: F1 94.2% for both; throughput within 3%). `--anonymization-strategy hybrid` and profiles with `strategy: hybrid` still run, as `filtered`, with a warning.
 
 ## NER models
 
@@ -180,7 +181,7 @@ Anonymized files are written to `output/` (configurable with `--output-dir`), an
 
 | Flag | Purpose |
 |---|---|
-| `--anonymization-strategy` | `filtered` (default), `hybrid`, `standalone`, `presidio`, `regex` |
+| `--anonymization-strategy` | `filtered` (default), `standalone`, `presidio`, `regex` |
 | `--transformer-model` | NER model to load |
 | `--entities` / `--preserve-entities` | Anonymize only these types / keep these types untouched |
 | `--allow-list` | Terms that must never be anonymized |
@@ -276,7 +277,7 @@ AnonShield is the third generation of a peer-reviewed line of on-premise pseudon
 
 On the AnonShield evaluation (network vulnerability scan reports):
 
-- **F1 = 94.2%**, **Recall = 96.4%** on a specialist-annotated validation set (`filtered` / `hybrid` strategies).
+- **F1 = 94.2%**, **Recall = 96.4%** on a specialist-annotated validation set (`filtered` strategy; the paper also lists `hybrid`, since removed as identical).
 - **Over 92 hours reduced to under 10 minutes**, up to **738x** faster than the unaccelerated baseline.
 - Evaluated on datasets up to **550 MB** and **70,951 vulnerability records**.
 

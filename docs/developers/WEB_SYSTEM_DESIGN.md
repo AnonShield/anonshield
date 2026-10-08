@@ -59,7 +59,7 @@
 │   │  queue=fast          │           │  queue=gpu           │   │
 │   │  concurrency=4       │           │  concurrency=1       │   │
 │   │  strategy: regex     │           │  strategy: filtered  │   │
-│   │  (CPU only)          │           │  standalone · hybrid │   │
+│   │  (CPU only)          │           │  standalone·presidio │   │
 │   └──────────┬──────────┘           └──────────┬──────────┘   │
 │              └─────────────┬─────────────────────┘             │
 │                            ▼                                    │
@@ -100,7 +100,7 @@
 | Worker | Fila | Estratégias | Concorrência |
 |--------|------|-------------|-------------|
 | `worker-fast` | `fast` | `regex` | 4 (CPU) |
-| `worker-gpu` | `gpu` | `filtered`, `standalone`, `hybrid` | 1 (GPU) |
+| `worker-gpu` | `gpu` | `filtered`, `standalone`, `presidio` | 1 (GPU) |
 
 ### 3.4 Redis
 
@@ -223,7 +223,7 @@ Upload + criação de job.
 ```
 file:     UploadFile   (obrigatório)
 key:      str          (opcional — ativa tier 10 GB)
-strategy: str          (filtered | standalone | regex | hybrid)
+strategy: str          (filtered | standalone | regex | presidio)
 lang:     str          (en | pt | es | ...)
 entities: str          (JSON array: ["EMAIL_ADDRESS", "CPF", ...])
 config:   str          (YAML inline — perfil completo, opcional)

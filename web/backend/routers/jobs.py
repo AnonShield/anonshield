@@ -29,7 +29,7 @@ LIMIT_WITH_KEY = int(os.getenv("ANON_MAX_SIZE_KEY_MB", "1")) * 1024 * 1024
 if LIMIT_NO_KEY < 0 or LIMIT_WITH_KEY < 0:
     raise ValueError("ANON_MAX_SIZE_MB and ANON_MAX_SIZE_KEY_MB must be non-negative; use 0 for no limit.")
 
-_GPU_STRATEGIES = {"filtered", "standalone", "hybrid", "presidio"}
+_GPU_STRATEGIES = {"filtered", "standalone", "presidio"}
 
 
 def _queue_for(strategy: str) -> str:
@@ -133,7 +133,10 @@ async def create_job(
             entities_list = profile.get("entities")
 
     from src.anon.config import NerDefaults
+    from src.anon.strategy_names import canonical_strategy
     from services.profile import VALID_STRATEGIES
+    # A removed strategy (hybrid) from the form or a saved profile runs its replacement.
+    strategy = canonical_strategy(strategy) if isinstance(strategy, str) else strategy
     slug_length = slug_length if slug_length is not None else profile.get("slug_length", 8)
     ner_score_threshold = ner_score_threshold if ner_score_threshold is not None else profile.get("ner_score_threshold", NerDefaults.SCORE_THRESHOLD)
     ner_aggregation_strategy = ner_aggregation_strategy or profile.get("ner_aggregation_strategy", NerDefaults.AGGREGATION_STRATEGY)

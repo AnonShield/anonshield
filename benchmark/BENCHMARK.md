@@ -42,7 +42,7 @@ campaigns with full resilience to interruptions.
 |---------|------------|-------------|:----------:|
 | v1.0    | default    | Single file only | No |
 | v2.0    | default    | Single file or directory | Yes |
-| AnonShield    | presidio, filtered, hybrid, standalone | Single file or directory | Yes |
+| AnonShield    | presidio, filtered, standalone | Single file or directory | Yes |
 
 **Key capabilities:**
 
@@ -65,7 +65,7 @@ The benchmark suite follows a modular, SOLID-principled design:
 benchmark.py
 ├── Configuration Layer
 │   ├── AnonVersion          # Enum: V1_0, V2_0, V3_0
-│   ├── Strategy             # Enum: DEFAULT, PRESIDIO, FILTERED, HYBRID, STANDALONE
+│   ├── Strategy             # Enum: DEFAULT, PRESIDIO, FILTERED, STANDALONE
 │   └── VersionConfig        # Per-version paths, extensions, capabilities
 │
 ├── Data Layer
