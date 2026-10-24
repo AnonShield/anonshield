@@ -66,6 +66,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Security
 
 - Fixes 18 Dependabot advisories in transformers, cryptography, urllib3 and devalue.
+- Fixes 54 Dependabot advisories: 41 in Pillow (5 critical, 23 high; image decoders that OCR runs on every uploaded image), now 13.0.0, and the rest in certifi, filelock, opentelemetry-api, setuptools, vite (frontend) and zod (e2e tests).
 
 ---
 
