@@ -98,6 +98,9 @@ Action items:
     if (!target.closest('.pipe-node')) activeNode = null;
   }
 
+  // ── Video tour: narrated in Portuguese and in English; other languages get the English one ──
+  const tour = $derived($locale === 'pt' ? { lang: 'pt', name: 'Português' } : { lang: 'en', name: 'English' });
+
   // ── Scroll-triggered counter animation ───────────────────────────────────
   let statsVisible = $state(false);
   let statsRef: HTMLElement;
@@ -281,8 +284,8 @@ Action items:
     <p class="section-label">{$t('landing.tour.label')}</p>
     <h2 class="section-title tour-title" id="tour-title">{$t('landing.tour.title')}</h2>
     <p class="tour-sub">{$t('landing.tour.sub')}</p>
-    <!-- One narrated video per language; the key swaps the whole element when the language changes. -->
-    {#key $locale}
+    <!-- The key swaps the whole element (source and captions) when the language changes. -->
+    {#key tour.lang}
       <video
         class="tour-video"
         controls
@@ -290,11 +293,11 @@ Action items:
         playsinline
         width="1280"
         height="720"
-        poster="/demo/anonshield-demo-{$locale}.webp"
+        poster="/demo/anonshield-demo-{tour.lang}.webp"
         aria-label={$t('landing.tour.title')}
       >
-        <source src="/demo/anonshield-demo-{$locale}.mp4" type="video/mp4" />
-        <track kind="captions" src="/demo/anonshield-demo-{$locale}.vtt" srclang={$locale} label={$t('landing.tour.captions')} default />
+        <source src="/demo/anonshield-demo-{tour.lang}.mp4" type="video/mp4" />
+        <track kind="captions" src="/demo/anonshield-demo-{tour.lang}.vtt" srclang={tour.lang} label={tour.name} default />
       </video>
     {/key}
   </div>
