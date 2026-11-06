@@ -7,8 +7,9 @@
   let { slide, video = '' }: { slide: Slide; video?: string } = $props();
 
   const isFull = (e: El) => e.x < 5 && e.y < 5 && e.w > 95 && e.h > 95;
-  // EN vem de deck-en.ts (dicionario PT->EN); fallback para PT (codigo/numeros).
-  const runText = (r: Run) => ($locale === 'en' ? EN[r.pt] ?? r.pt : r.pt);
+  // O deck so existe em PT e EN: fora do PT, mostra o EN de deck-en.ts (dicionario
+  // PT->EN); sem traducao, fica o PT (codigo/numeros).
+  const runText = (r: Run) => ($locale === 'pt' ? r.pt : EN[r.pt] ?? r.pt);
 
   const fontFamily = (f?: string) =>
     f === 'head' ? 'var(--df-head)' : f === 'mono' ? 'var(--df-mono)' : 'var(--df-sans)';
