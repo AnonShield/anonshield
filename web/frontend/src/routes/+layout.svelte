@@ -1,6 +1,6 @@
 <script lang="ts">
   import '../app.css';
-  import { t, toggleLocale } from '#lib/i18n.js';
+  import { t, locale, LOCALES, LOCALE_NAMES } from '#lib/i18n.js';
   import { page } from '$app/state';
 
   let { children } = $props();
@@ -28,7 +28,7 @@
 
     <nav class="nav">
       {#if !isApp}
-        <a href="/slides" class="nav-link">{$t('nav.slides')}</a>
+        <a href="/slides" class="nav-link nav-slides">{$t('nav.slides')}</a>
         <a href="/app" class="nav-cta">{$t('nav.app')}</a>
       {:else}
         <a href="/" class="nav-link">← Home</a>
@@ -36,9 +36,19 @@
           <a href="/app/metrics" class="nav-link metrics-link">Metrics</a>
         {/if}
       {/if}
-      <button class="lang-btn" onclick={toggleLocale} aria-label="Switch language">
-        {$t('nav.lang_toggle')}
-      </button>
+      <div class="lang-switch" role="group" aria-label={$t('nav.lang_label')}>
+        {#each LOCALES as l (l)}
+          <button
+            type="button"
+            class="lang-opt"
+            data-lang={l}
+            lang={l}
+            aria-label={LOCALE_NAMES[l]}
+            aria-pressed={$locale === l}
+            onclick={() => locale.set(l)}
+          >{l.toUpperCase()}</button>
+        {/each}
+      </div>
     </nav>
   </div>
 </header>
@@ -117,21 +127,31 @@
     outline-offset: 3px;
   }
 
-  .lang-btn {
-    padding: var(--space-1) var(--space-3);
+  .lang-switch {
+    display: flex; gap: 2px; padding: 2px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
+  }
+  .lang-opt {
+    min-width: 28px;
+    padding: var(--space-1) 6px;
+    border: none; border-radius: 4px;
     background: transparent;
     color: var(--color-text-secondary);
-    font-size: var(--text-xs); font-weight: 600;
+    font-size: var(--text-xs); font-weight: 600; line-height: 1.4;
     cursor: pointer;
-    transition: border-color var(--duration-fast) var(--ease-out),
+    transition: background var(--duration-fast) var(--ease-out),
                 color var(--duration-fast) var(--ease-out);
   }
-  .lang-btn:hover { border-color: var(--color-accent); color: var(--color-text-primary); }
-  .lang-btn:focus-visible {
+  .lang-opt:hover { color: var(--color-text-primary); }
+  .lang-opt[aria-pressed='true'] {
+    background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+    box-shadow: inset 0 0 0 1px var(--color-accent);
+    color: var(--color-text-primary);
+  }
+  .lang-opt:focus-visible {
     outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
+    outline-offset: 1px;
   }
 
   /* App page: more compact main container */
@@ -146,6 +166,14 @@
   }
   :global(.metrics-main) {
     max-width: 1200px !important;
+  }
+  /* Phone width: room for the three languages next to the logo. The home page
+     keeps its own slides button. */
+  @media (max-width: 520px) {
+    .nav { gap: var(--space-2); }
+    .nav-slides { display: none; }
+    .lang-switch { gap: 0; padding: 1px; }
+    .lang-opt { min-width: 24px; padding: var(--space-1) 4px; }
   }
   @media (max-width: 480px) {
     header { padding: 0 var(--space-4); }
