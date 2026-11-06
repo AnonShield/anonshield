@@ -483,6 +483,10 @@ const messages = {
     'landing.team.label': 'The team',
     'landing.team.title': 'Built by researchers, for CSIRTs',
     'landing.team.affil': 'Developed at UNIPAMPA in collaboration with UBO (Université de Bretagne Occidentale), UFU, UFRGS, and SENAC.',
+    'footer.bug': 'Found a bug?',
+    'footer.issue': 'Open an issue on GitHub',
+    'footer.or_write': 'or write to',
+    'footer.security': 'Security issues, privately:',
     /* ── landing: cta ── */
     'landing.cta.title': 'Ready to anonymize your data?',
     'landing.cta.sub': 'Run it on-premise in seconds. No account, no upload, no data ever leaves your network.',
@@ -992,6 +996,10 @@ const messages = {
     'landing.team.label': 'A equipe',
     'landing.team.title': 'Feito por pesquisadores, para CSIRTs',
     'landing.team.affil': 'Desenvolvido na UNIPAMPA em colaboração com a UBO (Université de Bretagne Occidentale), a UFU, a UFRGS e o SENAC.',
+    'footer.bug': 'Achou um bug?',
+    'footer.issue': 'Abra uma issue no GitHub',
+    'footer.or_write': 'ou escreva para',
+    'footer.security': 'Falhas de segurança, em privado:',
     /* ── landing: cta ── */
     'landing.cta.title': 'Pronto para anonimizar seus dados?',
     'landing.cta.sub': 'Rode on-premise em segundos. Sem conta, sem upload, e nenhum dado sai da sua rede.',
@@ -1501,6 +1509,10 @@ const messages = {
     'landing.team.label': 'El equipo',
     'landing.team.title': 'Hecho por investigadores, para equipos CSIRT',
     'landing.team.affil': 'Desarrollado en la UNIPAMPA en colaboración con la UBO (Université de Bretagne Occidentale), la UFU, la UFRGS y el SENAC.',
+    'footer.bug': '¿Encontraste un error?',
+    'footer.issue': 'Abre un issue en GitHub',
+    'footer.or_write': 'o escribe a',
+    'footer.security': 'Fallas de seguridad, en privado:',
     /* ── landing: cta ── */
     'landing.cta.title': '¿Listo para anonimizar sus datos?',
     'landing.cta.sub': 'Ejecútelo on-premise en segundos. Sin cuenta, sin subir archivos y sin que ningún dato salga de su red.',

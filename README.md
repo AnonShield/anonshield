@@ -312,7 +312,7 @@ If you use AnonShield in your research, please cite the SBRC 2026 paper:
 
 Contributions are welcome. Please read [CONTRIBUTING.md](.github/CONTRIBUTING.md) and the [Code of Conduct](.github/CODE_OF_CONDUCT.md) before opening an issue or pull request.
 
-For questions or to report a security issue directly: **anonshield@unipampa.edu.br**.
+Bugs and feature requests go to [GitHub Issues](https://github.com/AnonShield/anonshield/issues); without a GitHub account, write to **contact@anonshield.org**. Report security issues privately to **security@anonshield.org**. The team address **anonshield@unipampa.edu.br** also reaches us.
 
 ## License
 
