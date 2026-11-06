@@ -128,6 +128,10 @@ async function importProfile(file) {
   await (await page.$('input[type=file][accept=".yaml,.yml,.json"]')).uploadFile(`${D}/${file}`);
   await page.waitForSelector('.profile-toast'); return page.$eval('.profile-toast', (e) => e.innerText);
 }
+async function language(code) {
+  await page.locator(`header [data-lang=${code}]`).click();
+  await page.waitForSelector(`header [data-lang=${code}][aria-pressed=true]`);
+}
 
 // ── 1. first visit: tutorial, then home and app ───────────────────────────────
 await step('first visit shows the tutorial and Skip closes it', async () => {
@@ -142,10 +146,10 @@ await step('home page loads and links to the app', async () => {
   await page.waitForFunction(() => /AnonShield/.test(document.title), { timeout: 30000 });
   assert(await page.$('main .cta-primary[href="/app"]'), 'the page\'s own link to /app (the header has one too)');
 });
-await step('language toggle switches the interface', async () => {
+await step('language selector switches the interface to Portuguese', async () => {
   await fresh();
   const before = await page.$eval('.configure-title', (e) => e.innerText);
-  await clickByText('header button, header a', /^(PT|EN)$/);
+  await language('pt');
   await page.waitForFunction((b) => document.querySelector('.configure-title').innerText !== b, {}, before);
   // The app starts in English; after the switch, texts that used to stay in English.
   const pt = await page.evaluate(() => document.body.innerText);
@@ -155,12 +159,28 @@ await step('language toggle switches the interface', async () => {
   await page.click('#adv-s2 .patterns-header .btn-ghost'); await page.waitForSelector('.adv-dialog .overlay .modal');
   assert.equal(await fieldText('.adv-dialog .overlay h2'), 'Novo padrão personalizado');
   await page.keyboard.press('Escape'); await page.click('.adv-close');
-  await clickByText('header button, header a', /^(PT|EN)$/);
+  await language('en');
+  assert.equal(await fieldText('.configure-title'), before);
+});
+await step('language selector: Spanish on the home page carries over to the app', async () => {
+  await fresh({ path: '/' });
+  await language('es');
+  assert.equal(await fieldText('.hero-rule'), 'Seudonimización de PII on-premise, diseñada para equipos CSIRT.');
+  assert.deepEqual(await page.$$eval('header [data-lang]', (b) => b.map((x) => `${x.dataset.lang}:${x.getAttribute('aria-pressed')}`)),
+    ['en:false', 'pt:false', 'es:true']);
+  // The video tour exists in English and Portuguese only: Spanish gets the English one.
+  assert.match(await page.$eval('.tour-video source', (s) => s.src), /\/demo\/anonshield-demo-en\.mp4$/);
+  await page.click('header .nav-cta');  // the language is kept across the app's own navigation
+  await page.waitForSelector('.entity-selector', { timeout: 60000 });
+  assert.equal(await fieldText('.configure-title'), 'Anonimice su archivo');
+  const es = await page.evaluate(() => document.body.innerText);
+  for (const english of ['Drop your file here', 'click to select', 'Entities to anonymize', 'Save config'])
+    assert(!es.includes(english), `"${english}" left in English after switching to Spanish`);
 });
 await step('home page video tour plays, seeks and has captions, in English and Portuguese', async () => {
   await fresh({ path: '/' });
   for (const lang of ['en', 'pt']) {
-    if (lang === 'pt') await clickByText('header button, header a', /^PT$/);
+    if (lang === 'pt') await language('pt');
     await page.waitForFunction((l) => document.querySelector('.tour-video source')?.src.endsWith(`/demo/anonshield-demo-${l}.mp4`), {}, lang);
     const r = await page.$eval('.tour-video', async (v) => {
       const within = (p, what) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(what)), 15000))]);
