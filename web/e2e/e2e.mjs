@@ -157,6 +157,26 @@ await step('language toggle switches the interface', async () => {
   await page.keyboard.press('Escape'); await page.click('.adv-close');
   await clickByText('header button, header a', /^(PT|EN)$/);
 });
+await step('home page video tour plays, seeks and has captions, in English and Portuguese', async () => {
+  await fresh({ path: '/' });
+  for (const lang of ['en', 'pt']) {
+    if (lang === 'pt') await clickByText('header button, header a', /^PT$/);
+    await page.waitForFunction((l) => document.querySelector('.tour-video source')?.src.endsWith(`/demo/anonshield-demo-${l}.mp4`), {}, lang);
+    const r = await page.$eval('.tour-video', async (v) => {
+      const within = (p, what) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(what)), 15000))]);
+      v.muted = true;
+      await within(v.play(), 'the video did not start');
+      const seeked = new Promise((ok) => v.addEventListener('seeked', ok, { once: true }));
+      v.currentTime = 40; // what the seek bar does; needs Range requests
+      await within(seeked, 'the video did not seek to 0:40');
+      v.pause();
+      for (let i = 0; i < 50 && !v.textTracks[0]?.cues?.length; i++) await new Promise((ok) => setTimeout(ok, 100));
+      return { at: v.currentTime, cues: v.textTracks[0]?.cues?.length ?? 0, lang: v.textTracks[0]?.language };
+    });
+    assert(r.at >= 40, `the ${lang} video stopped at ${r.at}s`);
+    assert(r.cues > 10 && r.lang === lang, `${lang} captions: ${JSON.stringify(r)}`);
+  }
+});
 
 // ── 2. plain text with regex ──────────────────────────────────────────────────
 await step('TXT with regex is anonymized and downloadable', async () => {
