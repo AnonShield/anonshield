@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { t } from '#lib/i18n.js';
+  import { t, locale } from '#lib/i18n.js';
 
   // ── Client-side regex demo ────────────────────────────────────────────────
   const SAMPLE = `Meeting notes: Q4 Security Review
@@ -270,6 +270,33 @@ Action items:
       </a>
       <span class="hero-meta">{$t('landing.hero.meta')}</span>
     </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- VIDEO TOUR                                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section class="tour" aria-labelledby="tour-title">
+  <div class="tour-inner">
+    <p class="section-label">{$t('landing.tour.label')}</p>
+    <h2 class="section-title tour-title" id="tour-title">{$t('landing.tour.title')}</h2>
+    <p class="tour-sub">{$t('landing.tour.sub')}</p>
+    <!-- One narrated video per language; the key swaps the whole element when the language changes. -->
+    {#key $locale}
+      <video
+        class="tour-video"
+        controls
+        preload="none"
+        playsinline
+        width="1280"
+        height="720"
+        poster="/demo/anonshield-demo-{$locale}.webp"
+        aria-label={$t('landing.tour.title')}
+      >
+        <source src="/demo/anonshield-demo-{$locale}.mp4" type="video/mp4" />
+        <track kind="captions" src="/demo/anonshield-demo-{$locale}.vtt" srclang={$locale} label={$t('landing.tour.captions')} default />
+      </video>
+    {/key}
   </div>
 </section>
 
@@ -1152,6 +1179,22 @@ Action items:
   .hero-meta {
     font-size: var(--text-xs); font-family: var(--font-mono);
     color: var(--color-text-secondary);
+  }
+
+  /* ══════════════ VIDEO TOUR ══════════════ */
+  .tour { padding: var(--space-16) var(--space-6); }
+  .tour-inner { max-width: 960px; margin: 0 auto; text-align: center; }
+  .tour-title { margin-bottom: var(--space-3); }
+  .tour-sub {
+    margin: 0 auto var(--space-8); max-width: 640px;
+    font-size: var(--text-base); line-height: 1.7;
+    color: var(--color-text-secondary);
+  }
+  .tour-video {
+    display: block; width: 100%; height: auto; aspect-ratio: 16 / 9;
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    background: #050610;
+    box-shadow: 0 8px 40px color-mix(in srgb, var(--color-accent) 14%, transparent);
   }
 
   /* ══════════════ PIPELINE ══════════════ */

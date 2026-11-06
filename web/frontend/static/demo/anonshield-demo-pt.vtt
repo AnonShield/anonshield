@@ -1,0 +1,40 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:07.536
+AnonShield: pseudonimização de dados pessoais para equipes de resposta a incidentes, no ar em anonshield.org.
+
+00:00:08.560 --> 00:00:16.000
+Na página inicial, uma demonstração no navegador troca e-mails, IPs, cartões e tokens por pseudônimos.
+
+00:00:16.300 --> 00:00:20.077
+No app, um tutorial curto apresenta a tela.
+
+00:00:20.077 --> 00:00:25.084
+Os modelos de IA rodam no seu servidor: nada sai da rede.
+
+00:00:28.637 --> 00:00:34.013
+Solto um export do Tenable fictício, com trezentas vulnerabilidades.
+
+00:00:34.337 --> 00:00:41.393
+Cada coluna tem a sua regra: ignoro tudo e forço só os identificadores, o IP e o nome da máquina.
+
+00:00:46.897 --> 00:00:51.409
+Dois campos forçados; o resto do registro sai como entrou.
+
+00:00:51.897 --> 00:00:53.412
+Anonimizo e baixo.
+
+00:00:53.412 --> 00:00:57.705
+O arquivo é apagado do servidor depois do download.
+
+00:00:58.437 --> 00:01:03.213
+Também funciona com texto livre, como este chamado de incidente.
+
+00:01:07.937 --> 00:01:15.881
+A IA acha nomes, e-mails, telefones e IPs, e o mesmo IP vira sempre o mesmo pseudônimo.
+
+00:01:16.867 --> 00:01:22.668
+O AnonShield é código aberto e roda inteiro dentro da sua rede.
+
+00:01:22.668 --> 00:01:25.339
+Melhor Artefato do SBRC 2026.

@@ -1,0 +1,40 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:06.672
+AnonShield: pseudonymization of personal data for incident response teams, live at anonshield.org.
+
+00:00:07.700 --> 00:00:14.228
+On the home page, a demo in the browser swaps emails, IPs, cards and tokens for pseudonyms.
+
+00:00:14.670 --> 00:00:17.926
+In the app, a short tutorial walks through the screen.
+
+00:00:17.926 --> 00:00:21.846
+The AI models run on your own server: nothing leaves the network.
+
+00:00:26.330 --> 00:00:30.866
+I drop in a fictional Tenable export with three hundred vulnerabilities.
+
+00:00:31.230 --> 00:00:38.262
+Each column gets its own rule: I ignore everything and force only the identifiers, the IP and the host name.
+
+00:00:44.330 --> 00:00:48.386
+Two fields forced; the rest of each record comes out as it went in.
+
+00:00:48.900 --> 00:00:50.393
+I anonymize and download.
+
+00:00:50.393 --> 00:00:53.676
+The file is deleted from the server after the download.
+
+00:00:55.430 --> 00:00:58.862
+It also works on free text, like this incident ticket.
+
+00:01:05.130 --> 00:01:12.162
+The AI finds names, emails, phone numbers and IPs, and the same IP always gets the same pseudonym.
+
+00:01:13.170 --> 00:01:18.673
+AnonShield is open source and runs entirely inside your network.
+
+00:01:18.673 --> 00:01:20.994
+Best Artifact at SBRC 2026.

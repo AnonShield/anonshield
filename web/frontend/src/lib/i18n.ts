@@ -399,6 +399,11 @@ const messages = {
     'landing.hero.tradeoff.maximum': 'Maximum',
     'landing.hero.cta': 'Launch the app',
     'landing.hero.meta': 'No account · No upload · Open source',
+    /* ── landing: video tour ── */
+    'landing.tour.label': 'Video tour',
+    'landing.tour.title': 'The app in a minute and a half',
+    'landing.tour.sub': 'A narrated walkthrough with fictional data. Per-field rules on a Tenable export with 300 vulnerabilities, then an incident ticket in free text.',
+    'landing.tour.captions': 'English',
     /* ── landing: pipeline ── */
     'landing.pipe.label': 'How it works',
     'landing.pipe.title': 'Five stages, zero data left behind',
@@ -904,6 +909,11 @@ const messages = {
     'landing.hero.tradeoff.maximum': 'Máxima',
     'landing.hero.cta': 'Abrir o app',
     'landing.hero.meta': 'Sem conta · Sem upload · Código aberto',
+    /* ── landing: tour em vídeo ── */
+    'landing.tour.label': 'Tour em vídeo',
+    'landing.tour.title': 'O app em um minuto e meio',
+    'landing.tour.sub': 'Passo a passo narrado, com dados fictícios. Regras por campo num export do Tenable com 300 vulnerabilidades e depois um chamado de incidente em texto livre.',
+    'landing.tour.captions': 'Português',
     /* ── landing: pipeline ── */
     'landing.pipe.label': 'Como funciona',
     'landing.pipe.title': 'Cinco etapas, nenhum dado deixado para trás',
