@@ -594,16 +594,7 @@ Action items:
     <div class="award-card">
       <div class="award-glow" aria-hidden="true"></div>
       <div class="award-body">
-        <span class="award-trophy" aria-hidden="true">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
-            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
-            <path d="M4 22h16"/>
-            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
-            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
-            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
-          </svg>
-        </span>
+        <img class="award-logo" src="/logos/sbrc-2026.png" alt="SBRC 2026" width="150" height="70" />
         <p class="section-label award-label">{$t('landing.award.label')}</p>
         <h2 class="award-title">{$t('landing.award.title')}</h2>
         <p class="award-sub">{$t('landing.award.sub')}</p>
@@ -665,7 +656,7 @@ Action items:
         <div class="tl-connector"></div>
         <div class="paper-card">
           <div class="paper-venue-row">
-            <span class="paper-venue">SBSeg 2025</span>
+            <span class="paper-venue"><img class="paper-venue-logo" src="/logos/sbseg-2025.png" alt="" height="30" />SBSeg 2025</span>
             <span class="paper-gen">AnonLFI v1.0</span>
           </div>
           <h3 class="paper-title">Anonimização de Incidentes de Segurança com Reidentificação Controlada</h3>
@@ -694,7 +685,7 @@ Action items:
         <div class="tl-connector"></div>
         <div class="paper-card">
           <div class="paper-venue-row">
-            <span class="paper-venue">WRSeg / ERRC 2025</span>
+            <span class="paper-venue"><img class="paper-venue-logo" src="/logos/errc-2025.png" alt="" height="30" />WRSeg / ERRC 2025</span>
             <span class="paper-gen">AnonLFI v2.0</span>
           </div>
           <h3 class="paper-title">AnonLFI 2.0: Extensible Architecture for PII Pseudonymization in CSIRTs with OCR and Technical Recognizers</h3>
@@ -758,46 +749,53 @@ Action items:
     <div class="members">
       <div class="member">
         <span class="member-name">Cristhian Kapelinski</span>
-        <span class="member-role">UNIPAMPA</span>
+        <img class="member-logo" src="/logos/unipampa.png" alt="UNIPAMPA" title="UNIPAMPA" height="22" />
       </div>
       <div class="member">
         <span class="member-name">Douglas Lautert</span>
-        <span class="member-role">UNIPAMPA</span>
+        <img class="member-logo" src="/logos/unipampa.png" alt="UNIPAMPA" title="UNIPAMPA" height="22" />
       </div>
       <div class="member">
         <span class="member-name">Beatriz Machado</span>
-        <span class="member-role">UNIPAMPA</span>
+        <img class="member-logo" src="/logos/unipampa.png" alt="UNIPAMPA" title="UNIPAMPA" height="22" />
       </div>
       <div class="member">
         <span class="member-name">Diego Kreutz</span>
-        <span class="member-role">UNIPAMPA</span>
+        <img class="member-logo" src="/logos/unipampa.png" alt="UNIPAMPA" title="UNIPAMPA" height="22" />
       </div>
       <div class="member">
         <span class="member-name">Isadora G. Ferrão</span>
-        <span class="member-role">UBO</span>
+        <img class="member-logo" src="/logos/ubo.png" alt="UBO (Université de Bretagne Occidentale)" title="UBO (Université de Bretagne Occidentale)" height="22" />
       </div>
       <div class="member">
         <span class="member-name">Carolina Tompsen Bandel</span>
-        <span class="member-role">SENAC EAD</span>
+        <img class="member-logo" src="/logos/senac.svg" alt="SENAC EAD" title="SENAC EAD" height="22" />
       </div>
       <div class="member">
         <span class="member-name">João Pedro Ramires Esteves</span>
-        <span class="member-role">UFU</span>
+        <img class="member-logo" src="/logos/ufu.png" alt="UFU" title="UFU" height="22" />
       </div>
       <div class="member">
         <span class="member-name">Kalian Pereira Guerra</span>
-        <span class="member-role">UFRGS</span>
+        <img class="member-logo" src="/logos/ufrgs.png" alt="UFRGS" title="UFRGS" height="22" />
       </div>
       <div class="member">
         <span class="member-name">Leandro M. Bertholdo</span>
-        <span class="member-role">UFRGS</span>
+        <img class="member-logo" src="/logos/ufrgs.png" alt="UFRGS" title="UFRGS" height="22" />
       </div>
       <div class="member">
         <span class="member-name">Rodrigo S. Miani</span>
-        <span class="member-role">UFU</span>
+        <img class="member-logo" src="/logos/ufu.png" alt="UFU" title="UFU" height="22" />
       </div>
     </div>
 
+    <div class="team-logos">
+      <img src="/logos/unipampa.png" alt="UNIPAMPA" title="UNIPAMPA" height="34" loading="lazy" />
+      <img src="/logos/ubo.png" alt="UBO (Université de Bretagne Occidentale)" title="UBO (Université de Bretagne Occidentale)" height="34" loading="lazy" />
+      <img src="/logos/ufu.png" alt="UFU" title="UFU" height="34" loading="lazy" />
+      <img src="/logos/ufrgs.png" alt="UFRGS" title="UFRGS" height="34" loading="lazy" />
+      <img src="/logos/senac.svg" alt="SENAC" title="SENAC" height="34" loading="lazy" />
+    </div>
     <p class="team-affil">{$t('landing.team.affil')}</p>
   </div>
 </section>
@@ -1704,13 +1702,9 @@ Action items:
     padding: var(--space-12) var(--space-8);
   }
 
-  .award-trophy {
-    display: flex; align-items: center; justify-content: center;
-    width: 56px; height: 56px; border-radius: 50%;
-    color: var(--color-accent);
-    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
-    box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 25%, transparent);
+  /* the SBRC 2026 mark (white version) heads the award card */
+  .award-logo {
+    display: block; height: 70px; width: auto;
     margin-bottom: var(--space-1);
   }
 
@@ -1871,10 +1865,12 @@ Action items:
     display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
   }
   .paper-venue {
+    display: inline-flex; align-items: center; gap: 10px;
     font-size: var(--text-xs); font-weight: 800; letter-spacing: 0.1em;
     text-transform: uppercase; color: var(--color-accent);
     font-family: var(--font-mono);
   }
+  .paper-venue-logo { height: 30px; width: auto; }
   .accent-venue { color: var(--color-accent-hover); }
   .paper-gen {
     font-size: var(--text-xs); font-family: var(--font-mono);
@@ -1967,10 +1963,27 @@ Action items:
   .member-name {
     font-size: var(--text-sm); font-weight: 600; color: var(--color-text-primary);
   }
-  .member-role {
-    font-size: var(--text-xs); font-family: var(--font-mono);
-    color: var(--color-accent);
+  /* institution marks shown in white on the dark theme; the name stays in alt and title */
+  .member-logo {
+    height: 22px; width: auto; max-width: 120px; object-fit: contain; object-position: left center;
+    filter: brightness(0) invert(1); opacity: 0.8;
   }
+  .member:hover .member-logo { opacity: 1; }
+  /* each mark has its own proportions (stacked UNIPAMPA and UFRGS, wide UFU wordmark): balance their
+     optical size instead of giving all of them the same height */
+  .member-logo[src$='unipampa.png'], .member-logo[src$='ufrgs.png'] { height: 30px; }
+  .member-logo[src$='ubo.png'] { height: 20px; }
+  .member-logo[src$='ufu.png'] { height: 17px; }
+  .member-logo[src$='senac.svg'] { height: 24px; }
+  .team-logos img[src$='unipampa.png'], .team-logos img[src$='ufrgs.png'] { height: 46px; }
+  .team-logos img[src$='ubo.png'] { height: 30px; }
+  .team-logos img[src$='ufu.png'] { height: 26px; }
+  .team-logos img[src$='senac.svg'] { height: 36px; }
+  .team-logos {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6) var(--space-8);
+    margin: var(--space-8) 0 var(--space-4);
+  }
+  .team-logos img { height: 34px; width: auto; filter: brightness(0) invert(1); opacity: 0.7; }
   .team-affil {
     margin: 0; font-size: var(--text-xs); font-family: var(--font-mono);
     color: var(--color-text-secondary); line-height: 1.6;

@@ -15,7 +15,7 @@ AnonShield is research software. Security fixes are applied to the latest versio
 
 Report security bugs by emailing the maintainers directly:
 
-**anonshield@unipampa.edu.br**
+**security@anonshield.org** (or the team address **anonshield@unipampa.edu.br**)
 
 Please include:
 

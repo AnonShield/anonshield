@@ -388,5 +388,6 @@ Once `nvidia-smi` works inside that test container, `./run.sh --gpu ...` and `./
 
 We welcome feedback, questions, and contributions from the community.
 
-* **Bugs and feature requests:** please [open an issue](https://github.com/AnonShield/anonshield/issues) on GitHub. This helps us track problems and keep the community informed.
-* **Institutional inquiries and security reports:** for partnerships, institutional questions, or to report a security bug directly, reach our team at **[anonshield@unipampa.edu.br](mailto:anonshield@unipampa.edu.br)**.
+* **Bugs and feature requests:** please [open an issue](https://github.com/AnonShield/anonshield/issues) on GitHub. This helps us track problems and keep the community informed. No GitHub account? Write to **[contact@anonshield.org](mailto:contact@anonshield.org)**.
+* **Security vulnerabilities:** report them privately to **[security@anonshield.org](mailto:security@anonshield.org)**, not in a public issue.
+* **Institutional inquiries and security reports:** for partnerships, institutional questions, or to report a security bug directly, you can also reach our team at **[anonshield@unipampa.edu.br](mailto:anonshield@unipampa.edu.br)**.

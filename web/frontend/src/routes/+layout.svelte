@@ -2,10 +2,12 @@
   import '../app.css';
   import { t, locale, LOCALES, LOCALE_NAMES } from '#lib/i18n.js';
   import { page } from '$app/state';
+  import SiteFooter from '#lib/components/SiteFooter.svelte';
 
   let { children } = $props();
 
   let isApp       = $derived(page.url.pathname.startsWith('/app'));
+  let isSlides    = $derived(page.url.pathname.startsWith('/slides'));
   let isMetrics   = $derived(page.url.pathname === '/app/metrics');
   let appClass    = $derived(
     isApp
@@ -56,6 +58,10 @@
 <main class={appClass}>
   {@render children()}
 </main>
+
+{#if !isSlides}
+  <SiteFooter />
+{/if}
 
 <style>
   header {
