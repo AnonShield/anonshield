@@ -1,6 +1,7 @@
 # Internal Caddy: one port, /api to the backend and the rest to the frontend.
-# On the a10 host (docker-compose.a10.yml) it listens on 127.0.0.1:18080 and the
-# host Caddy terminates TLS for anonshield.org and proxies here; `make local`
+# On the a10 host (docker-compose.a10.yml) each copy of the app has its own,
+# azul on 127.0.0.1:18080 and verde on 18081, and the host Caddy terminates TLS
+# for anonshield.org and proxies to whichever copy is healthy; `make local`
 # (docker-compose.local.yml) serves it on http://localhost:8080.
 {
     auto_https off
@@ -11,10 +12,22 @@
         max_size 1MB
     }
     handle /api/* {
-        reverse_proxy backend:8000
+        # Drain before a deploy stops this copy (deploy-a10.sh creates /tmp/drain): the host
+        # Caddy's health check, sent with this header, gets 503 and moves visitors to the other
+        # copy, while everyone else is still served until the copy stops.
+        @drain {
+            path /api/health
+            header X-Health-Check proxy
+            file {
+                root /tmp
+                try_files /drain
+            }
+        }
+        respond @drain 503
+        reverse_proxy {$BACKEND_UPSTREAM:backend:8000}
     }
     handle {
-        reverse_proxy frontend:3000
+        reverse_proxy {$FRONTEND_UPSTREAM:frontend:3000}
     }
     header {
         X-Content-Type-Options "nosniff"
