@@ -335,7 +335,7 @@ jobs:
           set -euo pipefail
           DEST="$HOME/anonshield_deploy/web"
           mkdir -p "$DEST"
-          cp web/docker-compose.a10.yml web/Caddyfile.a10 web/warm_cache.sh "$DEST/"
+          cp web/docker-compose.a10.yml web/Caddyfile.a10 web/warm_cache.sh web/deploy-a10.sh "$DEST/"
           test -f "$DEST/.env" || { echo "::error::$DEST/.env is missing (ANON_SECRET_KEY)"; exit 1; }
       - name: Log in to GHCR
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
@@ -343,15 +343,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Pull and restart the stack
-        run: |
-          set -euo pipefail
-          cd "$HOME/anonshield_deploy/web"
-          docker compose -f docker-compose.a10.yml pull
-          docker compose -f docker-compose.a10.yml up -d --remove-orphans
-          docker compose -f docker-compose.a10.yml ps
-      - name: Warm the model cache (runs a real anonymization job)
-        run: bash "$HOME/anonshield_deploy/web/warm_cache.sh" http://127.0.0.1:18000
+      - name: Blue-green deploy (the site never goes down; a failed start leaves the old copy serving)
+        # Starts this commit in the stopped copy, warms its model cache, then drains and stops the
+        # copy that was serving. See web/deploy-a10.sh and web/docker-compose.a10.yml.
+        run: bash "$HOME/anonshield_deploy/web/deploy-a10.sh" "$IMAGE_TAG"
       - name: Check that the public site runs this commit
         # The old check only asked whether the site was up; a stack that was
         # never updated passed it. The backend reports the deployed commit.

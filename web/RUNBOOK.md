@@ -60,22 +60,27 @@ scans). On `main`, once they pass, it pushes the web images to GHCR
 commit and `latest`) and runs the deploy on the self-hosted runner of the host
 that serves anonshield.org (label `anonshield-prod`). The deploy:
 
-1. copies `web/docker-compose.a10.yml`, `web/Caddyfile.a10` and `warm_cache.sh`
-   into `~/anonshield_deploy/web` (the host's `.env` is never touched);
-2. pulls the images for the commit and restarts the stack
-   (`docker compose -f docker-compose.a10.yml up -d`);
-3. runs a real anonymization job through the API (`warm_cache.sh`);
-4. fails unless `https://anonshield.org/api/health` reports the deployed commit
+1. copies `web/docker-compose.a10.yml`, `web/Caddyfile.a10`, `warm_cache.sh` and
+   `deploy-a10.sh` into `~/anonshield_deploy/web` (the host's `.env` is never touched);
+2. runs `deploy-a10.sh <commit>`, a blue-green deploy that never takes the site down.
+   There are two copies of the app, `azul` (18080) and `verde` (18081), sharing one
+   Redis and the jobs volume. The commit starts in the copy that is stopped while the
+   other keeps serving, gets a real anonymization job (`warm_cache.sh`), and only once it
+   reports the commit on `/api/health` is the old copy drained (its health check answers
+   503 to the host Caddy) and stopped, its worker finishing the job it was running. If the
+   new copy never reports the commit, it is stopped and the old one goes on serving;
+3. fails unless `https://anonshield.org/api/health` reports the deployed commit
    (`"version"`), so a stack that was not updated cannot pass as healthy;
-5. removes this app's previous images (never a global prune: the host is shared).
+4. removes this app's previous images (never a global prune: the host is shared).
 
 Nothing is built on the host. To run the stack by hand there:
 
 ```bash
 cd ~/anonshield_deploy/web
-docker compose -f docker-compose.a10.yml ps          # status
-docker compose -f docker-compose.a10.yml logs -f backend
-IMAGE_TAG=<commit> docker compose -f docker-compose.a10.yml up -d   # roll back/forward
+alias anon='docker compose -p web -f docker-compose.a10.yml --env-file .env --env-file cores.env'
+anon ps                                  # status (cores.env holds each copy's image tag)
+anon --profile verde logs -f backend-verde
+bash deploy-a10.sh <commit>              # roll back/forward, same blue-green swap
 ```
 
 The runner lives in `~/actions-runner` on the host and is started at boot by the
@@ -94,9 +99,11 @@ and drop the crontab line.
   Caddy, skips the containerized Caddy, and caps memory (backend 3G, worker 6G,
   frontend 1G, redis 512M). Edit the limits here if the host has more or less room.
 - The public route lives in the host Caddyfile (`/etc/caddy/Caddyfile`), in the
-  `anonshield.org` block: `/api/*` to `127.0.0.1:18000`, everything else to
-  `127.0.0.1:13000`. After editing it: `sudo caddy validate --config
-  /etc/caddy/Caddyfile && sudo systemctl reload caddy`.
+  `anonshield.org` block: `reverse_proxy 127.0.0.1:18081 127.0.0.1:18080` with
+  `lb_policy first` and an active health check on `/api/health` sent with
+  `X-Health-Check: proxy` (verde first, so a deploy can replace azul while verde
+  serves). After editing it: `caddy validate --config /etc/caddy/Caddyfile
+  --adapter caddyfile && caddy reload --config /etc/caddy/Caddyfile`.
 
 ## Troubleshooting
 
