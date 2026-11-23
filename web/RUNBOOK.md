@@ -89,6 +89,19 @@ exits; its log is `~/actions-runner/keepalive.log`. To remove it:
 `cd ~/actions-runner && ./config.sh remove --token "$(gh api -X POST repos/AnonShield/anonshield/actions/runners/remove-token --jq .token)"`
 and drop the crontab line.
 
+### Standby copy
+
+A standby host runs the `azul` copy of the same stack all the time, in
+`~/apps/anonshield-espera` with its own `.env` and an override that adds the Cloudflare tunnel;
+a Cloudflare Worker sends the traffic there when the production host is down
+(`https://anonshield.org/__failover/primario` tells which host serves). The job "Deploy to
+standby" runs on its runner (label `anonshield-standby`, in `~/actions-runner-anonshield`, same
+crontab keepalive) on every push to `main`, also while production is down:
+`web/deploy-standby.sh <commit>` pulls the images from GHCR, recreates the copy in place (there is
+no second copy to swap with, so while the standby serves, the site is down while the backend
+starts) and checks that it reports the commit; when the standby is serving, the job also checks the
+public site.
+
 ## Configuration
 
 - `web/.env` (on the host, not in git): `ANON_SECRET_KEY` (required, keep it
