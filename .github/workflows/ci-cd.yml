@@ -366,3 +366,53 @@ jobs:
           docker images --format '{{.Repository}}:{{.Tag}}' \
             | grep -E '^ghcr\.io/anonshield/anonshield-web-(backend|frontend):' \
             | grep -vE ":($IMAGE_TAG|latest)$" | xargs -r docker image rm || true
+
+  # Runs on the self-hosted runner of the standby host (label anonshield-standby), whose copy of
+  # the site takes the traffic when the production host is down. Without it, a deploy made while
+  # production is down never reaches the site. See web/deploy-standby.sh.
+  deploy-standby:
+    name: Deploy to standby
+    needs: [changes, web-images]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'AnonShield/anonshield' && needs.changes.outputs.code == 'true'
+    # The runner has no default labels (not even self-hosted), so only this job can land on it.
+    runs-on: [anonshield-standby]
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    concurrency:
+      group: deploy-standby
+      cancel-in-progress: false
+    env:
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update the standby copy
+        run: bash web/deploy-standby.sh "$IMAGE_TAG"
+      - name: Check the public site when the standby is serving it
+        # The failover Worker reports which host serves the site.
+        run: |
+          primary="$(curl -fsS https://anonshield.org/__failover/primario || true)"
+          echo "$primary"
+          case "$primary" in *'"primario":"a10"'*) echo "production serves the site"; exit 0 ;; esac
+          for _ in $(seq 1 12); do
+            got="$(curl -fsS https://anonshield.org/api/health || true)"
+            echo "$got"
+            case "$got" in *"\"version\":\"$IMAGE_TAG\""*) exit 0 ;; esac
+            sleep 10
+          done
+          echo "::error::anonshield.org does not report $IMAGE_TAG"
+          exit 1
+      - name: Remove this app's previous images
+        # Only AnonShield's own images: the host is shared, so no global prune.
+        if: always()
+        run: |
+          docker images --format '{{.Repository}}:{{.Tag}}' \
+            | grep -E '^ghcr\.io/anonshield/anonshield-web-(backend|frontend):' \
+            | grep -vE ":($IMAGE_TAG|latest)$" | xargs -r docker image rm || true
